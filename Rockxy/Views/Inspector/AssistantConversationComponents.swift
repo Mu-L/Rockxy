@@ -70,6 +70,80 @@ struct AssistantProgressRow: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
+// MARK: - AssistantConversationContextMismatchBanner
+
+struct AssistantConversationContextMismatchBanner: View {
+    let context: DebugAssistantConversationContext?
+    let onRestore: () -> Void
+    let onStartNew: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label(
+                String(localized: "This conversation belongs to different traffic"),
+                systemImage: "arrow.trianglehead.branch"
+            )
+            .font(metrics.swiftUIFont(size: metrics.secondaryFontSize, weight: .semibold))
+
+            if let context {
+                Text(
+                    String(
+                        localized: "It was started with \(context.summary). Restore that selection or start a clean conversation for the traffic shown above."
+                    )
+                )
+                .font(metrics.swiftUIFont(size: metrics.metadataFontSize))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 7) {
+                Button(String(localized: "Restore Traffic"), action: onRestore)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                Button(String(localized: "New Conversation"), action: onStartNew)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.08))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "Conversation traffic changed"))
+    }
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
+}
+
+// MARK: - AssistantUserMessageBubble
+
+struct AssistantUserMessageBubble: View {
+    let text: String
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 44)
+            Text(text)
+                .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "You: \(text)"))
+    }
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
+}
+
 // MARK: - AssistantResponseActionBar
 
 struct AssistantResponseActionBar: View {

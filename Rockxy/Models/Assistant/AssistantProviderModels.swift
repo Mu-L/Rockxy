@@ -731,6 +731,7 @@ enum ModelInvestigationState: Equatable {
     case streaming(
         runID: UUID,
         provider: AssistantProviderKind,
+        executionLocation: AssistantExecutionLocation,
         model: String,
         endpointHost: String,
         text: String
@@ -745,6 +746,7 @@ enum AssistantExecutionLimits {
     static let maxOutputBytes = 256 * 1_024
     static let maxStreamEventBytes = 256 * 1_024
     static let maxToolArgumentBytes = 64 * 1_024
+    static let maxAggregateToolArgumentBytes = 256 * 1_024
     static let maxToolCalls = 16
     static let streamingUIUpdateInterval: TimeInterval = 0.25
 }

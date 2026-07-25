@@ -20,14 +20,16 @@ enum NativeWorkspaceWindowChrome {
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
 
-        guard let workspaceSplitController,
-              let toolbarConfiguration else {
-            return
+        if let workspaceSplitController,
+           let toolbarConfiguration
+        {
+            workspaceSplitController.installToolbarIfNeeded(
+                window: window,
+                configuration: toolbarConfiguration
+            )
         }
-        workspaceSplitController.installToolbarIfNeeded(
-            window: window,
-            configuration: toolbarConfiguration
-        )
+
+        window.titleVisibility = .hidden
     }
 }
 

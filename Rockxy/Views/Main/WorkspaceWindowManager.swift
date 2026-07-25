@@ -282,7 +282,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
               workspace.isClosable else {
             return
         }
-        coordinator.workspaceStore.closeWorkspace(id: workspaceID)
+        coordinator.closeWorkspace(id: workspaceID)
         updateTabAccessory()
         updateWindowTitles(coordinator: coordinator)
     }

@@ -6,6 +6,11 @@ import os
 // MARK: - MainContentCoordinator + Workspaces
 
 extension MainContentCoordinator {
+    func closeWorkspace(id: UUID) {
+        cancelDebugAssistantTask(for: id)
+        workspaceStore.closeWorkspace(id: id)
+    }
+
     // MARK: - All-Workspace Updates
 
     func recomputeAllWorkspaces() {

@@ -21,10 +21,13 @@ struct SensitiveDataRedactor {
         "set-cookie",
         "www-authenticate",
         "proxy-authenticate",
+        "api-key",
+        "ocp-apim-subscription-key",
         "x-api-key",
         "x-auth-token",
         "x-access-token",
         "x-csrf-token",
+        "x-goog-api-key",
         "x-xsrf-token",
         "x-payment",
         "x-payment-response",
@@ -154,19 +157,28 @@ struct SensitiveDataRedactor {
         guard isEnabled else {
             return url
         }
-        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems,
-              !queryItems.isEmpty else {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url
         }
 
-        components.queryItems = queryItems.map { item in
-            guard Self.sensitiveQueryParams.contains(item.name.lowercased()) else {
-                return item
-            }
-            return URLQueryItem(name: item.name, value: redactedPlaceholder)
+        var didRedact = false
+        if components.user != nil || components.password != nil {
+            components.user = nil
+            components.password = nil
+            didRedact = true
         }
-        return components.url ?? url
+
+        if let queryItems = components.queryItems, !queryItems.isEmpty {
+            components.queryItems = queryItems.map { item in
+                guard Self.sensitiveQueryParams.contains(item.name.lowercased()) else {
+                    return item
+                }
+                didRedact = true
+                return URLQueryItem(name: item.name, value: redactedPlaceholder)
+            }
+        }
+
+        return didRedact ? (components.url ?? url) : url
     }
 
     func redactBody(_ body: Data?, contentType: ContentType?) -> Data? {

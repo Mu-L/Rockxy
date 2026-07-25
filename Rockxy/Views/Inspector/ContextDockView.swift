@@ -67,6 +67,14 @@ private struct AIAssistantDockView: View {
             Divider()
             attachedContextHeader
             Divider()
+            if conversationContextMismatch {
+                AssistantConversationContextMismatchBanner(
+                    context: coordinator.activeWorkspace.debugAssistantConversationContext,
+                    onRestore: coordinator.restoreDebugAssistantConversationContext,
+                    onStartNew: coordinator.startNewDebugAssistantConversationForCurrentSelection
+                )
+                Divider()
+            }
             conversationTranscript
             Divider()
             promptComposer
@@ -74,16 +82,12 @@ private struct AIAssistantDockView: View {
         .background(Color.clear)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "Rockxy AI Assistant"))
-        .sheet(item: reviewPackBinding) { pack in
+        .sheet(item: reviewPackBinding) { _ in
             DebugAssistantReviewDataSheet(
-                pack: pack,
-                request: coordinator.activeWorkspace.debugAssistantReviewRequest,
-                configuration: coordinator.activeWorkspace.debugAssistantReviewConfiguration,
-                trafficScope: coordinator.activeWorkspace.debugAssistantReviewTrafficScope
-                    ?? AssistantTrustPolicy.defaultTrafficScope,
-                modelAccessEnabled: coordinator.activeWorkspace.debugAssistantReviewModelAccessEnabled,
+                coordinator: coordinator,
                 onSend: coordinator.sendDebugAssistantReview,
-                onDismiss: coordinator.dismissDebugAssistantReview
+                onDismiss: coordinator.dismissDebugAssistantReview,
+                onOverride: coordinator.applyDebugAssistantReviewFocusNoiseOverride
             )
         }
         .alert(
@@ -130,7 +134,11 @@ private struct AIAssistantDockView: View {
             }
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: {
-            Text(String(localized: "Rockxy will create an editable draft. Nothing is sent until you press Send in Compose."))
+            Text(
+                String(
+                    localized: "Rockxy will create an editable draft. Nothing is sent until you press Send in Compose."
+                )
+            )
         }
         .onAppear(perform: focusComposerIfRequested)
         .onChange(of: coordinator.activeWorkspace.isDebugAssistantComposerFocusRequested) {
@@ -263,8 +271,19 @@ private struct AIAssistantDockView: View {
         min(selectedTransactions.count, InvestigationContextLimits.default.maxTransactions)
     }
 
+    private var selectedContextLabel: String {
+        guard selectedContextCount < selectedTransactions.count else {
+            return selectedContextCount.formatted()
+        }
+        return String(localized: "\(selectedContextCount) of \(selectedTransactions.count)")
+    }
+
     private var conversationIsEmpty: Bool {
         coordinator.activeWorkspace.debugAssistantMessages.isEmpty
+    }
+
+    private var conversationContextMismatch: Bool {
+        coordinator.debugAssistantConversationHasContextMismatch()
     }
 
     private var isBusy: Bool {
@@ -282,12 +301,13 @@ private struct AIAssistantDockView: View {
 
     private var canSendDraft: Bool {
         !isBusy
+            && !conversationContextMismatch
             && !coordinator.activeWorkspace.debugAssistantDraft
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var streamingText: String {
-        guard case let .streaming(_, _, _, _, text) = coordinator.activeWorkspace.modelInvestigationState else {
+        guard case let .streaming(_, _, _, _, _, text) = coordinator.activeWorkspace.modelInvestigationState else {
             return ""
         }
         return text
@@ -401,7 +421,7 @@ private struct AIAssistantDockView: View {
                         coordinator.setDebugAssistantTrafficScope(.selectedOnly)
                     } label: {
                         Label(
-                            String(localized: "Selected Traffic Only (\(selectedContextCount))"),
+                            String(localized: "Selected Traffic Only (\(selectedContextLabel))"),
                             systemImage: coordinator.activeWorkspace.debugAssistantTrafficScope == .selectedOnly
                                 ? "checkmark" : "circle"
                         )
@@ -559,54 +579,12 @@ private struct AIAssistantDockView: View {
         }
     }
 
-    @ViewBuilder private func currentResultTurn(_ result: InvestigationResult) -> some View {
-        switch coordinator.activeWorkspace.modelInvestigationState {
-        case .streaming,
-             .failed:
-            modelAssistantTurn
-        case .completed:
-            EmptyView()
-        case .idle:
-            if resultIsInTranscript(result) {
-                EmptyView()
-            } else if coordinator.activeWorkspace.isPreparingDebugAssistantReview {
-                assistantBubble {
-                    AssistantProgressRow(
-                        title: String(localized: "Selected traffic inspected"),
-                        systemImage: "checkmark.circle.fill",
-                        color: .green
-                    )
-                    AssistantProgressRow(
-                        title: String(localized: "Redacting sensitive fields"),
-                        showsProgress: true
-                    )
-                    Text(String(localized: "Preparing the exact request for Review Data."))
-                        .font(assistantFont(appMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
-                }
-            } else if coordinator.activeWorkspace.debugAssistantReviewPack != nil {
-                assistantBubble {
-                    AssistantProgressRow(
-                        title: String(localized: "Waiting for Review Data"),
-                        systemImage: "lock.shield",
-                        color: .secondary
-                    )
-                    Text(String(localized: "Confirm the redacted traffic and conversation before the model runs."))
-                        .font(assistantFont(appMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                reviewReadyTurn(result)
-            }
-        }
-    }
-
     @ViewBuilder private var modelAssistantTurn: some View {
         switch coordinator.activeWorkspace.modelInvestigationState {
         case .idle,
              .completed:
             EmptyView()
-        case let .streaming(_, provider, model, endpointHost, text):
+        case let .streaming(_, provider, executionLocation, model, endpointHost, text):
             assistantBubble {
                 HStack(spacing: 7) {
                     ProgressView()
@@ -622,9 +600,13 @@ private struct AIAssistantDockView: View {
                     .controlSize(.mini)
                 }
                 if text.isEmpty {
-                    Text(String(localized: "The local model is reading the reviewed request context."))
-                        .font(assistantFont(appMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
+                    Text(
+                        executionLocation.isLocal
+                            ? String(localized: "The local model is reading the reviewed request context.")
+                            : String(localized: "The configured provider is processing the reviewed request context.")
+                    )
+                    .font(assistantFont(appMetrics.metadataFontSize))
+                    .foregroundStyle(.secondary)
                 } else {
                     AssistantStreamingText(source: text)
                 }
@@ -667,7 +649,11 @@ private struct AIAssistantDockView: View {
 
     private var promptComposer: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if primaryTransaction != nil, !isBusy, conversationIsEmpty {
+            if primaryTransaction != nil,
+               !isBusy,
+               !conversationContextMismatch,
+               conversationIsEmpty
+            {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(DebugAssistantRecipe.allCases.prefix(2)) { recipe in
@@ -695,7 +681,7 @@ private struct AIAssistantDockView: View {
                 .lineLimit(1 ... 4)
                 .focused($isComposerFocused)
                 .onSubmit(sendDraft)
-                .disabled(isBusy)
+                .disabled(isBusy || conversationContextMismatch)
 
                 Button(action: sendDraft) {
                     Image(systemName: "arrow.up")
@@ -719,7 +705,7 @@ private struct AIAssistantDockView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                guard !isBusy else {
+                guard !isBusy, !conversationContextMismatch else {
                     return
                 }
                 isComposerFocused = true
@@ -792,6 +778,49 @@ private struct AIAssistantDockView: View {
         .background(Color.clear)
     }
 
+    @ViewBuilder
+    private func currentResultTurn(_ result: InvestigationResult) -> some View {
+        switch coordinator.activeWorkspace.modelInvestigationState {
+        case .streaming,
+             .failed:
+            modelAssistantTurn
+        case .completed:
+            EmptyView()
+        case .idle:
+            if resultIsInTranscript(result) {
+                EmptyView()
+            } else if coordinator.activeWorkspace.isPreparingDebugAssistantReview {
+                assistantBubble {
+                    AssistantProgressRow(
+                        title: String(localized: "Selected traffic inspected"),
+                        systemImage: "checkmark.circle.fill",
+                        color: .green
+                    )
+                    AssistantProgressRow(
+                        title: String(localized: "Redacting sensitive fields"),
+                        showsProgress: true
+                    )
+                    Text(String(localized: "Preparing the exact request for Review Data."))
+                        .font(assistantFont(appMetrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
+                }
+            } else if coordinator.activeWorkspace.debugAssistantReviewPack != nil {
+                assistantBubble {
+                    AssistantProgressRow(
+                        title: String(localized: "Waiting for Review Data"),
+                        systemImage: "lock.shield",
+                        color: .secondary
+                    )
+                    Text(String(localized: "Confirm the redacted traffic and conversation before the model runs."))
+                        .font(assistantFont(appMetrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                reviewReadyTurn(result)
+            }
+        }
+    }
+
     private func conversationHistoryRow(_ conversation: DebugAssistantConversation) -> some View {
         Button {
             coordinator.selectDebugAssistantConversation(conversation.id)
@@ -861,7 +890,7 @@ private struct AIAssistantDockView: View {
     private func conversationMessage(_ message: DebugAssistantMessage) -> some View {
         switch message.role {
         case .user:
-            userBubble(message.text)
+            AssistantUserMessageBubble(text: message.text)
         case .assistant:
             VStack(alignment: .leading, spacing: 8) {
                 if let investigation = message.investigation {
@@ -893,26 +922,6 @@ private struct AIAssistantDockView: View {
         }
     }
 
-    private func userBubble(_ text: String) -> some View {
-        HStack {
-            Spacer(minLength: 44)
-            Text(text)
-                .font(assistantFont(appMetrics.primaryFontSize))
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                }
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "You: \(text)"))
-    }
-
     private func assistantBubble(@ViewBuilder content: () -> some View) -> some View {
         AssistantResponseCard(content: content)
     }
@@ -921,7 +930,9 @@ private struct AIAssistantDockView: View {
         text: String,
         investigation: InvestigationResult?,
         canRetryModel: Bool
-    ) -> some View {
+    )
+        -> some View
+    {
         let requestID = investigation?.selectedTransactionID
         return AssistantResponseActionBar(
             canCopy: !text.isEmpty,
@@ -1114,7 +1125,9 @@ private struct AIAssistantDockView: View {
         title: String,
         detail: String,
         cancel: @escaping () -> Void
-    ) -> some View {
+    )
+        -> some View
+    {
         assistantBubble {
             HStack(spacing: 8) {
                 ProgressView()
@@ -1185,47 +1198,6 @@ private struct AIAssistantDockView: View {
         }
     }
 
-    private func requestSummary(for transaction: HTTPTransaction) -> String {
-        let status = transaction.response.map { String($0.statusCode) } ?? "—"
-        return "\(transaction.request.method) \(status)  \(transaction.request.host)\(transaction.request.path)"
-    }
-
-    private func evidenceColor(_ kind: InvestigationEvidenceKind) -> Color {
-        switch kind {
-        case .observed: .blue
-        case .derived: .purple
-        case .inferred: .orange
-        case .unknown: .secondary
-        }
-    }
-
-    private func statusColor(for transaction: HTTPTransaction) -> Color {
-        guard let status = transaction.response?.statusCode else {
-            return transaction.state == .failed ? .red : .secondary
-        }
-        switch status {
-        case 200 ..< 300: return .green
-        case 300 ..< 400: return .blue
-        case 400 ..< 500: return .orange
-        case 500...: return .red
-        default: return .secondary
-        }
-    }
-
-    private func relativeDateLabel(_ date: Date) -> String {
-        let interval = max(0, Date().timeIntervalSince(date))
-        if interval < 60 {
-            return String(localized: "Now")
-        }
-        if interval < 3_600 {
-            return String(localized: "\(Int(interval / 60))m")
-        }
-        if Calendar.current.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .shortened)
-        }
-        return date.formatted(.dateTime.weekday(.abbreviated))
-    }
-
     private func assistantFont(
         _ size: CGFloat,
         weight: Font.Weight = .regular,
@@ -1262,5 +1234,46 @@ private extension AIAssistantDockView {
         coordinator.activeWorkspace.debugAssistantMessages.contains {
             $0.investigation == result
         }
+    }
+
+    func requestSummary(for transaction: HTTPTransaction) -> String {
+        let status = transaction.response.map { String($0.statusCode) } ?? "—"
+        return "\(transaction.request.method) \(status)  \(transaction.request.host)\(transaction.request.path)"
+    }
+
+    func evidenceColor(_ kind: InvestigationEvidenceKind) -> Color {
+        switch kind {
+        case .observed: .blue
+        case .derived: .purple
+        case .inferred: .orange
+        case .unknown: .secondary
+        }
+    }
+
+    func statusColor(for transaction: HTTPTransaction) -> Color {
+        guard let status = transaction.response?.statusCode else {
+            return transaction.state == .failed ? .red : .secondary
+        }
+        switch status {
+        case 200 ..< 300: return .green
+        case 300 ..< 400: return .blue
+        case 400 ..< 500: return .orange
+        case 500...: return .red
+        default: return .secondary
+        }
+    }
+
+    func relativeDateLabel(_ date: Date) -> String {
+        let interval = max(0, Date().timeIntervalSince(date))
+        if interval < 60 {
+            return String(localized: "Now")
+        }
+        if interval < 3_600 {
+            return String(localized: "\(Int(interval / 60))m")
+        }
+        if Calendar.current.isDateInToday(date) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return date.formatted(.dateTime.weekday(.abbreviated))
     }
 }
