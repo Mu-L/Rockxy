@@ -5,6 +5,8 @@ import Testing
 
 @MainActor
 struct NativeBottomInspectorSplitViewTests {
+    // MARK: Internal
+
     @Test("Bottom inspector sizing preserves the proposed workspace size")
     func proposedSizeIsPreserved() throws {
         let resolved = try #require(NativeBottomInspectorSplitSizing.resolve(
@@ -54,18 +56,125 @@ struct NativeBottomInspectorSplitViewTests {
         #expect(coordinator.shouldApplyPresentation(true))
     }
 
+    // MARK: - Startup geometry readiness
+
+    @Test("Bottom inspector layout readiness rejects zero and non-finite bounds")
+    func layoutReadinessRejectsInvalidBounds() {
+        #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(.zero))
+        #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(
+            CGRect(x: 0, y: 0, width: 1_200, height: 0)
+        ))
+        #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(
+            CGRect(x: 0, y: 0, width: 0, height: 700)
+        ))
+        #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(
+            CGRect(x: 0, y: 0, width: 1_200, height: CGFloat.infinity)
+        ))
+        #expect(NativeBottomInspectorSplitSizing.isLayoutReady(
+            CGRect(x: 0, y: 0, width: 1_200, height: 700)
+        ))
+    }
+
+    @Test("Configuring the bottom inspector at zero bounds never produces negative geometry")
+    func zeroBoundsProducesNonNegativeGeometry() {
+        let autosaveName = uniqueAutosaveName()
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+
+        layout(controller, at: .zero)
+
+        expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Deferred initial collapse applies once bounds become sufficient")
+    func deferredCollapseAppliesAtSufficientBounds() {
+        let autosaveName = uniqueAutosaveName()
+        let controller = makeConfiguredController(
+            isInspectorPresented: false,
+            autosaveName: autosaveName
+        )
+
+        layout(controller, at: .zero)
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+
+        #expect(!controller.isInspectorPresented)
+        expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Insufficient height preserves inspector visibility without negative geometry")
+    func insufficientHeightPreservesVisibility() {
+        let autosaveName = uniqueAutosaveName()
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+
+        // Positive but below the combined primary + inspector minimum height.
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 400))
+
+        #expect(controller.isInspectorPresented)
+        expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    // MARK: Private
+
+    // MARK: - Helpers
+
     private func makeController(isInspectorPresented: Bool) -> NativeBottomInspectorSplitViewController {
+        let controller = makeConfiguredController(
+            isInspectorPresented: isInspectorPresented,
+            autosaveName: uniqueAutosaveName()
+        )
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+        return controller
+    }
+
+    private func layout(_ controller: NativeBottomInspectorSplitViewController, at frame: CGRect) {
+        controller.view.frame = frame
+        controller.view.needsLayout = true
+        controller.view.layoutSubtreeIfNeeded()
+    }
+
+    private func makeConfiguredController(
+        isInspectorPresented: Bool,
+        autosaveName: String
+    )
+        -> NativeBottomInspectorSplitViewController
+    {
         let controller = NativeBottomInspectorSplitViewController()
         controller.configure(
             primaryController: NSHostingController(rootView: Color.clear),
             inspectorController: NSHostingController(rootView: Color.clear),
             isInspectorPresented: isInspectorPresented,
-            autosaveName: "NativeBottomInspectorSplitViewTests-\(UUID().uuidString)",
+            autosaveName: autosaveName,
             primaryMinimumHeight: 200,
             inspectorMinimumHeight: 320
         )
-        controller.view.frame = CGRect(x: 0, y: 0, width: 1_200, height: 700)
-        controller.view.layoutSubtreeIfNeeded()
         return controller
+    }
+
+    private func uniqueAutosaveName() -> String {
+        "NativeBottomInspectorSplitViewTests-\(UUID().uuidString)"
+    }
+
+    private func expectNonNegativeArrangedGeometry(
+        _ controller: NativeBottomInspectorSplitViewController
+    ) {
+        for item in controller.splitViewItems {
+            let frame = item.viewController.view.frame
+            #expect(frame.width.isFinite)
+            #expect(frame.height.isFinite)
+            #expect(frame.width >= 0)
+            #expect(frame.height >= 0)
+        }
+    }
+
+    private func removeSplitViewAutosaveDefaults(_ autosaveName: String) {
+        UserDefaults.standard.removeObject(forKey: "NSSplitView Subview Frames \(autosaveName)")
     }
 }

@@ -5,6 +5,8 @@ import Testing
 // MARK: - OpenAIResponsesProviderTests
 
 struct OpenAIResponsesProviderTests {
+    // MARK: Internal
+
     @Test("Responses adapter emits fixture text, tool call, usage, and exact request options")
     func fixtureStreamingFlow() async throws {
         let lines = [
@@ -281,9 +283,31 @@ struct OpenAIResponsesProviderTests {
                 "arguments": oversized,
             ],
         ])
-        let line = "data: " + (try #require(String(bytes: data, encoding: .utf8)))
+        let line = try "data: " + #require(String(bytes: data, encoding: .utf8))
         #expect(throws: (any Error).self) {
             _ = try toolDecoder.decode(line: line)
+        }
+
+        var activeToolDecoder = OpenAIResponsesStreamDecoder()
+        for index in 0 ..< AssistantExecutionLimits.maxToolCalls {
+            let delta = #"data: {"type":"response.function_call_arguments.delta","item_id":"item_\#(index)","delta":"x"}"#
+            _ = try activeToolDecoder.decode(line: delta)
+        }
+        #expect(throws: (any Error).self) {
+            _ = try activeToolDecoder.decode(
+                line: #"data: {"type":"response.function_call_arguments.delta","item_id":"overflow","delta":"x"}"#
+            )
+        }
+
+        var anthropicDecoder = AnthropicStreamDecoder()
+        for index in 0 ..< AssistantExecutionLimits.maxToolCalls {
+            let start = #"data: {"type":"content_block_start","index":\#(index),"content_block":{"type":"tool_use","id":"tool_\#(index)","name":"fixture"}}"#
+            _ = try anthropicDecoder.decode(line: start)
+        }
+        #expect(throws: (any Error).self) {
+            _ = try anthropicDecoder.decode(
+                line: #"data: {"type":"content_block_start","index":999,"content_block":{"type":"tool_use","id":"overflow","name":"fixture"}}"#
+            )
         }
     }
 
@@ -300,18 +324,18 @@ struct OpenAIResponsesProviderTests {
         }
         let modelError = Data(#"{"error":{"code":"model_not_found","message":"missing"}}"#.utf8)
 
-        #expect(AssistantHTTPErrorMapper.error(
-            response: try response(401),
+        #expect(try AssistantHTTPErrorMapper.error(
+            response: response(401),
             body: Data(),
             model: "fixture"
         ) == .authentication)
-        #expect(AssistantHTTPErrorMapper.error(
-            response: try response(403),
+        #expect(try AssistantHTTPErrorMapper.error(
+            response: response(403),
             body: Data(),
             model: "fixture"
         ) == .permission)
-        #expect(AssistantHTTPErrorMapper.error(
-            response: try response(404),
+        #expect(try AssistantHTTPErrorMapper.error(
+            response: response(404),
             body: modelError,
             model: "fixture"
         ) == .modelNotFound("fixture"))
@@ -322,6 +346,100 @@ struct OpenAIResponsesProviderTests {
         {
             Issue.record("Expected network classification")
             return
+        }
+    }
+
+    @Test("Compatible adapter rejects a non-2xx streaming response with a typed error")
+    func compatibleStreamRejectsHTTPFailure() async throws {
+        let provider = try OpenAICompatibleAssistantProvider(
+            baseURL: #require(URL(string: "http://127.0.0.1:1234/v1")),
+            apiKey: "",
+            transport: FixtureAssistantTransport(
+                streamStatus: 401,
+                streamLines: [#"{"error":{"message":"denied"}}"#]
+            )
+        )
+
+        await expectStreamFailure(provider.stream(fixtureRequest(model: "local-model"))) { error in
+            #expect(error == .authentication)
+        }
+    }
+
+    @Test("Compatible stream without data: [DONE] fails instead of presenting partial output")
+    func compatibleStreamRejectsPrematureEOF() async throws {
+        let provider = try OpenAICompatibleAssistantProvider(
+            baseURL: #require(URL(string: "http://127.0.0.1:1234/v1")),
+            apiKey: "",
+            transport: FixtureAssistantTransport(streamLines: [
+                #"data: {"choices":[{"delta":{"content":"partial"}}]}"#,
+            ])
+        )
+
+        await expectStreamFailure(provider.stream(fixtureRequest(model: "local-model"))) { error in
+            guard case .malformedResponse = error else {
+                Issue.record("Expected malformedResponse, got \(error)")
+                return
+            }
+        }
+    }
+
+    @Test("Ollama adapter rejects a non-2xx streaming response with a typed error")
+    func ollamaStreamRejectsHTTPFailure() async throws {
+        let provider = try OllamaAssistantProvider(
+            baseURL: #require(URL(string: "http://127.0.0.1:11434")),
+            transport: FixtureAssistantTransport(
+                streamStatus: 401,
+                streamLines: [#"{"error":"denied"}"#]
+            )
+        )
+
+        await expectStreamFailure(provider.stream(fixtureRequest(model: "qwen-fixture"))) { error in
+            #expect(error == .authentication)
+        }
+    }
+
+    @Test("Ollama stream without done=true fails instead of presenting partial output")
+    func ollamaStreamRejectsPrematureEOF() async throws {
+        let provider = try OllamaAssistantProvider(
+            baseURL: #require(URL(string: "http://127.0.0.1:11434")),
+            transport: FixtureAssistantTransport(streamLines: [
+                #"{"message":{"role":"assistant","content":"partial"},"done":false}"#,
+            ])
+        )
+
+        await expectStreamFailure(provider.stream(fixtureRequest(model: "qwen-fixture"))) { error in
+            guard case .malformedResponse = error else {
+                Issue.record("Expected malformedResponse, got \(error)")
+                return
+            }
+        }
+    }
+
+    // MARK: Private
+
+    private func fixtureRequest(model: String) -> AssistantCompletionRequest {
+        AssistantCompletionRequest(
+            instructions: "fixture system",
+            input: "fixture input",
+            model: model,
+            maxOutputTokens: 99,
+            storeResponse: false
+        )
+    }
+
+    private func expectStreamFailure(
+        _ stream: AsyncThrowingStream<AssistantStreamEvent, Error>,
+        _ validate: (AssistantProviderError) -> Void
+    )
+        async
+    {
+        do {
+            for try await _ in stream {}
+            Issue.record("Expected the stream to fail before completing normally")
+        } catch let error as AssistantProviderError {
+            validate(error)
+        } catch {
+            Issue.record("Unexpected error: \(error)")
         }
     }
 }
@@ -373,9 +491,9 @@ private actor FixtureAssistantTransport: AssistantHTTPTransport {
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         requests.append(request)
-        return (
+        return try (
             dataBody,
-            try response(url: #require(request.url), status: dataStatus, headers: nil)
+            response(url: #require(request.url), status: dataStatus, headers: nil)
         )
     }
 
@@ -388,8 +506,8 @@ private actor FixtureAssistantTransport: AssistantHTTPTransport {
             }
             continuation.finish()
         }
-        return AssistantHTTPStream(
-            response: try response(
+        return try AssistantHTTPStream(
+            response: response(
                 url: #require(request.url),
                 status: streamStatus,
                 headers: streamHeaders

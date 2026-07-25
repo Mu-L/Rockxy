@@ -159,6 +159,10 @@ struct DebugAssistantMessage: Identifiable, Equatable {
         return fragments.joined(separator: "\n")
     }
 
+    var retainedTextBytes: Int {
+        searchableText.utf8.count
+    }
+
     static func user(_ text: String) -> DebugAssistantMessage {
         DebugAssistantMessage(role: .user, text: text)
     }
@@ -188,6 +192,73 @@ struct DebugAssistantMessage: Identifiable, Equatable {
     }
 }
 
+// MARK: - DebugAssistantConversationContext
+
+/// Stable, bounded identity for the captured traffic attached to a conversation.
+/// Only the requests Rockxy can actually include are retained; the original count
+/// remains visible so a large selection is never represented as complete.
+struct DebugAssistantConversationContext: Equatable {
+    // MARK: Lifecycle
+
+    init(
+        primaryTransactionID: UUID,
+        selectedTransactionIDs: [UUID],
+        requestedSelectionCount: Int
+    ) {
+        var orderedIDs = [primaryTransactionID]
+        var seen: Set<UUID> = [primaryTransactionID]
+        for id in selectedTransactionIDs where seen.insert(id).inserted {
+            orderedIDs.append(id)
+        }
+        self.primaryTransactionID = primaryTransactionID
+        self.selectedTransactionIDs = Array(
+            orderedIDs.prefix(InvestigationContextLimits.default.maxTransactions)
+        )
+        self.requestedSelectionCount = max(requestedSelectionCount, self.selectedTransactionIDs.count)
+    }
+
+    // MARK: Internal
+
+    let primaryTransactionID: UUID
+    let selectedTransactionIDs: [UUID]
+    let requestedSelectionCount: Int
+
+    var summary: String {
+        if requestedSelectionCount == selectedTransactionIDs.count {
+            return String(localized: "\(selectedTransactionIDs.count) selected request(s)")
+        }
+        return String(
+            localized: "\(selectedTransactionIDs.count) of \(requestedSelectionCount) selected request(s)"
+        )
+    }
+
+    func matches(
+        primaryTransactionID: UUID?,
+        selectedTransactionIDs: [UUID],
+        requestedSelectionCount: Int
+    )
+        -> Bool
+    {
+        self.primaryTransactionID == primaryTransactionID
+            && Set(self.selectedTransactionIDs) == Set(selectedTransactionIDs)
+            && (
+                self.requestedSelectionCount == requestedSelectionCount
+                    || self.selectedTransactionIDs.count == requestedSelectionCount
+            )
+    }
+}
+
+// MARK: - DebugAssistantConversationLimits
+
+enum DebugAssistantConversationLimits {
+    static let maximumPromptBytes = 16 * 1_024
+    static let maximumMessagesPerConversation = 48
+    static let maximumConversationTextBytes = 2 * 1_024 * 1_024
+    static let maximumConversationsPerWorkspace = 32
+    static let maximumPinnedConversationsPerWorkspace = 8
+    static let maximumWorkspaceTextBytes = 8 * 1_024 * 1_024
+}
+
 // MARK: - DebugAssistantConversation
 
 /// A workspace-local assistant thread. Keeping the captured evidence snapshots in memory avoids
@@ -200,6 +271,7 @@ struct DebugAssistantConversation: Identifiable, Equatable {
         id: UUID = UUID(),
         title: String,
         messages: [DebugAssistantMessage],
+        context: DebugAssistantConversationContext? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         isPinned: Bool = false
@@ -207,6 +279,7 @@ struct DebugAssistantConversation: Identifiable, Equatable {
         self.id = id
         self.title = title
         self.messages = messages
+        self.context = context
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isPinned = isPinned
@@ -217,6 +290,7 @@ struct DebugAssistantConversation: Identifiable, Equatable {
     let id: UUID
     var title: String
     var messages: [DebugAssistantMessage]
+    var context: DebugAssistantConversationContext?
     let createdAt: Date
     var updatedAt: Date
     var isPinned: Bool
@@ -224,6 +298,10 @@ struct DebugAssistantConversation: Identifiable, Equatable {
     var preview: String {
         messages.last(where: { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.text
             ?? String(localized: "No messages yet")
+    }
+
+    var retainedTextBytes: Int {
+        title.utf8.count + messages.reduce(0) { $0 + $1.retainedTextBytes }
     }
 
     func matches(_ query: String) -> Bool {

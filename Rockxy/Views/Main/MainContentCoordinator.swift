@@ -94,6 +94,11 @@ final class MainContentCoordinator {
         let task: Task<Void, Never>
     }
 
+    struct DebugAssistantRelatedCacheKey: Equatable {
+        let primaryTransactionID: UUID
+        let trafficIndexGeneration: UInt
+    }
+
     static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "MainContentCoordinator")
 
     let policy: any AppPolicy
@@ -137,6 +142,13 @@ final class MainContentCoordinator {
     let readiness = ReadinessCoordinator.shared
 
     @ObservationIgnored var debugAssistantTasks: [UUID: DebugAssistantTaskHandle] = [:]
+    @ObservationIgnored var debugAssistantTransactionsByHost: [String: [HTTPTransaction]] = [:]
+    @ObservationIgnored var debugAssistantIndexedTransactionIDs: Set<UUID> = []
+    @ObservationIgnored var debugAssistantIndexedLiveCount = 0
+    @ObservationIgnored var debugAssistantIndexedFavoriteCount = 0
+    @ObservationIgnored var debugAssistantTrafficIndexGeneration: UInt = 0
+    @ObservationIgnored var debugAssistantRelatedCache:
+        (key: DebugAssistantRelatedCacheKey, transactions: [HTTPTransaction])?
 
     // MARK: - UI State — Logs
 

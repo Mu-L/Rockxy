@@ -408,6 +408,7 @@ extension MainContentCoordinator {
                 errorCount += 1
             }
         }
+        appendToDebugAssistantTrafficIndex(filteredBatch)
         appendObservedDomainsByApp(from: filteredBatch)
 
         updateAllWorkspaces(with: filteredBatch)

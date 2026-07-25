@@ -13,7 +13,7 @@ enum SigningDiagnostics {
 
     // MARK: - Result
 
-    enum Result: Equatable {
+    enum Result: Equatable, Sendable {
         /// App signature is valid, helper exists, certificate chains match.
         case healthy
         /// App bundle code signature is invalid (e.g., missing dylib after stale Xcode build).

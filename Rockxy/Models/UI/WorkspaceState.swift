@@ -1,12 +1,16 @@
 import Foundation
 import os
 
+// MARK: - ContextDockTab
+
 // Defines the UI state for a single workspace tab.
 
 enum ContextDockTab: Equatable {
     case details
     case aiAssistant
 }
+
+// MARK: - WorkspaceState
 
 @MainActor @Observable
 final class WorkspaceState: Identifiable {
@@ -55,6 +59,7 @@ final class WorkspaceState: Identifiable {
     var debugAssistantConversationTitle = String(localized: "New Conversation")
     var debugAssistantConversationCreatedAt = Date()
     var debugAssistantConversationUpdatedAt = Date()
+    var debugAssistantConversationContext: DebugAssistantConversationContext?
     var debugAssistantConversations: [DebugAssistantConversation] = []
     var debugAssistantUsesConfiguredModel = true
     var debugAssistantTrafficScope = AssistantTrustPolicy.defaultTrafficScope
@@ -63,7 +68,10 @@ final class WorkspaceState: Identifiable {
     var debugAssistantReviewConfiguration: AssistantProviderConfiguration?
     var debugAssistantReviewTrafficScope: AssistantTrafficScope?
     var debugAssistantReviewModelAccessEnabled = false
+    var debugAssistantReviewSummary: DebugAssistantReviewSummary?
+    var debugAssistantRequestedContextCount = 0
     var isPreparingDebugAssistantReview = false
+    var isPreparingDebugAssistantReviewOverride = false
     var isDebugAssistantComposerFocusRequested = false
     var focusNavigatorMode: FocusNavigatorMode = .browse
     var activeTrafficSignal: TrafficSignal?
@@ -123,6 +131,7 @@ final class WorkspaceState: Identifiable {
         debugAssistantConversationTitle = String(localized: "New Conversation")
         debugAssistantConversationCreatedAt = Date()
         debugAssistantConversationUpdatedAt = Date()
+        debugAssistantConversationContext = nil
         debugAssistantConversations.removeAll()
         debugAssistantTrafficScope = AssistantTrustPolicy.defaultTrafficScope
         debugAssistantReviewPack = nil
@@ -130,7 +139,10 @@ final class WorkspaceState: Identifiable {
         debugAssistantReviewConfiguration = nil
         debugAssistantReviewTrafficScope = nil
         debugAssistantReviewModelAccessEnabled = false
+        debugAssistantReviewSummary = nil
+        debugAssistantRequestedContextCount = 0
         isPreparingDebugAssistantReview = false
+        isPreparingDebugAssistantReviewOverride = false
         isDebugAssistantComposerFocusRequested = false
         domainTree.removeAll()
         totalDomainCount = 0

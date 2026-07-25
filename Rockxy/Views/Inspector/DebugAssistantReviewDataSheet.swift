@@ -1,16 +1,17 @@
 import SwiftUI
 
+// MARK: - DebugAssistantReviewDataSheet
+
 /// Exact, read-only view of the redacted context pack shown before an outbound request.
+/// Reads live review state from the coordinator so the one-time Focus/Noise override can
+/// recompute the reviewed pack in place without dismissing and reopening the sheet.
 struct DebugAssistantReviewDataSheet: View {
     // MARK: Internal
 
-    let pack: InvestigationContextPack
-    let request: AssistantCompletionRequest?
-    let configuration: AssistantProviderConfiguration?
-    let trafficScope: AssistantTrafficScope
-    let modelAccessEnabled: Bool
+    let coordinator: MainContentCoordinator
     let onSend: () -> Void
     let onDismiss: () -> Void
+    let onOverride: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +32,38 @@ struct DebugAssistantReviewDataSheet: View {
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
+    private var workspace: WorkspaceState {
+        coordinator.activeWorkspace
+    }
+
+    private var pack: InvestigationContextPack? {
+        workspace.debugAssistantReviewPack
+    }
+
+    private var request: AssistantCompletionRequest? {
+        workspace.debugAssistantReviewRequest
+    }
+
+    private var configuration: AssistantProviderConfiguration? {
+        workspace.debugAssistantReviewConfiguration
+    }
+
+    private var trafficScope: AssistantTrafficScope {
+        workspace.debugAssistantReviewTrafficScope ?? AssistantTrustPolicy.defaultTrafficScope
+    }
+
+    private var modelAccessEnabled: Bool {
+        workspace.debugAssistantReviewModelAccessEnabled
+    }
+
+    private var reviewSummary: DebugAssistantReviewSummary {
+        workspace.debugAssistantReviewSummary ?? DebugAssistantReviewSummary()
+    }
+
+    private var isPreparingOverride: Bool {
+        workspace.isPreparingDebugAssistantReviewOverride
+    }
+
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
@@ -44,7 +77,7 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private var canSend: Bool {
-        modelAccessEnabled && configuration?.isComplete == true && request != nil
+        modelAccessEnabled && configuration?.isComplete == true && request != nil && !isPreparingOverride
     }
 
     private var isLocalExecution: Bool {
@@ -61,6 +94,10 @@ struct DebugAssistantReviewDataSheet: View {
         return settings
     }
 
+    private var showsScopeSummary: Bool {
+        trafficScope == .selectedAndRelated && reviewSummary.rawRelatedFound > 0
+    }
+
     private var headerSubtitle: String {
         if isLocalExecution {
             return String(localized: "Confirm the redacted traffic and conversation before local inference begins.")
@@ -73,6 +110,9 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private var footerStatus: String {
+        if isPreparingOverride {
+            return String(localized: "Rebuilding the reviewed context with the excluded traffic")
+        }
         if !modelAccessEnabled {
             return String(localized: "Model access is disabled in AI Assistant Settings")
         }
@@ -85,16 +125,294 @@ struct DebugAssistantReviewDataSheet: View {
         return String(localized: "Only reviewed content and required provider metadata will be sent")
     }
 
-    private var scopeDescription: String {
-        switch trafficScope {
-        case .selectedOnly:
-            String(localized: "\(pack.manifest.requestCount) selected request(s)")
-        case .selectedAndRelated:
-            String(localized: "\(pack.manifest.requestCount) selected and opted-in related request(s)")
+    private var header: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: isLocalExecution ? "lock.shield" : "arrow.up.forward.app")
+                .font(.system(size: toolMetrics.compactIconFontSize, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Review Data"))
+                    .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
+                Text(headerSubtitle)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
+    }
+
+    @ViewBuilder private var content: some View {
+        if let pack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    destinationSection(pack)
+                    if showsScopeSummary {
+                        scopeSummarySection
+                    }
+                    redactionSection(pack)
+                    previewSection(pack)
+                }
+                .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
+        } else {
+            Spacer(minLength: 0)
         }
     }
 
-    private var reviewDetails: [ReviewDetail] {
+    private var actionBar: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Label(footerStatus, systemImage: canSend ? "checkmark.shield" : "lock.shield")
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            Spacer(minLength: 12)
+
+            Button(String(localized: "Cancel"), action: onDismiss)
+                .keyboardShortcut(.cancelAction)
+
+            Button(primaryActionTitle, action: onSend)
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSend)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+        .frame(minHeight: toolMetrics.footerControlHeight + 20)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var scopeSummarySection: some View {
+        reviewSection(String(localized: "Related Traffic Scope")) {
+            VStack(alignment: .leading, spacing: 10) {
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 9) {
+                    GridRow {
+                        manifestRow(
+                            String(localized: "Related found"),
+                            value: reviewSummary.rawRelatedFound,
+                            systemImage: "magnifyingglass",
+                            color: .secondary
+                        )
+                        manifestRow(
+                            String(localized: "Included in review"),
+                            value: reviewSummary.relatedIncluded,
+                            systemImage: "checkmark.circle.fill",
+                            color: .green
+                        )
+                    }
+                    GridRow {
+                        manifestRow(
+                            String(localized: "Normally excluded by Focus / Noise"),
+                            value: reviewSummary.focusNoiseExcluded,
+                            systemImage: "eye.slash",
+                            color: reviewSummary.focusNoiseExcluded == 0 ? .secondary : .orange
+                        )
+                        Color.clear.frame(height: 0)
+                    }
+                }
+
+                if reviewSummary.overrideApplied {
+                    Label(
+                        String(localized: "Focus and Noise were ignored once for this review."),
+                        systemImage: "checkmark.circle"
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                } else if reviewSummary.canOverrideFocusNoise {
+                    overrideControl
+                }
+            }
+        }
+    }
+
+    private var overrideControl: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if isPreparingOverride {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(String(localized: "Including excluded traffic…"))
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Button(String(localized: "Include Excluded Traffic Once"), action: onOverride)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel(String(localized: "Include Excluded Traffic Once"))
+                    .help(String(localized: "Focus and Noise settings will not change."))
+            }
+            Text(
+                String(
+                    localized: "Adds the \(reviewSummary.focusNoiseExcluded) request(s) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change."
+                )
+            )
+            .font(toolMetrics.metadataFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func destinationSection(_ pack: InvestigationContextPack) -> some View {
+        reviewSection(String(localized: "Request Summary")) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.adaptive(minimum: 150), alignment: .topLeading),
+                ],
+                alignment: .leading,
+                spacing: 12
+            ) {
+                ForEach(reviewDetails(pack)) { detail in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(detail.title)
+                            .font(toolMetrics.metadataFont(weight: .medium))
+                            .foregroundStyle(.secondary)
+                        Text(detail.value)
+                            .font(toolMetrics.font())
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func redactionSection(_ pack: InvestigationContextPack) -> some View {
+        reviewSection(String(localized: "Redaction Manifest")) {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 9) {
+                GridRow {
+                    manifestRow(
+                        String(localized: "Sensitive fields redacted"),
+                        value: pack.manifest.redactedFieldCount,
+                        systemImage: "checkmark.shield.fill",
+                        color: .green
+                    )
+                    manifestRow(
+                        String(localized: "Payloads truncated"),
+                        value: pack.manifest.truncatedBodyCount,
+                        systemImage: "scissors",
+                        color: pack.manifest.truncatedBodyCount == 0 ? .secondary : .orange
+                    )
+                }
+                GridRow {
+                    manifestRow(
+                        String(localized: "Binary payloads omitted"),
+                        value: pack.manifest.omittedBinaryBodyCount,
+                        systemImage: "nosign",
+                        color: pack.manifest.omittedBinaryBodyCount == 0 ? .secondary : .orange
+                    )
+                    manifestRow(
+                        String(localized: "Requests outside the bound"),
+                        value: pack.manifest.omittedTransactionCount,
+                        systemImage: "square.stack.3d.down.right",
+                        color: pack.manifest.omittedTransactionCount == 0 ? .secondary : .orange
+                    )
+                }
+            }
+        }
+    }
+
+    private func previewSection(_ pack: InvestigationContextPack) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(String(localized: "Exact Reviewed Content"))
+                    .font(toolMetrics.font(weight: .semibold))
+                Spacer()
+                let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
+                Text(
+                    pack.manifest.omittedTransactionCount == 0
+                        ? String(localized: "\(pack.manifest.requestCount) requests")
+                        : String(localized: "\(pack.manifest.requestCount) of \(totalRequestCount) requests")
+                )
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+            }
+
+            InspectorBodyTextEditor(
+                text: request?.reviewedContentPreview ?? pack.preview,
+                editorID: "debug-assistant-review-\((request?.reviewedContentPreview ?? pack.preview).hashValue)",
+                editorSettings: previewEditorSettings,
+                isEditable: false
+            )
+            .frame(minHeight: 210, idealHeight: 260)
+            .overlay {
+                Rectangle()
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            }
+        }
+    }
+
+    private func reviewSection(
+        _ title: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(toolMetrics.font(weight: .semibold))
+
+            content()
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func manifestRow(
+        _ title: String,
+        value: Int,
+        systemImage: String,
+        color: Color
+    )
+        -> some View
+    {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .foregroundStyle(color)
+                .frame(width: 16)
+            Text(title)
+                .font(toolMetrics.secondaryFont())
+            Spacer(minLength: 8)
+            Text(value.formatted())
+                .font(toolMetrics.secondaryFont())
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func scopeDescription(_ pack: InvestigationContextPack) -> String {
+        let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
+        let countDescription = pack.manifest.omittedTransactionCount == 0
+            ? pack.manifest.requestCount.formatted()
+            : String(localized: "\(pack.manifest.requestCount) of \(totalRequestCount)")
+        return switch trafficScope {
+        case .selectedOnly:
+            String(localized: "\(countDescription) selected request(s)")
+        case .selectedAndRelated:
+            String(localized: "\(countDescription) selected and opted-in related request(s)")
+        }
+    }
+
+    private func reviewDetails(_ pack: InvestigationContextPack) -> [ReviewDetail] {
         var details = [
             ReviewDetail(
                 title: String(localized: "Provider"),
@@ -110,7 +428,7 @@ struct DebugAssistantReviewDataSheet: View {
             ),
             ReviewDetail(
                 title: String(localized: "Scope"),
-                value: scopeDescription
+                value: scopeDescription(pack)
             ),
             ReviewDetail(
                 title: String(localized: "Redaction"),
@@ -158,198 +476,9 @@ struct DebugAssistantReviewDataSheet: View {
         }
         return details
     }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: isLocalExecution ? "lock.shield" : "arrow.up.forward.app")
-                .font(.system(size: toolMetrics.compactIconFontSize, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Review Data"))
-                    .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
-                Text(headerSubtitle)
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.top, toolMetrics.headerTopPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
-    }
-
-    private var content: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                destinationSection
-                redactionSection
-                previewSection
-            }
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.vertical, toolMetrics.formVerticalPadding)
-        }
-    }
-
-    private var destinationSection: some View {
-        reviewSection(String(localized: "Request Summary")) {
-            LazyVGrid(
-                columns: [
-                    GridItem(.adaptive(minimum: 150), alignment: .topLeading),
-                ],
-                alignment: .leading,
-                spacing: 12
-            ) {
-                ForEach(reviewDetails) { detail in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(detail.title)
-                            .font(toolMetrics.metadataFont(weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Text(detail.value)
-                            .font(toolMetrics.font())
-                            .lineLimit(2)
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private var redactionSection: some View {
-        reviewSection(String(localized: "Redaction Manifest")) {
-            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 9) {
-                GridRow {
-                    manifestRow(
-                        String(localized: "Sensitive fields redacted"),
-                        value: pack.manifest.redactedFieldCount,
-                        systemImage: "checkmark.shield.fill",
-                        color: .green
-                    )
-                    manifestRow(
-                        String(localized: "Payloads truncated"),
-                        value: pack.manifest.truncatedBodyCount,
-                        systemImage: "scissors",
-                        color: pack.manifest.truncatedBodyCount == 0 ? .secondary : .orange
-                    )
-                }
-                GridRow {
-                    manifestRow(
-                        String(localized: "Binary payloads omitted"),
-                        value: pack.manifest.omittedBinaryBodyCount,
-                        systemImage: "nosign",
-                        color: pack.manifest.omittedBinaryBodyCount == 0 ? .secondary : .orange
-                    )
-                    manifestRow(
-                        String(localized: "Requests outside the bound"),
-                        value: pack.manifest.omittedTransactionCount,
-                        systemImage: "square.stack.3d.down.right",
-                        color: pack.manifest.omittedTransactionCount == 0 ? .secondary : .orange
-                    )
-                }
-            }
-        }
-    }
-
-    private var previewSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text(String(localized: "Exact Reviewed Content"))
-                    .font(toolMetrics.font(weight: .semibold))
-                Spacer()
-                Text(String(localized: "\(pack.manifest.requestCount) requests"))
-                    .font(toolMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
-            }
-
-            InspectorBodyTextEditor(
-                text: request?.reviewedContentPreview ?? pack.preview,
-                editorID: "debug-assistant-review-\((request?.reviewedContentPreview ?? pack.preview).hashValue)",
-                editorSettings: previewEditorSettings,
-                isEditable: false
-            )
-            .frame(minHeight: 210, idealHeight: 260)
-            .overlay {
-                Rectangle()
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            }
-        }
-    }
-
-    private var actionBar: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Label(footerStatus, systemImage: canSend ? "checkmark.shield" : "lock.shield")
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-
-            Spacer(minLength: 12)
-
-            Button(String(localized: "Cancel"), action: onDismiss)
-                .keyboardShortcut(.cancelAction)
-
-            Button(primaryActionTitle, action: onSend)
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSend)
-        }
-        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.vertical, toolMetrics.footerTopPadding)
-        .frame(minHeight: toolMetrics.footerControlHeight + 20)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func reviewSection<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
-    )
-        -> some View
-    {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(title)
-                .font(toolMetrics.font(weight: .semibold))
-
-            content()
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Color(nsColor: .controlBackgroundColor),
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func manifestRow(
-        _ title: String,
-        value: Int,
-        systemImage: String,
-        color: Color
-    )
-        -> some View
-    {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .foregroundStyle(color)
-                .frame(width: 16)
-            Text(title)
-                .font(toolMetrics.secondaryFont())
-            Spacer(minLength: 8)
-            Text(value.formatted())
-                .font(toolMetrics.secondaryFont())
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
+
+// MARK: - ReviewDetail
 
 private struct ReviewDetail: Identifiable {
     let title: String

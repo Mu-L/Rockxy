@@ -329,7 +329,10 @@ extension MainContentCoordinator {
                     return false
                 }
             }
-            if !DomainGrouping.path(transaction.request.path, matchesPrefix: workspace.filterCriteria.sidebarPathPrefix) {
+            if !DomainGrouping.path(
+                transaction.request.path,
+                matchesPrefix: workspace.filterCriteria.sidebarPathPrefix
+            ) {
                 return false
             }
             if let sidebarApp = workspace.filterCriteria.sidebarApp {
@@ -407,12 +410,13 @@ extension MainContentCoordinator {
     }
 
     private func isVisibleInWorkspaceScope(_ transaction: HTTPTransaction, workspace: WorkspaceState) -> Bool {
-        if workspace.mutedTrafficSources.contains(where: { $0.matches(transaction) }) {
+        // Shared Focus/Noise gate (mute + Focus Set), then the request-list-only Traffic Signal lens.
+        guard isWithinFocusNoiseScope(transaction, workspace: workspace) else {
             return false
         }
         if let signal = workspace.activeTrafficSignal, !signal.matches(transaction) {
             return false
         }
-        return workspace.activeFocusSet?.matches(transaction) ?? true
+        return true
     }
 }

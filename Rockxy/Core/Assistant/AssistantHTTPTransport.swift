@@ -7,6 +7,19 @@ struct AssistantHTTPStream {
     let lines: AsyncThrowingStream<String, Error>
 }
 
+// MARK: - AssistantHTTPTransportLimits
+
+/// Provider-neutral network bounds shared by local and remote model adapters.
+/// Individual providers may impose tighter semantic limits after framing, but
+/// no adapter can make the transport allocate an unbounded response first.
+struct AssistantHTTPTransportLimits: Equatable, Sendable {
+    static let `default` = AssistantHTTPTransportLimits()
+
+    var maximumDataBytes = 2 * 1_024 * 1_024
+    var maximumStreamLineBytes = 256 * 1_024
+    var maximumBufferedLines = 32
+}
+
 // MARK: - AssistantHTTPTransport
 
 protocol AssistantHTTPTransport: Sendable {
@@ -19,8 +32,12 @@ protocol AssistantHTTPTransport: Sendable {
 final class URLSessionAssistantHTTPTransport: AssistantHTTPTransport, @unchecked Sendable {
     // MARK: Lifecycle
 
-    init(session: URLSession? = nil) {
+    init(
+        session: URLSession? = nil,
+        limits: AssistantHTTPTransportLimits = .default
+    ) {
         self.session = session ?? URLSession(configuration: Self.proxyBypassConfiguration())
+        self.limits = limits
     }
 
     // MARK: Internal
@@ -35,9 +52,30 @@ final class URLSessionAssistantHTTPTransport: AssistantHTTPTransport, @unchecked
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await session.data(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
         guard let response = response as? HTTPURLResponse else {
             throw AssistantProviderError.malformedResponse("Missing HTTP response metadata")
+        }
+
+        if response.expectedContentLength > limits.maximumDataBytes {
+            throw AssistantProviderError.malformedResponse(
+                "The provider response exceeded Rockxy's \(limits.maximumDataBytes)-byte limit"
+            )
+        }
+
+        var data = Data()
+        data.reserveCapacity(min(
+            max(0, Int(response.expectedContentLength)),
+            limits.maximumDataBytes
+        ))
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            guard data.count < limits.maximumDataBytes else {
+                throw AssistantProviderError.malformedResponse(
+                    "The provider response exceeded Rockxy's \(limits.maximumDataBytes)-byte limit"
+                )
+            }
+            data.append(byte)
         }
         return (data, response)
     }
@@ -47,12 +85,23 @@ final class URLSessionAssistantHTTPTransport: AssistantHTTPTransport, @unchecked
         guard let response = response as? HTTPURLResponse else {
             throw AssistantProviderError.malformedResponse("Missing HTTP response metadata")
         }
-        let lines = AsyncThrowingStream<String, Error> { continuation in
+        let lines = AsyncThrowingStream<String, Error>(
+            bufferingPolicy: .bufferingOldest(max(1, limits.maximumBufferedLines))
+        ) { continuation in
             let task = Task {
                 do {
-                    for try await line in bytes.lines {
+                    var framer = AssistantHTTPLineFramer(
+                        maximumLineBytes: limits.maximumStreamLineBytes
+                    )
+                    for try await byte in bytes {
                         try Task.checkCancellation()
-                        continuation.yield(line)
+                        guard let line = try framer.append(byte) else {
+                            continue
+                        }
+                        try Self.yield(line, to: continuation)
+                    }
+                    if let finalLine = try framer.finish() {
+                        try Self.yield(finalLine, to: continuation)
                     }
                     continuation.finish()
                 } catch is CancellationError {
@@ -69,6 +118,83 @@ final class URLSessionAssistantHTTPTransport: AssistantHTTPTransport, @unchecked
     // MARK: Private
 
     private let session: URLSession
+    private let limits: AssistantHTTPTransportLimits
+
+    private static func yield(
+        _ line: String,
+        to continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) throws {
+        switch continuation.yield(line) {
+        case .enqueued:
+            break
+        case .dropped:
+            throw AssistantProviderError.malformedResponse(
+                "The provider stream produced data faster than Rockxy could safely process it"
+            )
+        case .terminated:
+            throw CancellationError()
+        @unknown default:
+            throw AssistantProviderError.malformedResponse("The provider stream ended unexpectedly")
+        }
+    }
+}
+
+// MARK: - AssistantHTTPLineFramer
+
+/// Incrementally frames UTF-8 lines without first constructing an unbounded
+/// `String`. This is deliberately independent of any provider's SSE/NDJSON
+/// grammar so future adapters inherit the same memory boundary.
+struct AssistantHTTPLineFramer {
+    // MARK: Lifecycle
+
+    init(maximumLineBytes: Int) {
+        self.maximumLineBytes = max(1, maximumLineBytes)
+    }
+
+    // MARK: Internal
+
+    mutating func append(_ byte: UInt8) throws -> String? {
+        guard byte != Self.lineFeed else {
+            return try consumeLine()
+        }
+        guard buffer.count < maximumLineBytes else {
+            throw AssistantProviderError.malformedResponse(
+                "A provider stream line exceeded Rockxy's \(maximumLineBytes)-byte limit"
+            )
+        }
+        buffer.append(byte)
+        return nil
+    }
+
+    mutating func finish() throws -> String? {
+        guard !buffer.isEmpty else {
+            return nil
+        }
+        return try consumeLine()
+    }
+
+    // MARK: Private
+
+    private static let carriageReturn: UInt8 = 0x0D
+    private static let lineFeed: UInt8 = 0x0A
+
+    private let maximumLineBytes: Int
+    private var buffer = Data()
+
+    private mutating func consumeLine() throws -> String {
+        if buffer.last == Self.carriageReturn {
+            buffer.removeLast()
+        }
+        defer {
+            buffer.removeAll(keepingCapacity: true)
+        }
+        guard let line = String(data: buffer, encoding: .utf8) else {
+            throw AssistantProviderError.malformedResponse(
+                "The provider stream contained invalid UTF-8"
+            )
+        }
+        return line
+    }
 }
 
 // MARK: - AssistantHTTPErrorMapper

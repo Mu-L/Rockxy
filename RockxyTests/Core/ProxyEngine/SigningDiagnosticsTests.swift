@@ -1,4 +1,5 @@
 import Foundation
+import os
 @testable import Rockxy
 import Testing
 
@@ -42,7 +43,8 @@ private struct MockSigningEnvironment: SigningDiagnostics.Environment {
 struct SigningDiagnosticsClassifyTests {
     @Test("installed helper path is preferred over the bundled helper path")
     func helperExecutableCandidatesPreferInstalledHelper() {
-        let bundledHelperURL = URL(fileURLWithPath: "/Applications/Rockxy.app/Contents/Library/HelperTools/RockxyHelperTool")
+        let bundledHelperURL =
+            URL(fileURLWithPath: "/Applications/Rockxy.app/Contents/Library/HelperTools/RockxyHelperTool")
         let installedHelperURL = URL(fileURLWithPath: "/Library/PrivilegedHelperTools/com.amunx.rockxy.helper")
 
         let candidates = SigningDiagnostics.helperExecutableCandidates(
@@ -192,7 +194,9 @@ struct SigningDiagnosticsClassifyTests {
 struct SigningDiagnosticsLiveTests {
     @Test("LiveEnvironment validates test host app signature successfully")
     func liveAppSignatureValid() {
-        guard !TestIdentity.isRunningUnderRawXCTestTool else { return }
+        guard !TestIdentity.isRunningUnderRawXCTestTool else {
+            return
+        }
         let env = SigningDiagnostics.LiveEnvironment()
         guard env.validateAppSignature() == nil else {
             return
@@ -204,7 +208,9 @@ struct SigningDiagnosticsLiveTests {
 
     @Test("LiveEnvironment resolves the bundled helper executable from the app package")
     func liveBundledHelperExecutableDetected() {
-        guard !TestIdentity.isRunningUnderRawXCTestTool else { return }
+        guard !TestIdentity.isRunningUnderRawXCTestTool else {
+            return
+        }
         let bundledHelperURL = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Library/HelperTools", isDirectory: true)
             .appendingPathComponent("RockxyHelperTool", isDirectory: false)
@@ -217,7 +223,9 @@ struct SigningDiagnosticsLiveTests {
 
     @Test("LiveEnvironment can extract app certificate chain from test host")
     func liveAppCertificateChainExtractable() {
-        guard !TestIdentity.isRunningUnderRawXCTestTool else { return }
+        guard !TestIdentity.isRunningUnderRawXCTestTool else {
+            return
+        }
         let env = SigningDiagnostics.LiveEnvironment()
         guard env.validateAppSignature() == nil else {
             return
@@ -230,7 +238,9 @@ struct SigningDiagnosticsLiveTests {
 
     @Test("LiveEnvironment handles helper certificate chain availability")
     func liveHelperCertificateChainAvailability() {
-        guard !TestIdentity.isRunningUnderRawXCTestTool else { return }
+        guard !TestIdentity.isRunningUnderRawXCTestTool else {
+            return
+        }
         let env = SigningDiagnostics.LiveEnvironment()
         guard env.validateAppSignature() == nil else {
             return
@@ -238,7 +248,7 @@ struct SigningDiagnosticsLiveTests {
 
         let chain = env.helperCertificateChain()
         if let chain {
-            #expect(chain.count > 0)
+            #expect(!chain.isEmpty)
         } else {
             #expect(SigningDiagnostics.classify(env) == .certificateChainUnavailable)
         }
@@ -246,7 +256,9 @@ struct SigningDiagnosticsLiveTests {
 
     @Test("Live classify returns healthy or helperBinaryNotFound depending on helper install state")
     func liveClassifyContract() {
-        guard !TestIdentity.isRunningUnderRawXCTestTool else { return }
+        guard !TestIdentity.isRunningUnderRawXCTestTool else {
+            return
+        }
         let env = SigningDiagnostics.LiveEnvironment()
         guard env.validateAppSignature() == nil else {
             return
@@ -275,33 +287,105 @@ struct SigningDiagnosticsLiveTests {
 
 // MARK: - SigningPreflightCacheTests
 
+@MainActor
 struct SigningPreflightCacheTests {
-    @Test("preflight cache invalidation triggers re-evaluation")
-    @MainActor
-    func preflightCacheInvalidation() {
+    @Test("async cache memoizes repeated calls until invalidated")
+    func preflightCacheInvalidation() async {
         let cache = SigningPreflightCache()
-        var callCount = 0
+        let callCount = OSAllocatedUnfairLock(initialState: 0)
 
         cache.provider = {
-            callCount += 1
-            if callCount == 1 {
+            let count = callCount.withLock { value -> Int in
+                value += 1
+                return value
+            }
+            if count == 1 {
                 return .signingIdentityMismatch(appSigner: "Dev", helperSigner: "Prod")
             }
             return .healthy
         }
 
-        let first = cache.evaluate()
+        let first = await cache.evaluate()
         #expect(first == .signingIdentityMismatch(appSigner: "Dev", helperSigner: "Prod"))
-        #expect(callCount == 1)
+        #expect(callCount.withLock { $0 } == 1)
 
-        let second = cache.evaluate()
+        let second = await cache.evaluate()
         #expect(second == .signingIdentityMismatch(appSigner: "Dev", helperSigner: "Prod"))
-        #expect(callCount == 1)
+        #expect(callCount.withLock { $0 } == 1)
 
         cache.invalidate()
 
-        let third = cache.evaluate()
+        let third = await cache.evaluate()
         #expect(third == .healthy)
-        #expect(callCount == 2)
+        #expect(callCount.withLock { $0 } == 2)
+    }
+
+    @Test("concurrent evaluations coalesce to a single provider invocation")
+    func concurrentEvaluationsCoalesce() async {
+        let cache = SigningPreflightCache()
+        let callCount = OSAllocatedUnfairLock(initialState: 0)
+
+        cache.provider = {
+            callCount.withLock { $0 += 1 }
+            // Hold the detached diagnosis open long enough for a second caller to attach to
+            // the same in-flight generation instead of starting its own.
+            Thread.sleep(forTimeInterval: 0.05)
+            return .healthy
+        }
+
+        async let first = cache.evaluate()
+        async let second = cache.evaluate()
+        let results = await [first, second]
+
+        #expect(results == [.healthy, .healthy])
+        #expect(callCount.withLock { $0 } == 1)
+    }
+
+    @Test("provider runs off the main thread")
+    func providerRunsOffMainThread() async {
+        let cache = SigningPreflightCache()
+        let ranOnMainThread = OSAllocatedUnfairLock(initialState: true)
+
+        cache.provider = {
+            ranOnMainThread.withLock { $0 = Thread.isMainThread }
+            return .healthy
+        }
+
+        _ = await cache.evaluate()
+
+        #expect(ranOnMainThread.withLock { $0 } == false)
+    }
+
+    @Test("invalidation during an in-flight evaluation returns the current generation")
+    func invalidationDuringFlightRetriesCurrentGeneration() async {
+        let cache = SigningPreflightCache()
+        let callCount = OSAllocatedUnfairLock(initialState: 0)
+
+        cache.provider = {
+            let count = callCount.withLock { value -> Int in
+                value += 1
+                return value
+            }
+            if count == 1 {
+                // The first (soon-to-be-stale) diagnosis blocks while it is invalidated.
+                Thread.sleep(forTimeInterval: 0.1)
+                return .signingIdentityMismatch(appSigner: "Stale", helperSigner: "Stale")
+            }
+            return .healthy
+        }
+
+        async let firstEvaluation = cache.evaluate()
+        // Let the first detached diagnosis start, then invalidate mid-flight.
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        cache.invalidate()
+
+        let result = await firstEvaluation
+        #expect(result == .healthy)
+        #expect(callCount.withLock { $0 } == 2)
+
+        // The fresh result is now memoized; no further diagnosis runs.
+        let cached = await cache.evaluate()
+        #expect(cached == .healthy)
+        #expect(callCount.withLock { $0 } == 2)
     }
 }

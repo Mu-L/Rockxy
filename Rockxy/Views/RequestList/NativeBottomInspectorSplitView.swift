@@ -28,6 +28,31 @@ struct NativeBottomInspectorSplitView<Primary: View, Inspector: View>: NSViewCon
 
     // MARK: Internal
 
+    // MARK: - Coordinator
+
+    final class Coordinator {
+        // MARK: Internal
+
+        var primaryController: NSHostingController<NativeBottomDeferredContent<Primary>>?
+        var inspectorController: NSHostingController<NativeBottomDeferredContent<Inspector>>?
+
+        func recordInitialPresentation(_ isPresented: Bool) {
+            lastAppliedPresentation = isPresented
+        }
+
+        func shouldApplyPresentation(_ isPresented: Bool) -> Bool {
+            guard lastAppliedPresentation != isPresented else {
+                return false
+            }
+            lastAppliedPresentation = isPresented
+            return true
+        }
+
+        // MARK: Private
+
+        private var lastAppliedPresentation: Bool?
+    }
+
     @Binding var isInspectorPresented: Bool
 
     let autosaveName: String
@@ -89,7 +114,9 @@ struct NativeBottomInspectorSplitView<Primary: View, Inspector: View>: NSViewCon
         _ proposal: ProposedViewSize,
         nsViewController: NativeBottomInspectorSplitViewController,
         context: Context
-    ) -> CGSize? {
+    )
+        -> CGSize?
+    {
         NativeBottomInspectorSplitSizing.resolve(
             proposal,
             naturalHeight: primaryMinimumHeight + inspectorMinimumHeight
@@ -101,28 +128,11 @@ struct NativeBottomInspectorSplitView<Primary: View, Inspector: View>: NSViewCon
     private func updateVisibilityCallback(on controller: NativeBottomInspectorSplitViewController) {
         let presentation = $isInspectorPresented
         controller.onInspectorVisibilityChanged = { isVisible in
-            guard presentation.wrappedValue != isVisible else { return }
+            guard presentation.wrappedValue != isVisible else {
+                return
+            }
             presentation.wrappedValue = isVisible
         }
-    }
-
-    // MARK: - Coordinator
-
-    final class Coordinator {
-        var primaryController: NSHostingController<NativeBottomDeferredContent<Primary>>?
-        var inspectorController: NSHostingController<NativeBottomDeferredContent<Inspector>>?
-
-        func recordInitialPresentation(_ isPresented: Bool) {
-            lastAppliedPresentation = isPresented
-        }
-
-        func shouldApplyPresentation(_ isPresented: Bool) -> Bool {
-            guard lastAppliedPresentation != isPresented else { return false }
-            lastAppliedPresentation = isPresented
-            return true
-        }
-
-        private var lastAppliedPresentation: Bool?
     }
 }
 
@@ -147,8 +157,20 @@ enum NativeBottomInspectorSplitSizing {
         let resolved = proposal.replacingUnspecifiedDimensions(
             by: CGSize(width: 800, height: naturalHeight)
         )
-        guard resolved.width.isFinite, resolved.height.isFinite else { return nil }
+        guard resolved.width.isFinite, resolved.height.isFinite else {
+            return nil
+        }
         return resolved
+    }
+
+    /// The split view can safely consume its pending initial state once both dimensions are
+    /// finite and strictly positive. Collapsing or expanding into zero/insufficient bounds is
+    /// what produced startup `Invalid view geometry` faults.
+    static func isLayoutReady(_ bounds: CGRect) -> Bool {
+        bounds.width.isFinite
+            && bounds.height.isFinite
+            && bounds.width > 0
+            && bounds.height > 0
     }
 }
 
@@ -162,6 +184,24 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
 
     var isInspectorPresented: Bool {
         inspectorItem.map { !$0.isCollapsed } ?? false
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        guard pendingInitialVisibility != nil else {
+            return
+        }
+        guard NativeBottomInspectorSplitSizing.isLayoutReady(splitView.bounds) else {
+            // Bounds are still zero/insufficient. Retain the requested state and wait for a
+            // valid layout pass rather than collapsing/expanding into negative geometry.
+            return
+        }
+        guard let pendingInitialVisibility else {
+            return
+        }
+        self.pendingInitialVisibility = nil
+        setInspectorPresented(pendingInitialVisibility, animated: false)
+        isApplyingInitialState = false
     }
 
     func configure(
@@ -196,12 +236,15 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         requestedInspectorVisibility = isInspectorPresented
         pendingInitialVisibility = isInspectorPresented
         observeCollapseState(of: inspectorItem)
-        setInspectorPresented(isInspectorPresented, animated: false)
+        // Initial collapse state is deferred to the first valid layout pass. Applying it here,
+        // while the controller has zero-sized bounds, risks negative startup geometry.
     }
 
     func setInspectorPresented(_ isPresented: Bool, animated: Bool) {
         requestedInspectorVisibility = isPresented
-        guard let inspectorItem, inspectorItem.isCollapsed == isPresented else { return }
+        guard let inspectorItem, inspectorItem.isCollapsed == isPresented else {
+            return
+        }
 
         if animated, view.window != nil {
             NSAnimationContext.runAnimationGroup { context in
@@ -213,20 +256,20 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         }
     }
 
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        guard let pendingInitialVisibility else { return }
-        self.pendingInitialVisibility = nil
-        setInspectorPresented(pendingInitialVisibility, animated: false)
-        isApplyingInitialState = false
-    }
-
     // MARK: Private
+
+    private weak var inspectorItem: NSSplitViewItem?
+    private var collapseObservation: NSKeyValueObservation?
+    private var requestedInspectorVisibility = false
+    private var pendingInitialVisibility: Bool?
+    private var isApplyingInitialState = true
 
     private func observeCollapseState(of item: NSSplitViewItem) {
         collapseObservation = item.observe(\.isCollapsed, options: [.new]) { [weak self] _, _ in
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 // Read the current value after AppKit finishes the collapse transaction.
                 // A queued KVO callback can otherwise publish an obsolete intermediate
                 // value and immediately reverse the SwiftUI binding.
@@ -236,15 +279,13 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
     }
 
     private func inspectorVisibilityDidChange(_ isVisible: Bool) {
-        guard !isApplyingInitialState else { return }
-        guard isVisible != requestedInspectorVisibility else { return }
+        guard !isApplyingInitialState else {
+            return
+        }
+        guard isVisible != requestedInspectorVisibility else {
+            return
+        }
         requestedInspectorVisibility = isVisible
         onInspectorVisibilityChanged?(isVisible)
     }
-
-    private weak var inspectorItem: NSSplitViewItem?
-    private var collapseObservation: NSKeyValueObservation?
-    private var requestedInspectorVisibility = false
-    private var pendingInitialVisibility: Bool?
-    private var isApplyingInitialState = true
 }

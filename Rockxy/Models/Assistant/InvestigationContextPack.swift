@@ -16,17 +16,44 @@ struct InvestigationContextLimits: Equatable {
 // MARK: - InvestigationContextManifest
 
 struct InvestigationContextManifest: Equatable {
+    // MARK: Lifecycle
+
+    init(
+        requestCount: Int,
+        outboundBytes: Int,
+        redactedHeaderCount: Int,
+        redactedQueryCount: Int,
+        redactedURLCredentialCount: Int = 0,
+        redactedBodyFieldCount: Int,
+        truncatedBodyCount: Int,
+        omittedBinaryBodyCount: Int,
+        omittedTransactionCount: Int
+    ) {
+        self.requestCount = requestCount
+        self.outboundBytes = outboundBytes
+        self.redactedHeaderCount = redactedHeaderCount
+        self.redactedQueryCount = redactedQueryCount
+        self.redactedURLCredentialCount = redactedURLCredentialCount
+        self.redactedBodyFieldCount = redactedBodyFieldCount
+        self.truncatedBodyCount = truncatedBodyCount
+        self.omittedBinaryBodyCount = omittedBinaryBodyCount
+        self.omittedTransactionCount = omittedTransactionCount
+    }
+
+    // MARK: Internal
+
     let requestCount: Int
     let outboundBytes: Int
     let redactedHeaderCount: Int
     let redactedQueryCount: Int
+    let redactedURLCredentialCount: Int
     let redactedBodyFieldCount: Int
     let truncatedBodyCount: Int
     let omittedBinaryBodyCount: Int
     let omittedTransactionCount: Int
 
     var redactedFieldCount: Int {
-        redactedHeaderCount + redactedQueryCount + redactedBodyFieldCount
+        redactedHeaderCount + redactedQueryCount + redactedURLCredentialCount + redactedBodyFieldCount
     }
 }
 

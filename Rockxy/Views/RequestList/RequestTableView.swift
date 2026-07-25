@@ -23,7 +23,7 @@ struct RequestTableView: NSViewRepresentable {
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
-    var onSelectionChanged: ((Set<UUID>) -> Void)?
+    var onSelectionChanged: ((Set<UUID>, UUID?) -> Void)?
     var onDoubleClick: ((HTTPTransaction) -> Void)?
     var mainCoordinator: MainContentCoordinator?
 
@@ -385,6 +385,7 @@ extension RequestTableView {
         private var autosizeGeneration = 0
         private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
         private var pendingContextSelectionIDs: Set<UUID>?
+        private var pendingContextPrimaryID: UUID?
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -647,7 +648,13 @@ extension RequestTableView {
 
             lastSyncedSelectionIDs = ids
             parent.selectedIDs = ids
-            parent.onSelectionChanged?(ids)
+            let primaryRow = selected.contains(tableView.clickedRow)
+                ? tableView.clickedRow
+                : tableView.selectedRow
+            let primaryID = primaryRow >= 0 && primaryRow < rows.count
+                ? rows[primaryRow].id
+                : nil
+            parent.onSelectionChanged?(ids, primaryID)
         }
 
         func tableView(_ tableView: NSTableView, sizeToFitWidthOfColumn column: Int) -> CGFloat {
@@ -809,13 +816,15 @@ extension RequestTableView {
                 return
             }
             pendingContextSelectionIDs = nil
+            let primaryID = pendingContextPrimaryID
+            pendingContextPrimaryID = nil
             DispatchQueue.main.async { [weak self] in
                 guard let self else {
                     return
                 }
                 self.lastSyncedSelectionIDs = ids
                 self.parent.selectedIDs = ids
-                self.parent.onSelectionChanged?(ids)
+                self.parent.onSelectionChanged?(ids, primaryID)
             }
         }
 
@@ -1689,6 +1698,7 @@ extension RequestTableView {
             tableView.selectRowIndexes(selection, byExtendingSelection: false)
             isUpdatingSelection = false
             pendingContextSelectionIDs = ids
+            pendingContextPrimaryID = rows[clickedRow].id
         }
 
         // MARK: - Column Header Context Menu
