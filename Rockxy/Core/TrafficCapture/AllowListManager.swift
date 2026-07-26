@@ -282,7 +282,7 @@ final class AllowListManager {
     /// Maximum length of a user-authored regex pattern. Bounds the worst case
     /// for regex compilation / matching as defense-in-depth against accidentally
     /// pasted catastrophic-backtracking patterns.
-    private static let maxUserRegexLength = 2_048
+    private static let maxUserRegexLength = AllowListRulePatternValidation.maxRegexLength
 
     private static var defaultStorageURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

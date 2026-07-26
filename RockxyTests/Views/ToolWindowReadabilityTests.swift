@@ -362,7 +362,7 @@ struct ToolWindowReadabilityTests {
         }
     }
 
-    @Test("Block and Allow List retain readable table rhythm during the adaptive migration")
+    @Test("Block and Allow List retain readable table rhythm")
     func blockAndAllowListRetainReadableTableRhythm() throws {
         let blockListFile = "Rockxy/Views/Rules/BlockListWindowView.swift"
         let allowListFile = "Rockxy/Views/Rules/AllowListWindowView.swift"
@@ -390,10 +390,9 @@ struct ToolWindowReadabilityTests {
         #expect(blockListSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
 
         let allowListSource = try readProjectFile(allowListFile)
-        #expect(
-            allowListSource.contains(".frame(width: 1_200, height: 672)"),
-            "\(allowListFile) should retain the Scripting window height until its migration"
-        )
+        #expect(allowListSource.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
+        #expect(allowListSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+        #expect(!allowListSource.contains(".frame(width: 1_200, height: 672)"))
     }
 
     @Test("List-style tool windows do not add an extra footer top gap")
@@ -591,7 +590,6 @@ struct ToolWindowReadabilityTests {
         let legacyFooterFiles = [
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
-            "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
@@ -609,6 +607,7 @@ struct ToolWindowReadabilityTests {
 
         let adaptiveFooterFiles = [
             "Rockxy/Views/Rules/BlockListWindowView.swift",
+            "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
         ]
         for file in adaptiveFooterFiles {
@@ -623,6 +622,32 @@ struct ToolWindowReadabilityTests {
             )
             #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
         }
+    }
+
+    @Test("Allow List uses the approved native window and editor structure")
+    func allowListUsesApprovedNativeStructure() throws {
+        let windowSource = try readProjectFile("Rockxy/Views/Rules/AllowListWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Rules/AddAllowListRuleSheet.swift")
+
+        #expect(windowSource.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(windowSource.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(windowSource.contains("ALLOW LIST OFF"))
+        #expect(windowSource.contains("Migrate from Another Proxy"))
+        #expect(windowSource.contains("private enum AllowListTableLayout"))
+        #expect(windowSource.contains("static let contentInset: CGFloat = 10"))
+        #expect(windowSource.contains("width: AllowListTableLayout.nameWidth,"))
+        #expect(windowSource.contains("alignment: .center"))
+        #expect(windowSource.contains(".padding(.leading, AllowListTableLayout.contentInset)"))
+        #expect(windowSource.contains(".overlay(alignment: .trailing)"))
+        #expect(!windowSource.contains(".padding(.trailing, 10)"))
+        #expect(!windowSource.contains("AllowListFilterBar"))
+        #expect(!windowSource.contains("isFilterBarVisible"))
+
+        #expect(editorSource.contains(#"String(localized: "Rule Details")"#))
+        #expect(editorSource.contains(#"String(localized: "Capture Effect")"#))
+        #expect(editorSource.contains("dataEntryMenuLabel"))
+        #expect(editorSource.contains("chevron.up.chevron.down"))
+        #expect(editorSource.contains("footerButtonLabel"))
     }
 
     // MARK: Private
