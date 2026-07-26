@@ -362,12 +362,11 @@ struct ToolWindowReadabilityTests {
         }
     }
 
-    @Test("Block and Allow List follow Scripting window layout rhythm")
-    func blockAndAllowListFollowScriptingWindowLayoutRhythm() throws {
-        let files = [
-            "Rockxy/Views/Rules/BlockListWindowView.swift",
-            "Rockxy/Views/Rules/AllowListWindowView.swift",
-        ]
+    @Test("Block and Allow List retain readable table rhythm during the adaptive migration")
+    func blockAndAllowListRetainReadableTableRhythm() throws {
+        let blockListFile = "Rockxy/Views/Rules/BlockListWindowView.swift"
+        let allowListFile = "Rockxy/Views/Rules/AllowListWindowView.swift"
+        let files = [blockListFile, allowListFile]
         let forbiddenSnippets = [
             ".frame(width: 1_200, height: 642)",
             ".controlSize(.large)",
@@ -380,15 +379,21 @@ struct ToolWindowReadabilityTests {
 
         for file in files {
             let source = try readProjectFile(file)
-            #expect(
-                source.contains(".frame(width: 1_200, height: 672)"),
-                "\(file) should match Scripting window height"
-            )
             #expect(source.contains(".frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)"))
             for snippet in forbiddenSnippets {
                 #expect(!source.contains(snippet), "\(file) must not keep \(snippet)")
             }
         }
+
+        let blockListSource = try readProjectFile(blockListFile)
+        #expect(blockListSource.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
+        #expect(blockListSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+
+        let allowListSource = try readProjectFile(allowListFile)
+        #expect(
+            allowListSource.contains(".frame(width: 1_200, height: 672)"),
+            "\(allowListFile) should retain the Scripting window height until its migration"
+        )
     }
 
     @Test("List-style tool windows do not add an extra footer top gap")
@@ -581,25 +586,41 @@ struct ToolWindowReadabilityTests {
         }
     }
 
-    @Test("Rule-style tool windows share Scripting layout spacing")
-    func ruleStyleToolWindowsShareScriptingLayoutSpacing() throws {
-        let files = [
+    @Test("Rule-style tool windows use shared layout spacing")
+    func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
+        let legacyFooterFiles = [
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
-            "Rockxy/Views/Rules/BlockListWindowView.swift",
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
         ]
 
-        for file in files {
+        for file in legacyFooterFiles {
             let source = try readProjectFile(file)
             #expect(
                 source.contains("toolMetrics.contentHorizontalPadding"),
                 "\(file) should use shared horizontal padding"
             )
             #expect(source.contains("toolMetrics.footerBottomPadding"), "\(file) should use shared footer padding")
+            #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
+        }
+
+        let adaptiveFooterFiles = [
+            "Rockxy/Views/Rules/BlockListWindowView.swift",
+            "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
+        ]
+        for file in adaptiveFooterFiles {
+            let source = try readProjectFile(file)
+            #expect(
+                source.contains("toolMetrics.contentHorizontalPadding"),
+                "\(file) should use shared horizontal padding"
+            )
+            #expect(
+                source.contains(".padding(.vertical, toolMetrics.footerTopPadding)"),
+                "\(file) should use the approved adaptive footer rhythm"
+            )
             #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
         }
     }
