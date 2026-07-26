@@ -755,10 +755,14 @@ private struct ModifyHeaderEditSheet: View {
                         )
                     )
 
-                identityFields
-                methodAndMatchRow
-
-                conditionalFields
+                ModifyHeaderRuleDetailsSection(
+                    name: $name,
+                    urlPattern: $urlPattern,
+                    httpMethod: $httpMethod,
+                    matchType: $matchType,
+                    includeSubpaths: $includeSubpaths,
+                    toolMetrics: toolMetrics
+                )
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(String(localized: "Ordered Operations"))
@@ -849,6 +853,49 @@ private struct ModifyHeaderEditSheet: View {
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
+    }
+}
+
+private struct ModifyHeaderRuleDetailsSection: View {
+    // MARK: Internal
+
+    @Binding var name: String
+    @Binding var urlPattern: String
+    @Binding var httpMethod: HTTPMethodFilter
+    @Binding var matchType: RuleMatchType
+    @Binding var includeSubpaths: Bool
+
+    let toolMetrics: ToolWindowDisplayMetrics
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                identityFields
+                methodAndMatchRow
+                conditionalFields
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    // MARK: Private
 
     private var identityFields: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
@@ -989,13 +1036,5 @@ private struct ModifyHeaderEditSheet: View {
             }
             Text(title)
         }
-    }
-
-    private func footerButtonLabel(_ title: String) -> some View {
-        Text(title)
-            .frame(
-                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
-                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
-            )
     }
 }
