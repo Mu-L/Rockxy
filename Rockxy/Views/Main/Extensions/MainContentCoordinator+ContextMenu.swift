@@ -200,7 +200,8 @@ extension MainContentCoordinator {
         let draft = NetworkConditionsDraftBuilder.fromTransaction(transaction)
         NetworkConditionsDraftStore.shared.setPending(draft)
         NotificationCenter.default.post(name: .openNetworkConditionsWindow, object: nil)
-        Self.logger.info("Created Network Conditions draft for \(transaction.request.url.absoluteString)")
+        let safeTarget = "\(transaction.request.method) \(transaction.request.host)\(transaction.request.path)"
+        Self.logger.info("Created Network Conditions draft for \(safeTarget, privacy: .private)")
     }
 
     func enableSSLProxying(for transaction: HTTPTransaction) {

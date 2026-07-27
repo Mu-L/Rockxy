@@ -1,6 +1,11 @@
 import AppKit
+import Darwin
 import os
 import SwiftUI
+
+// The management window, editor, and their testable form contracts remain colocated
+// while this workflow is stabilized so rule semantics cannot drift across files.
+// swiftlint:disable file_length
 
 // Presents the network conditions window for rule editing and management.
 
@@ -17,13 +22,17 @@ struct NetworkConditionProfileMetadata: Equatable {
     static func from(preset: NetworkConditionPreset, latencyMs: Int) -> Self {
         let effectiveLatency = latencyMs > 0 ? latencyMs : preset.defaultLatencyMs
         return Self(
-            name: preset.displayName,
+            name: title(for: preset),
             latencyMs: effectiveLatency,
             downloadBandwidth: preset.downloadBandwidthLabel,
             uploadBandwidth: preset.uploadBandwidthLabel,
             packetLoss: preset.packetLossLabel,
             systemImage: preset.systemImage
         )
+    }
+
+    static func title(for preset: NetworkConditionPreset) -> String {
+        preset == .custom ? String(localized: "Custom Latency") : preset.displayName
     }
 }
 
@@ -43,7 +52,6 @@ final class NetworkConditionsWindowViewModel {
     private(set) var allRules: [ProxyRule] = []
     var searchText = ""
     var selectedRuleID: UUID?
-    var isFilterVisible = false
     var isToolEnabled: Bool
 
     var networkConditionRules: [ProxyRule] {
@@ -57,14 +65,15 @@ final class NetworkConditionsWindowViewModel {
 
     var filteredRules: [ProxyRule] {
         let conditions = networkConditionRules
-        guard !searchText.isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             return conditions
         }
         return conditions.filter { rule in
-            rule.name.localizedCaseInsensitiveContains(searchText)
-                || (rule.matchCondition.urlPattern ?? "").localizedCaseInsensitiveContains(searchText)
-                || hostLabel(for: rule).localizedCaseInsensitiveContains(searchText)
-                || networkProfile(for: rule).name.localizedCaseInsensitiveContains(searchText)
+            rule.name.localizedCaseInsensitiveContains(query)
+                || (rule.matchCondition.urlPattern ?? "").localizedCaseInsensitiveContains(query)
+                || hostLabel(for: rule).localizedCaseInsensitiveContains(query)
+                || networkProfile(for: rule).name.localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -139,9 +148,11 @@ final class NetworkConditionsWindowViewModel {
     }
 
     func addRule(_ rule: ProxyRule) {
-        for index in allRules.indices {
-            if case .networkCondition = allRules[index].action, allRules[index].isEnabled {
-                allRules[index].isEnabled = false
+        if rule.isEnabled {
+            for index in allRules.indices {
+                if case .networkCondition = allRules[index].action, allRules[index].isEnabled {
+                    allRules[index].isEnabled = false
+                }
             }
         }
         allRules.append(rule)
@@ -163,6 +174,38 @@ final class NetworkConditionsWindowViewModel {
                 }
             }
         }
+    }
+
+    @discardableResult
+    func saveRule(_ rule: ProxyRule, using gate: RulePolicyGate = .shared) async -> Bool {
+        guard commitChanges else {
+            if allRules.contains(where: { $0.id == rule.id }) {
+                updateRule(rule)
+            } else {
+                addRule(rule)
+            }
+            return true
+        }
+
+        if allRules.contains(where: { $0.id == rule.id }) {
+            await gate.updateRule(rule)
+        } else {
+            let accepted = if rule.isEnabled {
+                await gate.addNetworkConditionExclusive(rule)
+            } else {
+                await gate.addRule(rule)
+            }
+            guard accepted else {
+                allRules = await RuleEngine.shared.allRules
+                reconcileSelectionAfterRulesChange()
+                return false
+            }
+        }
+
+        allRules = await RuleEngine.shared.allRules
+        selectedRuleID = rule.id
+        reconcileSelectionAfterRulesChange()
+        return true
     }
 
     func updateRule(_ rule: ProxyRule) {
@@ -253,7 +296,7 @@ final class NetworkConditionsWindowViewModel {
         if hasMultipleActive {
             return (String(localized: "Conflict"), .orange)
         }
-        return (String(localized: "Active"), .green)
+        return (String(localized: "Enabled"), .green)
     }
 
     // MARK: Private
@@ -302,17 +345,20 @@ final class NetworkConditionsWindowViewModel {
 // MARK: - NetworkConditionsWindowView
 
 enum NetworkConditionsPatternFormatter {
+    private static let supportedURLSchemes = Set(["http", "https"])
+
     static func hostScopedPattern(from hostText: String) -> String {
         let host = normalizedHostAndPort(from: hostText)
         let escapedHost = NSRegularExpression.escapedPattern(for: host)
         let portPattern = hostContainsPort(host) ? "" : "(?::\\d+)?"
-        return "^https?://\(escapedHost)\(portPattern)(?:/.*)?$"
+        return "(?i)^https?://\(escapedHost)\(portPattern)(?:/.*)?$"
     }
 
     static func hostText(from pattern: String?) -> String {
         guard var value = pattern, !value.isEmpty else {
             return ""
         }
+        value = value.replacingOccurrences(of: "(?i)", with: "")
         value = value.replacingOccurrences(of: "^https?://", with: "")
         value = value.replacingOccurrences(of: "^", with: "")
         value = value.replacingOccurrences(of: "$", with: "")
@@ -320,6 +366,8 @@ enum NetworkConditionsPatternFormatter {
         value = value.replacingOccurrences(of: "(?::\\d+)?", with: "")
         value = value.replacingOccurrences(of: "\\.", with: ".")
         value = value.replacingOccurrences(of: "\\:", with: ":")
+        value = value.replacingOccurrences(of: "\\[", with: "[")
+        value = value.replacingOccurrences(of: "\\]", with: "]")
         value = value.replacingOccurrences(of: "https://", with: "")
         value = value.replacingOccurrences(of: "http://", with: "")
         if let slashIndex = value.firstIndex(of: "/") {
@@ -328,20 +376,144 @@ enum NetworkConditionsPatternFormatter {
         return value.isEmpty ? pattern ?? "" : value
     }
 
+    static func hostValidationMessage(for hostText: String) -> String? {
+        let trimmed = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return String(localized: "Enter a host or choose All proxied traffic.")
+        }
+        guard normalizedHostAndPortIfValid(from: trimmed) != nil else {
+            return String(
+                localized:
+                "Enter a valid hostname, IPv4 address, or IPv6 address with an optional port from 1 to 65535."
+            )
+        }
+        return nil
+    }
+
     private static func normalizedHostAndPort(from hostText: String) -> String {
-        var value = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let components = URLComponents(string: value), let host = components.host {
-            value = host
-            if let port = components.port {
-                value += ":\(port)"
+        normalizedHostAndPortIfValid(from: hostText)
+            ?? hostText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func normalizedHostAndPortIfValid(from hostText: String) -> String? {
+        let value = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.contains(where: \.isWhitespace), !value.contains("@") else {
+            return nil
+        }
+
+        if value.contains("://") {
+            guard let components = URLComponents(string: value),
+                  let scheme = components.scheme?.lowercased(),
+                  supportedURLSchemes.contains(scheme),
+                  let host = components.host,
+                  !host.isEmpty,
+                  components.user == nil,
+                  components.password == nil else
+            {
+                return nil
             }
+            let unwrappedHost = host.hasPrefix("[") && host.hasSuffix("]")
+                ? String(host.dropFirst().dropLast())
+                : host
+            guard let normalizedHost = normalizedHostIfValid(unwrappedHost) else {
+                return nil
+            }
+            let authorityHost = normalizedHost.contains(":") ? "[\(normalizedHost)]" : normalizedHost
+            guard let port = components.port else {
+                return authorityHost
+            }
+            guard (1 ... 65_535).contains(port) else {
+                return nil
+            }
+            return "\(authorityHost):\(port)"
         }
-        value = value.replacingOccurrences(of: "https://", with: "")
-        value = value.replacingOccurrences(of: "http://", with: "")
-        if let slashIndex = value.firstIndex(of: "/") {
-            value = String(value[..<slashIndex])
+
+        guard !value.contains(where: { $0 == "/" || $0 == "?" || $0 == "#" }) else {
+            return nil
         }
-        return value
+
+        if value.hasPrefix("[") {
+            guard let closingBracket = value.firstIndex(of: "]") else {
+                return nil
+            }
+            let bracketedHost = String(value[...closingBracket])
+            let innerHost = String(value[value.index(after: value.startIndex) ..< closingBracket])
+            guard isValidIPv6(innerHost) else
+            {
+                return nil
+            }
+            let remainder = String(value[value.index(after: closingBracket)...])
+            guard !remainder.isEmpty else {
+                return bracketedHost.lowercased()
+            }
+            guard remainder.hasPrefix(":"),
+                  let port = Int(remainder.dropFirst()),
+                  (1 ... 65_535).contains(port) else
+            {
+                return nil
+            }
+            return "\(bracketedHost.lowercased()):\(port)"
+        }
+
+        if value.filter({ $0 == ":" }).count > 1 {
+            guard isValidIPv6(value) else {
+                return nil
+            }
+            return "[\(value.lowercased())]"
+        }
+
+        if let colon = value.lastIndex(of: ":") {
+            let host = String(value[..<colon])
+            guard let port = Int(value[value.index(after: colon)...]),
+                  let normalizedHost = normalizedHostIfValid(host),
+                  (1 ... 65_535).contains(port) else
+            {
+                return nil
+            }
+            return "\(normalizedHost):\(port)"
+        }
+
+        return normalizedHostIfValid(value)
+    }
+
+    private static func normalizedHostIfValid(_ host: String) -> String? {
+        let normalized = host.lowercased()
+        if isValidIPv4(normalized) || isValidIPv6(normalized) {
+            return normalized
+        }
+        guard normalized.utf8.count <= 253 else {
+            return nil
+        }
+
+        let hostname = normalized.hasSuffix(".") ? String(normalized.dropLast()) : normalized
+        guard !hostname.isEmpty else {
+            return nil
+        }
+        if hostname.allSatisfy({ $0.isNumber || $0 == "." }) {
+            return nil
+        }
+
+        let labels = hostname.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.allSatisfy({ label in
+            !label.isEmpty
+                && label.utf8.count <= 63
+                && label.first != "-"
+                && label.last != "-"
+                && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+        }) else {
+            return nil
+        }
+        return hostname
+    }
+
+    private static func isValidIPv4(_ host: String) -> Bool {
+        var address = in_addr()
+        return host.withCString { inet_pton(AF_INET, $0, &address) } == 1
+    }
+
+    private static func isValidIPv6(_ host: String) -> Bool {
+        var address = in6_addr()
+        return host.withCString { inet_pton(AF_INET6, $0, &address) } == 1
     }
 
     private static func hostContainsPort(_ host: String) -> Bool {
@@ -368,13 +540,35 @@ enum NetworkConditionsRuleForm {
         hostText: String,
         applySystemWide: Bool,
         preset: NetworkConditionPreset,
-        customLatencyMs: Int
+        customLatencyMs: Int,
+        original: ProxyRule? = nil
     )
         -> Bool
     {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && effectiveLatencyMs(preset: preset, customLatencyMs: customLatencyMs) > 0
-            && (applySystemWide || !hostText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            && hostValidationMessage(
+                original: original,
+                hostText: hostText,
+                applySystemWide: applySystemWide
+            ) == nil
+    }
+
+    static func hostValidationMessage(
+        original: ProxyRule?,
+        hostText: String,
+        applySystemWide: Bool
+    )
+        -> String?
+    {
+        guard !applySystemWide, !scopeIsUnchanged(
+            original: original,
+            hostText: hostText,
+            applySystemWide: applySystemWide
+        ) else {
+            return nil
+        }
+        return NetworkConditionsPatternFormatter.hostValidationMessage(for: hostText)
     }
 
     static func makeRule(
@@ -395,7 +589,7 @@ enum NetworkConditionsRuleForm {
         )
         return ProxyRule(
             id: existingID ?? UUID(),
-            name: name,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             isEnabled: isEnabled,
             matchCondition: condition,
             action: .networkCondition(
@@ -404,6 +598,85 @@ enum NetworkConditionsRuleForm {
             )
         )
     }
+
+    static func makeRule(
+        original: ProxyRule?,
+        name: String,
+        isEnabled: Bool,
+        hostText: String,
+        applySystemWide: Bool,
+        preset: NetworkConditionPreset,
+        customLatencyMs: Int
+    )
+        -> ProxyRule
+    {
+        let trimmedHost = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let originalCondition = original?.matchCondition
+        let originalPattern = originalCondition?.urlPattern
+        let scopeIsUnchanged = scopeIsUnchanged(
+            original: original,
+            hostText: trimmedHost,
+            applySystemWide: applySystemWide
+        )
+
+        let updatedPattern: String?
+        if scopeIsUnchanged {
+            updatedPattern = originalPattern
+        } else if applySystemWide || trimmedHost.isEmpty {
+            updatedPattern = nil
+        } else {
+            updatedPattern = NetworkConditionsPatternFormatter.hostScopedPattern(from: trimmedHost)
+        }
+
+        let condition = RuleMatchCondition(
+            urlPattern: updatedPattern,
+            sourceURLPattern: scopeIsUnchanged ? originalCondition?.sourceURLPattern : nil,
+            method: originalCondition?.method,
+            headerName: originalCondition?.headerName,
+            headerValue: originalCondition?.headerValue,
+            matchType: scopeIsUnchanged ? originalCondition?.matchType : nil,
+            includeSubpaths: scopeIsUnchanged ? originalCondition?.includeSubpaths : nil
+        )
+
+        return ProxyRule(
+            id: original?.id ?? UUID(),
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            isEnabled: isEnabled,
+            matchCondition: condition,
+            action: .networkCondition(
+                preset: preset,
+                delayMs: effectiveLatencyMs(preset: preset, customLatencyMs: customLatencyMs)
+            ),
+            priority: original?.priority ?? 0
+        )
+    }
+
+    private static func scopeIsUnchanged(
+        original: ProxyRule?,
+        hostText: String,
+        applySystemWide: Bool
+    )
+        -> Bool
+    {
+        guard let original else {
+            return false
+        }
+        let originalPattern = original.matchCondition.urlPattern
+        let originalWasSystemWide = originalPattern == nil
+        let originalHostText = NetworkConditionsPatternFormatter.hostText(from: originalPattern)
+        let trimmedHost = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return originalWasSystemWide == applySystemWide
+            && (
+                applySystemWide
+                    || originalHostText.caseInsensitiveCompare(trimmedHost) == .orderedSame
+            )
+    }
+}
+
+private struct NetworkConditionsEditorSession: Identifiable {
+    let id = UUID()
+    let existingRule: ProxyRule?
+    let draft: NetworkConditionsDraft?
 }
 
 struct NetworkConditionsWindowView: View {
@@ -415,15 +688,18 @@ struct NetworkConditionsWindowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            if viewModel.isFilterVisible {
-                filterBar
-            }
+            Divider()
+            infoBanner
+            Divider()
             tableContent
-            shortcutStrip
-            bottomBar
+            Divider()
+            footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_198, height: 641)
+        .frame(
+            minWidth: max(900, toolMetrics.bodyFontSize * 30 + 520),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
         .task { await viewModel.loadRules() }
         .onAppear { consumePendingDraft() }
         .onReceive(NotificationCenter.default.publisher(for: .openNetworkConditionsWindow)) { _ in
@@ -432,123 +708,137 @@ struct NetworkConditionsWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .rulesDidChange)) { notification in
             viewModel.handleRulesDidChange(notification)
         }
-        .sheet(isPresented: $showEditSheet) {
+        .sheet(item: $editorSession) { session in
             NetworkConditionsEditSheet(
-                existingRule: editingRule,
-                draft: pendingDraft,
+                existingRule: session.existingRule,
+                draft: session.draft,
+                willReplaceEnabledRule: session.existingRule == nil && viewModel.activeCount > 0,
                 onSave: { rule in
-                    if editingRule != nil {
-                        viewModel.updateRule(rule)
-                    } else {
-                        viewModel.addRule(rule)
-                    }
-                    pendingDraft = nil
+                    await viewModel.saveRule(rule)
                 }
             )
+            .id(session.id)
+        }
+        .onDeleteCommand {
+            viewModel.removeSelectedRule()
         }
     }
 
     // MARK: Private
 
-    @State private var showEditSheet = false
-    @State private var editingRule: ProxyRule?
-    @State private var pendingDraft: NetworkConditionsDraft?
+    @FocusState private var isSearchFocused: Bool
+    @State private var editorSession: NetworkConditionsEditorSession?
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
-            Toggle(isOn: Binding(
-                get: { viewModel.isToolEnabled },
-                set: { viewModel.setToolEnabled($0) }
-            )) {
-                Text(String(localized: "Enable Network Conditions"))
-                    .font(toolMetrics.font())
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.isToolEnabled },
+                    set: { viewModel.setToolEnabled($0) }
+                )) {
+                    Text(String(localized: "Enable Network Conditions"))
+                        .font(toolMetrics.font(weight: .medium))
+                }
+                .toggleStyle(.checkbox)
+
+                Text(String(localized: "Simulate latency and bandwidth limits for matching HTTP and HTTPS traffic."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
             }
-            .toggleStyle(.checkbox)
-            .padding(.top, toolMetrics.headerTopPadding)
 
-            Text(String(localized: "Simulate Network Conditions with various Preset Profiles. Useful to test with slow networks."))
-                .font(toolMetrics.font())
-                .foregroundStyle(.primary)
+            Spacer()
 
-            Text(String(localized: "Only 1 Rule can be activated at once."))
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
-                .foregroundStyle(.orange)
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .focused($isSearchFocused)
+                .accessibilityLabel(String(localized: "Search Network Conditions rules"))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
     }
 
-    private var filterBar: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField(String(localized: "Filter Network Conditions"), text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-            Button {
-                viewModel.searchText = ""
-                viewModel.isFilterVisible = false
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: viewModel.hasMultipleActive ? "exclamationmark.triangle.fill" : "info.circle")
+                .foregroundStyle(viewModel.hasMultipleActive ? .orange : .secondary)
+            Text(infoBannerText)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(viewModel.hasMultipleActive ? Color.primary : Color.secondary)
+            Spacer()
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, 8)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(
+            viewModel.hasMultipleActive
+                ? Color.orange.opacity(0.1)
+                : Color(nsColor: .controlBackgroundColor).opacity(0.5)
+        )
     }
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleID) {
             TableColumn(String(localized: "Enabled")) { rule in
-                HStack {
-                    Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { rule.isEnabled },
-                        set: { _ in viewModel.toggleRule(id: rule.id) }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-                    .controlSize(.small)
-                    Spacer()
-                }
+                Toggle("", isOn: Binding(
+                    get: { rule.isEnabled },
+                    set: { _ in viewModel.toggleRule(id: rule.id) }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .accessibilityLabel(
+                    String(localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)")
+                )
             }
             .width(62)
 
             TableColumn(String(localized: "Name")) { rule in
                 Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
-                    .font(toolMetrics.font())
                     .lineLimit(1)
-                    .opacity(rule.isEnabled ? 1.0 : 0.62)
+                    .truncationMode(.middle)
+                    .help(rule.name)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 250, ideal: 300)
+            .width(min: 150, ideal: 200)
 
-            TableColumn(String(localized: "Status")) { rule in
-                let (label, color) = viewModel.statusLabel(for: rule)
-                Text(label)
-                    .font(toolMetrics.font())
-                    .lineLimit(1)
-                    .foregroundStyle(color)
-            }
-            .width(110)
-
-            TableColumn(String(localized: "Host")) { rule in
+            TableColumn(String(localized: "Scope")) { rule in
                 Text(viewModel.hostLabel(for: rule))
-                    .font(toolMetrics.font())
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .help(rule.matchCondition.urlPattern ?? String(localized: "System-wide"))
-                    .opacity(rule.isEnabled ? 1.0 : 0.75)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 230, ideal: 250)
+            .width(min: 180, ideal: 260)
 
-            TableColumn(String(localized: "Network Profile")) { rule in
+            TableColumn(String(localized: "Profile")) { rule in
                 let profile = viewModel.networkProfile(for: rule)
                 Text(profile.name)
-                    .font(toolMetrics.font())
                     .lineLimit(1)
-                    .help("\(profile.name), \(profile.latencyMs) ms")
-                    .opacity(rule.isEnabled ? 1.0 : 0.75)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 230, ideal: 260)
+            .width(min: 110, ideal: 145)
+
+            TableColumn(String(localized: "Latency")) { rule in
+                Text("\(viewModel.networkProfile(for: rule).latencyMs) ms")
+                    .lineLimit(1)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
+            }
+            .width(84)
+
+            TableColumn(String(localized: "Download")) { rule in
+                Text(viewModel.networkProfile(for: rule).downloadBandwidth)
+                    .lineLimit(1)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
+            }
+            .width(min: 105, ideal: 125)
+
+            TableColumn(String(localized: "Upload")) { rule in
+                Text(viewModel.networkProfile(for: rule).uploadBandwidth)
+                    .lineLimit(1)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
+            }
+            .width(min: 105, ideal: 125)
         }
         .contextMenu(forSelectionType: UUID.self) { ids in
             tableContextMenu(ids: ids)
@@ -562,40 +852,51 @@ struct NetworkConditionsWindowView: View {
         }
         .overlay {
             if viewModel.filteredRules.isEmpty {
-                Text(emptyTableMessage)
-                    .font(.system(size: toolMetrics.emptyStateFontSize))
-                    .foregroundStyle(.secondary)
+                ContentUnavailableView(
+                    isSearching
+                        ? String(localized: "No matching rules")
+                        : String(localized: "No Network Conditions rules"),
+                    systemImage: isSearching ? "magnifyingglass" : "speedometer",
+                    description: Text(
+                        isSearching
+                            ? String(localized: "Try a different name, scope, or profile.")
+                            : String(localized: "Click \"+\" or press ⌘N to create a profile.")
+                    )
+                )
             }
         }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
     }
 
-    private var shortcutStrip: some View {
-        Text("New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ↵")
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
-    }
-
-    private var bottomBar: some View {
+    private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             addRemoveControl
 
-            Button {
-                // Help content is intentionally deferred; this mirrors the reference affordance.
-            } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.bordered)
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
             moreMenu
+
+            Text(statusCapsuleText)
+                .font(toolMetrics.metadataFont(weight: .semibold))
+                .foregroundStyle(statusCapsuleForeground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(statusCapsuleBackground)
+                .clipShape(Capsule())
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
     private var addRemoveControl: some View {
@@ -631,27 +932,26 @@ struct NetworkConditionsWindowView: View {
             .disabled(viewModel.selectedRuleID == nil)
             .help(String(localized: "Delete Rule"))
         }
-        .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
         .background(Color(nsColor: .controlBackgroundColor))
-        .overlay(
-            Rectangle()
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
+        }
+        .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
     }
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New…")) {
+            Button(String(localized: "New Rule")) {
                 openNewEditor()
             }
             .keyboardShortcut("n", modifiers: .command)
 
-            Divider()
-
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit Rule")) {
                 openEditorForSelection()
             }
-            .keyboardShortcut("e", modifiers: .command)
+            .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRule == nil)
 
             Button(String(localized: "Duplicate")) {
@@ -665,22 +965,12 @@ struct NetworkConditionsWindowView: View {
                     viewModel.toggleRule(id: id)
                 }
             }
-            .keyboardShortcut(.return, modifiers: [])
-            .disabled(viewModel.selectedRule == nil)
-            Button(enableDisableLabel) {
-                if let id = viewModel.selectedRuleID {
-                    viewModel.toggleRule(id: id)
-                }
-            }
-            .keyboardShortcut(.space, modifiers: [])
             .disabled(viewModel.selectedRule == nil)
 
             Divider()
 
-            Button(viewModel.isFilterVisible ? String(localized: "Hide Filter") : String(localized: "Show Filter")) {
-                withAnimation {
-                    viewModel.isFilterVisible.toggle()
-                }
+            Button(String(localized: "Focus Search")) {
+                isSearchFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
 
@@ -708,13 +998,6 @@ struct NetworkConditionsWindowView: View {
         .fixedSize()
     }
 
-    private var emptyTableMessage: String {
-        if viewModel.networkConditionRules.isEmpty {
-            return String(localized: "Click \"+\" or ⌘N to add new entry")
-        }
-        return String(localized: "No Network Conditions match the current filter")
-    }
-
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
@@ -724,6 +1007,66 @@ struct NetworkConditionsWindowView: View {
             return String(localized: "Toggle")
         }
         return selectedRule.isEnabled ? String(localized: "Disable") : String(localized: "Enable")
+    }
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var footerHint: String {
+        let countText = isSearching
+            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
+            : String(localized: "\(viewModel.ruleCount) rules")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
+    }
+
+    private var infoBannerText: String {
+        if viewModel.hasMultipleActive {
+            return String(
+                localized:
+                "Multiple profiles are enabled in stored rules. Choose one profile to restore exclusive behavior."
+            )
+        }
+        return String(
+            localized:
+            """
+            Only one profile can be enabled. It follows Rockxy's global first-match rule order and applies to \
+            intercepted HTTP and HTTPS traffic.
+            """
+        )
+    }
+
+    private var statusCapsuleText: String {
+        if !viewModel.isToolEnabled {
+            return String(localized: "CONDITIONS OFF")
+        }
+        if viewModel.hasMultipleActive {
+            return String(localized: "MULTIPLE ENABLED")
+        }
+        if viewModel.activeCount == 0 {
+            return String(localized: "NO PROFILE ENABLED")
+        }
+        return String(localized: "1 ENABLED")
+    }
+
+    private var statusCapsuleForeground: Color {
+        if viewModel.hasMultipleActive, viewModel.isToolEnabled {
+            return .white
+        }
+        if viewModel.activeCount == 1, viewModel.isToolEnabled {
+            return .white
+        }
+        return .secondary
+    }
+
+    private var statusCapsuleBackground: Color {
+        if viewModel.hasMultipleActive, viewModel.isToolEnabled {
+            return .orange
+        }
+        if viewModel.activeCount == 1, viewModel.isToolEnabled {
+            return .green
+        }
+        return Color.secondary.opacity(0.14)
     }
 
     @ViewBuilder
@@ -756,9 +1099,7 @@ struct NetworkConditionsWindowView: View {
     }
 
     private func openNewEditor() {
-        pendingDraft = nil
-        editingRule = nil
-        showEditSheet = true
+        editorSession = NetworkConditionsEditorSession(existingRule: nil, draft: nil)
     }
 
     private func openEditorForSelection() {
@@ -769,18 +1110,14 @@ struct NetworkConditionsWindowView: View {
     }
 
     private func openEditor(for rule: ProxyRule) {
-        editingRule = rule
-        pendingDraft = nil
-        showEditSheet = true
+        editorSession = NetworkConditionsEditorSession(existingRule: rule, draft: nil)
     }
 
     private func consumePendingDraft() {
         guard let draft = NetworkConditionsDraftStore.shared.consumePending() else {
             return
         }
-        pendingDraft = draft
-        editingRule = nil
-        showEditSheet = true
+        editorSession = NetworkConditionsEditorSession(existingRule: nil, draft: draft)
     }
 }
 
@@ -792,15 +1129,21 @@ private struct NetworkConditionsEditSheet: View {
     init(
         existingRule: ProxyRule?,
         draft: NetworkConditionsDraft? = nil,
-        onSave: @escaping (ProxyRule) -> Void
+        willReplaceEnabledRule: Bool,
+        onSave: @escaping (ProxyRule) async -> Bool
     ) {
         self.onSave = onSave
+        self.existingRule = existingRule
         self.draft = draft
-        self.existingID = existingRule?.id
+        self.willReplaceEnabledRule = willReplaceEnabledRule
 
         if let existingRule {
             _name = State(initialValue: existingRule.name)
-            _hostText = State(initialValue: Self.hostText(from: existingRule.matchCondition.urlPattern))
+            _hostText = State(
+                initialValue: NetworkConditionsPatternFormatter.hostText(
+                    from: existingRule.matchCondition.urlPattern
+                )
+            )
             _applySystemWide = State(initialValue: existingRule.matchCondition.urlPattern == nil)
             _isEnabled = State(initialValue: existingRule.isEnabled)
             if case let .networkCondition(preset, delayMs) = existingRule.action {
@@ -815,89 +1158,77 @@ private struct NetworkConditionsEditSheet: View {
 
     // MARK: Internal
 
-    let onSave: (ProxyRule) -> Void
+    let onSave: (ProxyRule) async -> Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                labeledTextField(
-                    String(localized: "Name:"),
-                    text: $name,
-                    prompt: String(localized: "Untitled")
-                )
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 3) {
+                    Text(editorTitle)
+                        .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
 
-                labeledTextField(
-                    String(localized: "Host:"),
-                    text: $hostText,
-                    prompt: "api.proxyman.com"
-                )
-                .disabled(applySystemWide)
-
-                Text(String(localized: "Only support Host and Port. No Wildcard or Regex"))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Toggle(isOn: $applySystemWide) {
-                    Text(String(localized: "Apply System-wide"))
-                        .font(toolMetrics.font())
-                }
-                .toggleStyle(.checkbox)
-                .padding(.leading, fieldLeading)
-
-                Text(String(localized: "All traffic being proxied through Rockxy will be affected by Network Throttling"))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .padding(.bottom, 6)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: toolMetrics.controlSpacing) {
-                    Text(String(localized: "Preset Profiles:"))
-                        .font(toolMetrics.font())
-                        .lineLimit(1)
-                        .frame(width: labelWidth, alignment: .trailing)
-                    Picker("", selection: $selectedPreset) {
-                        ForEach(NetworkConditionPreset.allCases, id: \.self) { preset in
-                            Text(preset.displayName).tag(preset)
-                        }
+                    if let provenance = quickCreateProvenance {
+                        provenanceBanner(provenance)
                     }
-                    .labelsHidden()
-                    .frame(width: toolMetrics.menuWidth(160))
+
+                    ruleDetailsSection
+                    networkProfileSection
+
+                    if willReplaceEnabledRule {
+                        Label(
+                            String(
+                                localized:
+                                "Adding this enabled profile will disable the profile that is currently enabled."
+                            ),
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, toolMetrics.formHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
+
+            Divider()
+            VStack(alignment: .trailing, spacing: toolMetrics.controlSpacing) {
+                if let saveError {
+                    validationLabel(saveError)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
 
-                profileStats
-            }
-            .padding(.top, toolMetrics.formVerticalPadding)
-            .padding(.horizontal, toolMetrics.formHorizontalPadding)
-
-            Text(String(localized: "To simulate network condition in real-life, the bandwidth is generated randomly in a given range"))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .padding(.leading, fieldLeading + toolMetrics.formHorizontalPadding)
-                .padding(.top, toolMetrics.formVerticalPadding)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack {
-                Spacer()
-                Button(String(localized: "Cancel")) { dismiss() }
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        footerButtonLabel(String(localized: "Cancel"))
+                    }
                     .keyboardShortcut(.cancelAction)
-                    .frame(width: toolMetrics.footerButtonWidth)
-                Button(isEditing ? String(localized: "Save (⌘↩)") : String(localized: "Add (⌘↩)")) {
-                    saveRule()
+                    .disabled(isSaving)
+
+                    Button {
+                        Task { await saveRule() }
+                    } label: {
+                        footerButtonLabel(
+                            isSaving
+                                ? String(localized: "Saving…")
+                                : isEditing ? String(localized: "Save") : String(localized: "Add")
+                        )
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!isValid || isSaving)
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!isValid)
-                .frame(width: toolMetrics.footerButtonWidth)
             }
-            .padding(.top, toolMetrics.formVerticalPadding + 4)
             .padding(.horizontal, toolMetrics.formHorizontalPadding)
-            .padding(.bottom, toolMetrics.formVerticalPadding + 6)
+            .padding(.vertical, toolMetrics.controlSpacing)
         }
         .font(toolMetrics.font())
-        .frame(minWidth: 838, minHeight: max(390, toolMetrics.bodyFontSize * 16 + 190))
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(
+            minWidth: max(760, toolMetrics.bodyFontSize * 24 + 472),
+            minHeight: max(460, toolMetrics.bodyFontSize * 14 + 278)
+        )
     }
 
     // MARK: Private
@@ -910,23 +1241,15 @@ private struct NetworkConditionsEditSheet: View {
     @State private var selectedPreset = NetworkConditionsRuleForm.defaultPreset
     @State private var customLatencyMs = NetworkConditionsRuleForm.defaultCustomLatencyMs
     @State private var isEnabled = true
+    @State private var isSaving = false
+    @State private var saveError: String?
 
+    private let existingRule: ProxyRule?
     private let draft: NetworkConditionsDraft?
-    private let existingID: UUID?
-    private var labelWidth: CGFloat {
-        max(96, toolMetrics.formCompactLabelWidth)
-    }
-
-    private var fieldWidth: CGFloat {
-        toolMetrics.fieldWidth(700)
-    }
-
-    private var fieldLeading: CGFloat {
-        labelWidth + toolMetrics.controlSpacing
-    }
+    private let willReplaceEnabledRule: Bool
 
     private var isEditing: Bool {
-        existingID != nil
+        existingRule != nil
     }
 
     private var effectiveLatencyMs: Int {
@@ -939,89 +1262,357 @@ private struct NetworkConditionsEditSheet: View {
             hostText: hostText,
             applySystemWide: applySystemWide,
             preset: selectedPreset,
-            customLatencyMs: customLatencyMs
+            customLatencyMs: customLatencyMs,
+            original: existingRule
         )
     }
 
-    private var profileStats: some View {
+    private var editorTitle: String {
+        isEditing
+            ? String(localized: "Edit Network Conditions Rule")
+            : String(localized: "New Network Conditions Rule")
+    }
+
+    private var quickCreateProvenance: String? {
+        guard let draft else {
+            return nil
+        }
+        if let sourceURL = draft.sourceURL {
+            let method = draft.sourceMethod ?? "ANY"
+            let path = sourceURL.path.isEmpty ? "/" : sourceURL.path
+            return String(localized: "Created from \(method) \(draft.sourceHost)\(path)")
+        }
+        return String(localized: "Created from domain \(draft.sourceHost)")
+    }
+
+    private var ruleDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Name")) {
+                        TextField(String(localized: "Untitled"), text: $name)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Rule name"))
+                    }
+                    .frame(width: max(250, toolMetrics.fieldWidth(250)))
+
+                    fieldGroup(String(localized: "Scope")) {
+                        scopeMenu
+                    }
+                    .frame(width: toolMetrics.menuWidth(190))
+
+                    fieldGroup(String(localized: "Host")) {
+                        TextField("api.example.com", text: $hostText)
+                            .textFieldStyle(.roundedBorder)
+                            .disabled(applySystemWide)
+                            .accessibilityLabel(String(localized: "Network Conditions host"))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    validationLabel(String(localized: "Enter a rule name."))
+                }
+                if let hostValidationMessage {
+                    validationLabel(hostValidationMessage)
+                }
+
+                Text(scopeHelpText)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    private var networkProfileSection: some View {
         let metadata = NetworkConditionProfileMetadata.from(preset: selectedPreset, latencyMs: effectiveLatencyMs)
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 20) {
-                Text(String(localized: "Download"))
-                    .font(toolMetrics.font())
-                    .frame(width: toolMetrics.fieldWidth(260), alignment: .leading)
-                Text(String(localized: "Upload"))
-                    .font(toolMetrics.font())
-                    .frame(width: toolMetrics.fieldWidth(260), alignment: .leading)
+        return VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Network Profile"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Preset")) {
+                        presetMenu
+                    }
+                    .frame(width: toolMetrics.menuWidth(190))
+
+                    if selectedPreset == .custom {
+                        fieldGroup(String(localized: "Latency")) {
+                            HStack(spacing: 6) {
+                                TextField("", value: $customLatencyMs, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: toolMetrics.fieldWidth(90))
+                                    .accessibilityLabel(String(localized: "Custom latency"))
+                                Text(String(localized: "ms"))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    Spacer()
+                }
+
+                if selectedPreset == .custom, customLatencyMs <= 0 {
+                    validationLabel(String(localized: "Custom latency must be greater than 0 ms."))
+                }
+
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    profileMetric(
+                        title: String(localized: "Latency"),
+                        value: "\(metadata.latencyMs) ms",
+                        systemImage: "timer"
+                    )
+                    profileMetric(
+                        title: String(localized: "Download"),
+                        value: metadata.downloadBandwidth,
+                        systemImage: "arrow.down"
+                    )
+                    profileMetric(
+                        title: String(localized: "Upload"),
+                        value: metadata.uploadBandwidth,
+                        systemImage: "arrow.up"
+                    )
+                }
+
+                Text(
+                    String(
+                        localized:
+                        """
+                        Presets add connection latency and pace request and response bodies at the displayed limits. \
+                        Custom Latency leaves upload and download bandwidth unlimited.
+                        """
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 20) {
-                statsCard(
-                    bandwidth: metadata.downloadBandwidth,
-                    packetLoss: metadata.packetLoss,
-                    latencyMs: metadata.latencyMs
-                )
-                statsCard(
-                    bandwidth: metadata.uploadBandwidth,
-                    packetLoss: metadata.packetLoss,
-                    latencyMs: metadata.latencyMs
-                )
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
         }
-        .padding(.leading, fieldLeading)
-        .padding(.top, 4)
     }
 
-    private func labeledTextField(_ label: String, text: Binding<String>, prompt: String) -> some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Text(label)
-                .font(toolMetrics.font())
-                .lineLimit(1)
-                .frame(width: labelWidth, alignment: .trailing)
-            TextField(prompt, text: text)
-                .textFieldStyle(.roundedBorder)
-                .font(toolMetrics.font())
-                .frame(width: fieldWidth)
-                .frame(minHeight: toolMetrics.formControlHeight)
+    private var scopeMenu: some View {
+        Menu {
+            Button {
+                applySystemWide = false
+            } label: {
+                menuCheckmarkLabel(
+                    String(localized: "Specific host"),
+                    isSelected: !applySystemWide
+                )
+            }
+            Button {
+                applySystemWide = true
+            } label: {
+                menuCheckmarkLabel(
+                    String(localized: "All proxied traffic"),
+                    isSelected: applySystemWide
+                )
+            }
+        } label: {
+            dataEntryMenuLabel(
+                applySystemWide
+                    ? String(localized: "All proxied traffic")
+                    : String(localized: "Specific host"),
+                width: toolMetrics.menuWidth(190)
+            )
         }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "Traffic scope"))
     }
 
-    private func statsCard(bandwidth: String, packetLoss: String, latencyMs: Int) -> some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            Text("Bandwidth:  \(bandwidth)")
-            Text("Packets Dropped:  \(packetLoss)")
-            HStack(spacing: 6) {
-                Text("Delay:")
-                if selectedPreset == .custom {
-                    TextField("", value: $customLatencyMs, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                        .frame(width: toolMetrics.fieldWidth(70))
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                    Text("ms")
-                } else {
-                    Text("\(latencyMs).0 ms")
+    private var presetMenu: some View {
+        Menu {
+            ForEach(NetworkConditionPreset.allCases, id: \.self) { preset in
+                Button {
+                    selectedPreset = preset
+                } label: {
+                    menuCheckmarkLabel(profileTitle(for: preset), isSelected: selectedPreset == preset)
                 }
             }
+        } label: {
+            dataEntryMenuLabel(profileTitle(for: selectedPreset), width: toolMetrics.menuWidth(190))
         }
-        .font(toolMetrics.font())
-        .padding(.horizontal, 20)
-        .frame(width: toolMetrics.fieldWidth(260), alignment: .center)
-        .frame(minHeight: max(88, toolMetrics.bodyFontSize + 75), alignment: .center)
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "Network profile"))
+    }
+
+    private var scopeHelpText: String {
+        if applySystemWide {
+            return String(
+                localized:
+                """
+                This profile is eligible for intercepted HTTP and HTTPS traffic that reaches it in Rockxy's \
+                global first-match rule order.
+                """
+            )
+        }
+        return String(
+            localized:
+            """
+            Enter a host with an optional port, or paste an HTTP or HTTPS URL. URL paths and queries are ignored. \
+            Wildcards and raw regular expressions are not added from this editor.
+            """
+        )
+    }
+
+    private var hostValidationMessage: String? {
+        guard !applySystemWide else {
+            return nil
+        }
+        return NetworkConditionsRuleForm.hostValidationMessage(
+            original: existingRule,
+            hostText: hostText,
+            applySystemWide: applySystemWide
+        )
+    }
+
+    private func profileMetric(title: String, value: String, systemImage: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(toolMetrics.font(weight: .medium))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private static func hostText(from pattern: String?) -> String {
-        NetworkConditionsPatternFormatter.hostText(from: pattern)
+    private func profileTitle(for preset: NetworkConditionPreset) -> String {
+        NetworkConditionProfileMetadata.title(for: preset)
     }
 
-    private func saveRule() {
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+            Text(title)
+        }
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(toolMetrics.font())
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func provenanceBanner(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "arrow.turn.down.right")
+                .foregroundStyle(.secondary)
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(message)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
+    }
+
+    private func validationLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @MainActor
+    private func saveRule() async {
+        guard !isSaving else {
+            return
+        }
         let rule = NetworkConditionsRuleForm.makeRule(
-            existingID: existingID,
+            original: existingRule,
             name: name,
             isEnabled: isEnabled,
             hostText: hostText,
@@ -1029,7 +1620,17 @@ private struct NetworkConditionsEditSheet: View {
             preset: selectedPreset,
             customLatencyMs: customLatencyMs
         )
-        onSave(rule)
+        isSaving = true
+        saveError = nil
+        let accepted = await onSave(rule)
+        isSaving = false
+        guard accepted else {
+            saveError = String(
+                localized:
+                "This rule could not be saved. Disable another Network Conditions rule and try again."
+            )
+            return
+        }
         dismiss()
     }
 }

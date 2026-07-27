@@ -588,7 +588,6 @@ struct ToolWindowReadabilityTests {
     @Test("Rule-style tool windows use shared layout spacing")
     func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
         let legacyFooterFiles = [
-            "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
         ]
@@ -609,6 +608,7 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/BlockListWindowView.swift",
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
+            "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
         ]
         for file in adaptiveFooterFiles {
             let source = try readProjectFile(file)
@@ -720,6 +720,50 @@ struct ToolWindowReadabilityTests {
         #expect(editorSource.contains("dataEntryMenuLabel"))
         #expect(editorSource.contains("chevron.up.chevron.down"))
         #expect(editorSource.contains("footerButtonLabel"))
+    }
+
+    @Test("Network Conditions uses the approved native window and editor structure")
+    func networkConditionsUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Rules/NetworkConditionsWindowView.swift")
+
+        // Always-visible search field, mirroring the approved Map Remote window.
+        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+
+        // Adaptive min window sizing consistent with Map Remote (shared minHeight formula).
+        #expect(source.contains("minWidth: max("))
+        #expect(source.contains("toolMetrics.bodyFontSize"))
+        #expect(source.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+        #expect(source.contains("minHeight: max(460, toolMetrics.bodyFontSize * 14 + 278)"))
+
+        // Native empty state instead of a bare overlay label.
+        #expect(source.contains("ContentUnavailableView"))
+
+        // textBackgroundColor table/card surfaces with rounded corners and a separator stroke.
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+
+        // Approved editor sections.
+        #expect(source.contains(#"String(localized: "Rule Details")"#))
+        #expect(source.contains(#"String(localized: "Network Profile")"#))
+
+        // Shared footer button label and native footer shortcuts.
+        #expect(source.contains("footerButtonLabel"))
+        #expect(source.contains(".keyboardShortcut(.cancelAction)"))
+        #expect(source.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(source.contains(".id(session.id)"))
+        #expect(source.contains("onSave: @escaping (ProxyRule) async -> Bool"))
+        #expect(!source.contains(".keyboardShortcut(.space, modifiers: [])"))
+
+        // Regressions locked out: fixed frame, reference placeholder, per-field monospace override.
+        #expect(!source.contains(".frame(width: 1_198, height: 641)"))
+        #expect(!source.contains("api.proxyman.com"))
+        #expect(!source.contains("font(monospaced: true)"))
+        #expect(!source.contains("secondaryFont(monospaced: true)"))
+
+        // No misleading bandwidth / packet-loss copy (the engine applies no random bandwidth or packet loss).
+        #expect(!source.contains("generated randomly"))
+        #expect(!source.contains("Packets Dropped"))
     }
 
     // MARK: Private
