@@ -347,8 +347,9 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 800, height: 500)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         composeWindow
 

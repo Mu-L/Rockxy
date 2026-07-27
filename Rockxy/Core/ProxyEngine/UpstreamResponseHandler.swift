@@ -533,15 +533,16 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
         } else {
             nil
         }
-        let bodyString = bodyData.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let bodyProjection = BreakpointRequestData.editableBodyProjection(from: bodyData)
 
         let breakpointData = BreakpointRequestData(
             method: requestData.method,
             url: requestData.url.absoluteString,
             headers: responseHeaders,
-            body: bodyString,
+            body: bodyProjection.text,
             statusCode: Int(head.status.code),
-            phase: .response
+            phase: .response,
+            isBodyEditable: bodyProjection.isEditable
         )
 
         let eventLoop = context.eventLoop

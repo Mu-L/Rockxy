@@ -33,12 +33,40 @@ struct BreakpointRequestData {
     var body: String
     var statusCode: Int
     var phase: BreakpointPhase = .request
+    var isBodyEditable = true
+    var fixedHTTPSAuthority: String?
 
-    /// Whether the original request uses HTTPS. Used by the breakpoint sheet to constrain
+    /// Whether the original request uses HTTPS. Used by the breakpoint editor to constrain
     /// the URL editor so the user can only modify path and query — the host is fixed by the
     /// TLS tunnel and cannot be changed mid-connection.
     var isHTTPS: Bool {
         url.lowercased().hasPrefix("https://")
+    }
+
+    /// Projects captured bytes into the text-only breakpoint editor without
+    /// claiming that a lossy conversion is editable.
+    static func editableBodyProjection(from data: Data?) -> (text: String, isEditable: Bool) {
+        guard let data else {
+            return ("", true)
+        }
+        guard let text = String(data: data, encoding: .utf8) else {
+            return ("", false)
+        }
+        return (text, true)
+    }
+
+    /// Applies an origin-form request target while preserving its percent-
+    /// encoded delimiters and the current connection authority.
+    static func applyingOriginForm(_ value: String, to currentURL: String) -> String? {
+        let normalized = value.hasPrefix("/") ? value : "/\(value)"
+        guard let editedTarget = URLComponents(string: normalized),
+              var components = URLComponents(string: currentURL)
+        else {
+            return nil
+        }
+        components.percentEncodedPath = editedTarget.percentEncodedPath
+        components.percentEncodedQuery = editedTarget.percentEncodedQuery
+        return components.string
     }
 }
 

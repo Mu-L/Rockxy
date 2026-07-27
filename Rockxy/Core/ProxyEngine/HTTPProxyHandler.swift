@@ -293,7 +293,6 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         }
         let contentType = ContentTypeDetector.detect(headers: headers, body: body)
 
-        // swiftlint:disable:next force_unwrapping
         let fallbackURL = URL(string: "http://localhost/")!
         let parsedURL = URL(string: url) ?? URL(string: "http://\(host)/") ?? fallbackURL
         return HTTPRequestData(
@@ -512,13 +511,15 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             return
         }
 
+        let bodyProjection = BreakpointRequestData.editableBodyProjection(from: requestData.body)
         let breakpointData = BreakpointRequestData(
             method: head.method.rawValue,
             url: requestData.url.absoluteString,
             headers: requestData.headers.map { EditableHeader(name: $0.name, value: $0.value) },
-            body: requestData.body.flatMap { String(data: $0, encoding: .utf8) } ?? "",
+            body: bodyProjection.text,
             statusCode: 200,
-            phase: .request
+            phase: .request,
+            isBodyEditable: bodyProjection.isEditable
         )
 
         let eventLoop = context.eventLoop

@@ -301,7 +301,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/ProtobufSchemaListWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointWindowView.swift",
-            "Rockxy/Views/Breakpoint/BreakpointQueueListView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleRow.swift",
             "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
@@ -427,7 +426,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
-            "Rockxy/Views/Breakpoint/BreakpointSheetView.swift",
             "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
             "Rockxy/Views/Scripting/ScriptEditorWindowView.swift",
             "Rockxy/Views/Scripting/ScriptListRow.swift",
@@ -882,6 +880,42 @@ struct ToolWindowReadabilityTests {
         #expect(queueEditorSource.contains(".disabled(!validation.isValid)"))
         #expect(queueEditorSource.contains("guard let application = template.applicationPayload"))
         #expect(queueEditorSource.contains("draft = application.applying(to: draft)"))
+    }
+
+    @Test("Breakpoint Queue uses a native interruption-safe master-detail flow")
+    func breakpointQueueUsesNativeInterruptionSafeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointEditorView.swift")
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+
+        #expect(source.contains("HSplitView"))
+        #expect(source.contains("VSplitView"))
+        #expect(source.contains("List(selection: queueSelection)"))
+        #expect(source.contains("ContentUnavailableView"))
+        #expect(source.contains(#"String(localized: "No Paused Traffic")"#))
+        #expect(source.contains("ToolWindowDisplayMetrics"))
+        #expect(source.contains("minWidth: max(1_060, toolMetrics.bodyFontSize * 34 + 618)"))
+        #expect(source.contains("minHeight: max(640, toolMetrics.bodyFontSize * 18 + 406)"))
+        #expect(appSource.contains(".defaultSize(width: 1_120, height: 720)"))
+
+        #expect(source.contains(#"String(localized: "Continue Original")"#))
+        #expect(source.contains(#"String(localized: "Abort with 503")"#))
+        #expect(source.contains(#"String(localized: "Apply Changes & Continue")"#))
+        #expect(source.contains(#".keyboardShortcut(".", modifiers: .command)"#))
+        #expect(!source.contains(#"String(localized: "Skip Once")"#))
+        #expect(!source.contains(#"String(localized: "Execute All")"#))
+        #expect(source.contains(".confirmationDialog("))
+
+        #expect(editorSource.contains("ContentUnavailableView"))
+        #expect(editorSource.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(editorSource.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(editorSource.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+        #expect(editorSource.contains(#"String(localized: "Path and query")"#))
+        #expect(editorSource.contains("canApplySelectedChanges = validation.isValid"))
+        #expect(editorSource.contains("syncRawMessageFromDraft(itemId: selectedItemId, force: true)"))
+        #expect(source.contains("item.editableDraft.isBodyEditable"))
+        #expect(editorSource.contains(#"String(localized: "Original payload protected")"#))
+        #expect(editorSource.contains("draft.isBodyEditable"))
     }
 
     // MARK: Private
