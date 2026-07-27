@@ -118,7 +118,7 @@ nonisolated enum UpstreamPACResolver {
     private static func makeTargetURL(scheme: String, host: String, port: Int) -> URL? {
         var components = URLComponents()
         components.scheme = normalizedScheme(scheme)
-        components.host = host
+        components.host = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
         components.port = port
         components.path = "/"
         return components.url

@@ -24,8 +24,9 @@ final class HTTPConnectTunnelHandler: ChannelInboundHandler, RemovableChannelHan
     typealias OutboundOut = ByteBuffer
 
     func handlerAdded(context: ChannelHandlerContext) {
-        var request = "CONNECT \(targetHost):\(targetPort) HTTP/1.1\r\n"
-        request += "Host: \(targetHost):\(targetPort)\r\n"
+        let authority = "\(hostForAuthority(targetHost)):\(targetPort)"
+        var request = "CONNECT \(authority) HTTP/1.1\r\n"
+        request += "Host: \(authority)\r\n"
         request += "Proxy-Connection: Keep-Alive\r\n"
         if let credentials {
             let rawValue = "\(credentials.username):\(credentials.password)"
@@ -87,6 +88,13 @@ final class HTTPConnectTunnelHandler: ChannelInboundHandler, RemovableChannelHan
     }
 
     // MARK: Private
+
+    private func hostForAuthority(_ host: String) -> String {
+        if host.contains(":"), !host.hasPrefix("["), !host.hasSuffix("]") {
+            return "[\(host)]"
+        }
+        return host
+    }
 
     private let targetHost: String
     private let targetPort: Int

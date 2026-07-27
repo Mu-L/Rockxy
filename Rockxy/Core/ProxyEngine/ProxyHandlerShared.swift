@@ -116,9 +116,11 @@ enum ProxyHandlerShared {
             resolvedMethod = originalHead.method
         }
 
+        let components = URLComponents(url: requestData.url, resolvingAgainstBaseURL: false)
+        let encodedPath = components?.percentEncodedPath ?? requestData.url.path
+        let path = encodedPath.isEmpty ? "/" : encodedPath
         let uri: String
-        let path = requestData.url.path.isEmpty ? "/" : requestData.url.path
-        if let query = requestData.url.query, !query.isEmpty {
+        if let query = components?.percentEncodedQuery, !query.isEmpty {
             uri = "\(path)?\(query)"
         } else {
             uri = path
@@ -167,7 +169,7 @@ enum ProxyHandlerShared {
         let schemeOverride = normalizedScheme(configuration.scheme)
         let originalScheme = normalizedScheme(originalURL.scheme) ?? fallbackScheme.lowercased()
         let scheme = schemeOverride ?? originalScheme
-        let upstreamHost = configuration.host ?? (originalURL.host ?? fallbackHost)
+        let upstreamHost = configuration.host ?? (originalURL.host() ?? fallbackHost)
         let upstreamPort = resolvedMapRemotePort(
             configuration: configuration,
             schemeOverride: schemeOverride,
@@ -175,20 +177,27 @@ enum ProxyHandlerShared {
             originalURL: originalURL,
             fallbackPort: fallbackPort
         )
-        let remotePath = configuration.path ?? originalURL.path
-        let remoteQuery = configuration.query ?? originalURL.query
+        let originalComponents = URLComponents(url: originalURL, resolvingAgainstBaseURL: false)
+        let originalPath = originalComponents?.percentEncodedPath ?? originalURL.path
+        let originalQuery = originalComponents?.percentEncodedQuery ?? originalURL.query
+        let remotePath = configuration.preserveOriginalURL
+            ? originalPath
+            : configuration.path ?? originalPath
+        let remoteQuery = configuration.preserveOriginalURL
+            ? originalQuery
+            : configuration.query ?? originalQuery
 
         let effectivePath = remotePath.isEmpty ? "/" : remotePath
         let encodedQuery = remoteQuery.flatMap(percentEncodedQuery)
         let uri = encodedQuery.map { "\(effectivePath)?\($0)" } ?? effectivePath
 
         var modifiedHead = originalHead
-        modifiedHead.uri = configuration.preserveOriginalURL ? originalHead.uri : uri
+        modifiedHead.uri = uri
 
         let hostHeaderValue: String
         if configuration.preserveHostHeader {
             hostHeaderValue = originalHead.headers.first(name: "Host")
-                ?? hostHeader(host: originalURL.host ?? fallbackHost, port: originalURL.port ?? fallbackPort, scheme: originalScheme)
+                ?? hostHeader(host: originalURL.host() ?? fallbackHost, port: originalURL.port ?? fallbackPort, scheme: originalScheme)
         } else {
             hostHeaderValue = hostHeader(host: upstreamHost, port: upstreamPort, scheme: scheme)
         }
@@ -308,7 +317,7 @@ enum ProxyHandlerShared {
 
     private static func hostHeader(host: String, port: Int?, scheme: String) -> String {
         guard let port, !isDefaultPort(port, for: scheme) else {
-            return host
+            return hostForAuthority(host)
         }
         return "\(hostForAuthority(host)):\(port)"
     }

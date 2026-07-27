@@ -588,7 +588,6 @@ struct ToolWindowReadabilityTests {
     @Test("Rule-style tool windows use shared layout spacing")
     func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
         let legacyFooterFiles = [
-            "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
@@ -606,6 +605,7 @@ struct ToolWindowReadabilityTests {
 
         let adaptiveFooterFiles = [
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
+            "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/BlockListWindowView.swift",
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
@@ -622,6 +622,47 @@ struct ToolWindowReadabilityTests {
             )
             #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
         }
+    }
+
+    @Test("Map Remote uses the approved native window and editor structure")
+    func mapRemoteUsesApprovedNativeStructure() throws {
+        let windowSource = try readProjectFile("Rockxy/Views/Rules/MapRemoteWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Rules/MapRemoteEditorViewModel.swift")
+
+        #expect(windowSource.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(windowSource.contains("minWidth: max(900, toolMetrics.bodyFontSize * 30 + 520)"))
+        #expect(windowSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+        #expect(windowSource.contains(#"String(localized: "Remote Destination")"#))
+        #expect(windowSource.contains(#"String(localized: "Rule Details")"#))
+        #expect(windowSource.contains("ContentUnavailableView"))
+        #expect(windowSource.contains("width: toolMetrics.menuWidth(150)"))
+        #expect(windowSource.contains("dataEntryMenuLabel"))
+        #expect(windowSource.contains("footerButtonLabel"))
+        #expect(windowSource.contains(".keyboardShortcut(.cancelAction)"))
+        #expect(windowSource.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(windowSource.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(windowSource.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+        #expect(windowSource.contains("viewModel.save()"))
+        #expect(!windowSource.contains(".frame(width: 1_202, height: 640)"))
+        #expect(!windowSource.contains("Test your Rule"))
+        #expect(!windowSource.contains("Preserve the Original URL"))
+        #expect(windowSource.contains("Keep original request path and query"))
+        #expect(windowSource.contains(".focused($isDestinationHostFocused)"))
+        #expect(editorSource.contains("condition.sourceURLPattern"))
+        #expect(editorSource.contains("condition.includeSubpaths"))
+        #expect(editorSource.contains("func save(using gate: RulePolicyGate = .shared) async -> Bool"))
+        #expect(editorSource.contains("private(set) var isSaving = false"))
+
+        let editorMarker = try #require(windowSource.range(of: "// MARK: - MapRemoteEditorWindowView"))
+        let editorViewSource = String(windowSource[editorMarker.lowerBound...])
+        #expect(
+            !editorViewSource.contains("font(monospaced: true)"),
+            "Map Remote Editor should use the shared Rockxy form font instead of per-field font overrides"
+        )
+        #expect(
+            !editorViewSource.contains("secondaryFont(monospaced: true)"),
+            "Map Remote Editor supporting copy should use the shared Rockxy secondary font"
+        )
     }
 
     @Test("Map Local uses the approved native window and editor structure")

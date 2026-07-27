@@ -5,6 +5,8 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct MapRemoteModelTests {
+    // MARK: Internal
+
     @Test("filter matches name, method, rule, and destination")
     func filterMatchesVisibleColumns() {
         let vm = MapRemoteWindowViewModel()
@@ -70,6 +72,41 @@ struct MapRemoteModelTests {
         #expect(vm.methodLabel(for: rule) == "ANY")
         #expect(vm.matchingRuleLabel(for: rule) == "Wildcard: https://localhost:3000/v1/*")
         #expect(vm.destinationLabel(for: rule) == "https://api.production.com/v2/api?id=123")
+    }
+
+    @Test("management destination label uses override tokens when host is inherited")
+    func inheritedHostDestinationLabelUsesTokens() {
+        let vm = MapRemoteWindowViewModel()
+        let rule = ProxyRule(
+            name: "Keep host",
+            matchCondition: RuleMatchCondition(urlPattern: "https://api.example.com/.*"),
+            action: .mapRemote(configuration: MapRemoteConfiguration(
+                scheme: "https",
+                port: 8_443,
+                path: "/v2",
+                query: "debug=1"
+            ))
+        )
+
+        let label = vm.destinationLabel(for: rule)
+        #expect(label == "Protocol HTTPS · Port 8443 · Path /v2 · Query debug=1 · Original host")
+        #expect(!label.contains("https://"))
+    }
+
+    @Test("management destination label brackets IPv6 hosts")
+    func ipv6DestinationLabelUsesBrackets() {
+        let vm = MapRemoteWindowViewModel()
+        let rule = ProxyRule(
+            name: "IPv6 target",
+            matchCondition: RuleMatchCondition(urlPattern: "https://api.example.com/.*"),
+            action: .mapRemote(configuration: MapRemoteConfiguration(
+                scheme: "https",
+                host: "2001:db8::1",
+                port: 8_443
+            ))
+        )
+
+        #expect(vm.destinationLabel(for: rule) == "https://[2001:db8::1]:8443")
     }
 
     @Test("remove selected Map Remote rows preserves unrelated rules")
@@ -170,32 +207,6 @@ struct MapRemoteModelTests {
         }
     }
 
-    @Test("Enable All only enables Map Remote rules")
-    func enableAllOnlyTouchesMapRemoteRules() async {
-        await withSharedRuleStateRestored {
-            let vm = MapRemoteWindowViewModel()
-            let remote = ProxyRule(
-                name: "Remote",
-                isEnabled: false,
-                matchCondition: RuleMatchCondition(urlPattern: "https://api.example.com/.*"),
-                action: .mapRemote(configuration: MapRemoteConfiguration(host: "staging.example.com"))
-            )
-            let block = ProxyRule(
-                name: "Block",
-                isEnabled: false,
-                matchCondition: RuleMatchCondition(urlPattern: "https://blocked.example.com/.*"),
-                action: .block(statusCode: 403)
-            )
-            vm.allRules = [remote, block]
-
-            vm.enableAll()
-            await vm.waitForPendingRuleSync()
-
-            #expect(vm.allRules[0].isEnabled)
-            #expect(vm.allRules[1].isEnabled == false)
-        }
-    }
-
     @Test("tool enable setter updates view model immediately")
     func toolEnableSetter() async {
         await withSharedRuleStateRestored {
@@ -286,18 +297,67 @@ struct MapRemoteModelTests {
         #expect(rule.matchCondition.urlPattern == #"https://api\.example\.com/v[0-9]+/users"#)
     }
 
-    @Test("editor parses pasted destination URL into components")
-    func editorParsesDestinationURL() {
+    @Test("editor fills destination fields from a full URL and clears stale components")
+    func editorFillsDestinationFromURL() {
         let vm = MapRemoteEditorViewModel()
         vm.load(context: .blank)
 
-        vm.tryParseDestinationURL("HTTPS://api.production.com:8443/v2/api?filter=hello%20world&id=1&id=2")
-
+        #expect(vm.applyDestinationURL("HTTPS://api.production.com:8443/v2/api?filter=hello%20world&id=1&id=2"))
         #expect(vm.destScheme == "https")
         #expect(vm.destHost == "api.production.com")
         #expect(vm.destPort == "8443")
         #expect(vm.destPath == "v2/api")
         #expect(vm.destQuery == "filter=hello%20world&id=1&id=2")
+        #expect(vm.urlParseError == nil)
+
+        // A URL lacking an explicit path targets the remote root and clears port/query.
+        #expect(vm.applyDestinationURL("http://staging.example.com"))
+        #expect(vm.destScheme == "http")
+        #expect(vm.destHost == "staging.example.com")
+        #expect(vm.destPort == "")
+        #expect(vm.destPath == "/")
+        #expect(vm.destQuery == "")
+        #expect(vm.urlFillConfirmation != nil)
+    }
+
+    @Test("full URL fill preserves encoded paths and rejects dropped components")
+    func editorFullURLFillPreservesPathEncoding() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+
+        #expect(vm.applyDestinationURL("https://api.example.com/files/a%2Fb%20c"))
+        #expect(vm.destPath == "files/a%2Fb%20c")
+        let source = try #require(URL(string: "https://source.example.com/original"))
+        #expect(vm.mergedDestination(onto: source) == "https://api.example.com/files/a%2Fb%20c")
+
+        #expect(!vm.applyDestinationURL("https://user:secret@api.example.com/files"))
+        #expect(!vm.applyDestinationURL("https://api.example.com/files#section"))
+        #expect(vm.destPath == "files/a%2Fb%20c")
+    }
+
+    @Test("editor surfaces feedback for an invalid pasted destination URL")
+    func editorInvalidDestinationURL() {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.destHost = "keepme.example.com"
+
+        #expect(!vm.applyDestinationURL("not a url"))
+        #expect(vm.urlParseError != nil)
+        // A failed parse must not mutate the existing destination fields.
+        #expect(vm.destHost == "keepme.example.com")
+    }
+
+    @Test("editor rejects unsupported destination URL schemes without changing fields")
+    func editorRejectsUnsupportedDestinationScheme() {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.destScheme = "https"
+        vm.destHost = "keepme.example.com"
+
+        #expect(!vm.applyDestinationURL("ftp://files.example.com/archive"))
+        #expect(vm.destScheme == "https")
+        #expect(vm.destHost == "keepme.example.com")
+        #expect(vm.urlParseError != nil)
     }
 
     @Test("editor loads transaction and domain drafts")
@@ -341,9 +401,12 @@ struct MapRemoteModelTests {
             isEnabled: false,
             matchCondition: RuleMatchCondition(
                 urlPattern: MapLocalPatternFormatter.wildcardToRegex("https://api.example.com/v1/*"),
+                sourceURLPattern: "https://api.example.com/v1/*",
                 method: "DELETE",
                 headerName: "X-Debug",
-                headerValue: "1"
+                headerValue: "1",
+                matchType: .wildcard,
+                includeSubpaths: false
             ),
             action: .mapRemote(configuration: MapRemoteConfiguration(
                 scheme: "http",
@@ -395,6 +458,45 @@ struct MapRemoteModelTests {
         #expect(vm.errorMessage != nil)
     }
 
+    @Test("editor rejects embedded ports and malformed hosts while accepting IPv6")
+    func editorHostValidation() {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Host validation"
+        vm.urlText = "https://api.example.com/*"
+
+        for invalidHost in [
+            "staging.example.com:8443",
+            "staging.example.com?debug=1",
+            "staging.example.com#fragment",
+            "staging.example.com%",
+            "[::1",
+        ] {
+            vm.destHost = invalidHost
+            #expect(!vm.isSaveEnabled, "Expected invalid host: \(invalidHost)")
+            #expect(vm.hostValidationMessage != nil)
+        }
+
+        vm.destHost = "::1"
+        #expect(vm.isSaveEnabled)
+        let rawIPv6Rule = vm.makeRule()
+        if case let .mapRemote(configuration) = rawIPv6Rule?.action {
+            #expect(configuration.host == "::1")
+        } else {
+            Issue.record("Expected an IPv6 Map Remote rule")
+        }
+        vm.destHost = "[2001:db8::1]"
+        #expect(vm.isSaveEnabled)
+        let bracketedIPv6Rule = vm.makeRule()
+        if case let .mapRemote(configuration) = bracketedIPv6Rule?.action {
+            #expect(configuration.host == "2001:db8::1")
+        } else {
+            Issue.record("Expected a normalized IPv6 Map Remote rule")
+        }
+        vm.destHost = "staging.example.com"
+        #expect(vm.isSaveEnabled)
+    }
+
     @Test("editor saves wildcard rule with exact boundary when subpaths are off")
     func editorExactWildcardBoundaryWhenSubpathsOff() throws {
         let vm = MapRemoteEditorViewModel()
@@ -419,12 +521,13 @@ struct MapRemoteModelTests {
         }
     }
 
-    @Test("editor destination preview uses placeholders and normalized path")
-    func editorDestinationPreview() {
+    @Test("editor destination summary describes overrides without inventing a host")
+    func editorDestinationSummaryDescribesOverrides() {
         let vm = MapRemoteEditorViewModel()
         vm.load(context: .blank)
 
-        #expect(vm.destinationPreviewString == "https://example.com/")
+        // Nothing configured yet, and no fabricated example.com placeholder.
+        #expect(!vm.destinationSummary.contains("example.com"))
 
         vm.destScheme = "http"
         vm.destHost = "staging.example.com"
@@ -432,8 +535,262 @@ struct MapRemoteModelTests {
         vm.destPath = "api/v2"
         vm.destQuery = "debug=true"
 
-        #expect(vm.destinationPreviewString == "http://staging.example.com:8080/api/v2?debug=true")
+        let summary = vm.destinationSummary
+        #expect(summary.contains("scheme → http"))
+        #expect(summary.contains("host → staging.example.com"))
+        #expect(summary.contains("port → 8080"))
+        #expect(summary.contains("path → /api/v2"))
+        #expect(summary.contains("query → debug=true"))
     }
+
+    @Test("editor destination summary merges a concrete draft source URL")
+    func editorDestinationSummaryMergesDraftSource() throws {
+        let sourceURL = try #require(URL(string: "https://api.prod.example.com/v2/users?page=1"))
+        let draft = MapRemoteDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Users",
+            sourceURL: sourceURL,
+            sourceHost: "api.prod.example.com",
+            sourcePath: "/v2/users",
+            sourceMethod: "GET"
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(draft: draft))
+        vm.destHost = "staging.example.com"
+        vm.destPath = "internal/users"
+
+        // Host and path are overridden; scheme and query are inherited from the source.
+        #expect(vm.destinationSummary == "https://staging.example.com/internal/users?page=1")
+    }
+
+    @Test("keep-original summary renders the effective request target")
+    func editorDestinationSummaryKeepsOriginalTarget() throws {
+        let sourceURL = try #require(URL(string: "https://api.example.com/original?source=1"))
+        let draft = MapRemoteDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Original",
+            sourceURL: sourceURL,
+            sourceHost: "api.example.com",
+            sourcePath: "/original",
+            sourceMethod: "GET"
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(draft: draft))
+        vm.destHost = "staging.example.com"
+        vm.destPath = "ignored"
+        vm.destQuery = "ignored=true"
+        vm.preserveOriginalURL = true
+
+        #expect(
+            vm.destinationSummary
+                == "https://staging.example.com/original?source=1 The forwarded request keeps its original path and query."
+        )
+    }
+
+    @Test("scheme override without a port uses the new scheme default in preview")
+    func editorDestinationSummaryResetsInheritedPortForSchemeOverride() throws {
+        let sourceURL = try #require(URL(string: "http://api.prod.example.com:8080/v2/users"))
+        let draft = MapRemoteDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Users",
+            sourceURL: sourceURL,
+            sourceHost: "api.prod.example.com",
+            sourcePath: "/v2/users",
+            sourceMethod: "GET"
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(draft: draft))
+        vm.destScheme = "https"
+        vm.destPort = ""
+
+        #expect(vm.destinationSummary == "https://api.prod.example.com/v2/users")
+    }
+
+    @Test("destination preview safely encodes an incomplete percent query while typing")
+    func editorDestinationSummarySafelyEncodesLiveQuery() throws {
+        let sourceURL = try #require(URL(string: "https://api.prod.example.com/v2/users"))
+        let draft = MapRemoteDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Users",
+            sourceURL: sourceURL,
+            sourceHost: "api.prod.example.com",
+            sourcePath: "/v2/users",
+            sourceMethod: "GET"
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(draft: draft))
+        vm.destQuery = "progress=100% ready"
+
+        #expect(vm.destinationSummary == "https://api.prod.example.com/v2/users?progress=100%25%20ready")
+    }
+
+    @Test("editor persists authoring metadata alongside the compiled pattern")
+    func editorPersistsAuthoringMetadata() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Metadata"
+        vm.urlText = "https://api.example.com/v1/*"
+        vm.matchType = .wildcard
+        vm.includeSubpaths = false
+        vm.destHost = "staging.example.com"
+
+        let rule = try #require(vm.makeRule())
+        #expect(rule.matchCondition.sourceURLPattern == "https://api.example.com/v1/*")
+        #expect(rule.matchCondition.matchType == .wildcard)
+        #expect(rule.matchCondition.includeSubpaths == false)
+        #expect(rule.matchCondition.urlPattern == #"https:\/\/api\.example\.com\/v1\/.*($|[?#])"#)
+    }
+
+    @Test("wildcard rule with subpaths round-trips through save and reload")
+    func wildcardSubpathsRoundTrip() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Subpaths"
+        vm.urlText = "https://api.example.com/v1/*"
+        vm.matchType = .wildcard
+        vm.includeSubpaths = true
+        vm.destHost = "staging.example.com"
+
+        let saved = try #require(vm.makeRule())
+        #expect(saved.matchCondition.includeSubpaths == true)
+
+        let reopened = MapRemoteEditorViewModel()
+        reopened.load(context: MapRemoteEditorContext(existingRule: saved))
+        #expect(reopened.urlText == "https://api.example.com/v1/*")
+        #expect(reopened.matchType == .wildcard)
+        #expect(reopened.includeSubpaths)
+
+        let resaved = try #require(reopened.makeRule())
+        #expect(resaved.matchCondition.urlPattern == saved.matchCondition.urlPattern)
+    }
+
+    @Test("legacy compiled pattern remains a regex and re-saves verbatim")
+    func legacyRegexRoundTrip() throws {
+        // A legacy rule stored only the compiled pattern, with no authoring metadata.
+        let compiled = #"127\.0\.0\.1:43210\/rockxy-demo\/environment($|[?#])"#
+        let legacy = ProxyRule(
+            name: "Legacy",
+            matchCondition: RuleMatchCondition(urlPattern: compiled),
+            action: .mapRemote(configuration: MapRemoteConfiguration(host: "httpbin.org", path: "/get"))
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(existingRule: legacy))
+
+        #expect(vm.matchType == .regex)
+        #expect(vm.includeSubpaths == false)
+        #expect(vm.urlText == compiled)
+
+        // Re-saving without touching the URL controls reproduces the identical pattern.
+        let resaved = try #require(vm.makeRule())
+        #expect(resaved.matchCondition.urlPattern == compiled)
+    }
+
+    @Test("legacy advanced regex ending in wildcard syntax is never reinterpreted")
+    func legacyAdvancedRegexRoundTrip() throws {
+        let compiled = #"https://api\.example\.com/v[0-9]+/.*"#
+        let legacy = ProxyRule(
+            name: "Advanced regex",
+            matchCondition: RuleMatchCondition(urlPattern: compiled),
+            action: .mapRemote(configuration: MapRemoteConfiguration(host: "staging.example.com"))
+        )
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: MapRemoteEditorContext(existingRule: legacy))
+
+        #expect(vm.matchType == .regex)
+        #expect(vm.urlText == compiled)
+        let resaved = try #require(vm.makeRule())
+        #expect(resaved.matchCondition.urlPattern == compiled)
+    }
+
+    @Test("advanced regex rule round-trips through save and reload verbatim")
+    func advancedRegexRoundTrip() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Regex"
+        vm.urlText = #"https://api\.example\.com/v[0-9]+/users"#
+        vm.matchType = .regex
+        vm.destHost = "staging.example.com"
+
+        let saved = try #require(vm.makeRule())
+        #expect(saved.matchCondition.matchType == .regex)
+        #expect(saved.matchCondition.urlPattern == #"https://api\.example\.com/v[0-9]+/users"#)
+
+        let reopened = MapRemoteEditorViewModel()
+        reopened.load(context: MapRemoteEditorContext(existingRule: saved))
+        #expect(reopened.matchType == .regex)
+        #expect(reopened.urlText == #"https://api\.example\.com/v[0-9]+/users"#)
+
+        let resaved = try #require(reopened.makeRule())
+        #expect(resaved.matchCondition.urlPattern == saved.matchCondition.urlPattern)
+    }
+
+    @Test("root destination path survives save and reopen")
+    func rootDestinationPathRoundTrip() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Root"
+        vm.urlText = "https://api.example.com/v1/*"
+        vm.destHost = "staging.example.com"
+        vm.destPath = "/"
+
+        let saved = try #require(vm.makeRule())
+        guard case let .mapRemote(savedConfiguration) = saved.action else {
+            Issue.record("Expected Map Remote configuration")
+            return
+        }
+        #expect(savedConfiguration.path == "/")
+
+        let reopened = MapRemoteEditorViewModel()
+        reopened.load(context: MapRemoteEditorContext(existingRule: saved))
+        #expect(reopened.destPath == "/")
+
+        let resaved = try #require(reopened.makeRule())
+        guard case let .mapRemote(resavedConfiguration) = resaved.action else {
+            Issue.record("Expected Map Remote configuration")
+            return
+        }
+        #expect(resavedConfiguration.path == "/")
+    }
+
+    @Test("authored wildcard metadata still matches without a cached regex")
+    func authoredWildcardMetadataMatchesWithoutCompiledCache() throws {
+        let vm = MapRemoteEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Direct Match"
+        vm.urlText = "https://api.example.com/v1/*"
+        vm.matchType = .wildcard
+        vm.includeSubpaths = false
+        vm.destHost = "staging.example.com"
+
+        let rule = try #require(vm.makeRule())
+        let matchingURL = try #require(URL(string: "https://api.example.com/v1/users?debug=1"))
+        let nonMatchingURL = try #require(URL(string: "https://api.example.com/v2/users"))
+
+        #expect(rule.matchCondition.matches(method: "GET", url: matchingURL, headers: []))
+        #expect(!rule.matchCondition.matches(method: "GET", url: nonMatchingURL, headers: []))
+    }
+
+    @Test("quota rejection keeps editor state and exposes an inline error")
+    func quotaRejectionKeepsEditorState() async {
+        await withSharedRuleStateRestored {
+            let vm = MapRemoteEditorViewModel()
+            vm.load(context: .blank)
+            vm.name = "Keep this draft"
+            vm.urlText = "https://api.example.com/*"
+            vm.destHost = "staging.example.com"
+
+            let accepted = await vm.save(using: RulePolicyGate(policy: MapRemoteQuotaPolicy(maxRules: 0)))
+
+            #expect(!accepted)
+            #expect(!vm.isSaving)
+            #expect(vm.name == "Keep this draft")
+            #expect(vm.urlText == "https://api.example.com/*")
+            #expect(vm.destHost == "staging.example.com")
+            #expect(vm.errorMessage != nil)
+        }
+    }
+
+    // MARK: Private
 
     private func withSharedRuleStateRestored(_ body: () async -> Void) async {
         await RuleTestLock.shared.acquire()
@@ -451,5 +808,17 @@ struct MapRemoteModelTests {
             await RuleEngine.shared.setMapRemoteToolEnabled(true)
         }
         await RuleTestLock.shared.release()
+    }
+}
+
+private struct MapRemoteQuotaPolicy: AppPolicy {
+    let maxWorkspaceTabs = 8
+    let maxDomainFavorites = 5
+    let maxActiveRulesPerTool: Int
+    let maxEnabledScripts = 10
+    let maxLiveHistoryEntries = 1_000
+
+    init(maxRules: Int) {
+        maxActiveRulesPerTool = maxRules
     }
 }

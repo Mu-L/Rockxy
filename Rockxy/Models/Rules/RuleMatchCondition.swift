@@ -75,8 +75,9 @@ struct RuleMatchCondition: Codable, Equatable {
         guard let matchType else {
             return urlPattern
         }
+        let authoredPattern = sourceURLPattern ?? urlPattern
         return RulePatternBuilder.regexSource(
-            rawPattern: urlPattern,
+            rawPattern: authoredPattern,
             matchType: matchType,
             includeSubpaths: matchType == .wildcard ? includeSubpaths ?? false : false
         )

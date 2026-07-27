@@ -172,7 +172,10 @@ extension MainContentCoordinator {
         let draft = MapRemoteDraftBuilder.fromTransaction(transaction)
         MapRemoteDraftStore.shared.setPending(draft)
         NotificationCenter.default.post(name: .openMapRemoteWindow, object: nil)
-        Self.logger.info("Created Map Remote draft for \(transaction.request.url.absoluteString)")
+        // Log only method + host + path — query strings and fragments may carry
+        // tokens, session IDs, or other sensitive values we must not leak into OSLog.
+        let safeTarget = "\(transaction.request.method) \(transaction.request.host)\(transaction.request.path)"
+        Self.logger.info("Created Map Remote draft for \(safeTarget, privacy: .private)")
     }
 
     func createBlockRule(for transaction: HTTPTransaction) {
