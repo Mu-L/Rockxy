@@ -93,8 +93,11 @@ struct BreakpointTemplate: Identifiable, Codable, Equatable {
         name = try container.decodeIfPresent(String.self, forKey: .name)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty ?? decodedKind.emptyName
-        rawMessage = try container.decodeIfPresent(String.self, forKey: .rawMessage)?
-            .nilIfEmpty ?? decodedKind.sampleMessage
+        if container.contains(.rawMessage) {
+            rawMessage = try container.decodeIfPresent(String.self, forKey: .rawMessage) ?? decodedKind.sampleMessage
+        } else {
+            rawMessage = decodedKind.sampleMessage
+        }
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }

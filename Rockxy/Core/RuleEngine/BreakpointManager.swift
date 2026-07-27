@@ -74,7 +74,7 @@ final class BreakpointManager {
                 selectedItemId = itemId
             }
             BreakpointWindowModel.shared.selectPausedItem(item.id)
-            Self.logger.info("Breakpoint paused: \(host)\(path)")
+            Self.logger.info("Breakpoint paused")
             NotificationCenter.default.post(name: .breakpointHit, object: nil)
         }
     }
@@ -97,7 +97,7 @@ final class BreakpointManager {
 
         BreakpointWindowModel.shared.handlePausedResolutionFallback(remainingPausedItems: pausedItems)
 
-        Self.logger.info("Breakpoint resolved (\(String(describing: decision))): \(item.host)\(item.path)")
+        Self.logger.info("Breakpoint resolved (\(String(describing: decision)))")
     }
 
     /// Resolve all paused items at once with the same decision.

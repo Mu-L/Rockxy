@@ -278,9 +278,17 @@ struct BreakpointEditorView: View {
                     }
                     Divider()
                     ForEach(templateStore.templates(for: kind)) { template in
-                        Button(template.name.isEmpty ? String(localized: "Untitled") : template.name) {
+                        let validation = template.validation
+                        Button {
                             applyTemplate(template, to: itemId)
+                        } label: {
+                            Label(
+                                template.name.isEmpty ? String(localized: "Untitled") : template.name,
+                                systemImage: validation.isValid ? "doc.text" : "exclamationmark.triangle"
+                            )
                         }
+                        .disabled(!validation.isValid)
+                        .help(validation.message)
                     }
                 } label: {
                     Label(String(localized: "Template"), systemImage: "doc.text")
@@ -466,9 +474,17 @@ struct BreakpointEditorView: View {
     }
 
     private func applyTemplate(_ template: BreakpointTemplate, to itemId: UUID) {
+        guard let application = template.applicationPayload,
+              application.kind == rawKind(for: itemId),
+              draftFor(itemId) != nil
+        else {
+            return
+        }
+        manager.updateDraft(id: itemId) { draft in
+            draft = application.applying(to: draft)
+        }
         rawMessageItemID = itemId
         rawMessage = template.rawMessage
-        updateRawMessage(template.rawMessage, itemId: itemId)
     }
 
     private var saveTemplateSheet: some View {

@@ -5,7 +5,9 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct BreakpointPhaseATests {
-    // BP_A1
+    // MARK: Internal
+
+    /// BP_A1
     @Test("globalEnableTogglePersistsToEngine")
     func globalEnableTogglePersistsToEngine() async {
         await BreakpointRuleTestIsolation.withSharedRuleState {
@@ -41,60 +43,60 @@ struct BreakpointPhaseATests {
         }
     }
 
-    // BP_A2
+    /// BP_A2
     @Test("ruleEditorOpensWithDefaultDraft")
     func ruleEditorOpensWithDefaultDraft() {
         let store = BreakpointRuleEditorStore.shared
-        store.openNew { _, _, _, _, _, _, _ in }
+        store.openNew { _, _, _, _, _, _, _ in true }
         let firstVersion = store.draftVersion
         #expect(store.editingRule == nil)
         #expect(store.editorContext == nil)
 
-        store.openNew { _, _, _, _, _, _, _ in }
+        store.openNew { _, _, _, _, _, _, _ in true }
         #expect(store.editingRule == nil)
         #expect(store.editorContext == nil)
         #expect(store.draftVersion == firstVersion + 1)
     }
 
-    // BP_A3a
+    /// BP_A3a
     @Test("ruleDraftPersistsFieldName")
     func ruleDraftPersistsFieldName() {
         let rule = makeDraftRule(name: "Case 5 - auth profile")
         #expect(rule.name == "Case 5 - auth profile")
     }
 
-    // BP_A3b
+    /// BP_A3b
     @Test("ruleDraftPersistsFieldMatchingRule")
     func ruleDraftPersistsFieldMatchingRule() {
         let rule = makeDraftRule(matchingRule: "127.0.0.1:43210/rockxy-demo/profile")
-        let decoded = AddBreakpointRuleSheet.decode(rule: rule)
+        let decoded = BreakpointRuleForm.decode(rule: rule)
         #expect(decoded.displayPattern == "127.0.0.1:43210/rockxy-demo/profile")
     }
 
-    // BP_A3c
+    /// BP_A3c
     @Test("ruleDraftPersistsFieldMethod")
     func ruleDraftPersistsFieldMethod() {
         let rule = makeDraftRule(method: .post)
         #expect(rule.matchCondition.method == "POST")
     }
 
-    // BP_A3d
+    /// BP_A3d
     @Test("ruleDraftPersistsFieldMatchType")
     func ruleDraftPersistsFieldMatchType() {
         let rule = makeDraftRule(matchingRule: #"https://httpbin\.org/get"#, matchType: .regex)
-        let decoded = AddBreakpointRuleSheet.decode(rule: rule)
+        let decoded = BreakpointRuleForm.decode(rule: rule)
         #expect(decoded.matchType == RuleMatchType.regex)
     }
 
-    // BP_A3e
+    /// BP_A3e
     @Test("ruleDraftPersistsFieldIncludeSubpaths")
     func ruleDraftPersistsFieldIncludeSubpaths() {
         let rule = makeDraftRule(includeSubpaths: true)
-        let decoded = AddBreakpointRuleSheet.decode(rule: rule)
+        let decoded = BreakpointRuleForm.decode(rule: rule)
         #expect(decoded.includeSubpaths == true)
     }
 
-    // BP_A3f
+    /// BP_A3f
     @Test("ruleDraftPersistsFieldPhases")
     func ruleDraftPersistsFieldPhases() {
         let rule = makeDraftRule(phaseRequest: true, phaseResponse: false)
@@ -105,7 +107,7 @@ struct BreakpointPhaseATests {
         #expect(phase == .request)
     }
 
-    // BP_A4
+    /// BP_A4
     @Test("addButtonCommitsDraftToRuleList")
     func addButtonCommitsDraftToRuleList() {
         let viewModel = BreakpointRulesViewModel(syncsChanges: false)
@@ -122,7 +124,7 @@ struct BreakpointPhaseATests {
         #expect(viewModel.selectedRule?.name == "Add Test")
     }
 
-    // BP_A5
+    /// BP_A5
     @Test("ruleRoundTripThroughStorage")
     func ruleRoundTripThroughStorage() async throws {
         try await BreakpointRuleTestIsolation.withSharedRuleState {
@@ -143,8 +145,8 @@ struct BreakpointPhaseATests {
         }
     }
 
-    @Test("breakpoint window refresh loads persisted rules after restart")
-    func breakpointWindowRefreshLoadsPersistedRulesAfterRestart() async throws {
+    @Test("startup reload followed by window refresh surfaces persisted rules")
+    func startupReloadThenWindowRefreshSurfacesPersistedRules() async throws {
         try await BreakpointRuleTestIsolation.withSharedRuleState {
             let rule = ProxyRule.breakpointTest(
                 name: "Persisted Breakpoint",
@@ -155,6 +157,7 @@ struct BreakpointPhaseATests {
             )
             try RuleStore().saveRules([rule])
             await RuleEngine.shared.replaceAll([])
+            await RuleSyncService.loadFromDisk()
 
             let viewModel = BreakpointRulesViewModel(syncsChanges: false)
             await viewModel.refreshFromEngine()
@@ -165,22 +168,30 @@ struct BreakpointPhaseATests {
         }
     }
 
-    // BP_A6
+    /// BP_A6
     @Test("perRuleEnableObservedWithoutRestart")
     func perRuleEnableObservedWithoutRestart() async {
         let engine = RuleEngine()
         let rule = ProxyRule.breakpointTest(matchingRule: "httpbin.org/get")
         await engine.addRule(rule)
         await engine.setEnabled(id: rule.id, enabled: false)
-        let disabled = await engine.evaluateBreakpointRule(method: "GET", url: TestEndpoints.httpbinHTTPS("get"), headers: [])
+        let disabled = await engine.evaluateBreakpointRule(
+            method: "GET",
+            url: TestEndpoints.httpbinHTTPS("get"),
+            headers: []
+        )
         #expect(disabled == nil)
 
         await engine.setEnabled(id: rule.id, enabled: true)
-        let enabled = await engine.evaluateBreakpointRule(method: "GET", url: TestEndpoints.httpbinHTTPS("get"), headers: [])
+        let enabled = await engine.evaluateBreakpointRule(
+            method: "GET",
+            url: TestEndpoints.httpbinHTTPS("get"),
+            headers: []
+        )
         #expect(enabled?.id == rule.id)
     }
 
-    // BP_A7
+    /// BP_A7
     @Test("deleteRuleRemovesFromListAndStorage")
     func deleteRuleRemovesFromListAndStorage() async throws {
         try await BreakpointRuleTestIsolation.withSharedRuleState {
@@ -194,7 +205,7 @@ struct BreakpointPhaseATests {
         }
     }
 
-    // BP_A8
+    /// BP_A8
     @Test("duplicateRuleCreatesIndependentCopy")
     func duplicateRuleCreatesIndependentCopy() {
         let viewModel = BreakpointRulesViewModel(syncsChanges: false)
@@ -226,6 +237,8 @@ struct BreakpointPhaseATests {
         #expect(viewModel.breakpointRules[1].name == "Copy Edited")
     }
 
+    // MARK: Private
+
     private func makeDraftRule(
         name: String = "Draft",
         matchingRule: String = "httpbin.org/get",
@@ -234,7 +247,9 @@ struct BreakpointPhaseATests {
         phaseRequest: Bool = true,
         phaseResponse: Bool = true,
         includeSubpaths: Bool = false
-    ) -> ProxyRule {
+    )
+        -> ProxyRule
+    {
         let viewModel = BreakpointRulesViewModel(syncsChanges: false)
         viewModel.addBreakpointRule(
             ruleName: name,

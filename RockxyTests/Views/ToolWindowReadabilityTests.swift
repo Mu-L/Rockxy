@@ -300,7 +300,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSchemaListWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
-            "Rockxy/Views/Breakpoint/AddBreakpointRuleSheet.swift",
             "Rockxy/Views/Breakpoint/BreakpointWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointQueueListView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleRow.swift",
@@ -427,7 +426,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
-            "Rockxy/Views/Breakpoint/AddBreakpointRuleSheet.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointSheetView.swift",
             "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
@@ -565,7 +563,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderEditorView.swift",
-            "Rockxy/Views/Breakpoint/AddBreakpointRuleSheet.swift",
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
         ]
         let forbiddenSnippets = [
@@ -589,7 +586,6 @@ struct ToolWindowReadabilityTests {
     func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
         let legacyFooterFiles = [
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
-            "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
         ]
 
         for file in legacyFooterFiles {
@@ -609,6 +605,7 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
+            "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
         ]
         for file in adaptiveFooterFiles {
             let source = try readProjectFile(file)
@@ -764,6 +761,127 @@ struct ToolWindowReadabilityTests {
         // No misleading bandwidth / packet-loss copy (the engine applies no random bandwidth or packet loss).
         #expect(!source.contains("generated randomly"))
         #expect(!source.contains("Packets Dropped"))
+    }
+
+    @Test("Breakpoint Rules and editor use scalable min frames, not a fixed 1200x675 shell")
+    func breakpointWindowsUseScalableMinFrames() throws {
+        let windowSource = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift")
+
+        // Adaptive min sizing derived from Appearance metrics.
+        #expect(windowSource.contains(".frame(\n            minWidth: max("))
+        #expect(windowSource.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
+        #expect(windowSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+
+        #expect(editorSource.contains(".frame(\n            minWidth: max("))
+        #expect(editorSource.contains("minWidth: max(760, toolMetrics.bodyFontSize * 24 + 472)"))
+        #expect(editorSource.contains("minHeight: max(430, toolMetrics.bodyFontSize * 13 + 261)"))
+
+        // No fixed 1200x675 shell in either window.
+        for file in [windowSource, editorSource] {
+            #expect(!file.contains(".frame(width: 1200, height: 675)"))
+            #expect(!file.contains(".frame(width: 1_200, height: 675)"))
+        }
+    }
+
+    @Test("Breakpoint Rules window uses the approved native management structure")
+    func breakpointRulesUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift")
+
+        // Fixed search field, native Table, and a separate Enabled column.
+        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(source.contains("Table(viewModel.filteredBreakpointRules"))
+        #expect(source.contains(#"TableColumn(String(localized: "Enabled"))"#))
+
+        // Info banner + status capsule + native empty state.
+        #expect(source.contains(#"Image(systemName: "pause.circle")"#))
+        #expect(source.contains(".clipShape(Capsule())"))
+        #expect(source.contains("ACTIVE"))
+        #expect(source.contains("BREAKPOINTS OFF"))
+        #expect(source.contains("ContentUnavailableView"))
+
+        // Semantic card surfaces.
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+
+        // Forbidden legacy markers: hidden filter bar, New Folder, Test your Rule,
+        // bare Space shortcut, fixed shell.
+        #expect(!source.contains("BreakpointFilterBar"))
+        #expect(!source.contains("isFilterBarVisible"))
+        #expect(!source.contains("filterColumn"))
+        #expect(!source.contains("New Folder"))
+        #expect(!source.contains("Test your Rule"))
+        #expect(!source.contains(".keyboardShortcut(.space, modifiers: [])"))
+    }
+
+    @Test("Breakpoint rule editor uses the approved native editor structure")
+    func breakpointRuleEditorUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift")
+
+        // Approved editor sections and semantic card surfaces.
+        #expect(source.contains(#"String(localized: "Rule Details")"#))
+        #expect(source.contains(#"String(localized: "Pause Phases")"#))
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+
+        // Equal footer buttons via the shared label, with native footer shortcuts.
+        #expect(source.contains("footerButtonLabel"))
+        #expect(source.components(separatedBy: "footerButtonLabel(").count - 1 >= 2)
+        #expect(source.contains(".keyboardShortcut(.cancelAction)"))
+        #expect(source.contains(".keyboardShortcut(.defaultAction)"))
+
+        // Exactly one custom caret (menu chevron) in the editor.
+        #expect(source.components(separatedBy: "chevron.up.chevron.down").count - 1 == 1)
+
+        // Forbidden legacy markers.
+        #expect(!source.contains("New Folder"))
+        #expect(!source.contains("Test your Rule"))
+        #expect(!source.contains(".keyboardShortcut(.space, modifiers: [])"))
+    }
+
+    @Test("Breakpoint Templates window uses the approved native master-detail structure")
+    func breakpointTemplateWindowUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointTemplateWindowView.swift")
+        let queueEditorSource = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointEditorView.swift")
+
+        // Adaptive 860/620 min frame (shared tool-window family), search field, segmented kind control.
+        #expect(source.contains("minWidth: max(860,"))
+        #expect(source.contains("minHeight: max(620,"))
+        #expect(source.contains(#"String(localized: "Search"#))
+        #expect(source.contains(".pickerStyle(.segmented)"))
+
+        // Native list + real empty state, approved section titles, shared code-editor settings.
+        #expect(source.contains("ContentUnavailableView"))
+        #expect(source.contains("Template Details"))
+        #expect(source.contains("Raw HTTP Message"))
+        #expect(source.contains("codeEditorSettings"))
+        #expect(source.contains("Open Queue"))
+
+        // Semantic card surfaces: textBackgroundColor, radius 6, 1pt separator strokes.
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+
+        // Accessible add/remove controls and an explicit delete confirmation (no silent count guard).
+        #expect(source.contains("accessibilityLabel"))
+        #expect(
+            source.contains(".confirmationDialog(") || source.contains(".alert("),
+            "Breakpoint Templates window must confirm deletion instead of guarding on template count"
+        )
+
+        // Forbidden legacy markers (contract item 5).
+        #expect(!source.contains("NSSound.beep()"))
+        #expect(!source.contains("templates.count <= 1"))
+        #expect(!source.contains("Breakpoint Window -> Select Raw Tab -> Template"))
+        #expect(!source.contains("cornerRadius: 10"))
+        #expect(!source.contains(".overlay(Rectangle().stroke"))
+        #expect(!source.contains(".keyboardShortcut(.delete, modifiers: .command)"))
+
+        // Queue application is atomic: invalid templates are disabled and cannot update the visible raw draft.
+        #expect(queueEditorSource.contains(".disabled(!validation.isValid)"))
+        #expect(queueEditorSource.contains("guard let application = template.applicationPayload"))
+        #expect(queueEditorSource.contains("draft = application.applying(to: draft)"))
     }
 
     // MARK: Private

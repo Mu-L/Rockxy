@@ -38,7 +38,7 @@ actor RuleEngine {
             }
             let compiled = compiledPatterns[rule.id]
             if rule.matchCondition.matches(method: method, url: url, headers: headers, compiledPattern: compiled) {
-                Self.logger.debug("Breakpoint rule matched: \(rule.name)")
+                Self.logger.debug("Breakpoint rule matched: \(rule.name, privacy: .private)")
                 return rule
             }
         }
@@ -69,7 +69,7 @@ actor RuleEngine {
             }
             let compiled = compiledPatterns[rule.id]
             if rule.matchCondition.matches(method: method, url: url, headers: headers, compiledPattern: compiled) {
-                Self.logger.debug("Rule matched: \(rule.name)")
+                Self.logger.debug("Rule matched: \(rule.name, privacy: .private)")
                 return rule
             }
         }

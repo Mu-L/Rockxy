@@ -331,7 +331,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Template"), id: "breakpointTemplates") {
+        Window(String(localized: "Breakpoint Templates"), id: "breakpointTemplates") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointTemplateWindowView()
             }

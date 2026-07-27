@@ -170,7 +170,7 @@ struct BreakpointTemplateStoreTests {
 
     @Test("Codable legacy template fills missing defaults")
     func codableLegacyTemplateDefaults() throws {
-        let json = #"{"kind":"response"}"#.data(using: .utf8)!
+        let json = Data(#"{"kind":"response"}"#.utf8)
         let template = try JSONDecoder().decode(BreakpointTemplate.self, from: json)
 
         #expect(template.kind == .response)
@@ -178,6 +178,16 @@ struct BreakpointTemplateStoreTests {
         #expect(template.rawMessage == BreakpointTemplateKind.response.sampleMessage)
         #expect(template.updatedAt >= template.createdAt)
         #expect(template.validation.isValid)
+    }
+
+    @Test("Codable preserves an explicitly empty raw message as an editable draft")
+    func codablePreservesExplicitlyEmptyRawMessage() throws {
+        let json = Data(#"{"kind":"request","rawMessage":""}"#.utf8)
+        let template = try JSONDecoder().decode(BreakpointTemplate.self, from: json)
+
+        #expect(template.rawMessage.isEmpty)
+        #expect(!template.validation.isValid)
+        #expect(template.applicationPayload == nil)
     }
 
     @Test("Duplicate selected template creates persisted copy")
@@ -312,6 +322,104 @@ struct BreakpointTemplateStoreTests {
         }
     }
 
+    @Test("Selecting a template synchronizes selectedKind so addTemplate matches the visible kind")
+    func selectingTemplateSynchronizesSelectedKind() {
+        let store = BreakpointTemplateStore(defaults: makeDefaults(), storageKey: storageKey, seedDefaults: false)
+        let request = store.addTemplate(kind: .request)
+        let response = store.addTemplate(kind: .response)
+
+        store.selectedTemplateID = request.id
+        #expect(store.selectedKind == .request)
+
+        store.selectedTemplateID = response.id
+        #expect(store.selectedKind == .response)
+        #expect(store.selectedTemplate?.kind == .response)
+
+        let created = store.addTemplate()
+        #expect(created.kind == .response)
+    }
+
+    @Test("reload keeps the current selection when the selected template still exists")
+    func reloadKeepsSelectionWhenTemplateStillExists() {
+        let store = BreakpointTemplateStore(defaults: makeDefaults(), storageKey: storageKey, seedDefaults: false)
+        let first = store.addTemplate(kind: .request)
+        store.addTemplate(kind: .request)
+        store.selectedTemplateID = first.id
+
+        store.reload()
+
+        #expect(store.selectedTemplateID == first.id)
+        #expect(store.selectedKind == .request)
+    }
+
+    @Test("reload repairs a stale selection by falling back to the first template of the selected kind")
+    func reloadRepairsStaleSelectionWithinSameKind() {
+        let defaults = makeDefaults()
+        let writer = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        let first = writer.addTemplate(kind: .request)
+        let second = writer.addTemplate(kind: .request)
+        writer.addTemplate(kind: .response)
+
+        let reader = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        reader.selectedKind = .request
+        reader.selectedTemplateID = first.id
+
+        writer.deleteTemplate(id: first.id)
+        reader.reload()
+
+        #expect(reader.selectedKind == .request)
+        #expect(reader.selectedTemplateID == second.id)
+    }
+
+    @Test("reload falls back across kinds and synchronizes when the selected kind becomes empty")
+    func reloadFallsBackAcrossKindWhenSelectedKindBecomesEmpty() {
+        let defaults = makeDefaults()
+        let writer = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        let request = writer.addTemplate(kind: .request)
+        let response = writer.addTemplate(kind: .response)
+
+        let reader = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        reader.selectedKind = .request
+        reader.selectedTemplateID = request.id
+
+        writer.deleteTemplate(id: request.id)
+        reader.reload()
+
+        #expect(reader.selectedTemplateID == response.id)
+        #expect(reader.selectedKind == .response)
+    }
+
+    @Test("reload clears the selection when no templates remain")
+    func reloadClearsSelectionWhenNoTemplatesRemain() {
+        let defaults = makeDefaults()
+        let writer = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        let request = writer.addTemplate(kind: .request)
+
+        let reader = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        reader.selectedTemplateID = request.id
+
+        writer.deleteTemplate(id: request.id)
+        reader.reload()
+
+        #expect(reader.templates.isEmpty)
+        #expect(reader.selectedTemplateID == nil)
+    }
+
+    @Test("Invalid raw template persists as an editable draft but produces no application payload")
+    func invalidRawTemplatePersistsAsDraftWithoutApplicationPayload() {
+        let defaults = makeDefaults()
+        let store = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        let template = store.addTemplate(kind: .response)
+        store.updateTemplate(id: template.id, rawMessage: "not a response")
+
+        #expect(store.applicationPayload(for: template.id) == nil)
+
+        let fresh = BreakpointTemplateStore(defaults: defaults, storageKey: storageKey, seedDefaults: false)
+        #expect(fresh.responseTemplates.first?.rawMessage == "not a response")
+        #expect(fresh.responseTemplates.first?.validation.isValid == false)
+        #expect(fresh.applicationPayload(for: template.id) == nil)
+    }
+
     // MARK: Private
 
     private let storageKey = "breakpointTemplates.tests"
@@ -322,7 +430,9 @@ struct BreakpointTemplateStoreTests {
 
     private func makeDefaults() -> UserDefaults {
         let suiteName = "com.amunx.rockxy.tests.breakpointTemplates.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            preconditionFailure("Could not create isolated Breakpoint template test defaults.")
+        }
         defaults.removePersistentDomain(forName: suiteName)
         return defaults
     }
