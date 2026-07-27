@@ -178,6 +178,11 @@ struct BypassProxyManagerTests {
             #expect(domainStrings.contains(preset), "Missing preset: \(preset)")
         }
         #expect(manager.domains.count == expected.count)
+        #expect(manager.isHostBypassed("localhost"))
+        #expect(manager.isHostBypassed("device.local"))
+        #expect(manager.isHostBypassed("127.0.0.1"))
+        #expect(manager.isHostBypassed("::1"))
+        #expect(manager.isHostBypassed("169.254.10.20"))
     }
 
     @Test("addPresets does not create duplicates")
@@ -208,6 +213,19 @@ struct BypassProxyManagerTests {
         #expect(manager2.domains.count == 2)
         #expect(manager2.domains.map(\.domain).contains("a.local"))
         #expect(manager2.domains.map(\.domain).contains("b.local"))
+    }
+
+    @Test("Preset export and import roundtrip preserves effective matching")
+    func presetExportImportRoundtrip() throws {
+        let manager = makeManager()
+        manager.addPresets()
+        let data = try #require(manager.exportDomains())
+
+        let imported = makeManager()
+        try imported.importDomains(from: data)
+
+        #expect(imported.domains == manager.domains)
+        #expect(imported.isHostBypassed("169.254.10.20"))
     }
 
     // MARK: - Persistence

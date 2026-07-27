@@ -918,6 +918,38 @@ struct ToolWindowReadabilityTests {
         #expect(editorSource.contains("draft.isBodyEditable"))
     }
 
+    @Test("HTTPS decryption and full proxy bypass keep distinct native workflows")
+    func httpsDecryptionAndFullProxyBypassUseApprovedStructure() throws {
+        let sslSource = try readProjectFile("Rockxy/Views/Settings/SSLProxyingListView.swift")
+        let sslViewModelSource = try readProjectFile("Rockxy/Views/Settings/SSLProxyingListViewModel.swift")
+        let bypassSource = try readProjectFile("Rockxy/Views/Settings/BypassProxyListView.swift")
+        let tlsExceptionsSource = try readProjectFile("Rockxy/Views/Settings/BypassProxySettingsSheet.swift")
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+
+        #expect(sslSource.contains("Table(viewModel.filteredRules"))
+        #expect(sslSource.contains(#"TableColumn(String(localized: "Behavior"))"#))
+        #expect(sslViewModelSource.contains(#"String(localized: "Decrypt HTTPS")"#))
+        #expect(sslViewModelSource.contains(#"String(localized: "Tunnel Without Decryption")"#))
+        #expect(sslSource.contains("Tunnel rules take priority on overlaps"))
+        #expect(sslSource.contains("row order does not affect matching"))
+        #expect(sslSource.contains("PASSTHROUGH ACTIVE"))
+        #expect(sslSource.contains(#".keyboardShortcut("f", modifiers: .command)"#))
+        #expect(sslSource.contains("Replace existing HTTPS decryption settings?"))
+        #expect(!sslSource.contains("Include List"))
+        #expect(!sslSource.contains("Exclude List"))
+
+        #expect(bypassSource.contains("Table(filteredDomains"))
+        #expect(bypassSource.contains("System-proxy clients matching these patterns connect directly"))
+        #expect(bypassSource.contains("Manually configured clients that still reach Rockxy"))
+        #expect(bypassSource.contains("Replace existing Full Proxy Bypass entries?"))
+        #expect(bypassSource.contains("No Full Proxy Bypass Entries"))
+
+        #expect(tlsExceptionsSource.contains("TLS Passthrough Exceptions"))
+        #expect(tlsExceptionsSource.contains("They do not bypass the proxy"))
+        #expect(appSource.contains(#"Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList")"#))
+        #expect(appSource.contains(#"Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList")"#))
+    }
+
     // MARK: Private
 
     private enum ResolveError: Error, CustomStringConvertible {

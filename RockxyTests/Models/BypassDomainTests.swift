@@ -64,9 +64,12 @@ struct BypassDomainTests {
     @Test("IP wildcard 169.254.* matches subnet")
     func ipWildcard() {
         let domain = TestFixtures.makeBypassDomain(domain: "169.254.*")
-        // 169.254.* is treated as exact match since it doesn't start with *.
-        // The actual matching behavior: "169.254.*" != "169.254.1.1"
-        #expect(!domain.matches("169.254.1.1"))
+        #expect(domain.matches("169.254.1.1"))
+        #expect(domain.matches("169.254.255.255"))
+        #expect(!domain.matches("169.255.1.1"))
+        #expect(!domain.matches("169.254.invalid"))
+        #expect(BypassDomain.isIPv4PrefixWildcard("169.254.*"))
+        #expect(!BypassDomain.isIPv4PrefixWildcard("169.999.*"))
     }
 
     // MARK: - Codable

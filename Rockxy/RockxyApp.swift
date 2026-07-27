@@ -198,7 +198,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "SSL Proxying List"), id: "sslProxyingList") {
+        Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList") {
             ToolWindowDisplayMetricsProvider {
                 SSLProxyingListView()
             }
@@ -208,7 +208,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Bypass Proxy List"), id: "bypassProxyList") {
+        Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList") {
             ToolWindowDisplayMetricsProvider {
                 BypassProxyListView()
             }
@@ -216,6 +216,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "External Proxy Settings"), id: "externalProxySettings") {
             ToolWindowDisplayMetricsProvider {
@@ -869,12 +870,12 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "SSL Proxying List…")) {
+            Button(String(localized: "HTTPS Decryption…")) {
                 openWindow(id: "sslProxyingList")
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
 
-            Button(String(localized: "Bypass Proxy List…")) {
+            Button(String(localized: "Full Proxy Bypass…")) {
                 openWindow(id: "bypassProxyList")
             }
             .keyboardShortcut("b", modifiers: [.command, .option])
