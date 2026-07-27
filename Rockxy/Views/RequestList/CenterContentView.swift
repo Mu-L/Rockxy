@@ -218,7 +218,8 @@ struct CenterContentView: View {
                     coordinator.selectTransaction(nil)
                 }
             },
-            mainCoordinator: coordinator
+            mainCoordinator: coordinator,
+            headerColumns: coordinator.headerColumnStore.columns
         )
     }
 }

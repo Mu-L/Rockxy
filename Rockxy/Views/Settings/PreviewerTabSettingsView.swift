@@ -5,73 +5,175 @@ import SwiftUI
 struct PreviewerTabSettingsView: View {
     // MARK: Internal
 
+    let store: PreviewTabStore
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Body Previewer Tabs"))
-                .font(settingsMetrics.font(weight: .semibold))
-            Text(String(localized: "Select tabs to render body content as a specific format"))
-                .font(settingsMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(alignment: .top, spacing: 12) {
-                panelColumn(title: String(localized: "Request Panel"), panel: .request)
-                panelColumn(title: String(localized: "Response Panel"), panel: .response)
-            }
-
+        VStack(alignment: .leading, spacing: 0) {
+            header
             Divider()
-
-            Toggle(isOn: $store.autoBeautify) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(String(localized: "Auto beautify minified content"))
-                        .font(settingsMetrics.font())
-                    Text(String(localized: "Only applies to HTML, CSS, and JavaScript"))
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.checkbox)
+            infoBanner
+            previewMatrix
+            Divider()
+            footer
         }
-        .padding(12)
-        .font(settingsMetrics.font())
-        .frame(width: settingsMetrics.fieldWidth(480))
+        .font(toolMetrics.font())
+        .frame(
+            minWidth: max(720, toolMetrics.bodyFontSize * 24 + 408),
+            minHeight: max(500, toolMetrics.bodyFontSize * 14 + 304)
+        )
     }
 
     // MARK: Private
 
-    @State private var store = PreviewTabStore()
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
-    private var settingsMetrics: SettingsDisplayMetrics {
-        SettingsDisplayMetrics(appMetrics: appMetrics)
+    private var requestEnabledCount: Int {
+        PreviewRenderMode.allCases.count {
+            store.isEnabled(renderMode: $0, panel: .request)
+        }
     }
 
-    private func panelColumn(title: String, panel: PreviewPanel) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(settingsMetrics.secondaryFont(weight: .medium))
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(PreviewRenderMode.allCases) { mode in
-                    Toggle(mode.displayName, isOn: Binding(
-                        get: { store.isEnabled(renderMode: mode, panel: panel) },
-                        set: { enabled in
-                            if enabled {
-                                store.enableTab(renderMode: mode, panel: panel)
-                            } else {
-                                store.disableTab(renderMode: mode, panel: panel)
-                            }
-                        }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .font(settingsMetrics.font())
-                }
-            }
-            .padding(8)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+    private var responseEnabledCount: Int {
+        PreviewRenderMode.allCases.count {
+            store.isEnabled(renderMode: $0, panel: .response)
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Inspector Preview Tabs"))
+                    .font(toolMetrics.font(weight: .semibold))
+                Text(
+                    String(
+                        localized: "Choose which built-in format tabs appear in the request and response inspectors."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(String(localized: "APPLIES IMMEDIATELY"))
+                .font(toolMetrics.metadataFont(weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
+    }
+
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text(
+                String(
+                    localized:
+                    """
+                    Raw includes the request or status line and headers. Other formats focus on body content and may show \
+                    an unavailable state when the selected payload does not match.
+                    """
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    private var previewMatrix: some View {
+        Table(PreviewRenderMode.allCases) {
+            TableColumn(String(localized: "Format")) { mode in
+                Text(mode.displayName)
+                    .font(toolMetrics.font())
+                    .lineLimit(1)
+            }
+            .width(min: 260, ideal: 360)
+
+            TableColumn(String(localized: "Request")) { mode in
+                centeredToggle(for: mode, panel: .request)
+            }
+            .width(120)
+
+            TableColumn(String(localized: "Response")) { mode in
+                centeredToggle(for: mode, panel: .response)
+            }
+            .width(120)
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Toggle(
+                String(localized: "Beautify minified HTML, CSS, and JavaScript"),
+                isOn: Binding(
+                    get: { store.autoBeautify },
+                    set: { store.autoBeautify = $0 }
+                )
+            )
+            .toggleStyle(.checkbox)
+            .font(toolMetrics.font())
+
+            Spacer()
+
+            Text(
+                String(
+                    localized:
+                    "\(requestEnabledCount) request tabs · \(responseEnabledCount) response tabs"
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private func centeredToggle(for mode: PreviewRenderMode, panel: PreviewPanel) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { store.isEnabled(renderMode: mode, panel: panel) },
+                    set: { enabled in
+                        if enabled {
+                            store.enableTab(renderMode: mode, panel: panel)
+                        } else {
+                            store.disableTab(renderMode: mode, panel: panel)
+                        }
+                    }
+                )
+            )
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .accessibilityLabel(
+                String(
+                    localized:
+                    "\(mode.displayName) \(panel == .request ? "Request" : "Response") preview"
+                )
+            )
+            Spacer(minLength: 0)
+        }
     }
 }

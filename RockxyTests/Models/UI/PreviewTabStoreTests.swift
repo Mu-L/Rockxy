@@ -4,6 +4,7 @@ import Testing
 
 // Regression tests for `PreviewTabStore` in the models ui layer.
 
+@Suite(.serialized)
 @MainActor
 struct PreviewTabStoreTests {
     // MARK: Internal
@@ -12,9 +13,7 @@ struct PreviewTabStoreTests {
 
     @Test("Store initializes with empty tabs")
     func defaultInit() {
-        clearDefaultsKey("previewTabs", fallback: TestIdentity.previewTabStorageKey)
-        clearDefaultsKey("previewAutoBeautify", fallback: TestIdentity.previewTabBeautifyKey)
-        let freshStore = PreviewTabStore()
+        let freshStore = makeCleanStore()
         #expect(freshStore.requestTabs.isEmpty)
         #expect(freshStore.responseTabs.isEmpty)
         #expect(freshStore.autoBeautify == true)
@@ -94,6 +93,17 @@ struct PreviewTabStoreTests {
         #expect(store.responseTabs.count == 3)
     }
 
+    @Test("Re-enabled tabs return to canonical format order")
+    func canonicalTabOrder() {
+        let store = makeCleanStore()
+        store.enableTab(renderMode: .raw, panel: .request)
+        store.enableTab(renderMode: .json, panel: .request)
+        store.disableTab(renderMode: .json, panel: .request)
+        store.enableTab(renderMode: .json, panel: .request)
+
+        #expect(store.requestTabs.map(\.renderMode) == [.json, .raw])
+    }
+
     // MARK: - Panel Independence
 
     @Test("Same render mode can be in both panels independently")
@@ -110,14 +120,18 @@ struct PreviewTabStoreTests {
 
     @Test("Persisted custom raw tabs are ignored")
     func persistedCustomTabsIgnored() throws {
-        clearDefaultsKey("previewAutoBeautify", fallback: TestIdentity.previewTabBeautifyKey)
+        let environment = TestFixtures.makeNamedIsolatedDefaults()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
         let tabs = [
             PreviewTab(name: "Legacy Raw", renderMode: .raw, panel: .response, isBuiltIn: false),
-            PreviewTab(renderMode: .raw, panel: .response),
+            PreviewTab(name: "Raw (Old Locale)", renderMode: .raw, panel: .response),
         ]
-        UserDefaults.standard.set(try JSONEncoder().encode(tabs), forKey: currentDefaultsKey("previewTabs"))
+        environment.defaults.set(
+            try JSONEncoder().encode(tabs),
+            forKey: RockxyIdentity.current.defaultsKey("previewTabs")
+        )
 
-        let store = PreviewTabStore()
+        let store = PreviewTabStore(defaults: environment.defaults)
 
         #expect(store.responseTabs.count == 1)
         #expect(store.responseTabs.first?.isBuiltIn == true)
@@ -126,12 +140,54 @@ struct PreviewTabStoreTests {
 
     @Test("Auto beautify preference persists when toggled")
     func autoBeautifyPersistsWhenToggled() {
-        let store = makeCleanStore()
+        let environment = TestFixtures.makeNamedIsolatedDefaults()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let store = PreviewTabStore(defaults: environment.defaults)
         store.autoBeautify = false
 
-        let freshStore = PreviewTabStore()
+        let freshStore = PreviewTabStore(defaults: environment.defaults)
 
         #expect(freshStore.autoBeautify == false)
+    }
+
+    @Test("Built-in request and response tabs persist across store instances")
+    func builtInTabsPersistAcrossStoreInstances() {
+        let environment = TestFixtures.makeNamedIsolatedDefaults()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let store = PreviewTabStore(defaults: environment.defaults)
+        store.enableTab(renderMode: .jsonTree, panel: .request)
+        store.enableTab(renderMode: .hex, panel: .response)
+
+        let freshStore = PreviewTabStore(defaults: environment.defaults)
+
+        #expect(freshStore.isEnabled(renderMode: .jsonTree, panel: .request))
+        #expect(!freshStore.isEnabled(renderMode: .jsonTree, panel: .response))
+        #expect(freshStore.isEnabled(renderMode: .hex, panel: .response))
+        #expect(!freshStore.isEnabled(renderMode: .hex, panel: .request))
+    }
+
+    @Test("Inspector selection retains only an available preview tab")
+    func inspectorSelectionReconciliation() {
+        let selected = PreviewTab(renderMode: .json, panel: .request)
+
+        #expect(
+            InspectorPreviewSelectionReconciler.retainedSelection(
+                selected,
+                availableTabIDs: [selected.id]
+            ) == selected
+        )
+        #expect(
+            InspectorPreviewSelectionReconciler.retainedSelection(
+                selected,
+                availableTabIDs: []
+            ) == nil
+        )
+        #expect(
+            InspectorPreviewSelectionReconciler.retainedSelection(
+                nil,
+                availableTabIDs: [selected.id]
+            ) == nil
+        )
     }
 
     // MARK: Private
@@ -139,20 +195,6 @@ struct PreviewTabStoreTests {
     // MARK: - Helpers
 
     private func makeCleanStore() -> PreviewTabStore {
-        clearDefaultsKey("previewTabs", fallback: TestIdentity.previewTabStorageKey)
-        clearDefaultsKey("previewAutoBeautify", fallback: TestIdentity.previewTabBeautifyKey)
-        return PreviewTabStore()
-    }
-
-    private func clearDefaultsKey(_ key: String, fallback: String) {
-        let currentKey = currentDefaultsKey(key)
-        UserDefaults.standard.removeObject(forKey: currentKey)
-        if currentKey != fallback {
-            UserDefaults.standard.removeObject(forKey: fallback)
-        }
-    }
-
-    private func currentDefaultsKey(_ key: String) -> String {
-        RockxyIdentity.current.defaultsKey(key)
+        PreviewTabStore(defaults: TestFixtures.makeIsolatedDefaults())
     }
 }

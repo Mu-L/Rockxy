@@ -274,23 +274,27 @@ struct RockxyApp: App {
         .defaultSize(width: 1_120, height: 690)
         .defaultPosition(.center)
 
-        Window(String(localized: "Body Previewer Tabs"), id: "bodyPreviewerTabs") {
+        Window(String(localized: "Inspector Preview Tabs"), id: "bodyPreviewerTabs") {
             ToolWindowDisplayMetricsProvider {
-                PreviewerTabSettingsView()
+                PreviewerTabSettingsView(store: mainCoordinator.previewTabStore)
             }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 820, height: 560)
+        .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Custom Columns"), id: "customColumns") {
+        Window(String(localized: "Custom Header Columns"), id: "customColumns") {
             ToolWindowDisplayMetricsProvider {
-                CustomHeaderColumnsView()
+                CustomHeaderColumnsView(store: mainCoordinator.headerColumnStore)
             }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 900, height: 620)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Protobuf Settings"), id: "protobufSettings") {
             ToolWindowDisplayMetricsProvider {
@@ -960,7 +964,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Body Previewer Tabs…")) {
+            Button(String(localized: "Inspector Preview Tabs…")) {
                 openWindow(id: "bodyPreviewerTabs")
             }
 

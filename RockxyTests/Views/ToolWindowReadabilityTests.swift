@@ -116,8 +116,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Settings/PluginsSettingsTab.swift",
             "Rockxy/Views/Settings/PluginDetailView.swift",
             "Rockxy/Views/Settings/ToolsSettingsTab.swift",
-            "Rockxy/Views/Settings/PreviewerTabSettingsView.swift",
-            "Rockxy/Views/Settings/CustomHeaderColumnsView.swift",
             "Rockxy/Views/Settings/AdvancedSettingsTab.swift",
         ]
 
@@ -309,12 +307,49 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Scripting/ScriptListRow.swift",
             "Rockxy/Views/Scripting/ScriptEditorWindowView.swift",
             "Rockxy/Views/Scripting/ScriptConsolePanel.swift",
+            "Rockxy/Views/Settings/PreviewerTabSettingsView.swift",
+            "Rockxy/Views/Settings/CustomHeaderColumnsView.swift",
         ]
 
         for file in files {
             let source = try readProjectFile(file)
             #expect(source.contains("ToolWindowDisplayMetrics"), "\(file) should derive readable tool-window metrics")
         }
+    }
+
+    @Test("Workspace presentation windows share live coordinator stores")
+    func workspacePresentationWindowsShareLiveCoordinatorStores() throws {
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let previewSource = try readProjectFile("Rockxy/Views/Settings/PreviewerTabSettingsView.swift")
+        let columnsSource = try readProjectFile("Rockxy/Views/Settings/CustomHeaderColumnsView.swift")
+        let centerSource = try readProjectFile("Rockxy/Views/RequestList/CenterContentView.swift")
+        let tableSource = try readProjectFile("Rockxy/Views/RequestList/RequestTableView.swift")
+        let requestInspectorSource = try readProjectFile("Rockxy/Views/Inspector/RequestInspectorView.swift")
+        let responseInspectorSource = try readProjectFile("Rockxy/Views/Inspector/ResponseInspectorView.swift")
+
+        #expect(appSource.contains("PreviewerTabSettingsView(store: mainCoordinator.previewTabStore)"))
+        #expect(appSource.contains("CustomHeaderColumnsView(store: mainCoordinator.headerColumnStore)"))
+        #expect(!previewSource.contains("@State private var store = PreviewTabStore()"))
+        #expect(!columnsSource.contains("@State private var store = HeaderColumnStore()"))
+        #expect(!columnsSource.contains("store.reload()"))
+
+        #expect(previewSource.contains("Table(PreviewRenderMode.allCases)"))
+        #expect(previewSource.contains("ToolWindowDisplayMetrics"))
+        #expect(columnsSource.contains("ContentUnavailableView"))
+        #expect(columnsSource.contains("ToolWindowDisplayMetrics"))
+
+        #expect(centerSource.contains("headerColumns: coordinator.headerColumnStore.columns"))
+        #expect(tableSource.contains("var headerColumns: [HeaderColumn] = []"))
+        #expect(tableSource.contains("parent.headerColumns.filter(\\.isEnabled)"))
+        #expect(tableSource.contains("mainCoordinator.activeSortDescriptors = reconciledSortDescriptors"))
+        #expect(!columnsSource.contains(".keyboardShortcut(.space, modifiers: [])"))
+
+        #expect(requestInspectorSource.contains(
+            ".onChange(of: previewTabStore.requestTabs.map(\\.id))"
+        ))
+        #expect(responseInspectorSource.contains(
+            ".onChange(of: previewTabStore.responseTabs.map(\\.id))"
+        ))
     }
 
     @Test("Tool windows do not pin exact frames that can clip scaled text")

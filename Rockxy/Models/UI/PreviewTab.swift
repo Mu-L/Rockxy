@@ -26,19 +26,23 @@ enum PreviewRenderMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .json: "JSON"
-        case .jsonTree: "JSON Treeview"
-        case .formURLEncoded: "Form URL-Encoded"
-        case .html: "HTML"
-        case .htmlPreview: "HTML Preview"
-        case .css: "CSS"
-        case .javascript: "JavaScript"
-        case .xml: "XML"
-        case .images: "Images"
-        case .hex: "Hex"
-        case .jwt: "JWT"
-        case .raw: "Raw"
+        case .json: String(localized: "JSON")
+        case .jsonTree: String(localized: "JSON Treeview")
+        case .formURLEncoded: String(localized: "Form URL-Encoded")
+        case .html: String(localized: "HTML")
+        case .htmlPreview: String(localized: "HTML Preview")
+        case .css: String(localized: "CSS")
+        case .javascript: String(localized: "JavaScript")
+        case .xml: String(localized: "XML")
+        case .images: String(localized: "Images")
+        case .hex: String(localized: "Hex")
+        case .jwt: String(localized: "JWT")
+        case .raw: String(localized: "Raw")
         }
+    }
+
+    var displayOrder: Int {
+        Self.allCases.firstIndex(of: self) ?? .max
     }
 }
 
@@ -47,6 +51,22 @@ enum PreviewRenderMode: String, Codable, CaseIterable, Identifiable, Sendable {
 enum PreviewPanel: String, Codable, Sendable {
     case request
     case response
+}
+
+// MARK: - InspectorPreviewSelectionReconciler
+
+enum InspectorPreviewSelectionReconciler {
+    static func retainedSelection(
+        _ selection: PreviewTab?,
+        availableTabIDs: [UUID]
+    )
+        -> PreviewTab?
+    {
+        guard let selection, availableTabIDs.contains(selection.id) else {
+            return nil
+        }
+        return selection
+    }
 }
 
 // MARK: - PreviewTab
