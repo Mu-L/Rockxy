@@ -149,7 +149,9 @@ extension RuleAction: Codable {
             if isDirectory {
                 try container.encode(isDirectory, forKey: .isDirectory)
             }
-            if delayMs > 0 {
+            // Encode any non-zero delay so the random-delay sentinel (-1) survives the
+            // round-trip. Zero stays omitted for backward compatibility with older rules.
+            if delayMs != 0 {
                 try container.encode(delayMs, forKey: .delayMs)
             }
         case let .mapRemote(configuration):

@@ -588,7 +588,6 @@ struct ToolWindowReadabilityTests {
     @Test("Rule-style tool windows use shared layout spacing")
     func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
         let legacyFooterFiles = [
-            "Rockxy/Views/Rules/MapLocalWindowView.swift",
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
@@ -606,6 +605,7 @@ struct ToolWindowReadabilityTests {
         }
 
         let adaptiveFooterFiles = [
+            "Rockxy/Views/Rules/MapLocalWindowView.swift",
             "Rockxy/Views/Rules/BlockListWindowView.swift",
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
@@ -622,6 +622,37 @@ struct ToolWindowReadabilityTests {
             )
             #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
         }
+    }
+
+    @Test("Map Local uses the approved native window and editor structure")
+    func mapLocalUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Rules/MapLocalWindowView.swift")
+
+        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(source.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
+        #expect(source.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+        #expect(source.contains(#"String(localized: "Rule Details")"#))
+        #expect(source.contains(#"String(localized: "Response Source")"#))
+        #expect(source.contains("responseStatusRow"))
+        #expect(source.contains("urlValidationMessage"))
+        #expect(source.contains(".frame(height: max(680, toolMetrics.bodyFontSize * 20 + 420))"))
+        #expect(source.contains("width: toolMetrics.menuWidth(150)"))
+        #expect(!source.contains("width: toolMetrics.menuWidth(175)"))
+        #expect(source.contains(".frame(maxWidth: .infinity, alignment: .center)"))
+        #expect(source.contains(".textSelection(.enabled)"))
+        #expect(source.contains("dataEntryMenuLabel"))
+        #expect(source.contains("footerButtonLabel"))
+        #expect(source.contains(".keyboardShortcut(.cancelAction)"))
+        #expect(source.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+        #expect(!source.contains(".frame(width: 1_024, height: 570)"))
+        #expect(!source.contains("api.proxyman.com"))
+        #expect(!source.contains("Test your Rule"))
+        #expect(!source.contains("Auto-Save"))
+        #expect(!source.contains("New Folder"))
+        #expect(!source.contains("Support Status Code, Headers and Body"))
+        #expect(!source.contains("Map Response Body with a local file (Saved)"))
     }
 
     @Test("Allow List uses the approved native window and editor structure")
