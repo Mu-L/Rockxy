@@ -101,6 +101,9 @@ struct NativeWorkspaceSplitViewTests {
         #expect(identifiers.first == .flexibleSpace)
         #expect(toggleIndex != nil)
         #expect(trackingSeparatorIndex == toggleIndex.map { $0 + 1 })
+        #expect(!identifiers.contains {
+            $0.rawValue.hasSuffix(".toolbar.workspaceTitle")
+        })
         if let trackingSeparatorIndex {
             #expect(
                 toolbar.managedToolbar.items[trackingSeparatorIndex]
