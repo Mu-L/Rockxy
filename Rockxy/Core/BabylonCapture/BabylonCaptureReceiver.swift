@@ -24,6 +24,7 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     // MARK: Internal
 
     static let shared = BabylonCaptureReceiver()
+    static let maximumRuntimePayloadSize = 2 * 1_024 * 1_024
 
     private(set) var listenerStatus = BabylonListenerStatus.stopped
     /// Number of live TCP connections. Increments before authentication, so a
@@ -60,6 +61,36 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     func retryListener() {
         queue.async { [weak self] in
             self?.restartListener()
+        }
+    }
+
+    static func validateRuntimePayloadSize(_ byteCount: Int) throws {
+        guard byteCount >= 0, byteCount <= maximumRuntimePayloadSize else {
+            throw BabylonCaptureProtocolError.frameTooLarge
+        }
+    }
+
+    /// Clear every retained runtime event with an ingestion barrier.
+    ///
+    /// Runs on the capture queue, so it is totally ordered with runtime intake.
+    /// Any event accepted before this call is either already retained, invalidated
+    /// while awaiting MainActor publication, or still pending and discarded here.
+    /// The store clear is dispatched before any genuinely later publication, so no
+    /// earlier event can reappear afterward. Runtime-only: traffic, WebSocket
+    /// sessions, and pairing are untouched.
+    func clearRuntimeEvents() {
+        queue.async { [weak self] in
+            guard let self else {
+                return
+            }
+            runtimePublicationGate.advance()
+            cancelRuntimeFlush()
+            runtimeIntake.discardPending()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    BabylonRuntimeEventStore.shared.clear()
+                }
+            }
         }
     }
 
@@ -105,6 +136,8 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     private static let maximumSessionCount = 64
     private static let maximumTrackedTransactions = 10_000
     private static let authenticationTimeout: TimeInterval = 10
+    private static let runtimeBatchSize = 128
+    private static let runtimeFlushMaxLatency: DispatchTimeInterval = .milliseconds(100)
     private static let maximumAggregateBufferedBytes = BabylonCaptureProtocol.maximumFrameSize + 64 * 1_024 + 8
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
@@ -121,6 +154,9 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     private var pairingObserver: NSObjectProtocol?
     private var aggregateBufferedByteCount = 0
     private var isListenerStarting = false
+    private var runtimeIntake = BabylonRuntimeIntakeBuffer(batchSize: BabylonCaptureReceiver.runtimeBatchSize)
+    private var runtimeFlushWorkItem: DispatchWorkItem?
+    private let runtimePublicationGate = BabylonRuntimePublicationGate()
 
     private func startListenerIfNeeded() {
         installPairingObserverIfNeeded()
@@ -411,11 +447,65 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
         guard let identity = state.identity else {
             throw BabylonCaptureProtocolError.invalidIdentity
         }
+        try Self.validateRuntimePayloadSize(payload.content.count)
         let package = try BabylonCaptureProtocol.decoder.decode(BabylonRuntimePackageDTO.self, from: payload.content)
-        let event = BabylonRuntimeEvent(package: package, source: identity)
-        Task { @MainActor in
-            BabylonRuntimeEventStore.shared.append(event)
+        // Validation runs before retention. An invalid package throws here and
+        // fails the frame through the existing receive path, exactly like any
+        // other malformed payload — authentication and protocol guards upstream
+        // are untouched.
+        let event = try BabylonRuntimeEvent(validating: package, source: identity)
+        enqueueRuntimeEvent(event)
+    }
+
+    /// Accumulate a validated runtime event on the capture queue and publish it in
+    /// a bounded FIFO batch. Never spawns one unstructured MainActor task per event.
+    private func enqueueRuntimeEvent(_ event: BabylonRuntimeEvent) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        runtimeIntake.enqueue(event)
+        if runtimeIntake.isReadyForImmediateFlush {
+            flushRuntimeEvents()
+        } else {
+            scheduleRuntimeFlush()
         }
+    }
+
+    private func scheduleRuntimeFlush() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard runtimeFlushWorkItem == nil else {
+            return
+        }
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.flushRuntimeEvents()
+        }
+        runtimeFlushWorkItem = workItem
+        queue.asyncAfter(deadline: .now() + Self.runtimeFlushMaxLatency, execute: workItem)
+    }
+
+    private func flushRuntimeEvents() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        cancelRuntimeFlush()
+        guard runtimeIntake.hasPending else {
+            return
+        }
+        let batch = runtimeIntake.drain()
+        let publicationGeneration = runtimePublicationGate.snapshot()
+        // Dispatching from the serial capture queue to the main queue preserves
+        // FIFO order relative to every other runtime append and to clear — a plain
+        // main-queue hop keeps that ordering where unordered tasks would not.
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard self.runtimePublicationGate.isCurrent(publicationGeneration) else {
+                    return
+                }
+                BabylonRuntimeEventStore.shared.appendBatch(batch)
+            }
+        }
+    }
+
+    private func cancelRuntimeFlush() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        runtimeFlushWorkItem?.cancel()
+        runtimeFlushWorkItem = nil
     }
 
     private func remember(transaction: HTTPTransaction, packageID: String, state: SessionState) {
@@ -494,6 +584,9 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     }
 
     private func stopInternal() {
+        runtimePublicationGate.advance()
+        cancelRuntimeFlush()
+        runtimeIntake.discardPending()
         let active = listener
         listener = nil
         isListenerStarting = false

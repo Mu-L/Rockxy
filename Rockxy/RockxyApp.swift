@@ -82,10 +82,15 @@ struct RockxyApp: App {
         .defaultSize(width: 460, height: 420)
 
         Window(String(localized: "Babylon Runtime"), id: "babylonRuntime") {
-            BabylonRuntimeView()
+            ToolWindowDisplayMetricsProvider {
+                BabylonRuntimeView()
+            }
         }
-        .defaultSize(width: 760, height: 520)
+        .commandsRemoved()
         .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .defaultSize(width: 920, height: 660)
 
         Window(String(localized: "Developer Setup Hub"), id: "developerSetupHub") {
             AppUIDisplayMetricsProvider {
