@@ -71,9 +71,15 @@ struct RockxyApp: App {
         .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Babylon Pairing"), id: "babylonPairing") {
-            BabylonPairingView()
+            ToolWindowDisplayMetricsProvider {
+                BabylonPairingView()
+            }
         }
-        .defaultSize(width: 560, height: 360)
+        .commandsRemoved()
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .defaultSize(width: 460, height: 420)
 
         Window(String(localized: "Babylon Runtime"), id: "babylonRuntime") {
             BabylonRuntimeView()

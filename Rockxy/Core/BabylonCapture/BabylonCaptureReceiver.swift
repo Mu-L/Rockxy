@@ -3,6 +3,18 @@ import Network
 import Observation
 import os
 
+// MARK: - BabylonListenerStatus
+
+enum BabylonListenerStatus: Equatable {
+    case stopped
+    case starting
+    case waiting(String)
+    case ready
+    case failed(String)
+}
+
+// MARK: - BabylonCaptureReceiver
+
 @Observable
 final class BabylonCaptureReceiver: @unchecked Sendable {
     // MARK: Lifecycle
@@ -13,9 +25,10 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
 
     static let shared = BabylonCaptureReceiver()
 
-    private(set) var listenerError: String?
-    private(set) var isListening = false
-    private(set) var connectedClientCount = 0
+    private(set) var listenerStatus = BabylonListenerStatus.stopped
+    /// Number of live TCP connections. Increments before authentication, so a
+    /// non-zero value does not imply any paired/authenticated Babylon client.
+    private(set) var openConnectionCount = 0
 
     @MainActor
     func start(
@@ -32,6 +45,21 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     func stop() {
         queue.async { [weak self] in
             self?.stopInternal()
+        }
+    }
+
+    /// Restart only the Bonjour listener after a failure.
+    ///
+    /// Serialized and coalesced on the capture queue via queue-owned state
+    /// (`listener` / `isListenerStarting`). It restarts the listener alone —
+    /// already-accepted connections, their sessions, replay guards, and tracked
+    /// transactions are preserved, and the pairing-token observer is left intact.
+    /// It deliberately does NOT call `stopInternal()`. Authentication,
+    /// connection/session limits, cryptography, protocol, and session handling are
+    /// all unchanged; any stale listener error is cleared before rebinding.
+    func retryListener() {
+        queue.async { [weak self] in
+            self?.restartListener()
         }
     }
 
@@ -92,13 +120,37 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     private var sessionOrder: [String] = []
     private var pairingObserver: NSObjectProtocol?
     private var aggregateBufferedByteCount = 0
+    private var isListenerStarting = false
 
     private func startListenerIfNeeded() {
+        installPairingObserverIfNeeded()
+        startListener()
+    }
+
+    /// Install the pairing-token observer exactly once for the receiver's
+    /// lifetime. Retry rebinds the listener without touching it, so it is never
+    /// duplicated; `stopInternal()` is the only path that removes it.
+    private func installPairingObserverIfNeeded() {
+        guard pairingObserver == nil else {
+            return
+        }
+        pairingObserver = NotificationCenter.default.addObserver(
+            forName: .babylonPairingTokenDidChange,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.queue.async { [weak self] in
+                self?.disconnectAllClients()
+            }
+        }
+    }
+
+    private func startListener() {
         guard listener == nil else {
             return
         }
         guard let port = NWEndpoint.Port(rawValue: BabylonCaptureProtocol.port) else {
-            updateListenerState(error: "Invalid Babylon capture port.")
+            publishListenerStatus(.failed("Invalid Babylon capture port."))
             return
         }
 
@@ -116,40 +168,62 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
                 }
                 handleListenerState(state, listener: listener)
             }
-            listener.newConnectionHandler = { [weak self] connection in
-                self?.accept(connection)
+            listener.newConnectionHandler = { [weak self, weak listener] connection in
+                guard let self, let listener, self.listener === listener else {
+                    connection.cancel()
+                    return
+                }
+                accept(connection)
             }
             self.listener = listener
-            pairingObserver = NotificationCenter.default.addObserver(
-                forName: .babylonPairingTokenDidChange,
-                object: nil,
-                queue: nil
-            ) { [weak self] _ in
-                self?.queue.async { [weak self] in
-                    self?.disconnectAllClients()
-                }
-            }
+            isListenerStarting = true
+            // Publish a truthful Starting state and clear any stale listener error.
+            publishListenerStatus(.starting)
             listener.start(queue: queue)
         } catch {
-            updateListenerState(error: error.localizedDescription)
+            isListenerStarting = false
+            publishListenerStatus(.failed(error.localizedDescription))
         }
     }
 
+    /// Restart only the listener generation. Cancels the current listener (its
+    /// late callbacks are ignored by the identity guard in `handleListenerState`)
+    /// and binds a fresh one, leaving connections, sessions, and the pairing
+    /// observer untouched. Coalesced while a bind is already in flight.
+    private func restartListener() {
+        guard !isListenerStarting else {
+            return
+        }
+        let active = listener
+        listener = nil
+        active?.stateUpdateHandler = nil
+        active?.cancel()
+        startListener()
+    }
+
     private func handleListenerState(_ state: NWListener.State, listener: NWListener) {
+        // Ignore every callback from a listener that is no longer the current
+        // generation, so a replaced listener can never publish state.
+        guard self.listener === listener else {
+            return
+        }
         switch state {
         case .ready:
-            updateListenerState(listening: true)
+            isListenerStarting = false
+            publishListenerStatus(.ready)
+        case let .waiting(error):
+            publishListenerStatus(.waiting(error.localizedDescription))
         case let .failed(error):
+            isListenerStarting = false
+            self.listener = nil
             listener.cancel()
-            if self.listener === listener {
-                self.listener = nil
-            }
-            updateListenerState(error: error.localizedDescription)
+            publishListenerStatus(.failed(error.localizedDescription))
         case .cancelled:
-            if self.listener === listener {
-                self.listener = nil
-            }
-            updateListenerState(listening: false)
+            isListenerStarting = false
+            // The current listener was cancelled without our asking — surface a
+            // retryable Unavailable state rather than a misleading Starting.
+            self.listener = nil
+            publishListenerStatus(.failed(String(localized: "The Babylon listener stopped unexpectedly.")))
         default:
             break
         }
@@ -162,7 +236,7 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
         }
         let context = ConnectionContext(connection: connection)
         connections[context.id] = context
-        publishConnectedClientCount()
+        publishOpenConnectionCount()
         connection.stateUpdateHandler = { [weak self, weak context] state in
             guard let self, let context else {
                 return
@@ -402,7 +476,7 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
         }
         aggregateBufferedByteCount -= context.accumulator.bufferedByteCount
         context.connection.cancel()
-        publishConnectedClientCount()
+        publishOpenConnectionCount()
     }
 
     private func reconcileBufferedByteCount(for context: ConnectionContext, previousByteCount: Int) {
@@ -416,31 +490,36 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
         aggregateBufferedByteCount = 0
         sessions.removeAll()
         sessionOrder.removeAll()
-        publishConnectedClientCount()
+        publishOpenConnectionCount()
     }
 
     private func stopInternal() {
-        listener?.cancel()
+        let active = listener
         listener = nil
+        isListenerStarting = false
+        active?.cancel()
         disconnectAllClients()
         if let pairingObserver {
             NotificationCenter.default.removeObserver(pairingObserver)
             self.pairingObserver = nil
         }
-        updateListenerState(listening: false)
+        publishListenerStatus(.stopped)
     }
 
-    private func updateListenerState(listening: Bool = false, error: String? = nil) {
-        Task { @MainActor [weak self] in
-            self?.isListening = listening
-            self?.listenerError = error
+    private func publishListenerStatus(_ status: BabylonListenerStatus) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        // Every publication originates on `queue`; dispatching from that serial
+        // source to the main queue preserves listener-generation ordering.
+        DispatchQueue.main.async { [weak self] in
+            self?.listenerStatus = status
         }
     }
 
-    private func publishConnectedClientCount() {
+    private func publishOpenConnectionCount() {
+        dispatchPrecondition(condition: .onQueue(queue))
         let count = connections.count
-        Task { @MainActor [weak self] in
-            self?.connectedClientCount = count
+        DispatchQueue.main.async { [weak self] in
+            self?.openConnectionCount = count
         }
     }
 }
