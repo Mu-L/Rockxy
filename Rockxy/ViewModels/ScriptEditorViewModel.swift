@@ -228,13 +228,15 @@ final class ScriptEditorViewModel {
     // MARK: - Load / Save
 
     func load(intent: ScriptEditorIntent) async {
+        loadGeneration &+= 1
+        let generation = loadGeneration
         switch intent {
         case .createNew:
             // Defer creation to the List window (which calls `createNewScript`).
             // If opened without a pending edit id, we still want a clean slate.
             resetToDefaults()
         case let .edit(pluginID):
-            await loadExisting(pluginID: pluginID)
+            await loadExisting(pluginID: pluginID, generation: generation)
         }
     }
 
@@ -242,6 +244,7 @@ final class ScriptEditorViewModel {
         guard let pluginID else {
             return
         }
+        let generation = loadGeneration
         do {
             let manifestURL = pluginDir(for: pluginID).appendingPathComponent("plugin.json")
             let scriptURL = pluginDir(for: pluginID).appendingPathComponent("index.js")
@@ -292,6 +295,7 @@ final class ScriptEditorViewModel {
 
             var enableSucceeded = alreadyEnabled
             var quotaReached = false
+            var enableErrorMessage: String?
             if !alreadyEnabled {
                 do {
                     try await effectivePolicyGate.enablePlugin(id: pluginID, using: pluginManager)
@@ -300,11 +304,7 @@ final class ScriptEditorViewModel {
                     quotaReached = true
                 } catch {
                     enableSucceeded = false
-                    appendConsole(.init(
-                        timestamp: .now,
-                        level: .errors,
-                        message: String(localized: "Enable failed: \(error.localizedDescription)")
-                    ))
+                    enableErrorMessage = String(localized: "Enable failed: \(error.localizedDescription)")
                 }
             }
 
@@ -312,6 +312,12 @@ final class ScriptEditorViewModel {
             let afterSnapshot = await pluginManager.plugins.first(where: { $0.id == pluginID })
             let isLiveActive = afterSnapshot?.isEnabled == true && afterSnapshot?.status == .active
 
+            guard generation == loadGeneration, self.pluginID == pluginID else {
+                return
+            }
+            if let enableErrorMessage {
+                appendConsole(.init(timestamp: .now, level: .errors, message: enableErrorMessage))
+            }
             savedAndActive = isLiveActive
             if isLiveActive {
                 statusTone = .success
@@ -347,6 +353,9 @@ final class ScriptEditorViewModel {
                 statusMessage = String(localized: "Saved (not active)")
             }
         } catch {
+            guard generation == loadGeneration, self.pluginID == pluginID else {
+                return
+            }
             savedAndActive = false
             statusTone = .error
             statusMessage = String(localized: "Save failed")
@@ -454,6 +463,8 @@ final class ScriptEditorViewModel {
     private let pluginManager: ScriptPluginManager
     private let policyGate: ScriptPolicyGate?
     private let pluginsDirectoryOverride: URL?
+    private var pluginBundlePath: URL?
+    private var loadGeneration: UInt = 0
     private var runtimeConsoleObserver: NSObjectProtocol?
 
     private var effectivePolicyGate: ScriptPolicyGate {
@@ -465,6 +476,9 @@ final class ScriptEditorViewModel {
     }
 
     private func pluginDir(for id: String) -> URL {
+        if self.pluginID == id, let pluginBundlePath {
+            return pluginBundlePath
+        }
         if let override = pluginsDirectoryOverride {
             return override.appendingPathComponent(id, isDirectory: true)
         }
@@ -473,6 +487,7 @@ final class ScriptEditorViewModel {
 
     private func resetToDefaults() {
         pluginID = nil
+        pluginBundlePath = nil
         name = ""
         urlPattern = ""
         method = .any
@@ -489,14 +504,20 @@ final class ScriptEditorViewModel {
         consoleEntries.removeAll()
     }
 
-    private func loadExisting(pluginID: String) async {
+    private func loadExisting(pluginID: String, generation: UInt) async {
         resetToDefaults()
-        let manifestURL = pluginDir(for: pluginID).appendingPathComponent("plugin.json")
-        let scriptURL = pluginDir(for: pluginID).appendingPathComponent("index.js")
+        let info = await pluginManager.plugins.first(where: { $0.id == pluginID })
+        guard generation == loadGeneration else {
+            return
+        }
+        let bundlePath = info?.bundlePath ?? pluginDir(for: pluginID)
+        let manifestURL = bundlePath.appendingPathComponent("plugin.json")
+        let scriptURL = bundlePath.appendingPathComponent("index.js")
         do {
             let manifest = try JSONDecoder().decode(PluginManifest.self, from: Data(contentsOf: manifestURL))
             let behavior = manifest.scriptBehavior ?? ScriptBehavior.defaults()
             self.pluginID = manifest.id
+            pluginBundlePath = bundlePath
             name = manifest.name
             let editorPattern = Self.editorPattern(for: behavior.matchCondition)
             urlPattern = editorPattern.pattern
@@ -507,7 +528,6 @@ final class ScriptEditorViewModel {
             runOnResponse = behavior.runOnResponse
             runAsMock = behavior.runAsMock
             code = (try? String(contentsOf: scriptURL, encoding: .utf8)) ?? ScriptTemplates.defaultSource
-            let info = await pluginManager.plugins.first(where: { $0.id == pluginID })
             savedAndActive = info?.isEnabled == true && info?.status == .active
             statusTone = savedAndActive ? .success : .neutral
             statusMessage = savedAndActive ? String(localized: "Saved and Active!") : String(localized: "Saved")

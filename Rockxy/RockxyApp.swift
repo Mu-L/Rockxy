@@ -262,9 +262,9 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .windowResizability(.contentSize)
         .defaultPosition(.center)
-        .defaultSize(width: 1_200, height: 672)
+        .defaultSize(width: 1_120, height: 700)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Script Editor"), id: "scriptEditor") {
             ToolWindowDisplayMetricsProvider {

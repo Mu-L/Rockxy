@@ -1,36 +1,78 @@
 import SwiftUI
 
-/// The main Scripting List window. Mirrors the AllowList / BlockList / SSL Proxying
-/// list-window idiom: title + master toggle, info banner, column header, List rows
-/// (flat scripts + folders), slide-up filter bar, bottom bar with +/-/New Folder/?/Filter/Advance/More.
+/// The Scripting List window. Mirrors the approved Allow List / Block List /
+/// Breakpoint Rules idiom: header (master toggle + always-visible search),
+/// divider, dynamic info banner, native Table (folders + scripts), divider,
+/// footer (add/remove + hint + More menu + status capsule).
 struct ScriptingListWindowView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            tableContent
-            shortcutStrip
-            bottomBar
-        }
-        .font(toolMetrics.font())
-        .frame(width: 1_200, height: 672)
-        .task { await viewModel.load() }
-        .onReceive(NotificationCenter.default.publisher(for: .rulesDidChange)) { _ in
-            Task { await viewModel.refresh() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .scriptsDidChange)) { _ in
-            Task { await viewModel.refresh() }
-        }
+        layout
+            .confirmationDialog(
+                deletionTitle(for: pendingDeletion),
+                isPresented: deletionPresented,
+                presenting: pendingDeletion
+            ) { row in
+                Button(deletionButtonTitle(for: row), role: .destructive) {
+                    confirmDeletion(row)
+                }
+                Button(String(localized: "Cancel"), role: .cancel) {
+                    pendingDeletion = nil
+                }
+            } message: { row in
+                Text(deletionMessage(for: row))
+            }
+            .alert(
+                String(localized: "Scripting"),
+                isPresented: operationErrorPresented
+            ) {
+                Button(String(localized: "OK")) { viewModel.operationError = nil }
+            } message: {
+                if let operationError = viewModel.operationError {
+                    Text(operationError)
+                }
+            }
     }
 
     // MARK: Private
 
     @State private var viewModel = ScriptingListViewModel()
+    @State private var pendingDeletion: ScriptListRowID?
+    @FocusState private var searchIsFocused: Bool
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.openWindow) private var openWindow
 
-    // MARK: - Helpers
+    private var deletionPresented: Binding<Bool> {
+        Binding(
+            get: { pendingDeletion != nil },
+            set: {
+                if !$0 {
+                    pendingDeletion = nil
+                }
+            }
+        )
+    }
+
+    private var operationErrorPresented: Binding<Bool> {
+        Binding(
+            get: { viewModel.operationError != nil },
+            set: {
+                if !$0 {
+                    viewModel.operationError = nil
+                }
+            }
+        )
+    }
+
+    // MARK: - Selection helpers
+
+    private var selectedRow: Binding<ScriptListRowID?> {
+        Binding(
+            get: { viewModel.selectedRowID },
+            set: { viewModel.selectedRowID = $0 }
+        )
+    }
 
     private var isScriptSelected: Bool {
         if case .script = viewModel.selectedRowID {
@@ -46,109 +88,499 @@ struct ScriptingListWindowView: View {
         return false
     }
 
-    private var selectedRows: Binding<Set<ScriptListRowID>> {
-        Binding(
-            get: {
-                if let selected = viewModel.selectedRowID {
-                    return [selected]
-                }
-                return []
-            },
-            set: { newValue in
-                viewModel.selectedRowID = newValue.first
+    private var isSearching: Bool {
+        !viewModel.filterText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var enabledScriptCount: Int {
+        viewModel.plugins.count(where: \.isEnabled)
+    }
+
+    private var activeScriptCount: Int {
+        viewModel.plugins.count { $0.isEnabled && $0.runtimeStatus == .active }
+    }
+
+    private var visibleScriptCount: Int {
+        viewModel.filteredDisplayRows.reduce(0) { partial, row in
+            if case .script = row.kind {
+                return partial + 1
             }
+            return partial
+        }
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var disclosureSlotWidth: CGFloat {
+        max(16, toolMetrics.smallIconFontSize + 5)
+    }
+
+    private var toggleControlSize: ControlSize {
+        toolMetrics.bodyFontSize >= 20 ? .large : .regular
+    }
+
+    private var infoBannerIsWarning: Bool {
+        !viewModel.toolEnabled || (enabledScriptCount > 0 && activeScriptCount == 0)
+    }
+
+    private var infoBannerMessage: String {
+        guard viewModel.toolEnabled else {
+            return String(
+                localized: "Scripting is off. Enabled scripts are kept, but none run until you turn Scripting on."
+            )
+        }
+        if enabledScriptCount == 0 {
+            return String(
+                localized: "Scripting is on, but no script is enabled. Traffic passes through unchanged."
+            )
+        }
+        if activeScriptCount == 0 {
+            return String(
+                localized: "Enabled scripts are not active. Review the Status column before testing traffic."
+            )
+        }
+        if viewModel.advanceAllowChaining {
+            return String(
+                localized: "Matching scripts can run in sequence. A block or mock result ends the chain."
+            )
+        }
+        return String(
+            localized: "Rockxy stops after the first matching script returns a result."
         )
+    }
+
+    private var enableDisableLabel: String {
+        guard case let .script(id) = viewModel.selectedRowID,
+              let script = viewModel.plugins.first(where: { $0.id == id }) else
+        {
+            return String(localized: "Enable Script")
+        }
+        return script.isEnabled
+            ? String(localized: "Disable Script")
+            : String(localized: "Enable Script")
+    }
+
+    private var footerHint: String {
+        let count = isSearching
+            ? "\(visibleScriptCount) of \(viewModel.plugins.count)"
+            : "\(viewModel.plugins.count)"
+        return String(localized: "\(count) scripts  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder")
+    }
+
+    private var statusText: String {
+        guard viewModel.toolEnabled else {
+            return String(localized: "SCRIPTING OFF")
+        }
+        if activeScriptCount == 0 {
+            return String(localized: "NO ACTIVE SCRIPTS")
+        }
+        return String(localized: "\(activeScriptCount) ACTIVE")
+    }
+
+    private var layout: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            infoBanner
+            Divider()
+            tableContent
+            Divider()
+            footer
+        }
+        .font(toolMetrics.font())
+        .frame(
+            minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
+        .task { await viewModel.load() }
+        .onReceive(NotificationCenter.default.publisher(for: .rulesDidChange)) { _ in
+            Task { await viewModel.refresh() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .scriptsDidChange)) { _ in
+            Task { await viewModel.refresh() }
+        }
+        .onChange(of: viewModel.filterText) { _, _ in
+            viewModel.reconcileSelectionWithVisibleRows()
+        }
+        .onChange(of: viewModel.filterColumn) { _, _ in
+            viewModel.reconcileSelectionWithVisibleRows()
+        }
+        .onDeleteCommand {
+            requestDeletionOfSelection()
+        }
     }
 
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle(isOn: Binding(
-                get: { viewModel.toolEnabled },
-                set: { viewModel.setToolEnabled($0) }
-            )) {
-                Text("Enable Scripting Tool")
-                    .font(toolMetrics.font())
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.toolEnabled },
+                    set: { viewModel.setToolEnabled($0) }
+                )) {
+                    Text(String(localized: "Enable Scripting"))
+                        .font(toolMetrics.font(weight: .medium))
+                }
+                .toggleStyle(.checkbox)
+                .controlSize(toggleControlSize)
+
+                Text(String(localized: "Rewrite requests and responses with JavaScript before they continue."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
             }
-            .toggleStyle(.checkbox)
-            .padding(.top, 16)
 
-            Text(
-                "Modify the Request or Response automatically with JavaScript. Support URL, Status Code, Header, Method, and Body."
-            )
-            .font(toolMetrics.font())
-            Text("Each request is checked against the rules from top to bottom, stopping when a match is found.")
+            Spacer()
+
+            HStack(spacing: 6) {
+                Picker(String(localized: "Search field"), selection: $viewModel.filterColumn) {
+                    ForEach(ScriptListFilterColumn.allCases) { column in
+                        Text(column.title).tag(column)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
                 .font(toolMetrics.font())
-                .foregroundStyle(.secondary)
+                .frame(minHeight: toolMetrics.formControlHeight)
 
-            if viewModel.isFilterVisible {
-                filterBar
+                TextField(String(localized: "Search scripts"), text: $viewModel.filterText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .frame(width: 220, height: toolMetrics.formControlHeight)
+                    .focused($searchIsFocused)
+                    .accessibilityLabel(String(localized: "Search scripts"))
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.bottom, 10)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerTopPadding)
+    }
+
+    // MARK: - Info banner
+
+    private var infoBanner: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: infoBannerIsWarning ? "exclamationmark.triangle.fill" : "info.circle")
+                .foregroundStyle(infoBannerIsWarning ? Color.orange : Color.secondary)
+                .padding(.top, 1)
+            Text(infoBannerMessage)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(infoBannerIsWarning ? Color.primary : Color.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(
+            infoBannerIsWarning
+                ? Color.orange.opacity(0.12)
+                : Color(nsColor: .controlBackgroundColor).opacity(0.5)
+        )
     }
 
     // MARK: - Table
 
     private var tableContent: some View {
-        Table(viewModel.filteredDisplayRows, selection: selectedRows) {
-            TableColumn(String(localized: "Name")) { row in
+        Table(viewModel.filteredDisplayRows, selection: selectedRow) {
+            TableColumn(
+                Text(String(localized: "Enabled"))
+                    .font(toolMetrics.tableHeaderFont())
+            ) { row in
+                enabledCell(for: row)
+            }
+            .width(max(72, toolMetrics.tableHeaderFontSize * 4.5))
+            .alignment(.center)
+
+            TableColumn(
+                Text(String(localized: "Name"))
+                    .font(toolMetrics.tableHeaderFont())
+            ) { row in
                 nameCell(for: row)
             }
-            .width(min: 300, ideal: 340)
+            .width(
+                min: max(220, toolMetrics.bodyFontSize * 10),
+                ideal: max(300, toolMetrics.bodyFontSize * 13)
+            )
 
-            TableColumn(String(localized: "Method")) { row in
-                switch row.kind {
-                case .folder:
-                    Text("")
-                case let .script(script):
+            TableColumn(
+                Text(String(localized: "Method"))
+                    .font(toolMetrics.tableHeaderFont())
+            ) { row in
+                if case let .script(script) = row.kind {
                     Text(script.method ?? "ANY")
+                        .font(toolMetrics.font())
                         .lineLimit(1)
+                        .foregroundStyle(script.isEnabled ? Color.primary : Color.secondary)
                 }
             }
-            .width(96)
+            .width(max(84, toolMetrics.tableHeaderFontSize * 4.8))
 
-            TableColumn(String(localized: "Matching Rule")) { row in
-                switch row.kind {
-                case .folder:
-                    Text("")
-                case let .script(script):
-                    Text(script.urlPattern?.isEmpty == false ? script.urlPattern ?? "" : "<Missing URL>")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(script.urlPattern ?? "<Missing URL>")
+            TableColumn(
+                Text(String(localized: "Matching Rule"))
+                    .font(toolMetrics.tableHeaderFont())
+            ) { row in
+                if case let .script(script) = row.kind {
+                    matchingRuleCell(for: script)
                 }
             }
-            .width(min: 420, ideal: 660)
+            .width(
+                min: max(260, toolMetrics.bodyFontSize * 12),
+                ideal: max(420, toolMetrics.bodyFontSize * 17)
+            )
+
+            TableColumn(
+                Text(String(localized: "Status"))
+                    .font(toolMetrics.tableHeaderFont())
+            ) { row in
+                if case let .script(script) = row.kind {
+                    statusCell(for: script)
+                }
+            }
+            .width(
+                min: max(104, toolMetrics.tableHeaderFontSize * 5.2),
+                ideal: max(128, toolMetrics.bodyFontSize * 6)
+            )
         }
         .contextMenu(forSelectionType: ScriptListRowID.self) { rows in
-            tableContextMenu(rows: rows)
-        } primaryAction: { rows in
-            guard let row = rows.first else {
-                return
+            if let row = rows.first {
+                rowContextMenu(for: row)
             }
-            primaryAction(for: row)
+        } primaryAction: { rows in
+            if let row = rows.first {
+                primaryAction(for: row)
+            }
         }
         .overlay {
             if viewModel.filteredDisplayRows.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "No Scripts"),
-                    systemImage: "curlybraces",
-                    description: Text(String(localized: "Click + to create a new script."))
+                    isSearching
+                        ? String(localized: "No Matching Scripts")
+                        : String(localized: "No Scripts"),
+                    systemImage: isSearching ? "magnifyingglass" : "curlybraces",
+                    description: Text(
+                        isSearching
+                            ? String(localized: "Try a different name, method, or matching rule.")
+                            : String(localized: "Click + or press ⌘N to create a script.")
+                    )
                 )
             }
         }
-        .padding(.horizontal, 18)
-        .onDeleteCommand {
-            Task { await viewModel.deleteSelection() }
+        .font(toolMetrics.font())
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
+        .onKeyPress(.return, phases: .down, action: handleReturnKeyPress)
+        .onKeyPress(.space, phases: .down, action: handleSpaceKeyPress)
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            addRemoveControl
+
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+
+            moreMenu
+            statusCapsule
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var addRemoveControl: some View {
+        HStack(spacing: 0) {
+            Button {
+                createNewScript()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: toolMetrics.smallIconFontSize))
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(viewModel.isCreatingOrDuplicating)
+            .accessibilityLabel(String(localized: "New Script"))
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1, height: 18)
+
+            Button {
+                requestDeletionOfSelection()
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: toolMetrics.smallIconFontSize))
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRowID == nil)
+            .accessibilityLabel(String(localized: "Delete Selected"))
+        }
+        .foregroundStyle(.primary)
+        .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button(String(localized: "New Script")) {
+                createNewScript()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(viewModel.isCreatingOrDuplicating)
+
+            Button(String(localized: "New Folder")) {
+                viewModel.createNewFolder()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+
+            Divider()
+
+            Button(String(localized: "Edit Script")) {
+                openEditorForSelection()
+            }
+            .disabled(!isScriptSelected)
+
+            Button(String(localized: "Duplicate")) {
+                Task { await viewModel.duplicateSelection() }
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(!isScriptSelected || viewModel.isCreatingOrDuplicating)
+
+            Button(enableDisableLabel) {
+                toggleSelectedScript()
+            }
+            .disabled(!isScriptSelected)
+
+            Button(String(localized: "Rename Folder")) {
+                viewModel.beginRenameSelectedFolder()
+            }
+            .disabled(!isFolderSelected)
+
+            Divider()
+
+            Button(String(localized: "Focus Search")) {
+                searchIsFocused = true
+            }
+            .keyboardShortcut("f", modifiers: .command)
+
+            Toggle(isOn: Binding(
+                get: { viewModel.advanceAllowChaining },
+                set: { viewModel.setAdvanceAllowChaining($0) }
+            )) {
+                Text(String(localized: "Run Every Matching Script"))
+            }
+            Toggle(isOn: Binding(
+                get: { viewModel.advanceAllowSystemEnvVars },
+                set: { viewModel.setAdvanceAllowSystemEnvVars($0) }
+            )) {
+                Text(String(localized: "Allow Scripts to Read System Environment Variables"))
+            }
+
+            Divider()
+
+            Button(String(localized: "Delete"), role: .destructive) {
+                requestDeletionOfSelection()
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRowID == nil)
+        } label: {
+            HStack(spacing: 6) {
+                Text(String(localized: "More"))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            }
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .frame(minHeight: toolMetrics.footerControlHeight)
+        .fixedSize()
+    }
+
+    private var statusCapsule: some View {
+        Text(statusText)
+            .font(toolMetrics.secondaryFont(weight: .semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 9)
+            .frame(height: toolMetrics.footerControlHeight)
+            .background(statusCapsuleBackground)
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(statusCapsuleStroke, lineWidth: 1)
+            }
+    }
+
+    private var statusCapsuleBackground: Color {
+        if !viewModel.toolEnabled {
+            return Color.secondary.opacity(0.1)
+        }
+        return activeScriptCount == 0 ? Color.orange.opacity(0.12) : Color.green.opacity(0.12)
+    }
+
+    private var statusCapsuleStroke: Color {
+        if !viewModel.toolEnabled {
+            return Color.secondary.opacity(0.25)
+        }
+        return activeScriptCount == 0 ? Color.orange.opacity(0.3) : Color.green.opacity(0.35)
+    }
+
+    private func enabledCell(for row: ScriptListDisplayRow) -> some View {
+        HStack {
+            Spacer()
+            switch row.kind {
+            case let .folder(folder):
+                Toggle("", isOn: allChildrenBinding(for: folder))
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .controlSize(toggleControlSize)
+                    .disabled(folder.scriptIDs.contains(where: viewModel.mutatingScriptIDs.contains))
+                    .accessibilityLabel(String(localized: "Toggle all scripts in \(folder.name)"))
+            case let .script(script):
+                Toggle("", isOn: Binding(
+                    get: { script.isEnabled },
+                    set: { enabled in
+                        Task { await viewModel.setScriptEnabled(id: script.id, enabled: enabled) }
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+                .controlSize(toggleControlSize)
+                .disabled(viewModel.mutatingScriptIDs.contains(script.id))
+                .accessibilityLabel(
+                    script.isEnabled
+                        ? String(localized: "Disable \(script.name)")
+                        : String(localized: "Enable \(script.name)")
+                )
+            }
+            Spacer()
         }
     }
 
     private func nameCell(for row: ScriptListDisplayRow) -> some View {
         HStack(spacing: 6) {
-            Spacer().frame(width: CGFloat(row.indent) * 16)
+            Spacer().frame(width: CGFloat(row.indent) * disclosureSlotWidth)
             switch row.kind {
             case let .folder(folder):
                 Button {
@@ -157,14 +589,18 @@ struct ScriptingListWindowView: View {
                     Image(systemName: folder.expanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 12)
+                        .frame(
+                            width: disclosureSlotWidth,
+                            height: toolMetrics.tableRowHeight
+                        )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-
-                Toggle("", isOn: allChildrenBinding(for: folder))
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
-                    .controlSize(.small)
+                .accessibilityLabel(
+                    folder.expanded
+                        ? String(localized: "Collapse \(folder.name)")
+                        : String(localized: "Expand \(folder.name)")
+                )
 
                 Image(systemName: "folder.fill")
                     .foregroundStyle(.secondary)
@@ -175,12 +611,10 @@ struct ScriptingListWindowView: View {
                         text: $viewModel.renamingFolderText,
                         onEditingChanged: { isEditing in
                             if !isEditing, viewModel.renamingFolderID == folder.id {
-                                viewModel.cancelFolderRename()
+                                viewModel.commitFolderRename()
                             }
                         },
-                        onCommit: {
-                            viewModel.commitFolderRename()
-                        }
+                        onCommit: { viewModel.commitFolderRename() }
                     )
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font())
@@ -190,244 +624,151 @@ struct ScriptingListWindowView: View {
                     Text(folder.name)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(folder.name)
                 }
 
             case let .script(script):
-                Spacer().frame(width: row.indent == 0 ? 14 : 0)
-                Toggle("", isOn: Binding(
-                    get: { script.isEnabled },
-                    set: { _ in Task { await viewModel.toggleScript(id: script.id) } }
-                ))
-                .labelsHidden()
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
+                Spacer().frame(width: row.indent == 0 ? disclosureSlotWidth : 0)
+                Image(systemName: "curlybraces")
+                    .foregroundStyle(.secondary)
                 Text(script.name.isEmpty ? String(localized: "Untitled") : script.name)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundStyle(script.isEnabled ? Color.primary : Color.secondary)
+                    .help(script.name)
             }
             Spacer()
         }
-        .opacity(row.isEnabled ? 1.0 : 0.6)
+        .font(toolMetrics.font())
     }
 
-    private var shortcutStrip: some View {
-        Text("New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ↵")
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 18)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-    }
-
-    // MARK: - Bottom bar
-
-    private var bottomBar: some View {
-        HStack(spacing: 8) {
-            addRemoveButtons
-            Button {
-                viewModel.createNewFolder()
-            } label: {
-                Text("New Folder")
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-
-            Button {
-                // help button — opens docs in a future milestone; for now, no-op.
-            } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.bordered)
-
-            Spacer()
-
-            Button {
-                withAnimation { viewModel.isFilterVisible.toggle() }
-            } label: {
-                Label(String(localized: "Filter"), systemImage: "magnifyingglass")
-            }
-            .buttonStyle(.bordered)
-            .keyboardShortcut("f", modifiers: .command)
-
-            Menu {
-                Toggle(isOn: Binding(
-                    get: { viewModel.advanceAllowSystemEnvVars },
-                    set: { viewModel.setAdvanceAllowSystemEnvVars($0) }
-                )) { Text("Allow Scripts to read System Environment Variables") }
-                Toggle(isOn: Binding(
-                    get: { viewModel.advanceAllowChaining },
-                    set: { viewModel.setAdvanceAllowChaining($0) }
-                )) { Text("Allow Running Multiple Scripts for one Request") }
-            } label: {
-                menuLabel(String(localized: "Advance"))
-            }
-            .menuIndicator(.hidden)
-            .buttonStyle(.bordered)
-            .fixedSize()
-
-            Menu {
-                moreMenuItems
-            } label: {
-                menuLabel(String(localized: "More"))
-            }
-            .menuIndicator(.hidden)
-            .buttonStyle(.bordered)
-            .fixedSize()
-        }
-        .padding(.horizontal, 18)
-        .padding(.bottom, 14)
-    }
-
-    private var addRemoveButtons: some View {
-        HStack(spacing: 0) {
-            Button {
-                Task {
-                    if await viewModel.createNewScript() != nil {
-                        await MainActor.run {
-                            openWindow(id: "scriptEditor")
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("n", modifiers: .command)
-
-            Rectangle()
-                .fill(Color(nsColor: .separatorColor))
-                .frame(width: 1, height: 18)
-
-            Button {
-                Task { await viewModel.deleteSelection() }
-            } label: {
-                Image(systemName: "minus")
-                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.delete, modifiers: .command)
-            .disabled(viewModel.selectedRowID == nil)
-        }
-        .foregroundStyle(.primary)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .overlay(
-            Rectangle()
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
-        .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
-    @ViewBuilder private var moreMenuItems: some View {
-        Button("New…") {
-            Task {
-                if await viewModel.createNewScript() != nil {
-                    await MainActor.run {
-                        openWindow(id: "scriptEditor")
-                    }
-                }
-            }
-        }
-        .keyboardShortcut("n", modifiers: .command)
-        Button("New Folder") { viewModel.createNewFolder() }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-        Divider()
-        Button("Edit") {
-            viewModel.openEditorForSelection()
-            openWindow(id: "scriptEditor")
-        }
-        .keyboardShortcut("e", modifiers: .command)
-        .disabled(!isScriptSelected)
-        Button("Duplicate") { Task { await viewModel.duplicateSelection() } }
-            .keyboardShortcut("d", modifiers: .command)
-            .disabled(!isScriptSelected)
-        Button("Enable Rule") {
-            if case let .script(id) = viewModel.selectedRowID {
-                Task { await viewModel.toggleScript(id: id) }
-            }
-        }
-        .keyboardShortcut(.return, modifiers: [])
-        .disabled(!isScriptSelected)
-        Button("Enable Rule") {
-            if case let .script(id) = viewModel.selectedRowID {
-                Task { await viewModel.toggleScript(id: id) }
-            }
-        }
-        .keyboardShortcut(.space, modifiers: [])
-        .disabled(!isScriptSelected)
-        Button("Rename Folder") { viewModel.beginRenameSelectedFolder() }
-            .disabled(!isFolderSelected)
-        Divider()
-        Menu("Export Settings") {
-            Button("JSON…") {} // deferred
-        }
-        Menu("Import Settings") {
-            Button("JSON…") {} // deferred
-        }
-        Divider()
-        Button("Show in Finder…") {} // deferred
-            .disabled(!isScriptSelected)
-        Menu("Open local file with") {
-            Button("System Default") {} // deferred
-        }
-        .disabled(!isScriptSelected)
-        Divider()
-        Button("Delete") { Task { await viewModel.deleteSelection() } }
-            .keyboardShortcut(.delete, modifiers: .command)
-            .disabled(viewModel.selectedRowID == nil)
-    }
-
-    // MARK: - Filter bar
-
-    private var filterBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            Picker("", selection: $viewModel.filterColumn) {
-                ForEach(ScriptListFilterColumn.allCases) { column in
-                    Text(column.title).tag(column)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
-            TextField("Filter…", text: $viewModel.filterText)
-                .textFieldStyle(.roundedBorder)
+    @ViewBuilder
+    private func matchingRuleCell(for script: PluginInfoSnapshot) -> some View {
+        if let pattern = script.urlPattern, !pattern.isEmpty {
+            Text(pattern)
+                .font(toolMetrics.font(monospaced: true))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .foregroundStyle(script.isEnabled ? Color.primary : Color.secondary)
+                .help(pattern)
+        } else {
+            Text(String(localized: "<Missing URL>"))
                 .font(toolMetrics.font())
-                .frame(minHeight: toolMetrics.formControlHeight)
-            Button {
-                viewModel.isFilterVisible = false
-                viewModel.filterText = ""
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
         }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
-    private func allChildrenBinding(for folder: ScriptFolder) -> Binding<Bool> {
-        Binding<Bool>(
-            get: {
-                let ids = Set(folder.scriptIDs)
-                let matching = viewModel.plugins.filter { ids.contains($0.id) }
-                return !matching.isEmpty && matching.allSatisfy(\.isEnabled)
-            },
-            set: { newValue in
-                Task {
-                    await viewModel.setScriptsEnabled(ids: folder.scriptIDs, enabled: newValue)
+    private func statusCell(for script: PluginInfoSnapshot) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(statusColor(for: script.runtimeStatus))
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(script.runtimeStatus.title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .font(toolMetrics.font())
+        .foregroundStyle(.secondary)
+        .help(script.statusDetail ?? script.runtimeStatus.title)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func statusColor(for status: ScriptListRuntimeStatus) -> Color {
+        switch status {
+        case .active:
+            .green
+        case .error:
+            .red
+        case .loading:
+            .orange
+        case .disabled:
+            .secondary
+        }
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(for row: ScriptListRowID) -> some View {
+        switch row {
+        case .script:
+            Button(String(localized: "Edit Script")) {
+                viewModel.selectedRowID = row
+                openEditorForSelection()
+            }
+            Button(String(localized: "Duplicate")) {
+                viewModel.selectedRowID = row
+                Task { await viewModel.duplicateSelection() }
+            }
+            .disabled(viewModel.isCreatingOrDuplicating)
+            Button(scriptEnableDisableLabel(for: row)) {
+                if case let .script(id) = row {
+                    Task { await viewModel.toggleScript(id: id) }
                 }
             }
-        )
+            Divider()
+            Button(String(localized: "Delete"), role: .destructive) {
+                requestDeletion(row)
+            }
+        case .folder:
+            Button(String(localized: "Rename Folder")) {
+                viewModel.selectedRowID = row
+                viewModel.beginRenameSelectedFolder()
+            }
+            Divider()
+            Button(String(localized: "Delete"), role: .destructive) {
+                requestDeletion(row)
+            }
+        }
+    }
+
+    private func createNewScript() {
+        Task {
+            if await viewModel.createNewScript() != nil {
+                openWindow(id: "scriptEditor")
+            }
+        }
+    }
+
+    private func openEditorForSelection() {
+        guard isScriptSelected else {
+            return
+        }
+        viewModel.openEditorForSelection()
+        openWindow(id: "scriptEditor")
+    }
+
+    private func toggleSelectedScript() {
+        guard case let .script(id) = viewModel.selectedRowID,
+              let script = viewModel.plugins.first(where: { $0.id == id }) else
+        {
+            return
+        }
+        Task { await viewModel.setScriptEnabled(id: id, enabled: !script.isEnabled) }
+    }
+
+    private func handleReturnKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard isScriptSelected else {
+            return .ignored
+        }
+        if keyPress.modifiers.contains(.command) {
+            openEditorForSelection()
+            return .handled
+        }
+        guard keyPress.modifiers.isEmpty else {
+            return .ignored
+        }
+        toggleSelectedScript()
+        return .handled
+    }
+
+    private func handleSpaceKeyPress(_ keyPress: KeyPress) -> KeyPress.Result {
+        guard isScriptSelected, keyPress.modifiers.isEmpty else {
+            return .ignored
+        }
+        toggleSelectedScript()
+        return .handled
     }
 
     private func primaryAction(for row: ScriptListRowID) {
@@ -440,88 +781,93 @@ struct ScriptingListWindowView: View {
         }
     }
 
-    @ViewBuilder
-    private func tableContextMenu(rows: Set<ScriptListRowID>) -> some View {
-        if let row = rows.first {
-            moreMenuItems(for: row)
+    private func scriptEnableDisableLabel(for row: ScriptListRowID) -> String {
+        guard case let .script(id) = row,
+              let script = viewModel.plugins.first(where: { $0.id == id }) else
+        {
+            return String(localized: "Enable Script")
         }
+        return script.isEnabled
+            ? String(localized: "Disable Script")
+            : String(localized: "Enable Script")
     }
 
-    @ViewBuilder
-    private func moreMenuItems(for row: ScriptListRowID) -> some View {
-        let previousSelection = viewModel.selectedRowID
-        Button("Edit") {
-            viewModel.selectedRowID = row
-            viewModel.openEditorForSelection()
-            openWindow(id: "scriptEditor")
-            if case .folder = row {
-                viewModel.selectedRowID = previousSelection
-            }
+    // MARK: - Deletion confirmation
+
+    private func requestDeletionOfSelection() {
+        guard let selection = viewModel.selectedRowID else {
+            return
         }
-        .keyboardShortcut("e", modifiers: .command)
-        .disabled({
-            if case .script = row {
-                return false
-            }
-            return true
-        }())
-        Button("Duplicate") {
-            viewModel.selectedRowID = row
-            Task { await viewModel.duplicateSelection() }
-        }
-        .keyboardShortcut("d", modifiers: .command)
-        .disabled({
-            if case .script = row {
-                return false
-            }
-            return true
-        }())
-        Button("Toggle") {
-            if case let .script(id) = row {
-                Task { await viewModel.toggleScript(id: id) }
-            }
-        }
-        .keyboardShortcut(.return, modifiers: [])
-        .disabled({
-            if case .script = row {
-                return false
-            }
-            return true
-        }())
-        Button("Rename Folder") {
-            viewModel.selectedRowID = row
-            viewModel.beginRenameSelectedFolder()
-        }
-        .disabled({
-            if case .folder = row {
-                return false
-            }
-            return true
-        }())
-        Divider()
-        Button("Delete", role: .destructive) {
-            viewModel.selectedRowID = row
-            Task { await viewModel.deleteSelection() }
-        }
-        .keyboardShortcut(.delete, modifiers: .command)
+        requestDeletion(selection)
     }
 
-    private func menuLabel(_ title: String) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-            Image(systemName: "chevron.down")
-                .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
-        }
+    private func requestDeletion(_ row: ScriptListRowID) {
+        viewModel.selectedRowID = row
+        pendingDeletion = row
     }
-}
 
-private extension ScriptListDisplayRow {
-    var isEnabled: Bool {
-        switch kind {
+    private func confirmDeletion(_ row: ScriptListRowID) {
+        viewModel.selectedRowID = row
+        pendingDeletion = nil
+        Task { await viewModel.deleteSelection() }
+    }
+
+    private func deletionTitle(for row: ScriptListRowID?) -> String {
+        switch row {
         case .folder:
-            true
-        case let .script(script):
-            script.isEnabled
+            String(localized: "Delete Folder?")
+        case .script,
+             .none:
+            String(localized: "Delete Script?")
         }
+    }
+
+    private func deletionButtonTitle(for row: ScriptListRowID) -> String {
+        switch row {
+        case .folder:
+            String(localized: "Delete Folder")
+        case .script:
+            String(localized: "Delete Script")
+        }
+    }
+
+    private func deletionMessage(for row: ScriptListRowID) -> String {
+        switch row {
+        case let .folder(id):
+            String(
+                localized: "“\(folderName(for: id))” will be removed. Scripts inside it are kept and moved to the top level."
+            )
+        case let .script(id):
+            String(
+                localized: "“\(scriptName(for: id))” will be removed from disk. This cannot be undone."
+            )
+        }
+    }
+
+    private func scriptName(for id: String) -> String {
+        let name = viewModel.plugins.first(where: { $0.id == id })?.name ?? ""
+        return name.isEmpty ? String(localized: "Untitled") : name
+    }
+
+    private func folderName(for id: UUID) -> String {
+        for row in viewModel.displayRows {
+            if case let .folder(folder) = row.kind, folder.id == id {
+                return folder.name.isEmpty ? String(localized: "Untitled") : folder.name
+            }
+        }
+        return String(localized: "Untitled")
+    }
+
+    private func allChildrenBinding(for folder: ScriptFolder) -> Binding<Bool> {
+        Binding<Bool>(
+            get: {
+                let ids = Set(folder.scriptIDs)
+                let matching = viewModel.plugins.filter { ids.contains($0.id) }
+                return !matching.isEmpty && matching.allSatisfy(\.isEnabled)
+            },
+            set: { newValue in
+                Task { await viewModel.setScriptsEnabled(ids: folder.scriptIDs, enabled: newValue) }
+            }
+        )
     }
 }

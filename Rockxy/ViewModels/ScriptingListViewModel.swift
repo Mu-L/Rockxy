@@ -25,17 +25,80 @@ struct ScriptListDisplayRow: Identifiable, Equatable {
     let kind: Kind
 }
 
+// MARK: - ScriptListRuntimeStatus
+
+enum ScriptListRuntimeStatus: Equatable {
+    case active
+    case disabled
+    case error
+    case loading
+
+    // MARK: Internal
+
+    init(_ status: PluginStatus) {
+        switch status {
+        case .active:
+            self = .active
+        case .disabled:
+            self = .disabled
+        case .error:
+            self = .error
+        case .loading:
+            self = .loading
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .active:
+            String(localized: "Active")
+        case .disabled:
+            String(localized: "Disabled")
+        case .error:
+            String(localized: "Error")
+        case .loading:
+            String(localized: "Loading…")
+        }
+    }
+}
+
 // MARK: - PluginInfoSnapshot
 
 /// Plain value snapshot of a script plugin for list rendering — pulled off
 /// the actor + folder store onto the MainActor viewmodel.
 struct PluginInfoSnapshot: Equatable {
+    // MARK: Lifecycle
+
+    init(
+        id: String,
+        name: String,
+        isEnabled: Bool,
+        method: String?,
+        urlPattern: String?,
+        runtimeStatus: ScriptListRuntimeStatus,
+        statusDetail: String? = nil,
+        bundlePath: URL? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.isEnabled = isEnabled
+        self.method = method
+        self.urlPattern = urlPattern
+        self.runtimeStatus = runtimeStatus
+        self.statusDetail = statusDetail
+        self.bundlePath = bundlePath
+    }
+
+    // MARK: Internal
+
     let id: String
     let name: String
     let isEnabled: Bool
     let method: String?
     let urlPattern: String?
-    let statusText: String
+    let runtimeStatus: ScriptListRuntimeStatus
+    let statusDetail: String?
+    let bundlePath: URL?
 }
 
 // MARK: - ScriptListFilterColumn
@@ -70,11 +133,11 @@ final class ScriptingListViewModel {
 
     init(
         pluginManager: ScriptPluginManager = PluginManager.shared.scriptManager,
-        folderStore: ScriptFolderStore = .shared,
+        folderStore: ScriptFolderStore? = nil,
         pluginsDirectory: URL? = nil
     ) {
         self.pluginManager = pluginManager
-        self.folderStore = folderStore
+        self.folderStore = folderStore ?? .shared
         self.pluginsDirectoryOverride = pluginsDirectory
     }
 
@@ -85,13 +148,17 @@ final class ScriptingListViewModel {
     var selectedRowID: ScriptListRowID?
     var renamingFolderID: UUID?
     var renamingFolderText: String = ""
-    var isFilterVisible: Bool = false
     var filterText: String = ""
     var filterColumn: ScriptListFilterColumn = .name
     var advanceAllowSystemEnvVars: Bool = false
     var advanceAllowChaining: Bool = false
     /// True when the master "Enable Scripting Tool" toggle is on.
     var toolEnabled: Bool = true
+    /// Last user-visible failure from a create/duplicate/delete/enable operation.
+    /// The window surfaces it through a single alert and clears it on dismiss.
+    var operationError: String?
+    private(set) var mutatingScriptIDs: Set<String> = []
+    private(set) var isCreatingOrDuplicating = false
 
     /// Identity of the underlying ScriptPluginManager — exposed for tests that
     /// need to verify multiple view models share the same backing actor.
@@ -104,13 +171,14 @@ final class ScriptingListViewModel {
     }
 
     var filteredDisplayRows: [ScriptListDisplayRow] {
-        guard isFilterVisible, !filterText.isEmpty else {
+        let query = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             return displayRows
         }
         return buildFilteredRows(
             pluginSnapshots: plugins,
             folderIndex: folderStore.index,
-            filterText: filterText,
+            filterText: query,
             filterColumn: filterColumn
         )
     }
@@ -123,10 +191,22 @@ final class ScriptingListViewModel {
 
     /// Refresh `plugins` snapshot from the actor + reconcile folder index.
     func refresh() async {
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         let current = await pluginManager.plugins
+        guard generation == refreshGeneration else {
+            let targetGeneration = refreshGeneration
+            while appliedRefreshGeneration < targetGeneration {
+                await Task.yield()
+            }
+            return
+        }
         plugins = current.map { Self.snapshot(from: $0) }
         folderStore.reconcile(with: plugins.map(\.id))
+        reconcileSelectionAfterRefresh()
+        reconcileSelectionWithVisibleRows()
         applySettingsSnapshot()
+        appliedRefreshGeneration = generation
     }
 
     /// Load-on-first-appear for the window.
@@ -162,6 +242,13 @@ final class ScriptingListViewModel {
 
     @discardableResult
     func createNewScript() async -> String? {
+        guard !isCreatingOrDuplicating else {
+            return nil
+        }
+        isCreatingOrDuplicating = true
+        defer { isCreatingOrDuplicating = false }
+        let selectionBeforeCreate = selectedRowID
+        operationError = nil
         let id = UUID().uuidString.lowercased()
         let name = "Untitled Script \(plugins.count + 1)"
         let pluginsDir = pluginDir(for: id)
@@ -195,7 +282,11 @@ final class ScriptingListViewModel {
             )
             await pluginManager.loadAllPlugins()
             await refresh()
-            selectedRowID = .script(id)
+            filterText = ""
+            filterColumn = .name
+            if selectedRowID == selectionBeforeCreate {
+                selectedRowID = .script(id)
+            }
             ScriptEditorSession.shared.setPending(.edit(pluginID: id))
             return id
         } catch {
@@ -207,12 +298,15 @@ final class ScriptingListViewModel {
                 }
             }
             Self.logger.error("Create script failed: \(error.localizedDescription)")
+            operationError = String(localized: "Could not create the script. \(error.localizedDescription)")
             return nil
         }
     }
 
     /// Create an empty folder ready to rename-in-place.
     func createNewFolder() {
+        filterText = ""
+        filterColumn = .name
         let id = folderStore.createFolder()
         renamingFolderID = id
         renamingFolderText = String(localized: "Untitled")
@@ -229,6 +323,7 @@ final class ScriptingListViewModel {
         }
         renamingFolderID = nil
         renamingFolderText = ""
+        reconcileSelectionWithVisibleRows()
     }
 
     func cancelFolderRename() {
@@ -250,26 +345,50 @@ final class ScriptingListViewModel {
         guard let selection = selectedRowID else {
             return
         }
+        operationError = nil
         switch selection {
         case let .folder(id):
             folderStore.deleteFolder(id: id)
+            selectedRowID = nil
         case let .script(id):
+            guard !mutatingScriptIDs.contains(id) else {
+                return
+            }
+            mutatingScriptIDs.insert(id)
+            defer { mutatingScriptIDs.remove(id) }
             do {
                 try await pluginManager.uninstallPlugin(id: id)
+                if selectedRowID == selection {
+                    selectedRowID = nil
+                }
             } catch {
                 Self.logger.error("Delete script failed: \(error.localizedDescription)")
+                operationError = String(localized: "Could not delete the script. \(error.localizedDescription)")
+                do {
+                    try await pluginManager.reloadPlugin(id: id)
+                } catch {
+                    Self.logger.error("Restore after failed delete failed: \(error.localizedDescription)")
+                    operationError = String(
+                        localized:
+                        "Could not delete the script, and Rockxy could not restore its runtime. \(error.localizedDescription)"
+                    )
+                }
             }
             await refresh()
         }
-        selectedRowID = nil
     }
 
     func duplicateSelection() async {
         guard case let .script(id) = selectedRowID,
-              let source = plugins.first(where: { $0.id == id }) else
+              let source = plugins.first(where: { $0.id == id }),
+              !isCreatingOrDuplicating else
         {
             return
         }
+        isCreatingOrDuplicating = true
+        defer { isCreatingOrDuplicating = false }
+        let selectionBeforeDuplicate = selectedRowID
+        operationError = nil
         let newID = UUID().uuidString.lowercased()
         let sourceDir = pluginDir(for: id)
         let destDir = pluginDir(for: newID)
@@ -280,7 +399,7 @@ final class ScriptingListViewModel {
             // Rewrite plugin.json with new id + name
             let manifestURL = destDir.appendingPathComponent("plugin.json")
             let data = try Data(contentsOf: manifestURL)
-            var manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
+            let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
             let newName = source.name + " " + String(localized: "(Copy)")
             let copy = PluginManifest(
                 id: newID,
@@ -297,13 +416,15 @@ final class ScriptingListViewModel {
                 license: manifest.license,
                 scriptBehavior: manifest.scriptBehavior
             )
-            _ = manifest
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(copy).write(to: manifestURL)
             await pluginManager.loadAllPlugins()
             await refresh()
-            selectedRowID = .script(newID)
+            if selectedRowID == selectionBeforeDuplicate {
+                selectedRowID = .script(newID)
+                reconcileSelectionWithVisibleRows()
+            }
         } catch {
             if createdDestination, FileManager.default.fileExists(atPath: destDir.path) {
                 do {
@@ -313,37 +434,60 @@ final class ScriptingListViewModel {
                 }
             }
             Self.logger.error("Duplicate failed: \(error.localizedDescription)")
+            operationError = String(localized: "Could not duplicate the script. \(error.localizedDescription)")
         }
+    }
+
+    func setScriptEnabled(id: String, enabled: Bool) async {
+        guard !mutatingScriptIDs.contains(id),
+              let plugin = plugins.first(where: { $0.id == id }),
+              plugin.isEnabled != enabled else
+        {
+            return
+        }
+        mutatingScriptIDs.insert(id)
+        defer { mutatingScriptIDs.remove(id) }
+        operationError = nil
+        if enabled {
+            do {
+                try await ScriptPolicyGate.shared.enablePlugin(id: id, using: pluginManager)
+            } catch {
+                Self.logger.error("Enable failed: \(error.localizedDescription)")
+                operationError = String(localized: "Could not enable the script. \(error.localizedDescription)")
+            }
+        } else {
+            await pluginManager.disablePlugin(id: id)
+        }
+        await refresh()
     }
 
     func toggleScript(id: String) async {
         guard let plugin = plugins.first(where: { $0.id == id }) else {
             return
         }
-        if plugin.isEnabled {
-            await pluginManager.disablePlugin(id: id)
-        } else {
-            do {
-                try await ScriptPolicyGate.shared.enablePlugin(id: id, using: pluginManager)
-            } catch {
-                Self.logger.error("Enable failed: \(error.localizedDescription)")
-            }
-        }
-        await refresh()
+        await setScriptEnabled(id: id, enabled: !plugin.isEnabled)
     }
 
     func setScriptsEnabled(ids: [String], enabled: Bool) async {
+        operationError = nil
         let requestedIDs = Set(ids)
-        let targets = plugins.filter { requestedIDs.contains($0.id) && $0.isEnabled != enabled }
+        let targets = plugins.filter {
+            requestedIDs.contains($0.id)
+                && !mutatingScriptIDs.contains($0.id)
+                && $0.isEnabled != enabled
+        }
         guard !targets.isEmpty else {
             return
         }
+        mutatingScriptIDs.formUnion(targets.map(\.id))
+        defer { mutatingScriptIDs.subtract(targets.map(\.id)) }
         for plugin in targets {
             if enabled {
                 do {
                     try await ScriptPolicyGate.shared.enablePlugin(id: plugin.id, using: pluginManager)
                 } catch {
                     Self.logger.error("Enable failed: \(error.localizedDescription)")
+                    operationError = String(localized: "Could not enable the script. \(error.localizedDescription)")
                 }
             } else {
                 await pluginManager.disablePlugin(id: plugin.id)
@@ -357,6 +501,7 @@ final class ScriptingListViewModel {
             return
         }
         folderStore.setExpanded(folderID: id, expanded: !folder.expanded)
+        reconcileSelectionWithVisibleRows()
     }
 
     // MARK: - Editor open
@@ -372,6 +517,15 @@ final class ScriptingListViewModel {
         ScriptEditorSession.shared.setPending(.edit(pluginID: pluginID))
     }
 
+    func reconcileSelectionWithVisibleRows() {
+        guard let selectedRowID else {
+            return
+        }
+        if !filteredDisplayRows.contains(where: { $0.id == selectedRowID }) {
+            self.selectedRowID = nil
+        }
+    }
+
     // MARK: Private
 
     private static let logger = Logger(
@@ -382,11 +536,8 @@ final class ScriptingListViewModel {
     private let pluginManager: ScriptPluginManager
     private let folderStore: ScriptFolderStore
     private let pluginsDirectoryOverride: URL?
-
-    private func pluginDir(for id: String) -> URL {
-        let root = pluginsDirectoryOverride ?? RockxyIdentity.current.appSupportPath("Plugins")
-        return root.appendingPathComponent(id, isDirectory: true)
-    }
+    private var refreshGeneration: UInt = 0
+    private var appliedRefreshGeneration: UInt = 0
 
     private static func snapshot(from info: PluginInfo) -> PluginInfoSnapshot {
         let behavior = info.manifest.scriptBehavior ?? ScriptBehavior.defaults()
@@ -398,8 +549,41 @@ final class ScriptingListViewModel {
             isEnabled: info.isEnabled,
             method: method,
             urlPattern: pattern.isEmpty ? nil : pattern,
-            statusText: info.statusText
+            runtimeStatus: ScriptListRuntimeStatus(info.status),
+            statusDetail: statusDetail(from: info),
+            bundlePath: info.bundlePath
         )
+    }
+
+    private static func statusDetail(from info: PluginInfo) -> String? {
+        if case let .error(message) = info.status {
+            return message.isEmpty ? info.lastError : message
+        }
+        return nil
+    }
+
+    private func reconcileSelectionAfterRefresh() {
+        guard let selectedRowID else {
+            return
+        }
+        switch selectedRowID {
+        case let .script(id):
+            if !plugins.contains(where: { $0.id == id }) {
+                self.selectedRowID = nil
+            }
+        case let .folder(id):
+            if !folderStore.index.folders.contains(where: { $0.id == id }) {
+                self.selectedRowID = nil
+            }
+        }
+    }
+
+    private func pluginDir(for id: String) -> URL {
+        if let bundlePath = plugins.first(where: { $0.id == id })?.bundlePath {
+            return bundlePath
+        }
+        let root = pluginsDirectoryOverride ?? RockxyIdentity.current.appSupportPath("Plugins")
+        return root.appendingPathComponent(id, isDirectory: true)
     }
 
     private func applySettingsSnapshot() {

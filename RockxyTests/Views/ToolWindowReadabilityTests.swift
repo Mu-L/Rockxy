@@ -419,7 +419,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointTemplateWindowView.swift",
             "Rockxy/Views/Scripting/ScriptingListWindowView.swift",
-            "Rockxy/Views/Scripting/ScriptListRow.swift",
             "Rockxy/Views/Scripting/ScriptEditorWindowView.swift",
             "Rockxy/Views/Scripting/ScriptConsolePanel.swift",
             "Rockxy/Views/Settings/PreviewerTabSettingsView.swift",
@@ -578,7 +577,6 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
             "Rockxy/Views/Scripting/ScriptEditorWindowView.swift",
-            "Rockxy/Views/Scripting/ScriptListRow.swift",
             "Rockxy/Views/Scripting/ScriptingListWindowView.swift",
             "Rockxy/Views/Compose/ComposeWindowView.swift",
             "Rockxy/Views/Compose/ComposeRequestEditor.swift",
@@ -1098,6 +1096,105 @@ struct ToolWindowReadabilityTests {
         #expect(tlsExceptionsSource.contains("They do not bypass the proxy"))
         #expect(appSource.contains(#"Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList")"#))
         #expect(appSource.contains(#"Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList")"#))
+    }
+
+    @Test("Scripting List uses the approved native window and honest action routing")
+    func scriptingListUsesApprovedNativeStructure() throws {
+        let source = try readProjectFile("Rockxy/Views/Scripting/ScriptingListWindowView.swift")
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+
+        // Adaptive metric-driven shell, no pinned 1200x672 frame.
+        #expect(source.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
+        #expect(source.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
+        #expect(!source.contains(".frame(width: 1_200, height: 672)"))
+
+        // Header: real master toggle + always-visible search + filter selector.
+        #expect(source.contains(#"String(localized: "Enable Scripting")"#))
+        #expect(source.contains(#"TextField(String(localized: "Search scripts")"#))
+        #expect(source.contains("ScriptListFilterColumn.allCases"))
+
+        // Native Table with an explicit optional-ID single selection
+        // and the separated Enabled / Method / Matching Rule / Status columns.
+        #expect(source.contains("Table(viewModel.filteredDisplayRows, selection: selectedRow)"))
+        #expect(source.contains("Binding<ScriptListRowID?>"))
+        #expect(!source.contains("Binding<Set<ScriptListRowID>>"))
+        #expect(source.components(separatedBy: "TableColumn(").count - 1 == 5)
+        #expect(source.contains(".font(toolMetrics.tableHeaderFont())"))
+        #expect(source.contains(".alignment(.center)"))
+        #expect(source.contains(".controlSize(toggleControlSize)"))
+        #expect(source.contains("font(monospaced: true)"))
+
+        // Empty state distinguishes no scripts from no search results.
+        #expect(source.contains("ContentUnavailableView"))
+        #expect(source.contains(#"String(localized: "No Scripts")"#))
+        #expect(source.contains(#"String(localized: "No Matching Scripts")"#))
+
+        // Info banner is truthful for all three modes (never always "stops").
+        #expect(source.contains("Scripting is off."))
+        #expect(source.contains("Matching scripts can run in sequence"))
+        #expect(source.contains("stops after the first matching script returns a result"))
+
+        // Status capsule + semantic card surfaces.
+        #expect(source.contains("SCRIPTING OFF"))
+        #expect(source.contains("ACTIVE"))
+        #expect(source.contains(".clipShape(Capsule())"))
+        #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(source.contains("RoundedRectangle(cornerRadius: 6)"))
+        #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
+
+        // Both delete kinds are confirmed; folder removal preserves its scripts.
+        #expect(source.contains(".confirmationDialog("))
+        #expect(source.contains("Scripts inside it are kept"))
+
+        // Single user-visible alert for surfaced operation failures.
+        #expect(source.contains("viewModel.operationError"))
+
+        // List-to-editor handoff is preserved on create / edit / double-click.
+        #expect(source.contains(#"openWindow(id: "scriptEditor")"#))
+        #expect(source.contains("viewModel.createNewScript()"))
+        #expect(source.contains("viewModel.openEditorForSelection()"))
+        #expect(source.contains("viewModel.openEditor(for: id)"))
+
+        // Enable toggles read from the snapshot and route through the view model.
+        #expect(source.contains("get: { script.isEnabled }"))
+        #expect(source.contains("viewModel.setScriptEnabled(id: script.id, enabled: enabled)"))
+        #expect(source.contains("viewModel.setScriptsEnabled(ids: folder.scriptIDs"))
+
+        // Truthful shortcuts.
+        #expect(source.contains(#".keyboardShortcut("n", modifiers: .command)"#))
+        #expect(source.contains(#".keyboardShortcut("n", modifiers: [.command, .shift])"#))
+        #expect(source.contains(#".keyboardShortcut("d", modifiers: .command)"#))
+        #expect(source.contains(".keyboardShortcut(.delete, modifiers: .command)"))
+        #expect(source.contains(#".keyboardShortcut("f", modifiers: .command)"#))
+        #expect(source.contains(".focused($searchIsFocused)"))
+        #expect(source.contains(".onKeyPress(.return, phases: .down, action: handleReturnKeyPress)"))
+        #expect(source.contains(".onKeyPress(.space, phases: .down, action: handleSpaceKeyPress)"))
+
+        // One dynamic enable/disable label, no duplicate "Enable Rule" items.
+        #expect(source.contains("enableDisableLabel"))
+        #expect(source.contains(#"String(localized: "Disable Script")"#))
+        #expect(!source.contains("Enable Rule"))
+        #expect(!source.contains(#"runtimeStatus == "Active""#))
+
+        // Removed no-op affordances.
+        #expect(!source.contains("Show in Finder"))
+        #expect(!source.contains("Export Settings"))
+        #expect(!source.contains("Import Settings"))
+        #expect(!source.contains("Open local file with"))
+        #expect(!source.contains("questionmark.circle"))
+
+        // Scene is resizable native chrome, not a contentSize-only 1200x672 shell.
+        let sceneStart = try #require(
+            appSource.range(of: "Window(String(localized: \"Scripting\"), id: \"scriptingList\")")
+        )
+        let scenesAfter = appSource[sceneStart.lowerBound...]
+        let nextScene = try #require(
+            scenesAfter.range(of: "Window(String(localized: \"Script Editor\"), id: \"scriptEditor\")")
+        )
+        let sceneSource = scenesAfter[..<nextScene.lowerBound]
+        #expect(sceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
+        #expect(!sceneSource.contains(".windowResizability(.contentSize)"))
+        #expect(!sceneSource.contains(".defaultSize(width: 1_200, height: 672)"))
     }
 
     // MARK: Private
