@@ -4,6 +4,8 @@ import Foundation
 @testable import Rockxy
 import Testing
 
+// MARK: - ToolWindowReadabilityTests
+
 @MainActor
 struct ToolWindowReadabilityTests {
     // MARK: Internal
@@ -1303,5 +1305,95 @@ struct ToolWindowReadabilityTests {
         }
         url.deleteLastPathComponent()
         return url
+    }
+}
+
+// MARK: - Advanced Proxy Settings workflow contracts
+
+@MainActor
+extension ToolWindowReadabilityTests {
+    @Test("Advanced Proxy Settings derives system routing from live coordinator state, not autoStartProxy")
+    func advancedProxySettingsUsesLiveCoordinatorState() throws {
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let viewSource = try readProjectFile("Rockxy/Views/Settings/AdvancedProxySettingsView.swift")
+
+        // The scene injects the live coordinator and uses the standard tool-window shell.
+        #expect(appSource.contains("AdvancedProxySettingsView(coordinator: mainCoordinator)"))
+        let sceneStart = try #require(
+            appSource.range(of: "Window(String(localized: \"Advanced Proxy Settings\"), id: \"advancedProxySettings\")")
+        )
+        let scenesAfter = appSource[sceneStart.lowerBound...]
+        let nextScene = try #require(
+            scenesAfter.range(of: "Window(String(localized: \"Babylon Pairing\"), id: \"babylonPairing\")")
+        )
+        let sceneSource = scenesAfter[..<nextScene.lowerBound]
+        #expect(sceneSource.contains(".windowResizability(.contentSize)"))
+        #expect(sceneSource.contains(".defaultPosition(.center)"))
+        #expect(sceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
+
+        // The view takes the coordinator and reads live proxy state for routing.
+        // The live listen port comes from the coordinator runtime snapshot, not the
+        // bare activeProxyPort, so the endpoint reflects the real address + fallback.
+        #expect(viewSource.contains("let coordinator: MainContentCoordinator"))
+        #expect(viewSource.contains("coordinator.isProxyRunning"))
+        #expect(viewSource.contains("coordinator.isProxyOverridden"))
+        #expect(viewSource.contains("coordinator.toggleSystemProxyOverride()"))
+        #expect(viewSource.contains("coordinator.refreshProxyOverrideStatus()"))
+
+        // No live-state decision may read the orphaned autoStartProxy field, and the
+        // old static-shortcut / no-op affordances must be gone.
+        #expect(!viewSource.contains("autoStartProxy"))
+        #expect(!viewSource.contains("systemProxyActive"))
+        #expect(!viewSource.contains("Toggle ON"))
+        #expect(!viewSource.contains("Toggle OFF"))
+        #expect(!viewSource.contains("\u{2325}\u{2318}O"))
+
+        // Enabling routing is unavailable while the proxy server is stopped.
+        #expect(viewSource.contains(".disabled(!coordinator.isProxyRunning)"))
+
+        // Listener settings use an explicit validated draft with Cancel / Apply / Restore Defaults.
+        #expect(viewSource.contains("AdvancedProxySettingsDraft"))
+        #expect(viewSource.contains("private func applyListenerSettings()"))
+        #expect(viewSource.contains("draft = savedDraft"))
+        #expect(viewSource.contains("draft = .default"))
+        #expect(viewSource.contains(".disabled(!isDirty || !draft.canApply)"))
+        #expect(viewSource.contains("listenerChangeNeedsRestart"))
+        #expect(viewSource.contains("apply after the proxy restarts"))
+
+        // Live endpoint + restart truth read the coordinator runtime snapshot,
+        // never a hard-coded loopback endpoint.
+        #expect(viewSource.contains("coordinator.runtimeListenerSnapshot"))
+        #expect(viewSource.contains("snapshot.listenAddress"))
+        #expect(viewSource.contains("snapshot.resolvedPort"))
+        #expect(viewSource.contains("matchesRequestedListener"))
+        #expect(!viewSource.contains("127.0.0.1:\\(coordinator.activeProxyPort)"))
+
+        // The unsupported IPv6 dual-stack control and its dishonest copy are gone.
+        #expect(!viewSource.contains("$draft.listenIPv6"))
+        #expect(!viewSource.contains("draft.listenIPv6"))
+        #expect(!viewSource.contains("Listen on IPv4 & IPv6"))
+        #expect(!viewSource.contains("::0 (IPv6)"))
+
+        // Truthful system-proxy copy that acknowledges apps may ignore the setting.
+        #expect(viewSource.contains("macOS System Proxy Enabled"))
+        #expect(viewSource.contains("Proxy-aware traffic"))
+        #expect(!viewSource.contains("System Traffic Routed Through Rockxy"))
+
+        // Merge-only apply so unrelated listener edits elsewhere are not clobbered.
+        #expect(viewSource.contains("changedFrom: savedDraft"))
+
+        // Cancel restores the draft and dismisses; accessibility is provided for the port.
+        #expect(viewSource.contains("@Environment(\\.dismiss) private var dismiss"))
+        #expect(viewSource.contains("dismiss()"))
+        #expect(viewSource.contains(".accessibilityLabel(String(localized: \"Listener port number\"))"))
+
+        // Footer and helper actions adapt to large fonts instead of overflowing one row.
+        #expect(viewSource.contains("ViewThatFits(in: .horizontal)"))
+
+        // Honest live-vs-next-start separation and shared tool-window shell.
+        #expect(viewSource.contains("Live listener"))
+        #expect(viewSource.contains("ToolWindowDisplayMetrics"))
+        #expect(viewSource.contains("coordinator.systemProxyWarning"))
+        #expect(viewSource.contains("coordinator.proxyError"))
     }
 }

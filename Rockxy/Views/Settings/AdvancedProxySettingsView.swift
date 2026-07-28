@@ -3,41 +3,54 @@ import os
 import ServiceManagement
 import SwiftUI
 
-// Renders the advanced proxy settings interface for the settings experience.
+// Renders the Advanced Proxy Settings window: live system-routing diagnostics,
+// the next-start listener configuration, and the privileged helper tool status.
 
 // MARK: - AdvancedProxySettingsView
 
-/// Standalone window for advanced proxy configuration. Controls the system proxy override,
-/// port number, auto-port selection, localhost-only binding, and IPv4/IPv6 dual-stack options.
+/// Standalone diagnostics + configuration window for the proxy listener.
+///
+/// System routing derives entirely from the live coordinator (`isProxyRunning`,
+/// `isProxyOverridden`, `activeProxyPort`) and drives the existing coordinator
+/// override path — it never reads the persisted launch-time recording preference.
+/// The live endpoint and restart-needed status read the coordinator's
+/// `runtimeListenerSnapshot`, captured from the exact settings the running proxy
+/// started with. Listener settings are edited through an explicit validated
+/// `AdvancedProxySettingsDraft` and only persist on Apply.
 struct AdvancedProxySettingsView: View {
     // MARK: Internal
 
+    let coordinator: MainContentCoordinator
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            systemProxySection
+        VStack(alignment: .leading, spacing: 0) {
+            header
             Divider()
-            helperToolSection
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
+                    systemRoutingSection
+                    listenerSection
+                    helperToolSection
+                }
+                .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
             Divider()
-            portNumberSection
-            Divider()
-            advancedSection
-
-            Spacer()
-
-            footerSection
+            footer
         }
         .font(toolMetrics.font())
-        .padding(24)
-        .frame(width: toolMetrics.fieldWidth(480), alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: toolMetrics.fieldWidth(560), height: 640)
         .onAppear {
-            settings = AppSettingsManager.shared.settings
-            portText = "\(settings.proxyPort)"
+            reloadFromStorage()
+        }
+        .onChange(of: coordinator.isProxyRunning, initial: true) {
+            coordinator.refreshProxyOverrideStatus()
         }
         .task {
             await helperManager.checkStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            coordinator.refreshProxyOverrideStatus()
             Task {
                 await helperManager.checkStatus()
             }
@@ -49,6 +62,7 @@ struct AdvancedProxySettingsView: View {
             Button(String(localized: "Cancel"), role: .cancel) {}
             Button(String(localized: "Uninstall"), role: .destructive) {
                 Task {
+                    defer { coordinator.refreshProxyOverrideStatus() }
                     do {
                         try await helperManager.uninstall()
                     } catch {
@@ -57,7 +71,11 @@ struct AdvancedProxySettingsView: View {
                 }
             }
         } message: {
-            Text("The helper tool will be removed. Rockxy will use networksetup and may ask for your password.")
+            Text(
+                String(
+                    localized: "The helper tool will be removed. Rockxy will use networksetup and may ask for your password."
+                )
+            )
         }
     }
 
@@ -68,14 +86,89 @@ struct AdvancedProxySettingsView: View {
         category: "AdvancedProxySettings"
     )
 
-    @State private var settings = AppSettingsManager.shared.settings
-    @State private var portText: String = ""
+    @State private var draft = AdvancedProxySettingsDraft(settings: AppSettingsManager.shared.settings)
+    @State private var savedDraft = AdvancedProxySettingsDraft(settings: AppSettingsManager.shared.settings)
     @State private var helperManager = HelperManager.shared
     @State private var showingUninstallConfirmation = false
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.dismiss) private var dismiss
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var isDirty: Bool {
+        draft != savedDraft
+    }
+
+    /// The live endpoint (`address:port`) of the running proxy, read from the
+    /// coordinator snapshot so it reflects the real listen address and any
+    /// fallback port rather than a hard-coded loopback string.
+    private var liveEndpointText: String? {
+        guard coordinator.isProxyRunning,
+              let snapshot = coordinator.runtimeListenerSnapshot else
+        {
+            return nil
+        }
+        return "\(snapshot.listenAddress):\(snapshot.resolvedPort)"
+    }
+
+    /// True when the saved (preferred) listener configuration differs from the
+    /// parameters the running proxy actually started with — applied changes only
+    /// take effect on restart. A fallback resolved port alone never counts, so a
+    /// port collision at launch does not falsely report unsaved-restart state.
+    private var listenerChangeNeedsRestart: Bool {
+        guard coordinator.isProxyRunning, let snapshot = coordinator.runtimeListenerSnapshot else {
+            return false
+        }
+        return !snapshot.matchesRequestedListener(
+            preferredPort: savedDraft.parsedPort,
+            autoSelectPort: savedDraft.autoSelectPort,
+            listenAddress: savedDraft.effectiveListenAddress
+        )
+    }
+
+    private var routingIcon: String {
+        guard coordinator.isProxyRunning else {
+            return "circle.slash"
+        }
+        return coordinator.isProxyOverridden ? "checkmark.circle.fill" : "circle"
+    }
+
+    private var routingColor: Color {
+        guard coordinator.isProxyRunning else {
+            return .secondary
+        }
+        return coordinator.isProxyOverridden ? .green : .orange
+    }
+
+    private var routingTitle: String {
+        guard coordinator.isProxyRunning else {
+            return String(localized: "Proxy Server Stopped")
+        }
+        return coordinator.isProxyOverridden
+            ? String(localized: "macOS System Proxy Enabled")
+            : String(localized: "macOS System Proxy Disabled")
+    }
+
+    private var routingSubtitle: String {
+        guard coordinator.isProxyRunning else {
+            return String(localized: "System routing is unavailable while the proxy server is stopped.")
+        }
+        return coordinator.isProxyOverridden
+            ? String(
+                localized: "Proxy-aware traffic is routed to Rockxy. Some apps ignore the macOS system proxy and stay direct."
+            )
+            : String(
+                localized: "The proxy server is running, but proxy-aware traffic is not automatically routed through Rockxy."
+            )
+    }
+
+    private var routingFailureMessage: String? {
+        if let warning = coordinator.systemProxyWarning {
+            return warning.message
+        }
+        return coordinator.proxyError
     }
 
     // MARK: - Helper Status Mappings
@@ -167,8 +260,6 @@ struct AdvancedProxySettingsView: View {
         }
     }
 
-    // MARK: - Diagnostics Helpers
-
     private var installedVersionColor: Color {
         guard helperManager.installedInfo?.binaryVersion != nil else {
             return .secondary
@@ -212,174 +303,220 @@ struct AdvancedProxySettingsView: View {
         }
     }
 
-    private var systemProxyActive: Bool {
-        AppSettingsManager.shared.settings.autoStartProxy
-    }
+    // MARK: - Header
 
-    // MARK: - System Proxy
-
-    private var systemProxySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "System Proxy:"))
-                .font(toolMetrics.font(weight: .semibold))
-
-            HStack(spacing: 8) {
-                Image(systemName: systemProxyActive ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(systemProxyActive ? .green : .secondary)
-                    .font(.system(size: max(16, toolMetrics.bodyFontSize + 3)))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(
-                        systemProxyActive
-                            ? String(localized: "Overridden by Rockxy")
-                            : String(localized: "Not Active")
-                    )
+    private var header: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Advanced Proxy Settings"))
                     .font(toolMetrics.font(weight: .medium))
 
-                    if systemProxyActive {
-                        Text("IP=\(settings.effectiveListenAddress) Port=\(settings.proxyPort)")
+                Text(String(localized: "Diagnose system routing and configure how the proxy listens."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
+    }
+
+    // MARK: - System Routing
+
+    private var systemRoutingSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "System Routing"))
+                .font(toolMetrics.tableHeaderFont())
+
+            HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                Image(systemName: routingIcon)
+                    .foregroundStyle(routingColor)
+                    .font(.system(size: toolMetrics.compactIconFontSize))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(routingTitle)
+                        .font(toolMetrics.font(weight: .medium))
+
+                    Text(routingSubtitle)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if coordinator.isProxyOverridden, let endpoint = liveEndpointText {
+                        Text(endpoint)
                             .font(toolMetrics.secondaryFont(monospaced: true))
                             .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
                     }
                 }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            HStack(spacing: 8) {
-                Button(systemProxyActive
-                    ? String(localized: "Toggle OFF")
-                    : String(localized: "Toggle ON"))
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+
+            if let failure = routingFailureMessage {
+                routingFailureRow(failure)
+            }
+
+            HStack(spacing: toolMetrics.controlSpacing) {
+                Button(coordinator.isProxyOverridden
+                    ? String(localized: "Disable macOS System Proxy")
+                    : String(localized: "Enable macOS System Proxy"))
                 {
-                    toggleSystemProxy()
+                    coordinator.toggleSystemProxyOverride()
                 }
-                Text("\u{2325}\u{2318}O")
-                    .font(toolMetrics.secondaryFont(monospaced: true))
-                    .foregroundStyle(.tertiary)
+                .disabled(!coordinator.isProxyRunning)
+
+                Spacer(minLength: 0)
+            }
+
+            if !coordinator.isProxyRunning {
+                Text(String(localized: "Start the proxy to route system traffic through Rockxy."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
             }
         }
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
     }
 
-    // MARK: - Port Number
+    // MARK: - Listener
 
-    private var portNumberSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text(String(localized: "Port Number:"))
-                    .font(toolMetrics.font(weight: .semibold))
+    private var listenerSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            Text(String(localized: "Listener"))
+                .font(toolMetrics.tableHeaderFont())
 
-                TextField("", text: $portText)
+            if let endpoint = liveEndpointText {
+                liveListenerRow(endpoint)
+            }
+
+            portRow
+
+            Toggle(isOn: $draft.autoSelectPort) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Auto-select an available port at launch"))
+                        .font(toolMetrics.font())
+                    Text(String(localized: "Automatically select a new available port if it's occupied at launch."))
+                        .font(toolMetrics.metadataFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            Toggle(isOn: $draft.onlyListenOnLocalhost) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Only listen on localhost"))
+                        .font(toolMetrics.font())
+                    Text(String(localized: "Listen on 127.0.0.1 (localhost) instead of 0.0.0.0."))
+                        .font(toolMetrics.metadataFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            if !draft.onlyListenOnLocalhost {
+                Text(String(localized: "Rockxy binds IPv4 only. IPv6 dual-stack listening isn't available yet."))
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if listenerChangeNeedsRestart {
+                restartNoticeRow
+            }
+        }
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
+    }
+
+    private var portRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                Text(String(localized: "Port Number"))
+                    .font(toolMetrics.font(weight: .medium))
+
+                TextField("", text: $draft.portText)
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
-                    .frame(width: toolMetrics.fieldWidth(100))
-                    .frame(minHeight: toolMetrics.formControlHeight)
-                    .onChange(of: portText) {
-                        if let newPort = Int(portText), newPort > 0, newPort <= 65_535 {
-                            settings.proxyPort = newPort
-                            saveSettings()
-                        }
-                    }
+                    .frame(width: toolMetrics.fieldWidth(110))
+                    .frame(height: toolMetrics.formControlHeight)
+                    .accessibilityLabel(String(localized: "Listener port number"))
+                    .accessibilityHint(
+                        String(
+                            localized: "Enter a port between 1 and 65535. Applied changes take effect after the proxy restarts."
+                        )
+                    )
+
+                Spacer(minLength: 0)
             }
 
-            Toggle(isOn: $settings.autoSelectPort) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Auto Select Available Port At Launch"))
-                        .font(toolMetrics.font())
-                    Text(String(localized: "Automatically select new available port if it's occupied at launch."))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            if !draft.isPortValid {
+                Text(String(localized: "Enter a port between 1 and 65535."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.red)
             }
-            .toggleStyle(.checkbox)
-            .onChange(of: settings.autoSelectPort) { saveSettings() }
         }
     }
 
-    // MARK: - Advanced
+    private var restartNoticeRow: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(.orange)
+                .font(.system(size: toolMetrics.smallIconFontSize))
 
-    private var advancedSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Advanced:"))
-                .font(toolMetrics.font(weight: .semibold))
+            Text(
+                String(
+                    localized: "Saved listener settings apply after the proxy restarts. The live endpoint above stays active until then."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
-            Toggle(isOn: $settings.onlyListenOnLocalhost) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Only Listen on localhost"))
-                        .font(toolMetrics.font())
-                    Text(String(localized: "Listen on 127.0.0.1 (localhost) instead of 0.0.0.0"))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.checkbox)
-            .onChange(of: settings.onlyListenOnLocalhost) { saveSettings() }
-
-            Toggle(isOn: $settings.listenIPv6) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Listen on IPv4 & IPv6"))
-                        .font(toolMetrics.font())
-                    Text(String(localized: "Listen on 0.0.0.0 (IPv4) & ::0 (IPv6)"))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.checkbox)
-            .disabled(settings.onlyListenOnLocalhost)
-            .onChange(of: settings.listenIPv6) { saveSettings() }
+            Spacer(minLength: 0)
         }
     }
 
     // MARK: - Helper Tool
 
     private var helperToolSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Privileged Helper Tool:"))
-                .font(toolMetrics.font(weight: .semibold))
+        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Privileged Helper Tool"))
+                .font(toolMetrics.tableHeaderFont())
 
-            // Zone A: Summary row
             helperSummaryRow
-
-            // Zone B: Diagnostics grid
             helperDiagnosticsGrid
 
-            // Error detail (conditional)
             if let errorMessage = helperManager.lastErrorMessage {
                 helperErrorDetail(errorMessage)
             }
 
-            // Zone C: Actions + progress
             helperActions
         }
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
     }
 
-    // MARK: Zone A — Summary Row
-
     private var helperSummaryRow: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
             Image(systemName: helperStatusIcon)
                 .foregroundStyle(helperStatusColor)
-                .font(.system(size: max(20, toolMetrics.bodyFontSize + 7)))
+                .font(.system(size: toolMetrics.compactIconFontSize))
             VStack(alignment: .leading, spacing: 2) {
                 Text(helperStatusTitle)
-                    .font(toolMetrics.font(weight: .semibold))
+                    .font(toolMetrics.font(weight: .medium))
                 Text(helperStatusSubtitle)
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
-
-    // MARK: Zone B — Diagnostics Grid
 
     private var helperDiagnosticsGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
@@ -419,15 +556,25 @@ struct AdvancedProxySettingsView: View {
         .padding(.leading, 4)
     }
 
-    // MARK: Zone C — Actions
-
     private var helperActions: some View {
-        HStack(spacing: 8) {
-            if helperManager.isBusy {
-                ProgressView()
-                    .controlSize(.small)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                helperActionButtons
+                Spacer(minLength: 0)
             }
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                helperActionButtons
+            }
+        }
+    }
 
+    @ViewBuilder private var helperActionButtons: some View {
+        if helperManager.isBusy {
+            ProgressView()
+                .controlSize(.small)
+        }
+
+        Group {
             switch helperManager.status {
             case .notInstalled:
                 Button(String(localized: "Install Helper Tool")) {
@@ -503,49 +650,156 @@ struct AdvancedProxySettingsView: View {
                     .disabled(helperManager.isBusy)
                 }
             }
-
-            Button(role: .destructive) {
-                HelperRecoveryPresenter.presentForceReset()
-            } label: {
-                Text(String(localized: "Force Reset…"))
-            }
-            .disabled(helperManager.isBusy)
         }
+
+        Button(role: .destructive) {
+            HelperRecoveryPresenter.presentForceReset()
+        } label: {
+            Text(String(localized: "Force Reset…"))
+        }
+        .disabled(helperManager.isBusy)
     }
 
     // MARK: - Footer
 
-    private var footerSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Button(String(localized: "Restore Default")) {
-                    restoreDefaults()
-                }
-                Spacer()
+    private var footer: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                restoreDefaultsButton
+                footerStatusText
+                Spacer(minLength: 0)
+                cancelButton
+                applyButton
             }
+
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                footerStatusText
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    restoreDefaultsButton
+                    Spacer(minLength: 0)
+                    cancelButton
+                    applyButton
+                }
+            }
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var restoreDefaultsButton: some View {
+        Button(String(localized: "Restore Defaults")) {
+            draft = .default
         }
     }
 
-    // MARK: Error Detail
+    private var footerStatusText: some View {
+        Text(
+            isDirty
+                ? String(localized: "Unsaved listener changes")
+                : String(localized: "Listener settings saved")
+        )
+        .font(toolMetrics.secondaryFont())
+        .foregroundStyle(.secondary)
+    }
+
+    private var cancelButton: some View {
+        Button {
+            draft = savedDraft
+            dismiss()
+        } label: {
+            footerButtonLabel(String(localized: "Cancel"))
+        }
+        .keyboardShortcut(.cancelAction)
+    }
+
+    private var applyButton: some View {
+        Button {
+            applyListenerSettings()
+        } label: {
+            footerButtonLabel(String(localized: "Apply"))
+        }
+        .keyboardShortcut(.defaultAction)
+        .disabled(!isDirty || !draft.canApply)
+    }
+
+    private func liveListenerRow(_ endpoint: String) -> some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Live listener"))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+
+            Text(endpoint)
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "Live proxy listener"))
+        .accessibilityValue(endpoint)
+    }
+
+    private func routingFailureRow(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .font(.system(size: toolMetrics.smallIconFontSize))
+
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
 
     private func helperErrorDetail(_ errorMessage: String) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Last Error"))
-                    .font(toolMetrics.metadataFont(weight: .semibold))
-                Text(errorMessage)
-                    .font(toolMetrics.metadataFont(monospaced: true))
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(localized: "Last Error"))
+                .font(toolMetrics.metadataFont(weight: .semibold))
+            Text(errorMessage)
+                .font(toolMetrics.metadataFont(monospaced: true))
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(toolMetrics.controlSpacing)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
     }
 
-    // MARK: - Helper Actions
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(width: toolMetrics.footerButtonWidth - (toolMetrics.controlSpacing * 3))
+    }
+
+    private func reloadFromStorage() {
+        let stored = AdvancedProxySettingsDraft(settings: AppSettingsManager.shared.settings)
+        savedDraft = stored
+        draft = stored
+    }
+
+    private func applyListenerSettings() {
+        guard let updated = draft.applied(
+            to: AppSettingsManager.shared.settings,
+            changedFrom: savedDraft
+        ) else {
+            return
+        }
+        AppSettingsManager.shared.settings = updated
+        AppSettingsManager.shared.save()
+        savedDraft = AdvancedProxySettingsDraft(settings: updated)
+        draft = savedDraft
+    }
 
     private func installHelper() {
         Task {
+            defer { coordinator.refreshProxyOverrideStatus() }
             do {
                 try await helperManager.install()
             } catch {
@@ -556,6 +810,7 @@ struct AdvancedProxySettingsView: View {
 
     private func updateHelper() {
         Task {
+            defer { coordinator.refreshProxyOverrideStatus() }
             do {
                 try await helperManager.update()
             } catch {
@@ -566,6 +821,7 @@ struct AdvancedProxySettingsView: View {
 
     private func reinstallHelper() {
         Task {
+            defer { coordinator.refreshProxyOverrideStatus() }
             do {
                 try await helperManager.reinstall()
             } catch {
@@ -573,23 +829,19 @@ struct AdvancedProxySettingsView: View {
             }
         }
     }
+}
 
-    private func toggleSystemProxy() {
-        settings.autoStartProxy.toggle()
-        saveSettings()
-    }
+// MARK: - View + panelStyle
 
-    private func saveSettings() {
-        AppSettingsManager.shared.settings = settings
-        AppSettingsManager.shared.save()
-    }
-
-    private func restoreDefaults() {
-        settings.proxyPort = 9_090
-        settings.onlyListenOnLocalhost = true
-        settings.listenIPv6 = false
-        settings.autoSelectPort = true
-        portText = "9090"
-        saveSettings()
+private extension View {
+    func panelStyle() -> some View {
+        background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
     }
 }

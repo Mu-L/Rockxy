@@ -62,10 +62,13 @@ struct RockxyApp: App {
 
         Window(String(localized: "Advanced Proxy Settings"), id: "advancedProxySettings") {
             ToolWindowDisplayMetricsProvider {
-                AdvancedProxySettingsView()
+                AdvancedProxySettingsView(coordinator: mainCoordinator)
             }
         }
         .commandsRemoved()
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Babylon Pairing"), id: "babylonPairing") {
             BabylonPairingView()
