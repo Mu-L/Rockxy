@@ -17,6 +17,7 @@ struct ComposeWindowView: View {
             VStack(spacing: 0) {
                 composeBar
                 restoreConfirmationBanner
+                requestRestrictionBanner
             }
             Divider()
             HSplitView {
@@ -25,6 +26,7 @@ struct ComposeWindowView: View {
                     onLoadFromFile: { isShowingBodyImporter = true }
                 )
                 .frame(minWidth: 430)
+                .disabled(isSending)
                 ComposeResponseViewer(viewModel: viewModel)
                     .frame(minWidth: 360)
             }
@@ -32,10 +34,19 @@ struct ComposeWindowView: View {
             footerBar
         }
         .font(toolMetrics.font())
-        .frame(minWidth: max(900, toolMetrics.bodyFontSize * 32 + 484), minHeight: max(600, toolMetrics.bodyFontSize * 18 + 366))
+        .frame(
+            minWidth: max(900, toolMetrics.bodyFontSize * 32 + 484),
+            idealWidth: max(1_120, toolMetrics.bodyFontSize * 38 + 626),
+            minHeight: max(600, min(780, toolMetrics.bodyFontSize * 18 + 366)),
+            idealHeight: max(720, toolMetrics.bodyFontSize * 24 + 508)
+        )
         .onAppear {
             consumeDraftRequest()
             isURLFocused = true
+        }
+        .onDisappear {
+            cancelSend()
+            cancelBodyImport()
         }
         .onChange(of: ComposeStore.shared.draftVersion) {
             consumeDraftRequest()
@@ -57,14 +68,54 @@ struct ComposeWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .focusComposeURLField)) { _ in
             isURLFocused = true
         }
+        .alert(
+            String(localized: "Import Failed"),
+            isPresented: Binding(
+                get: { importErrorMessage != nil },
+                set: {
+                    if !$0 {
+                        importErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: "OK"), role: .cancel) {
+                importErrorMessage = nil
+            }
+        } message: {
+            if let importErrorMessage {
+                Text(importErrorMessage)
+            }
+        }
+        .alert(
+            String(localized: "Clear Compose History?"),
+            isPresented: $isShowingClearHistoryConfirmation
+        ) {
+            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Clear History"), role: .destructive) {
+                Task {
+                    await viewModel.clearHistory()
+                }
+            }
+        } message: {
+            Text(String(localized: "This removes all locally stored Compose request and response history."))
+        }
     }
 
     // MARK: Private
 
-    private static let httpMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+    private static let httpMethods = [
+        "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE",
+    ]
 
     @State private var viewModel = ComposeViewModel()
     @State private var isShowingBodyImporter = false
+    @State private var isShowingClearHistoryConfirmation = false
+    @State private var importErrorMessage: String?
+    @State private var sendTask: Task<Void, Never>?
+    @State private var sendTaskID: UUID?
+    @State private var bodyImportTask: Task<Void, Never>?
+    @State private var bodyImportTaskID: UUID?
     @FocusState private var isURLFocused: Bool
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
@@ -72,64 +123,75 @@ struct ComposeWindowView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var isSending: Bool {
+        if case .loading = viewModel.responseState {
+            return true
+        }
+        return false
+    }
+
     private var composeBar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Picker("", selection: $viewModel.method) {
-                    ForEach(Self.httpMethods, id: \.self) { method in
-                        Text(method).tag(method)
-                    }
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Picker(String(localized: "HTTP Method"), selection: $viewModel.method) {
+                ForEach(Self.httpMethods, id: \.self) { method in
+                    Text(method).tag(method)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .tint(.accentColor)
-                .frame(width: toolMetrics.menuWidth(86))
-                .onChange(of: viewModel.method) {
-                    viewModel.syncUnsupportedState()
+                if viewModel.method == "CONNECT" {
+                    Text("CONNECT").tag("CONNECT")
                 }
-
-                TextField(String(localized: "URL"), text: $viewModel.url)
-                    .textFieldStyle(.plain)
-                    .font(toolMetrics.font(monospaced: true))
-                    .frame(minHeight: toolMetrics.formControlHeight)
-                    .focused($isURLFocused)
-                    .onSubmit {
-                        Task { await viewModel.send() }
-                    }
-                    .onChange(of: viewModel.url) {
-                        viewModel.syncURLToQuery()
-                    }
-
-                Button {
-                    // Future raw-message expansion hook. Kept as a native toolbar-style affordance.
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help(String(localized: "Expand Raw Message"))
             }
-            .padding(.horizontal, 10)
-            .frame(minHeight: max(44, toolMetrics.formControlHeight + 16))
-            .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 16))
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: methodControlWidth, height: toolMetrics.formControlHeight)
+            .onChange(of: viewModel.method) {
+                viewModel.syncUnsupportedState()
+            }
+            .accessibilityLabel(String(localized: "HTTP method"))
+            .disabled(isSending)
+
+            TextField(String(localized: "https://example.com/path"), text: $viewModel.url)
+                .textFieldStyle(.roundedBorder)
+                .font(toolMetrics.font(monospaced: true))
+                .frame(height: toolMetrics.formControlHeight)
+                .focused($isURLFocused)
+                .onSubmit {
+                    startSend()
+                }
+                .onChange(of: viewModel.url) {
+                    viewModel.syncURLToQuery()
+                }
+                .accessibilityLabel(String(localized: "Request URL"))
+                .disabled(isSending)
 
             sendButton
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
     }
 
     @ViewBuilder private var sendButton: some View {
-        if case .loading = viewModel.responseState {
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: toolMetrics.menuWidth(60))
+        if isSending {
+            Button {
+                cancelSend()
+            } label: {
+                Text(String(localized: "Cancel"))
+                    .frame(width: sendControlWidth)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .frame(height: toolMetrics.formControlHeight)
+            .keyboardShortcut(".", modifiers: .command)
+            .help(String(localized: "Cancel the active request"))
         } else {
-            Button(String(localized: "Send")) {
-                Task { await viewModel.send() }
+            Button {
+                startSend()
+            } label: {
+                Text(String(localized: "Send"))
+                    .frame(width: sendControlWidth)
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .controlSize(.regular)
+            .frame(height: toolMetrics.formControlHeight)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.url.isEmpty || viewModel.isUnsupportedForReplay)
         }
@@ -146,40 +208,71 @@ struct ComposeWindowView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.bottom, 6)
             .transition(.opacity)
         }
     }
 
+    @ViewBuilder private var requestRestrictionBanner: some View {
+        if shouldShowRequestRestriction,
+           let message = viewModel.replayRestrictionMessage
+        {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                if viewModel.sourceHasUnsupportedBinaryBody || viewModel.sourceHasTruncatedHistoryBody {
+                    Button(String(localized: "Use Empty Body")) {
+                        viewModel.replaceUnavailableBody(with: "")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+            .padding(.bottom, toolMetrics.controlSpacing)
+        }
+    }
+
     private var footerBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: toolMetrics.controlSpacing) {
             templateMenu
             historyMenu
             settingsMenu
             Spacer()
+            Text(isSending ? String(localized: "⌘. Cancel") : String(localized: "⌘↩ Send"))
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
     private var templateMenu: some View {
         Menu {
             Button(ComposeTemplate.empty.title) {
+                cancelSend()
                 viewModel.applyTemplate(.empty)
             }
             Divider()
             Button(ComposeTemplate.getWithQuery.title) {
+                cancelSend()
                 viewModel.applyTemplate(.getWithQuery)
             }
             Divider()
             Button(ComposeTemplate.postJSON.title) {
+                cancelSend()
                 viewModel.applyTemplate(.postJSON)
             }
             Button(ComposeTemplate.postForm.title) {
+                cancelSend()
                 viewModel.applyTemplate(.postForm)
             }
             Button(ComposeTemplate.postMultipart.title) {
+                cancelSend()
                 viewModel.applyTemplate(.postMultipart)
             }
             Divider()
@@ -201,14 +294,19 @@ struct ComposeWindowView: View {
             } else {
                 ForEach(viewModel.history) { entry in
                     Button(entry.menuTitle) {
+                        cancelSend()
                         viewModel.restoreHistoryEntry(id: entry.id)
                     }
                 }
                 Divider()
-                Text(String(localized: "Authorization and cookie headers are not stored on disk."))
+                Text(
+                    String(
+                        localized: "History stays on this Mac. Authentication and cookie header values are redacted; URLs and bodies remain stored locally."
+                    )
+                )
                     .font(toolMetrics.secondaryFont())
                 Button(String(localized: "Clear All..."), role: .destructive) {
-                    viewModel.clearHistory()
+                    isShowingClearHistoryConfirmation = true
                 }
             }
         } label: {
@@ -246,6 +344,7 @@ struct ComposeWindowView: View {
             )
             Divider()
             Button(String(localized: "Reset to Fresh Request")) {
+                cancelSend()
                 viewModel.resetDraft()
                 isURLFocused = true
             }
@@ -261,6 +360,9 @@ struct ComposeWindowView: View {
     private func consumeDraftRequest() {
         let store = ComposeStore.shared
         if let transaction = store.pendingTransaction {
+            sendTask?.cancel()
+            sendTask = nil
+            sendTaskID = nil
             viewModel.prefill(from: transaction)
             store.pendingTransaction = nil
             store.shouldOpenBlankDraft = false
@@ -270,29 +372,97 @@ struct ComposeWindowView: View {
         guard store.shouldOpenBlankDraft else {
             return
         }
+        sendTask?.cancel()
+        sendTask = nil
+        sendTaskID = nil
         viewModel.resetDraft()
         store.shouldOpenBlankDraft = false
     }
 
     private func importBodyFile(_ result: Result<[URL], Error>) {
         guard case let .success(urls) = result, let url = urls.first else {
+            if case let .failure(error) = result {
+                importErrorMessage = error.localizedDescription
+            }
             return
         }
-        do {
-            try viewModel.loadBodyFromFile(url: url)
-        } catch {
-            // The body editor exposes formatter errors; file import failures remain non-destructive.
+        cancelSend()
+        cancelBodyImport()
+        let taskID = UUID()
+        bodyImportTaskID = taskID
+        bodyImportTask = Task {
+            do {
+                try await viewModel.loadBodyFromFile(url: url)
+            } catch {
+                if !Task.isCancelled, bodyImportTaskID == taskID {
+                    importErrorMessage = error.localizedDescription
+                }
+            }
+            if bodyImportTaskID == taskID {
+                bodyImportTask = nil
+                bodyImportTaskID = nil
+            }
         }
     }
 
     private func importCurlFromPasteboard() {
         guard let command = NSPasteboard.general.string(forType: .string) else {
+            importErrorMessage = ComposeImportError.emptyCommand.localizedDescription
             return
         }
         do {
             try viewModel.importCurlCommand(command)
+            sendTask?.cancel()
+            sendTask = nil
+            sendTaskID = nil
         } catch {
-            // The body editor exposes formatter/import errors without replacing the current draft.
+            importErrorMessage = error.localizedDescription
         }
+    }
+
+    private var methodControlWidth: CGFloat {
+        max(toolMetrics.menuWidth(96), toolMetrics.bodyFontSize * 4.5 + 36)
+    }
+
+    private var sendControlWidth: CGFloat {
+        max(78, toolMetrics.bodyFontSize * 2.8 + 44)
+    }
+
+    private var shouldShowRequestRestriction: Bool {
+        switch viewModel.responseState {
+        case .empty, .success, .error:
+            true
+        case .loading, .unsupported:
+            false
+        }
+    }
+
+    private func startSend() {
+        guard sendTaskID == nil else {
+            return
+        }
+        let taskID = UUID()
+        sendTaskID = taskID
+        sendTask?.cancel()
+        sendTask = Task {
+            await viewModel.send()
+            if sendTaskID == taskID {
+                sendTask = nil
+                sendTaskID = nil
+            }
+        }
+    }
+
+    private func cancelSend() {
+        sendTask?.cancel()
+        sendTask = nil
+        sendTaskID = nil
+        viewModel.cancelActiveSend()
+    }
+
+    private func cancelBodyImport() {
+        bodyImportTask?.cancel()
+        bodyImportTask = nil
+        bodyImportTaskID = nil
     }
 }

@@ -85,6 +85,7 @@ enum KeyboardShortcutCatalog {
         ]),
         KeyboardShortcutSection(id: "compose", title: "Compose", shortcuts: [
             row("compose.send", "Compose", "Send", "⌘↩", "Compose window", nil, nil),
+            row("compose.cancel", "Compose", "Cancel the active request", "⌘.", "Request in progress", nil, nil),
             row("compose.url", "Compose", "Focus the URL field", "⌘L", "Compose URL field", nil, nil),
             row("compose.template", "Compose", "Open Template menu", "⌘T", "Compose footer", nil, nil),
             row("compose.history", "Compose", "Open History menu", "⌘Y", "Compose footer", nil, "⌘H is reserved by macOS for Hide App."),

@@ -38,6 +38,7 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | Shortcut | Action |
 |---|---|
 | `⌘↩` | Send |
+| `⌘.` | Cancel the active request |
 | `⌘L` | Focus the URL field |
 | `⌘T` | Open Template menu |
 | `⌘Y` | Open History menu |

@@ -399,8 +399,9 @@ private struct ComposeWindowScene: Scene {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 900, height: 600)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         if #available(macOS 15.0, *) {
             return base.restorationBehavior(.disabled)

@@ -347,6 +347,58 @@ struct ToolWindowReadabilityTests {
         #expect(!contextSource.contains("NotificationCenter.default.post(name: .openDiffWindow"))
     }
 
+    @Test("Compose uses a native request surface with honest shortcuts and no dead-end affordances")
+    func composeUsesNativeRequestSurface() throws {
+        let windowSource = try readProjectFile("Rockxy/Views/Compose/ComposeWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Compose/ComposeRequestEditor.swift")
+        let responseSource = try readProjectFile("Rockxy/Views/Compose/ComposeResponseViewer.swift")
+
+        // Native request target row replaces the web-like rounded capsule.
+        #expect(!windowSource.contains("RoundedRectangle(cornerRadius: 16)"))
+        #expect(!windowSource.contains(".background(.quaternary"))
+        #expect(windowSource.contains(".textFieldStyle(.roundedBorder)"))
+        #expect(windowSource.contains("toolMetrics.contentHorizontalPadding"))
+
+        // The no-op Expand Raw Message affordance is gone.
+        #expect(!windowSource.contains("Expand Raw Message"))
+        #expect(!windowSource.contains("arrow.up.left.and.arrow.down.right"))
+
+        // Primary Send action keeps a clear loading state and honest disabled logic.
+        #expect(windowSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(windowSource.contains("cancelActiveSend"))
+        #expect(windowSource.contains(#".keyboardShortcut(".", modifiers: .command)"#))
+        #expect(windowSource.contains("viewModel.url.isEmpty || viewModel.isUnsupportedForReplay"))
+        #expect(windowSource.contains(".disabled(isSending)"))
+        #expect(windowSource.contains(#"isSending ? String(localized: "⌘. Cancel")"#))
+        #expect(!windowSource.contains(#""TRACE", "CONNECT""#))
+
+        // Preserved shortcuts: Send, Cancel, Template, History, Focus URL, Reset.
+        #expect(windowSource.contains(".keyboardShortcut(.return, modifiers: .command)"))
+        #expect(windowSource.contains(#".keyboardShortcut("t", modifiers: .command)"#))
+        #expect(windowSource.contains(#".keyboardShortcut("y", modifiers: .command)"#))
+        #expect(windowSource.contains(#".keyboardShortcut("l", modifiers: .command)"#))
+        #expect(windowSource.contains(#".keyboardShortcut("0", modifiers: .command)"#))
+
+        // Request/Response navigation uses consistent native pickers that adapt at large fonts.
+        #expect(editorSource.contains("ComposeRequestTab.allCases"))
+        #expect(editorSource.contains(".pickerStyle(.segmented)"))
+        #expect(editorSource.contains(".pickerStyle(.menu)"))
+        #expect(editorSource.contains("toolMetrics.bodyFontSize >= 20"))
+        #expect(responseSource.contains(".pickerStyle(.segmented)"))
+        #expect(responseSource.contains(".pickerStyle(.menu)"))
+        #expect(editorSource.contains("toolMetrics.tableHeaderFont()"))
+        #expect(editorSource.contains("viewModel.replaceUnavailableBody"))
+        #expect(responseSource.contains("History snapshot truncated"))
+
+        // Restrained add/remove: no loud filled red minus glyph.
+        #expect(!editorSource.contains("minus.circle.fill"))
+
+        // Import, privacy, and destructive history actions are explicit.
+        #expect(windowSource.contains("Import Failed"))
+        #expect(windowSource.contains("Clear Compose History?"))
+        #expect(windowSource.contains("URLs and bodies remain stored locally"))
+    }
+
     @Test("Readable tool windows use tool metrics")
     func readableToolWindowsUseToolMetrics() throws {
         let files = [

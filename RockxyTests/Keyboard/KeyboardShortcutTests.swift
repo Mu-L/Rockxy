@@ -39,6 +39,8 @@ struct KeyboardShortcutTests {
         let reference = try Self.documentation(named: "keyboard-shortcuts.md")
         #expect(reference.contains("Focus the URL field"))
         #expect(reference.contains("`⌘L`"))
+        #expect(reference.contains("Cancel the active request"))
+        #expect(reference.contains("`⌘.`"))
     }
 
     @Test("KS_FOCUS_03 Breakpoint Queue documents execute without an extra click")
