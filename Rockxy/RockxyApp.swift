@@ -226,6 +226,8 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 900, height: 680)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "SOCKS Proxy Settings"), id: "socksProxySettings") {
             ToolWindowDisplayMetricsProvider {
@@ -235,6 +237,8 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 640, height: 280)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Allow List"), id: "allowList") {
             ToolWindowDisplayMetricsProvider {
@@ -895,12 +899,6 @@ struct RockxyMenuCommands: Commands {
 
                 Button(String(localized: "External Proxy Settings…")) {
                     openWindow(id: "externalProxySettings")
-                }
-
-                Divider()
-
-                Button(String(localized: "SOCKS Proxy Settings…")) {
-                    openWindow(id: "socksProxySettings")
                 }
             }
 

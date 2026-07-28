@@ -637,6 +637,62 @@ struct ToolWindowReadabilityTests {
         }
     }
 
+    @Test("Upstream Proxy uses one safe native settings workflow")
+    func upstreamProxyUsesOneSafeNativeWorkflow() throws {
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let externalSource = try readProjectFile(
+            "Rockxy/Views/Settings/ExternalProxySettingsView.swift"
+        )
+        let socksSource = try readProjectFile(
+            "Rockxy/Views/Settings/SOCKSProxySettingsView.swift"
+        )
+        let policyNoticeSource = try readProjectFile(
+            "Rockxy/Views/Common/PolicyLockNotice.swift"
+        )
+        let storeSource = try readProjectFile(
+            "Rockxy/Models/Settings/UpstreamProxyStore.swift"
+        )
+
+        #expect(appSource.contains(#"id: "externalProxySettings""#))
+        #expect(appSource.contains(#"id: "socksProxySettings""#))
+
+        let proxyMenuStart = try #require(
+            appSource.range(of: #"Menu(String(localized: "Proxy Settings"))"#)
+        )
+        let appAfterProxyMenu = appSource[proxyMenuStart.lowerBound...]
+        let proxyMenuEnd = try #require(
+            appAfterProxyMenu.range(of: "\n            Divider()")
+        )
+        let proxyMenuSource = appAfterProxyMenu[..<proxyMenuEnd.lowerBound]
+        #expect(proxyMenuSource.contains(#"openWindow(id: "externalProxySettings")"#))
+        #expect(!proxyMenuSource.contains(#"openWindow(id: "socksProxySettings")"#))
+        #expect(
+            proxyMenuSource.components(
+                separatedBy: #"openWindow(id: "externalProxySettings")"#
+            ).count == 2
+        )
+
+        #expect(externalSource.contains("UpstreamProxySettingsViewModel"))
+        #expect(externalSource.contains("Upstream bypass entries are still"))
+        #expect(externalSource.contains("captured by Rockxy"))
+        #expect(externalSource.contains("Rockxy connects to those destinations directly"))
+        #expect(externalSource.contains("private var footerActions: some View"))
+        #expect(externalSource.contains("HStack(spacing: Theme.Layout.controlSpacing)"))
+        #expect(externalSource.contains("footerButtonLabel(String(localized: \"Cancel\"))"))
+        #expect(externalSource.contains("footerButtonLabel(String(localized: \"Apply\"))"))
+        #expect(!externalSource.contains("saveDraft()"))
+        #expect(!externalSource.contains("Rockxy Pro"))
+        #expect(!externalSource.contains("has not supported Authentication"))
+
+        #expect(socksSource.contains(#"openWindow(id: "externalProxySettings")"#))
+        #expect(!socksSource.contains("UpstreamProxyStore.shared"))
+        #expect(!socksSource.contains("saveConfiguration"))
+
+        #expect(policyNoticeSource.contains("struct PolicyLockNotice"))
+        #expect(!externalSource.contains("struct PolicyLockNotice"))
+        #expect(storeSource.contains("configuration draftConfiguration"))
+    }
+
     @Test("Settings shell keeps fixed dimensions while font size changes")
     func settingsShellKeepsFixedDimensionsWhileFontSizeChanges() throws {
         let source = try readProjectFile("Rockxy/Views/Settings/SettingsView.swift")

@@ -44,6 +44,20 @@ struct ExternalProxySettingsDraftTests {
         #expect(draft.credentials() == nil)
     }
 
+    @Test("Bypass parsing accepts commas and new lines while preserving unique order")
+    func bypassParsing() {
+        let draft = ExternalProxySettingsDraft(
+            bypassText: " API.example.com, *.internal\napi.example.com\r\n localhost "
+        )
+
+        #expect(draft.parsedBypassPatterns == [
+            "api.example.com",
+            "*.internal",
+            "localhost",
+        ])
+        #expect(draft.bypassEntriesUsed == 3)
+    }
+
     @Test("HTTPS draft creates an HTTPS upstream proxy configuration")
     func httpsConfiguration() throws {
         let draft = ExternalProxySettingsDraft(
@@ -99,6 +113,56 @@ struct ExternalProxySettingsDraftTests {
         )
         #expect(authenticated.credentials()?.username == "user")
         #expect(authenticated.credentials()?.password == "secret")
+
+        let preserved = ExternalProxySettingsDraft(
+            usesAuthentication: true,
+            username: "saved-user",
+            hasStoredCredentials: true,
+            storedUsername: "saved-user"
+        )
+        #expect(preserved.credentials() == nil)
+        #expect(!preserved.needsReplacementPassword)
+
+        var renamed = preserved
+        renamed.username = "new-user"
+        #expect(renamed.needsReplacementPassword)
+        renamed.password = "replacement"
+        #expect(!renamed.needsReplacementPassword)
+        #expect(renamed.credentials()?.username == "new-user")
+    }
+
+    @Test("Draft loaded from configuration never exposes a stored password")
+    func configurationSnapshot() throws {
+        let configuration = UpstreamProxyConfiguration(
+            isEnabled: true,
+            type: .https,
+            host: "proxy.example.com",
+            port: 8_443,
+            hasCredentials: true,
+            username: "saved-user",
+            bypassHostPatterns: ["*.internal"],
+            bypassLocalhost: false
+        )
+
+        let draft = ExternalProxySettingsDraft(
+            configuration: configuration,
+            storedCredentialUsername: "saved-user"
+        )
+
+        #expect(draft.isEnabled)
+        #expect(draft.selectedProtocol == .https)
+        #expect(draft.hasStoredCredentials)
+        #expect(draft.storedUsername == "saved-user")
+        #expect(draft.password.isEmpty)
+        #expect(try draft.configuration().hasCredentials)
+        #expect(draft.credentials() == nil)
+
+        let missingCredentials = ExternalProxySettingsDraft(
+            configuration: configuration,
+            storedCredentialUsername: nil
+        )
+        #expect(!missingCredentials.hasStoredCredentials)
+        #expect(missingCredentials.needsReplacementPassword)
     }
 
     @Test("Invalid port text flows to configuration validation")
