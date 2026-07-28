@@ -54,6 +54,14 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | `Esc` | Close the queue window; queued items remain paused |
 | `⌘[` / `⌘]` | Move to the previous or next queued item |
 
+## Basic Compare
+
+| Shortcut | Action |
+|---|---|
+| `⌥⌘Y` | Open Diff View |
+| `⌥⌘D` | Compare Selected |
+| `⌥⌘S` | Swap Sides |
+
 ## Rules Windows
 
 Applies to Map Local, Map Remote, Block List, Allow List, Modify Headers, Network Conditions, Scripting, and Breakpoint Rules where the action exists.

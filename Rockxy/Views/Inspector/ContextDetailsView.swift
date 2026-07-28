@@ -317,7 +317,11 @@ struct ContextDetailsView: View {
             WorkspaceFooterBar(horizontalPadding: 10) {
                 HStack(spacing: 8) {
                     Button {
-                        NotificationCenter.default.post(name: .openDiffWindow, object: nil)
+                        let transactions = selectedTransactions
+                        guard transactions.count == 2 else {
+                            return
+                        }
+                        coordinator.compareTransactions(transactions[0], transactions[1])
                     } label: {
                         Label(String(localized: "Compare"), systemImage: "arrow.left.arrow.right")
                     }

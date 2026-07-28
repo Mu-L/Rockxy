@@ -284,6 +284,69 @@ struct ToolWindowReadabilityTests {
         }
     }
 
+    @Test("Diff workspace keeps the approved native hierarchy and honest action routing")
+    func diffWorkspaceUsesNativeHierarchy() throws {
+        let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let windowSource = try readProjectFile("Rockxy/Views/Diff/DiffWindowView.swift")
+        let tableSource = try readProjectFile("Rockxy/Views/Diff/DiffCandidateTableView.swift")
+        let viewerSource = try readProjectFile("Rockxy/Views/Diff/DiffViewerView.swift")
+        let controlsSource = try readProjectFile("Rockxy/Views/Diff/DiffControlBar.swift")
+        let contextSource = try readProjectFile("Rockxy/Views/Inspector/ContextDetailsView.swift")
+
+        let diffSceneStart = try #require(
+            appSource.range(of: "Window(String(localized: \"Diff\"), id: \"diff\")")
+        )
+        let scenesAfterDiff = appSource[diffSceneStart.lowerBound...]
+        let nextSceneStart = try #require(
+            scenesAfterDiff.range(of: "Window(String(localized: \"Scripting\"), id: \"scriptingList\")")
+        )
+        let diffSceneSource = scenesAfterDiff[..<nextSceneStart.lowerBound]
+        #expect(diffSceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
+        let diffMenuStart = try #require(appSource.range(of: "private var diffMenu: some Commands"))
+        let menusAfterDiff = appSource[diffMenuStart.lowerBound...]
+        let nextMenuStart = try #require(menusAfterDiff.range(of: "private var scriptingMenu: some Commands"))
+        let diffMenuSource = menusAfterDiff[..<nextMenuStart.lowerBound]
+        #expect(diffMenuSource.contains(#".keyboardShortcut("y", modifiers: [.command, .option])"#))
+        #expect(diffMenuSource.contains(#".keyboardShortcut("d", modifiers: [.command, .option])"#))
+
+        #expect(windowSource.contains("Basic Compare"))
+        #expect(windowSource.contains("Local · Read-only"))
+        #expect(windowSource.contains("Comparison Source"))
+        #expect(windowSource.contains("$viewModel.workspaceMode"))
+        #expect(windowSource.contains(".disabled(!viewModel.canSwapSides)"))
+        #expect(windowSource.contains("exportErrorMessage"))
+        #expect(windowSource.contains("DiffExportFormatter.write"))
+        #expect(windowSource.contains(#".keyboardShortcut("s", modifiers: [.command, .option])"#))
+        #expect(windowSource.contains("Export the comparison as a text file"))
+
+        #expect(tableSource.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(tableSource.contains("Color(nsColor: .separatorColor)"))
+        #expect(tableSource.contains("Comparison Set"))
+        #expect(tableSource.contains("viewModel.clearCandidates()"))
+        #expect(tableSource.contains("ContentUnavailableView"))
+        #expect(tableSource.contains("DiffMethodBadge"))
+        #expect(!tableSource.contains("private func statusColor"))
+
+        #expect(viewerSource.contains("GeometryReader"))
+        #expect(viewerSource.contains("ScrollView([.horizontal, .vertical])"))
+        #expect(viewerSource.contains("case .textReady"))
+        #expect(viewerSource.contains("comparisonContent(showsIdentity: false)"))
+        #expect(viewerSource.contains("Left text"))
+        #expect(viewerSource.contains("Right text"))
+        #expect(viewerSource.contains("Theme.Highlight.green"))
+        #expect(viewerSource.contains("Theme.Highlight.red"))
+
+        #expect(controlsSource.contains("Text(target.title)"))
+        #expect(controlsSource.contains("Text(mode.title)"))
+        #expect(controlsSource.contains("viewModel.compareText()"))
+        #expect(controlsSource.contains("viewModel.editText()"))
+        #expect(!controlsSource.contains("Text(target.rawValue)"))
+        #expect(!controlsSource.contains("Text(mode.rawValue)"))
+
+        #expect(contextSource.contains("coordinator.compareTransactions(transactions[0], transactions[1])"))
+        #expect(!contextSource.contains("NotificationCenter.default.post(name: .openDiffWindow"))
+    }
+
     @Test("Readable tool windows use tool metrics")
     func readableToolWindowsUseToolMetrics() throws {
         let files = [

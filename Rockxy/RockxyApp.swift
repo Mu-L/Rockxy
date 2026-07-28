@@ -254,6 +254,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .defaultSize(width: 1_240, height: 820)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Scripting"), id: "scriptingList") {
             ToolWindowDisplayMetricsProvider {

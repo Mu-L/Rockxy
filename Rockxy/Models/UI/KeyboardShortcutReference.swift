@@ -33,7 +33,7 @@ enum KeyboardShortcutCatalog {
                 "Current Window",
                 "Primary action: Add, Save, Send, or Execute",
                 "⌘↩",
-                "Primary action in editors, Compose, and Breakpoint Queue",
+                "Primary action in editors, Compose, Basic Compare, and Breakpoint Queue",
                 nil,
                 nil
             ),
@@ -96,6 +96,11 @@ enum KeyboardShortcutCatalog {
             row("breakpoint.close", "Breakpoint Queue", "Close the queue window; queued items remain paused", "Esc", "Breakpoint Queue window", nil, "Paused item stays queued."),
             row("breakpoint.previous", "Breakpoint Queue", "Move to the previous or next queued item", "⌘[", "Breakpoint Queue selection", nil, nil),
             row("breakpoint.next", "Breakpoint Queue", "Move to the previous or next queued item", "⌘]", "Breakpoint Queue selection", nil, nil),
+        ]),
+        KeyboardShortcutSection(id: "diff", title: "Basic Compare", shortcuts: [
+            row("diff.open", "Basic Compare", "Open Diff View", "⌥⌘Y", "App-wide Diff menu", "Diff", nil),
+            row("diff.compare", "Basic Compare", "Compare Selected", "⌥⌘D", "Exactly two selected requests", "Diff", nil),
+            row("diff.swap", "Basic Compare", "Swap Sides", "⌥⌘S", "Basic Compare window", nil, nil),
         ]),
         KeyboardShortcutSection(id: "rules", title: "Rules Windows", shortcuts: [
             row("rules.new", "Rules Windows", "New rule", "⌘N", "Focused rules window", nil, nil),
