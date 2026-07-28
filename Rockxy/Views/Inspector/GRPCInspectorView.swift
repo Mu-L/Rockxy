@@ -20,7 +20,9 @@ struct GRPCInspectorView: View {
                 InspectorEmptyStateView(
                     String(localized: "No gRPC Metadata"),
                     systemImage: "point.3.connected.trianglepath.dotted",
-                    description: String(localized: "Open this tab when a request uses application/grpc metadata or length-prefixed gRPC messages.")
+                    description: String(
+                        localized: "Open this tab when a request uses application/grpc metadata or length-prefixed gRPC messages."
+                    )
                 )
             case let .loaded(inspection):
                 inspectorContent(inspection)
@@ -36,6 +38,17 @@ struct GRPCInspectorView: View {
     @State private var inspectionState: GRPCInspectionState = .loading
     @State private var selectedFrameID: String?
     @Environment(\.appUIDisplayMetrics) private var metrics
+
+    private var frameHeaderRow: some View {
+        HStack(spacing: 0) {
+            headerCell("#", width: 44)
+            headerCell(String(localized: "Dir"), width: 86)
+            headerCell(String(localized: "Compressed"), width: 102)
+            headerCell(String(localized: "Bytes"), width: 72)
+            headerCell(String(localized: "Decode"), width: nil)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
 
     private func inspectorContent(_ inspection: GRPCInspection) -> some View {
         ScrollView {
@@ -56,8 +69,11 @@ struct GRPCInspectorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 badge(String(localized: "gRPC"), color: .blue)
-                badge(inspection.requestContentType ?? inspection.responseContentType ?? "application/grpc", color: .secondary)
-                badge(String(localized: "Schema: heuristic fallback"), color: .orange)
+                badge(
+                    inspection.requestContentType ?? inspection.responseContentType ?? "application/grpc",
+                    color: .secondary
+                )
+                badge(String(localized: "Wire-format heuristic"), color: .orange)
                 if let grpcStatus = inspection.grpcStatus {
                     badge(String(localized: "grpc-status: \(grpcStatus)"), color: grpcStatus == "0" ? .green : .red)
                 }
@@ -79,7 +95,11 @@ struct GRPCInspectorView: View {
                 metric(String(localized: "HTTP"), value: httpStatusText(inspection), color: .green)
                 metric(String(localized: "Duration"), value: durationText(inspection), color: .primary)
                 metric(String(localized: "Messages"), value: "\(inspection.frames.count)", color: .primary)
-                metric(String(localized: "Payload"), value: SizeFormatter.format(bytes: totalPayloadBytes(inspection)), color: .primary)
+                metric(
+                    String(localized: "Payload"),
+                    value: SizeFormatter.format(bytes: totalPayloadBytes(inspection)),
+                    color: .primary
+                )
             }
         }
         .padding(12)
@@ -104,7 +124,9 @@ struct GRPCInspectorView: View {
                 InspectorEmptyStateView(
                     String(localized: "No Message Frames"),
                     systemImage: "shippingbox",
-                    description: String(localized: "Headers identify gRPC, but no length-prefixed messages were captured.")
+                    description: String(
+                        localized: "Headers identify gRPC, but no length-prefixed messages were captured."
+                    )
                 )
                 .frame(minHeight: 120)
             } else {
@@ -126,17 +148,6 @@ struct GRPCInspectorView: View {
                 }
             }
         }
-    }
-
-    private var frameHeaderRow: some View {
-        HStack(spacing: 0) {
-            headerCell("#", width: 44)
-            headerCell(String(localized: "Dir"), width: 86)
-            headerCell(String(localized: "Compressed"), width: 102)
-            headerCell(String(localized: "Bytes"), width: 72)
-            headerCell(String(localized: "Decode"), width: nil)
-        }
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private func frameRow(_ frame: GRPCMessageFrame) -> some View {
@@ -188,7 +199,11 @@ struct GRPCInspectorView: View {
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
                         }
-                    Text(String(localized: "Schema needed for field names, message types, and enum labels."))
+                    Text(
+                        String(
+                            localized: "Field numbers are inferred heuristically; saved schemas are not applied in this build."
+                        )
+                    )
                         .font(.system(size: metrics.secondaryFontSize))
                         .foregroundStyle(.secondary)
                 } else {
@@ -218,9 +233,18 @@ struct GRPCInspectorView: View {
                 .font(.system(size: metrics.primaryFontSize, weight: .semibold))
 
             VStack(spacing: 0) {
-                metadataRow(String(localized: "grpc-encoding"), value: inspection.responseEncoding ?? inspection.requestEncoding ?? "identity")
-                metadataRow(String(localized: "grpc-status"), value: inspection.grpcStatus ?? String(localized: "Not captured"))
-                metadataRow(String(localized: "grpc-message"), value: inspection.grpcMessage ?? String(localized: "Not captured"))
+                metadataRow(
+                    String(localized: "grpc-encoding"),
+                    value: inspection.responseEncoding ?? inspection.requestEncoding ?? "identity"
+                )
+                metadataRow(
+                    String(localized: "grpc-status"),
+                    value: inspection.grpcStatus ?? String(localized: "Not captured")
+                )
+                metadataRow(
+                    String(localized: "grpc-message"),
+                    value: inspection.grpcMessage ?? String(localized: "Not captured")
+                )
                 metadataRow(
                     String(localized: "grpc-status-details-bin"),
                     value: inspection.grpcStatusDetails ?? String(localized: "Not captured")
@@ -244,8 +268,8 @@ struct GRPCInspectorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(String(localized: "Add Descriptor...")) {
-                onOpenToolWindow("protobufSchemaList")
+            Button(String(localized: "Protobuf Mapping…")) {
+                onOpenToolWindow("protobufSettings")
             }
             .controlSize(.small)
         }
@@ -256,43 +280,6 @@ struct GRPCInspectorView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 0.5)
         }
-    }
-
-    private func loadInspection() async {
-        inspectionState = .loading
-        let request = transaction.request
-        let response = transaction.response
-        let timingInfo = transaction.timingInfo
-        let measuredDuration = transaction.measuredDuration
-        let inspection = await Task.detached {
-            GRPCDetector.detect(
-                request: request,
-                response: response,
-                timingInfo: timingInfo,
-                measuredDuration: measuredDuration
-            )
-        }.value
-
-        guard !Task.isCancelled else {
-            return
-        }
-
-        if let inspection {
-            inspectionState = .loaded(inspection)
-            if !inspection.frames.contains(where: { $0.id == selectedFrameID }) {
-                selectedFrameID = inspection.frames.first?.id
-            }
-        } else {
-            inspectionState = .unsupported
-            selectedFrameID = nil
-        }
-    }
-
-    private func selectedFrame(in inspection: GRPCInspection) -> GRPCMessageFrame? {
-        guard let selectedFrameID else {
-            return inspection.frames.first
-        }
-        return inspection.frames.first { $0.id == selectedFrameID } ?? inspection.frames.first
     }
 
     private func badge(_ text: String, color: Color) -> some View {
@@ -361,6 +348,43 @@ struct GRPCInspectorView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
+    }
+
+    private func loadInspection() async {
+        inspectionState = .loading
+        let request = transaction.request
+        let response = transaction.response
+        let timingInfo = transaction.timingInfo
+        let measuredDuration = transaction.measuredDuration
+        let inspection = await Task.detached {
+            GRPCDetector.detect(
+                request: request,
+                response: response,
+                timingInfo: timingInfo,
+                measuredDuration: measuredDuration
+            )
+        }.value
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        if let inspection {
+            inspectionState = .loaded(inspection)
+            if !inspection.frames.contains(where: { $0.id == selectedFrameID }) {
+                selectedFrameID = inspection.frames.first?.id
+            }
+        } else {
+            inspectionState = .unsupported
+            selectedFrameID = nil
+        }
+    }
+
+    private func selectedFrame(in inspection: GRPCInspection) -> GRPCMessageFrame? {
+        guard let selectedFrameID else {
+            return inspection.frames.first
+        }
+        return inspection.frames.first { $0.id == selectedFrameID } ?? inspection.frames.first
     }
 
     private func methodTitle(_ inspection: GRPCInspection) -> String {
@@ -433,14 +457,18 @@ struct GRPCInspectorView: View {
     }
 
     private func descriptorCopy(_ inspection: GRPCInspection) -> String {
-        if let serviceName = inspection.serviceName, let methodName = inspection.methodName {
-            return String(
-                localized: "Add a descriptor to decode \(serviceName).\(methodName) with field names, message types, and enums."
-            )
-        }
-        return String(localized: "Add a descriptor to replace heuristic field numbers with schema-backed names.")
+        _ = inspection
+        return String(
+            localized:
+            """
+            This view uses heuristic Protobuf decoding. Saved schemas and mapping definitions are \
+            stored locally and are not applied to gRPC traffic in this build.
+            """
+        )
     }
 }
+
+// MARK: - GRPCInspectionState
 
 private enum GRPCInspectionState {
     case loading

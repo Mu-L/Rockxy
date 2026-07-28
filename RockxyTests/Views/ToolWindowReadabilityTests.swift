@@ -788,20 +788,6 @@ struct ToolWindowReadabilityTests {
 
     @Test("Rule-style tool windows use shared layout spacing")
     func ruleStyleToolWindowsUseSharedLayoutSpacing() throws {
-        let legacyFooterFiles = [
-            "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
-        ]
-
-        for file in legacyFooterFiles {
-            let source = try readProjectFile(file)
-            #expect(
-                source.contains("toolMetrics.contentHorizontalPadding"),
-                "\(file) should use shared horizontal padding"
-            )
-            #expect(source.contains("toolMetrics.footerBottomPadding"), "\(file) should use shared footer padding")
-            #expect(!source.contains(".padding(.horizontal, 22)"), "\(file) should not use old oversized padding")
-        }
-
         let adaptiveFooterFiles = [
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
@@ -809,6 +795,8 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
+            "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
+            "Rockxy/Views/Rules/ProtobufSchemaListWindowView.swift",
             "Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift",
         ]
         for file in adaptiveFooterFiles {

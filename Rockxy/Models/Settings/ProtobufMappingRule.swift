@@ -69,6 +69,63 @@ struct ProtobufMappingRule: Codable, Equatable, Identifiable {
     var requestMessageType: String?
     var responseMessageType: String?
     var payloadEncoding: ProtobufPayloadEncoding
+
+    /// Returns a copy with editable fields replaced while preserving identity and saved state.
+    ///
+    /// `id` and `isEnabled` are intentionally carried over so editing a disabled definition
+    /// never silently re-enables it.
+    func withEditedFields(
+        urlPattern: String,
+        method: HTTPMethodFilter,
+        matchType: RuleMatchType,
+        includeSubpaths: Bool,
+        schemaID: UUID?,
+        messageType: String,
+        requestMessageType: String?,
+        responseMessageType: String?,
+        payloadEncoding: ProtobufPayloadEncoding
+    )
+        -> ProtobufMappingRule
+    {
+        ProtobufMappingRule(
+            id: id,
+            isEnabled: isEnabled,
+            urlPattern: urlPattern,
+            method: method,
+            matchType: matchType,
+            includeSubpaths: includeSubpaths,
+            schemaID: schemaID,
+            messageType: messageType,
+            requestMessageType: requestMessageType,
+            responseMessageType: responseMessageType,
+            payloadEncoding: payloadEncoding
+        )
+    }
+}
+
+// MARK: - ProtobufSchemaReference
+
+/// How a mapping definition's stored schema id resolves against the local schema list.
+enum ProtobufSchemaReference: Equatable {
+    /// No schema id is stored on the definition.
+    case notSelected
+    /// The stored id resolves to a local schema with this file name.
+    case selected(String)
+    /// A non-nil schema id is stored but no matching local schema exists.
+    case missing
+
+    // MARK: Internal
+
+    var displayLabel: String {
+        switch self {
+        case .notSelected:
+            String(localized: "Not selected")
+        case let .selected(name):
+            name
+        case .missing:
+            String(localized: "Missing Schema")
+        }
+    }
 }
 
 // MARK: - ProtobufMappingRuleValidationError

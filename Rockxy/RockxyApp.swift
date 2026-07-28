@@ -304,7 +304,7 @@ struct RockxyApp: App {
         .defaultSize(width: 900, height: 620)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Protobuf Settings"), id: "protobufSettings") {
+        Window(String(localized: "Protobuf Mapping"), id: "protobufSettings") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSettingsWindowView()
             }
@@ -312,9 +312,10 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 940, height: 620)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Protobuf Schema List"), id: "protobufSchemaList") {
+        Window(String(localized: "Local Protobuf Schemas"), id: "protobufSchemaList") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSchemaListWindowView()
             }
@@ -322,6 +323,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 820, height: 560)
         .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Breakpoint Rules"), id: "breakpointRules") {
