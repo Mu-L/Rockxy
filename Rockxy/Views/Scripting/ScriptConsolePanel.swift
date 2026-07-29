@@ -20,19 +20,24 @@ struct ScriptConsolePanel: View {
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     @ViewBuilder private var content: some View {
-        let visible = viewModel.consoleEntries.filter { viewModel.consoleFilter.contains($0.level) }
-        if visible.isEmpty {
-            VStack(spacing: 6) {
-                Text("Empty Console")
-                    .font(.system(size: max(16, toolMetrics.bodyFontSize + 3), weight: .medium))
-                    .foregroundStyle(.primary)
-                Text("Use console.log() to log events")
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
+        let visible = viewModel.visibleConsoleEntries
+        switch viewModel.consoleEmptyState {
+        case .empty:
+            emptyState(
+                title: String(localized: "Empty Console"),
+                message: String(localized: "Use console.log() to log events")
+            )
+        case .filtered:
+            emptyState(
+                title: String(localized: "No Matching Output"),
+                message: String(localized: "Console entries exist, but the active level filter hides them all.")
+            )
+        case .populated:
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 4) {
@@ -52,8 +57,18 @@ struct ScriptConsolePanel: View {
         }
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func emptyState(title: String, message: String) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: max(16, toolMetrics.bodyFontSize + 3), weight: .medium))
+                .foregroundStyle(.primary)
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -78,13 +93,17 @@ private struct ScriptConsoleEntryRow: View {
 
     // MARK: Private
 
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
     private static let formatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss"
         return f
     }()
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
 
     private func colorFor(level: ScriptConsoleLogLevel) -> Color {
         switch level {
@@ -93,9 +112,5 @@ private struct ScriptConsoleEntryRow: View {
         case .userLogs: .primary
         case .system: .secondary
         }
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }

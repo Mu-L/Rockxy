@@ -274,8 +274,11 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 1_120, height: 690)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+        .rockxyDisablingRestorationOnModernMacOS()
 
         Window(String(localized: "Inspector Preview Tabs"), id: "bodyPreviewerTabs") {
             ToolWindowDisplayMetricsProvider {
@@ -487,6 +490,22 @@ private struct ComposeWindowScene: Scene {
             return base.restorationBehavior(.disabled)
         } else {
             return base
+        }
+    }
+}
+
+// MARK: - Scene restoration helper
+
+private extension Scene {
+    /// Disable window-state restoration on macOS 15+ so intent-dependent windows
+    /// (like the Script Editor) never re-open empty after a relaunch. On macOS 14
+    /// the window may auto-restore (acceptable degradation), mirroring the
+    /// Compose / Certificate scene wrappers.
+    func rockxyDisablingRestorationOnModernMacOS() -> some Scene {
+        if #available(macOS 15.0, *) {
+            return restorationBehavior(.disabled)
+        } else {
+            return self
         }
     }
 }

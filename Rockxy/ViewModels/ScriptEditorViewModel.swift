@@ -35,6 +35,49 @@ enum ScriptEditorStatusTone: Equatable {
     case error
 }
 
+// MARK: - ScriptEditorContentState
+
+/// What the editor window should render. Intent-dependent windows start
+/// `awaitingIntent`; a load transitions through `loading` to `editing`.
+enum ScriptEditorContentState: Equatable {
+    case awaitingIntent
+    case loading
+    case editing
+}
+
+// MARK: - ScriptEditorSwitchDecision
+
+/// User's choice in the native "unsaved changes" three-way prompt when a new
+/// load intent arrives while the current draft is dirty.
+enum ScriptEditorSwitchDecision: Equatable {
+    case saveAndSwitch
+    case discard
+    case cancel
+}
+
+// MARK: - ScriptConsoleEmptyState
+
+/// Distinguishes a genuinely empty console from one whose entries are all
+/// hidden by the active level filter.
+enum ScriptConsoleEmptyState: Equatable {
+    /// Entries exist and at least one passes the active filter.
+    case populated
+    /// No entries have ever been recorded.
+    case empty
+    /// Entries exist but the active level filter hides every one of them.
+    case filtered
+}
+
+// MARK: - ScriptRuleTestOutcome
+
+/// Result of testing the current matching rule against a sample URL. Keeps an
+/// invalid pattern distinct from a legitimate "no match" so the UI can be honest.
+enum ScriptRuleTestOutcome: Equatable {
+    case match
+    case noMatch
+    case invalidPattern
+}
+
 // MARK: - ScriptMatchPatternMode
 
 /// Pattern-mode for matching rule URL (popover in the Matching Rule header row).
@@ -112,6 +155,37 @@ enum ScriptMatchMethod: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - ScriptEditorDraft
+
+/// An equatable snapshot of every user-editable field in the Script Editor.
+/// Comparing the live draft against a persisted baseline yields truthful dirty
+/// state, and capturing the exact draft written during a save lets the async
+/// completion baseline only what it actually persisted.
+struct ScriptEditorDraft: Equatable {
+    /// The clean-slate draft matching a freshly constructed view model.
+    static let initialDefault = ScriptEditorDraft(
+        name: "",
+        urlPattern: "",
+        method: .any,
+        patternMode: .wildcard,
+        includeSubpaths: false,
+        runOnRequest: true,
+        runOnResponse: true,
+        runAsMock: false,
+        code: ScriptTemplates.defaultSource
+    )
+
+    var name: String
+    var urlPattern: String
+    var method: ScriptMatchMethod
+    var patternMode: ScriptMatchPatternMode
+    var includeSubpaths: Bool
+    var runOnRequest: Bool
+    var runOnResponse: Bool
+    var runAsMock: Bool
+    var code: String
+}
+
 // MARK: - ScriptEditorViewModel
 
 @MainActor
@@ -147,7 +221,7 @@ final class ScriptEditorViewModel {
     var runOnResponse: Bool = true
     var runAsMock: Bool = false
     private(set) var savedAndActive: Bool = false
-    private(set) var statusMessage: String = .init(localized: "Saved and Active!")
+    private(set) var statusMessage: String = ""
     private(set) var statusTone: ScriptEditorStatusTone = .neutral
 
     /// Editor
@@ -158,9 +232,72 @@ final class ScriptEditorViewModel {
     var consoleFilter: Set<ScriptConsoleLogLevel> = Set(ScriptConsoleLogLevel.allCases)
     var consolePanelVisible: Bool = true
 
-    /// UI-only (deferred in this milestone)
+    /// Test-Match field (user-directed) + last preview outcome.
     var testRulePreview: String = ""
     var sampleURL: String = "https://api.example.com/path"
+
+    /// Window presentation lifecycle for the intent-dependent editor.
+    private(set) var contentState: ScriptEditorContentState = .awaitingIntent
+
+    /// In-flight guards so the UI can disable actions and dedupe requests.
+    private(set) var isLoading: Bool = false
+    private(set) var isSaving: Bool = false
+
+    /// The persisted baseline the live draft is compared against for dirty
+    /// tracking. Updated only after a successful load or save.
+    private(set) var baseline: ScriptEditorDraft = .initialDefault
+
+    /// A load intent retained while the current draft has unsaved changes, so
+    /// the native three-way prompt can resolve it. Cleared on cancel/discard or
+    /// after a successful Save & Switch.
+    private(set) var pendingIntent: ScriptEditorIntent?
+
+    /// Drives the native "unsaved changes" confirmation dialog in the window.
+    var isShowingUnsavedSwitchPrompt: Bool = false
+
+    /// The live editor draft assembled from the bound fields.
+    var currentDraft: ScriptEditorDraft {
+        ScriptEditorDraft(
+            name: name,
+            urlPattern: urlPattern,
+            method: method,
+            patternMode: patternMode,
+            includeSubpaths: includeSubpaths,
+            runOnRequest: runOnRequest,
+            runOnResponse: runOnResponse,
+            runAsMock: runAsMock,
+            code: code
+        )
+    }
+
+    /// True when the live draft differs from the persisted baseline.
+    var isDirty: Bool {
+        currentDraft != baseline
+    }
+
+    /// True when there is a script bound and its draft has unsaved edits.
+    var hasUnsavedBoundChanges: Bool {
+        pluginID != nil && isDirty
+    }
+
+    /// Display name for confirmations / prompts naming the current script.
+    var currentScriptDisplayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? String(localized: "this script") : trimmed
+    }
+
+    /// Console entries passing the active level filter.
+    var visibleConsoleEntries: [ScriptConsoleEntry] {
+        consoleEntries.filter { consoleFilter.contains($0.level) }
+    }
+
+    /// Whether the console should render populated, truly-empty, or filtered-empty.
+    var consoleEmptyState: ScriptConsoleEmptyState {
+        if consoleEntries.isEmpty {
+            return .empty
+        }
+        return visibleConsoleEntries.isEmpty ? .filtered : .populated
+    }
 
     // MARK: - Wildcard → regex
 
@@ -225,11 +362,58 @@ final class ScriptEditorViewModel {
         return out.joined(separator: "\n")
     }
 
-    // MARK: - Load / Save
+    // MARK: - Request-load flow
+
+    /// Entry point the window uses for an incoming intent. When a bound plugin
+    /// has unsaved changes the intent is retained for a native three-way
+    /// decision; otherwise it loads immediately.
+    func requestLoad(intent: ScriptEditorIntent) async {
+        if hasUnsavedBoundChanges {
+            pendingIntent = intent
+            isShowingUnsavedSwitchPrompt = true
+            return
+        }
+        await load(intent: intent)
+    }
+
+    /// Resolve the retained intent from the native unsaved-changes prompt.
+    func resolveUnsavedSwitch(_ decision: ScriptEditorSwitchDecision) async {
+        guard let intent = pendingIntent else {
+            isShowingUnsavedSwitchPrompt = false
+            return
+        }
+        switch decision {
+        case .cancel:
+            pendingIntent = nil
+            isShowingUnsavedSwitchPrompt = false
+        case .discard:
+            pendingIntent = nil
+            isShowingUnsavedSwitchPrompt = false
+            await load(intent: intent)
+        case .saveAndSwitch:
+            isShowingUnsavedSwitchPrompt = false
+            let saved = await saveAndActivate()
+            // Only load the pending intent after a genuinely successful save;
+            // otherwise keep the current draft and the retained intent so the
+            // failure is not silently swallowed.
+            guard saved, let pending = pendingIntent else {
+                return
+            }
+            pendingIntent = nil
+            await load(intent: pending)
+        }
+    }
 
     func load(intent: ScriptEditorIntent) async {
         loadGeneration &+= 1
         let generation = loadGeneration
+        isLoading = true
+        contentState = .loading
+        defer {
+            if generation == loadGeneration {
+                isLoading = false
+            }
+        }
         switch intent {
         case .createNew:
             // Defer creation to the List window (which calls `createNewScript`).
@@ -238,12 +422,50 @@ final class ScriptEditorViewModel {
         case let .edit(pluginID):
             await loadExisting(pluginID: pluginID, generation: generation)
         }
-    }
-
-    func saveAndActivate() async {
-        guard let pluginID else {
+        guard generation == loadGeneration else {
             return
         }
+        baseline = currentDraft
+        contentState = .editing
+    }
+
+    // MARK: - Save
+
+    /// Persist the current draft, reload the runtime, and try to activate.
+    /// Returns `true` when the manifest and source were written to disk (even if
+    /// activation is deferred by quota), and `false` when preflight blocks the
+    /// save or the write itself fails. Never writes files when preflight fails.
+    @discardableResult
+    func saveAndActivate() async -> Bool {
+        guard !isSaving else {
+            return false
+        }
+        guard let pluginID else {
+            savedAndActive = false
+            statusTone = .warning
+            statusMessage = String(localized: "No script is loaded to save.")
+            appendConsole(.init(
+                timestamp: .now,
+                level: .warnings,
+                message: String(localized: "Save skipped: no script is loaded in the editor.")
+            ))
+            return false
+        }
+
+        // Capture the exact draft being written so an edit landing during the
+        // async reload cannot make the completion baseline newer content.
+        let draft = currentDraft
+
+        if let failure = preflightFailure(for: draft) {
+            savedAndActive = false
+            statusTone = .error
+            statusMessage = failure.status
+            appendConsole(.init(timestamp: .now, level: .errors, message: failure.consoleMessage))
+            return false
+        }
+
+        isSaving = true
+        defer { isSaving = false }
         let generation = loadGeneration
         do {
             let manifestURL = pluginDir(for: pluginID).appendingPathComponent("plugin.json")
@@ -252,17 +474,17 @@ final class ScriptEditorViewModel {
             let data = try Data(contentsOf: manifestURL)
             let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
 
-            let condition = buildMatchCondition()
+            let condition = buildMatchCondition(from: draft)
             let behavior = ScriptBehavior(
                 matchCondition: condition,
-                runOnRequest: runOnRequest,
-                runOnResponse: runOnResponse,
-                runAsMock: runAsMock
+                runOnRequest: draft.runOnRequest,
+                runOnResponse: draft.runOnResponse,
+                runAsMock: draft.runAsMock
             )
 
             let updated = PluginManifest(
                 id: manifest.id,
-                name: name.isEmpty ? manifest.name : name,
+                name: draft.name.isEmpty ? manifest.name : draft.name,
                 version: manifest.version,
                 author: manifest.author,
                 description: manifest.description,
@@ -279,7 +501,7 @@ final class ScriptEditorViewModel {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(updated).write(to: manifestURL)
-            try code.write(to: scriptURL, atomically: true, encoding: .utf8)
+            try draft.code.write(to: scriptURL, atomically: true, encoding: .utf8)
 
             // Reload the runtime so the new source + behavior are picked up.
             // For a brand-new script (or any disabled plugin) reload alone won't
@@ -313,8 +535,13 @@ final class ScriptEditorViewModel {
             let isLiveActive = afterSnapshot?.isEnabled == true && afterSnapshot?.status == .active
 
             guard generation == loadGeneration, self.pluginID == pluginID else {
-                return
+                // A newer load or context switch owns the UI now; the write did
+                // land on disk, so still report success without touching state.
+                return true
             }
+            // Baseline the captured draft only — never `currentDraft`, which may
+            // already carry edits made during the async reload above.
+            baseline = draft
             if let enableErrorMessage {
                 appendConsole(.init(timestamp: .now, level: .errors, message: enableErrorMessage))
             }
@@ -352,9 +579,10 @@ final class ScriptEditorViewModel {
                 statusTone = .neutral
                 statusMessage = String(localized: "Saved (not active)")
             }
+            return true
         } catch {
             guard generation == loadGeneration, self.pluginID == pluginID else {
-                return
+                return false
             }
             savedAndActive = false
             statusTone = .error
@@ -365,6 +593,7 @@ final class ScriptEditorViewModel {
                 message: String(localized: "Save failed: \(error.localizedDescription)")
             ))
             Self.logger.error("Save failed: \(error.localizedDescription)")
+            return false
         }
     }
 
@@ -384,6 +613,31 @@ final class ScriptEditorViewModel {
 
     func insertSnippet(_ snippet: String) {
         code += "\n" + snippet
+    }
+
+    /// Insert a real, runnable header-mutation example (not a nonexistent
+    /// template) at the end of the current source.
+    func insertHeaderExample() {
+        insertSnippet("request.headers[\"X-Custom-Header\"] = \"value\";")
+    }
+
+    /// Toggle the Request phase, keeping the mock invariant (a mock script must
+    /// run on Request) truthful.
+    func setRunOnRequest(_ enabled: Bool) {
+        runOnRequest = enabled
+        if !enabled {
+            runAsMock = false
+        }
+    }
+
+    /// Toggle Mock, normalizing the phases it depends on: a mock script runs on
+    /// Request and does not run on Response.
+    func setRunAsMock(_ enabled: Bool) {
+        runAsMock = enabled
+        if enabled {
+            runOnRequest = true
+            runOnResponse = false
+        }
     }
 
     func validateScript() {
@@ -415,22 +669,42 @@ final class ScriptEditorViewModel {
     }
 
     func testRule(against sampleURL: String) -> Bool {
+        evaluateRule(against: sampleURL) == .match
+    }
+
+    /// Test the current matching rule, distinguishing an invalid pattern from a
+    /// legitimate miss so the UI can report the two differently.
+    func evaluateRule(against sampleURL: String) -> ScriptRuleTestOutcome {
         guard !urlPattern.isEmpty else {
-            return true
+            return .match
         }
         let pattern: String = switch patternMode {
         case .wildcard:
             Self.wildcardToRegex(urlPattern, includeSubpaths: includeSubpaths)
-        case .regex:
-            urlPattern
-        case .advanced:
+        case .regex,
+             .advanced:
             urlPattern
         }
         guard let re = try? NSRegularExpression(pattern: pattern) else {
-            return false
+            return .invalidPattern
         }
         let range = NSRange(sampleURL.startIndex ..< sampleURL.endIndex, in: sampleURL)
-        return re.firstMatch(in: sampleURL, range: range) != nil
+        return re.firstMatch(in: sampleURL, range: range) != nil ? .match : .noMatch
+    }
+
+    /// Run the Test-Match action against the editable Test URL field and record
+    /// a user-facing preview line.
+    func runRuleTest() {
+        let sample = sampleURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let effectiveSample = sample.isEmpty ? "https://api.example.com/path" : sample
+        switch evaluateRule(against: effectiveSample) {
+        case .match:
+            testRulePreview = String(localized: "Matches: \(effectiveSample)")
+        case .noMatch:
+            testRulePreview = String(localized: "No match for: \(effectiveSample)")
+        case .invalidPattern:
+            testRulePreview = String(localized: "The matching pattern is not a valid regular expression.")
+        }
     }
 
     func clearConsole() {
@@ -455,6 +729,9 @@ final class ScriptEditorViewModel {
 
     // MARK: Private
 
+    /// Hard cap on retained console entries (newest kept, oldest evicted).
+    private static let maxConsoleEntries = 500
+
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "ScriptEditorViewModel"
@@ -473,6 +750,62 @@ final class ScriptEditorViewModel {
 
     private static func pluginDir(for id: String) -> URL {
         RockxyIdentity.current.appSupportPath("Plugins").appendingPathComponent(id, isDirectory: true)
+    }
+
+    private static func consoleLogLevel(for runtimeLevel: ScriptConsoleEventLevel) -> ScriptConsoleLogLevel {
+        switch runtimeLevel {
+        case .error:
+            .errors
+        case .warn:
+            .warnings
+        case .debug,
+             .info,
+             .log:
+            .userLogs
+        }
+    }
+
+    private static func legacyGeneratedWildcardDisplayPattern(_ pattern: String) -> (
+        pattern: String,
+        mode: ScriptMatchPatternMode,
+        includeSubpaths: Bool
+    )? {
+        let exactSuffix = "($|[?#])"
+        if pattern.hasSuffix(exactSuffix) {
+            let body = String(pattern.dropLast(exactSuffix.count))
+            return (decodeLegacyGeneratedWildcardBody(body), .wildcard, false)
+        }
+        guard pattern.hasSuffix(".*") else {
+            return nil
+        }
+        let body = String(pattern.dropLast(2))
+        return (decodeLegacyGeneratedWildcardBody(body), .wildcard, true)
+    }
+
+    private static func decodeLegacyGeneratedWildcardBody(_ body: String) -> String {
+        var output = ""
+        var index = body.startIndex
+        while index < body.endIndex {
+            let next = body.index(after: index)
+            if body[index] == ".",
+               next < body.endIndex,
+               body[next] == "*"
+            {
+                output.append("*")
+                index = body.index(after: next)
+                continue
+            }
+            if body[index] == "\\",
+               next < body.endIndex
+            {
+                output.append(body[next])
+                index = body.index(after: next)
+                continue
+            }
+            output.append(body[index] == "." ? "?" : body[index])
+            index = next
+        }
+        return output
     }
 
     private func pluginDir(for id: String) -> URL {
@@ -538,9 +871,48 @@ final class ScriptEditorViewModel {
         }
     }
 
-    private func buildMatchCondition() -> RuleMatchCondition? {
-        let trimmedPattern = urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        let methodValue = method.persistedValue
+    /// Validate the draft before touching disk or the runtime. Returns a
+    /// failure describing the first blocking problem, or `nil` when the draft is
+    /// safe to persist. Never mutates state.
+    private func preflightFailure(for draft: ScriptEditorDraft) -> (status: String, consoleMessage: String)? {
+        let trimmedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty {
+            return (
+                status: String(localized: "Name is required"),
+                consoleMessage: String(localized: "Save blocked: the script name cannot be empty.")
+            )
+        }
+
+        let trimmedPattern = draft.urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        let usesRegex = draft.patternMode == .regex || draft.patternMode == .advanced
+        if usesRegex, !trimmedPattern.isEmpty, (try? NSRegularExpression(pattern: trimmedPattern)) == nil {
+            return (
+                status: String(localized: "Invalid matching pattern"),
+                consoleMessage: String(
+                    localized: "Save blocked: the matching pattern is not a valid regular expression."
+                )
+            )
+        }
+
+        switch ScriptSourceValidator.validate(
+            source: draft.code,
+            runOnRequest: draft.runOnRequest,
+            runOnResponse: draft.runOnResponse,
+            runAsMock: draft.runAsMock
+        ) {
+        case .valid:
+            return nil
+        case let .invalid(reason):
+            return (
+                status: String(localized: "Cannot save this script"),
+                consoleMessage: String(localized: "Save blocked: \(reason)")
+            )
+        }
+    }
+
+    private func buildMatchCondition(from draft: ScriptEditorDraft) -> RuleMatchCondition? {
+        let trimmedPattern = draft.urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        let methodValue = draft.method.persistedValue
         if trimmedPattern.isEmpty, methodValue == nil {
             return nil
         }
@@ -548,7 +920,7 @@ final class ScriptEditorViewModel {
         let matchType: RuleMatchType? = if pattern == nil {
             nil
         } else {
-            switch patternMode {
+            switch draft.patternMode {
             case .wildcard:
                 .wildcard
             case .regex,
@@ -560,12 +932,17 @@ final class ScriptEditorViewModel {
             urlPattern: pattern,
             method: methodValue,
             matchType: matchType,
-            includeSubpaths: matchType == .wildcard ? includeSubpaths : nil
+            includeSubpaths: matchType == .wildcard ? draft.includeSubpaths : nil
         )
     }
 
     private func appendConsole(_ entry: ScriptConsoleEntry) {
         consoleEntries.append(entry)
+        // Bound the editor console deterministically so runtime spam or long
+        // editing sessions cannot grow it without limit; evict oldest first.
+        if consoleEntries.count > Self.maxConsoleEntries {
+            consoleEntries.removeFirst(consoleEntries.count - Self.maxConsoleEntries)
+        }
     }
 
     private func installRuntimeConsoleObserver() {
@@ -587,63 +964,11 @@ final class ScriptEditorViewModel {
         guard event.pluginID == pluginID else {
             return
         }
-        appendConsole(.init(timestamp: event.timestamp, level: Self.consoleLogLevel(for: event.level), message: event.message))
-    }
-
-    private static func consoleLogLevel(for runtimeLevel: ScriptConsoleEventLevel) -> ScriptConsoleLogLevel {
-        switch runtimeLevel {
-        case .error:
-            .errors
-        case .warn:
-            .warnings
-        case .debug,
-             .info,
-             .log:
-            .userLogs
-        }
-    }
-
-    private static func legacyGeneratedWildcardDisplayPattern(_ pattern: String) -> (
-        pattern: String,
-        mode: ScriptMatchPatternMode,
-        includeSubpaths: Bool
-    )? {
-        let exactSuffix = "($|[?#])"
-        if pattern.hasSuffix(exactSuffix) {
-            let body = String(pattern.dropLast(exactSuffix.count))
-            return (decodeLegacyGeneratedWildcardBody(body), .wildcard, false)
-        }
-        guard pattern.hasSuffix(".*") else {
-            return nil
-        }
-        let body = String(pattern.dropLast(2))
-        return (decodeLegacyGeneratedWildcardBody(body), .wildcard, true)
-    }
-
-    private static func decodeLegacyGeneratedWildcardBody(_ body: String) -> String {
-        var output = ""
-        var index = body.startIndex
-        while index < body.endIndex {
-            let next = body.index(after: index)
-            if body[index] == ".",
-               next < body.endIndex,
-               body[next] == "*"
-            {
-                output.append("*")
-                index = body.index(after: next)
-                continue
-            }
-            if body[index] == "\\",
-               next < body.endIndex
-            {
-                output.append(body[next])
-                index = body.index(after: next)
-                continue
-            }
-            output.append(body[index] == "." ? "?" : body[index])
-            index = next
-        }
-        return output
+        appendConsole(.init(
+            timestamp: event.timestamp,
+            level: Self.consoleLogLevel(for: event.level),
+            message: event.message
+        ))
     }
 }
 

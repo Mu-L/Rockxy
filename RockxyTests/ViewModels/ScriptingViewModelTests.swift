@@ -989,18 +989,21 @@ struct ScriptingViewModelTests {
             pluginsDirectory: env.pluginsDir
         )
         await vm.load(intent: .edit(pluginID: pluginID))
-        let updatedSource = "async function onResponse(context, url, request, response) { return response; }"
+        // A valid Mock configuration: mock scripts must run on Request (and not
+        // Response), and the source must define the onRequest hook.
+        let updatedSource = "async function onRequest(context, url, request) { return request; }"
         vm.name = "Persisted Script"
         vm.urlPattern = "https://api.example.com/v1/*"
         vm.includeSubpaths = true
         vm.patternMode = .wildcard
         vm.method = .post
-        vm.runOnRequest = false
-        vm.runOnResponse = true
+        vm.runOnRequest = true
+        vm.runOnResponse = false
         vm.runAsMock = true
         vm.code = updatedSource
 
-        await vm.saveAndActivate()
+        let saved = await vm.saveAndActivate()
+        #expect(saved)
 
         let pluginDir = env.pluginsDir.appendingPathComponent(pluginID, isDirectory: true)
         let manifest = try JSONDecoder().decode(
@@ -1013,8 +1016,8 @@ struct ScriptingViewModelTests {
         #expect(manifest.scriptBehavior?.matchCondition?.urlPattern == "https://api.example.com/v1/*")
         #expect(manifest.scriptBehavior?.matchCondition?.matchType == .wildcard)
         #expect(manifest.scriptBehavior?.matchCondition?.includeSubpaths == true)
-        #expect(manifest.scriptBehavior?.runOnRequest == false)
-        #expect(manifest.scriptBehavior?.runOnResponse == true)
+        #expect(manifest.scriptBehavior?.runOnRequest == true)
+        #expect(manifest.scriptBehavior?.runOnResponse == false)
         #expect(manifest.scriptBehavior?.runAsMock == true)
         #expect(source == updatedSource)
 
