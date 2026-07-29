@@ -96,15 +96,7 @@ struct RockxyApp: App {
 
         macCertificateSetupGuideWindow
 
-        Window(String(localized: "Custom Certificates"), id: "customCertificates") {
-            ToolWindowDisplayMetricsProvider {
-                CustomCertificatesView()
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 940, height: 600)
-        .defaultPosition(.center)
-        .windowToolbarStyle(.unifiedCompact)
+        customCertificatesWindow
 
         Window(String(localized: "Automatic Setup"), id: "automaticSetup") {
             AppUIDisplayMetricsProvider {
@@ -389,8 +381,41 @@ struct RockxyApp: App {
         MacCertificateSetupGuideWindowScene()
     }
 
+    private var customCertificatesWindow: some Scene {
+        CustomCertificatesWindowScene()
+    }
+
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+}
+
+// MARK: - CustomCertificatesWindowScene
+
+/// Certificate identities are managed in a focused utility window with
+/// predictable geometry rather than restoring a stale, oversized workspace.
+private struct CustomCertificatesWindowScene: Scene {
+    var body: some Scene {
+        customCertificatesWindow
+    }
+
+    private var customCertificatesWindow: some Scene {
+        let base = Window(String(localized: "Custom Certificates"), id: "customCertificates") {
+            ToolWindowDisplayMetricsProvider {
+                CustomCertificatesView()
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 900, height: 620)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
