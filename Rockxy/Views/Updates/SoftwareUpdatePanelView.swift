@@ -1,8 +1,11 @@
 import SwiftUI
 
+// MARK: - SoftwareUpdatePanelView
+
 struct SoftwareUpdatePanelView: View {
+    // MARK: Internal
+
     @ObservedObject var controller: SoftwareUpdateController
-    @ObservedObject private var updater = AppUpdater.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,14 +14,108 @@ struct SoftwareUpdatePanelView: View {
             footer
         }
         .frame(
-            width: SoftwareUpdateWindowPositioning.contentSize.width,
-            height: SoftwareUpdateWindowPositioning.contentSize.height
+            minWidth: SoftwareUpdateWindowPositioning.minimumContentSize.width,
+            maxWidth: .infinity,
+            minHeight: SoftwareUpdateWindowPositioning.minimumContentSize.height,
+            maxHeight: .infinity,
+            alignment: .top
         )
         .background(Color(nsColor: .windowBackgroundColor))
+        .onExitCommand {
+            controller.requestInteractiveClose()
+        }
     }
 
-    @ViewBuilder
-    private var content: some View {
+    // MARK: Private
+
+    @ObservedObject private var updater = AppUpdater.shared
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var supportingText: String? {
+        switch controller.phase {
+        case .checking:
+            String(localized: "You can cancel this check at any time.")
+        case .available,
+             .readyToInstall:
+            String(localized: "Updates are signed and verified before Rockxy installs them.")
+        case .downloading:
+            String(localized: "Downloading the signed update.")
+        case .extracting:
+            String(localized: "Preparing the update on your Mac.")
+        case .installing:
+            String(localized: "Rockxy will relaunch after installation completes.")
+        case .noUpdate:
+            String(localized: "You can still review the full release history.")
+        case .error:
+            String(localized: "No captured traffic is sent with update reports.")
+        case .hidden:
+            nil
+        }
+    }
+
+    private var detailURL: URL? {
+        switch controller.phase {
+        case let .available(context),
+             let .downloading(context, _, _),
+             let .extracting(context, _),
+             let .readyToInstall(context),
+             let .installing(context, _):
+            context.detailURL
+        case let .noUpdate(context):
+            context.detailURL
+        case .error:
+            AppUpdater.fullChangelogURL
+        case .checking,
+             .hidden:
+            nil
+        }
+    }
+
+    private var primaryActionTitle: String {
+        switch controller.phase {
+        case let .available(context):
+            if context.isInformationOnly {
+                String(localized: "Learn More")
+            } else {
+                String(localized: "Install Update")
+            }
+        default:
+            String(localized: "Continue")
+        }
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var heroTitleFont: Font {
+        appMetrics.swiftUIFont(size: max(22, appMetrics.primaryFontSize + 7), weight: .semibold)
+    }
+
+    private var sectionTitleFont: Font {
+        appMetrics.swiftUIFont(size: max(18, appMetrics.primaryFontSize + 4), weight: .semibold)
+    }
+
+    private var badgeSymbolFont: Font {
+        appMetrics.swiftUIFont(size: max(15, appMetrics.primaryFontSize + 4), weight: .semibold)
+    }
+
+    private var badgeDiameter: CGFloat {
+        max(26, appMetrics.primaryFontSize + 15)
+    }
+
+    private var appIconSize: CGFloat {
+        max(56, min(appMetrics.primaryFontSize + 51, 72))
+    }
+
+    private var releaseNotesFont: SoftwareUpdateReleaseNotesFont {
+        SoftwareUpdateReleaseNotesFont(
+            bodySize: appMetrics.primaryFontSize,
+            usesMonospacedFamily: appMetrics.settings.useMonospacedFont
+        )
+    }
+
+    @ViewBuilder private var content: some View {
         switch controller.phase {
         case .hidden:
             Color.clear
@@ -33,9 +130,6 @@ struct SoftwareUpdatePanelView: View {
                 title: String(localized: "A new version of Rockxy is available."),
                 summary: context.summary,
                 notesLabel: String(localized: "Release Notes"),
-                notesCaption: String(
-                    localized: "Show the current version changelog inline so the first useful update details are visible immediately."
-                ),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: context.buildNumber,
@@ -50,13 +144,11 @@ struct SoftwareUpdatePanelView: View {
                 context: context,
                 title: String(localized: "Downloading Rockxy \(context.latestVersion)…"),
                 summary: String(
-                    localized: "Rockxy is downloading the signed update package and verifying it before installation."
+                    localized: "Rockxy is downloading the signed update and verifying it before installation."
                 ),
                 detailLabel: String(localized: "Download Details"),
-                detailCaption: String(
-                    localized: "The installer is being fetched now. Release notes stay in the same place so the dialog does not jump around."
-                ),
                 detailMessage: downloadProgressDescription(received: bytesReceived, expected: expectedBytes),
+                progressLabel: String(localized: "Downloading update…"),
                 progress: progressValue(received: bytesReceived, expected: expectedBytes)
             )
 
@@ -65,13 +157,11 @@ struct SoftwareUpdatePanelView: View {
                 context: context,
                 title: String(localized: "Preparing Rockxy \(context.latestVersion)…"),
                 summary: String(
-                    localized: "Rockxy is extracting the update and preparing the signed app bundle for installation."
+                    localized: "Rockxy is extracting the update and preparing the app bundle for installation."
                 ),
                 detailLabel: String(localized: "Preparation Details"),
-                detailCaption: String(
-                    localized: "Preparation runs locally on your Mac. The update has already been validated by Sparkle."
-                ),
                 detailMessage: String(localized: "Preparing the app bundle and installation metadata."),
+                progressLabel: String(localized: "Preparing update…"),
                 progress: progress
             )
 
@@ -84,9 +174,6 @@ struct SoftwareUpdatePanelView: View {
                     localized: "The update has been downloaded and verified. Install now to relaunch into the latest version."
                 ),
                 notesLabel: String(localized: "Release Notes"),
-                notesCaption: String(
-                    localized: "Keep the latest notes visible here so the user can review them one last time before relaunching."
-                ),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: context.buildNumber,
@@ -101,15 +188,16 @@ struct SoftwareUpdatePanelView: View {
                 context: context,
                 title: String(localized: "Installing Rockxy \(context.latestVersion)…"),
                 summary: applicationTerminated
-                    ? String(localized: "Rockxy is finishing the installation in the background and will relaunch automatically.")
-                    : String(localized: "Rockxy is waiting for the app to terminate so installation can finish safely."),
+                    ? String(localized: "Rockxy is finishing the installation and will relaunch automatically.")
+                    :
+                    String(
+                        localized: "Rockxy is waiting for the app to terminate so installation can finish safely."
+                    ),
                 detailLabel: String(localized: "Installation Details"),
-                detailCaption: String(
-                    localized: "This keeps the same structured panel shape as the release notes view, but shifts the content toward installation progress."
-                ),
                 detailMessage: applicationTerminated
-                    ? String(localized: "Installing the new app bundle and refreshing the helper.")
+                    ? String(localized: "Installing the new version and preparing to relaunch.")
                     : String(localized: "Waiting for the running app process to exit before replacing the bundle."),
+                progressLabel: String(localized: "Installing update…"),
                 progress: applicationTerminated ? 0.8 : nil
             )
 
@@ -120,9 +208,6 @@ struct SoftwareUpdatePanelView: View {
                 title: String(localized: "Rockxy is up to date."),
                 summary: context.summary,
                 notesLabel: String(localized: "Release Notes"),
-                notesCaption: String(
-                    localized: "Keep the current release notes visible here so a successful check still feels informative."
-                ),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: nil,
@@ -145,17 +230,13 @@ struct SoftwareUpdatePanelView: View {
                 .controlSize(.large)
 
             Text(String(localized: "Checking for updates"))
-                .font(.system(size: 22, weight: .semibold))
+                .font(sectionTitleFont)
 
-            Text(
-                String(
-                    localized: "Rockxy is reaching out to the signed update feed and comparing your current build."
-                )
-            )
-            .font(.system(size: 13))
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: 420)
+            Text(String(localized: "Rockxy is comparing your current build against the signed update feed."))
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
 
             Spacer()
         }
@@ -163,284 +244,37 @@ struct SoftwareUpdatePanelView: View {
         .padding(28)
     }
 
-    private func updateDialog(
-        symbol: String,
-        symbolTint: Color,
-        title: String,
-        summary: String,
-        notesLabel: String,
-        notesCaption: String,
-        notesVersionLabel: String,
-        notes: SoftwareUpdateReleaseNotesContent,
-        progress: ProgressPresentation?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            hero(symbol: symbol, symbolTint: symbolTint, title: title, summary: summary)
-            releaseNotesGroup(
-                label: notesLabel,
-                caption: notesCaption,
-                versionLabel: notesVersionLabel,
-                content: notes,
-                minHeight: 300
-            )
-
-            if let progress {
-                progressStrip(progress)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 28)
-        .padding(.top, 28)
-        .padding(.bottom, 20)
-    }
-
-    private func progressDialog(
-        context: SoftwareUpdateController.UpdateContext,
-        title: String,
-        summary: String,
-        detailLabel: String,
-        detailCaption: String,
-        detailMessage: String,
-        progress: Double?
-    ) -> some View {
-        updateDialog(
-            symbol: "clock.arrow.circlepath",
-            symbolTint: .secondary,
-            title: title,
-            summary: summary,
-            notesLabel: detailLabel,
-            notesCaption: detailCaption,
-            notesVersionLabel: versionPanelLabel(
-                version: context.latestVersion,
-                buildNumber: context.buildNumber,
-                fallback: String(localized: "Installing")
-            ),
-            notes: .plainText(detailMessage),
-            progress: ProgressPresentation(
-                label: String(localized: "Installing update and refreshing helper…"),
-                detail: progressDetail(for: controller.phase),
-                value: progress
-            )
-        )
-    }
-
-    private func errorContent(_ context: SoftwareUpdateController.ErrorContext) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            hero(
-                symbol: "exclamationmark.triangle.fill",
-                symbolTint: .orange,
-                title: context.title,
-                summary: context.summary
-            )
-
-            if let recoverySuggestion = context.recoverySuggestion {
-                releaseNotesGroup(
-                    label: String(localized: "Recovery Suggestion"),
-                    caption: String(localized: "Rockxy could not complete the update flow. Review the recovery guidance below."),
-                    versionLabel: String(localized: "Error Details"),
-                    content: .plainText(recoverySuggestion),
-                    minHeight: 220
-                )
-            } else {
-                releaseNotesGroup(
-                    label: String(localized: "Update Details"),
-                    caption: String(localized: "No additional recovery suggestion was provided for this failure."),
-                    versionLabel: String(localized: "Error Details"),
-                    content: .unavailable(
-                        String(localized: "No additional recovery guidance is available for this error.")
-                    ),
-                    minHeight: 220
-                )
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 28)
-        .padding(.top, 28)
-        .padding(.bottom, 20)
-    }
-
-    private func hero(
-        symbol: String,
-        symbolTint: Color,
-        title: String,
-        summary: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            appIcon
-
-            statusBadge(symbol: symbol, tint: symbolTint)
-                .padding(.top, 8)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 28, weight: .semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(summary)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 560, alignment: .leading)
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-
     private var appIcon: some View {
         Image(nsImage: AppIconProvider.appIcon)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 64, height: 64)
+            .frame(width: appIconSize, height: appIconSize)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    private func statusBadge(symbol: String, tint: Color) -> some View {
-        Image(systemName: symbol)
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 28, height: 28)
-            .background(tint.opacity(0.12), in: Circle())
-            .overlay(
-                Circle()
-                    .stroke(tint.opacity(0.18), lineWidth: 1)
-            )
-    }
-
-    private func releaseNotesGroup(
-        label: String,
-        caption: String,
-        versionLabel: String,
-        content: SoftwareUpdateReleaseNotesContent,
-        minHeight: CGFloat
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(label)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-
-            Text(caption)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(spacing: 0) {
-                HStack {
-                    Text(versionLabel)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color(nsColor: .controlBackgroundColor))
-
-                Divider()
-
-                releaseNotesView(content)
-                    .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
-                    .background(Color(nsColor: .textBackgroundColor))
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-    }
-
-    @ViewBuilder
-    private func releaseNotesView(_ content: SoftwareUpdateReleaseNotesContent) -> some View {
-        switch content {
-        case .loading:
-            VStack(spacing: 12) {
-                ProgressView()
-                Text(String(localized: "Loading release notes…"))
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(20)
-
-        case .html, .plainText:
-            if let attributedText = content.nativeDisplayAttributedString(
-                fallbackMessage: String(localized: "Release notes are unavailable for this update.")
-            ) {
-                NativeReleaseNotesTextView(attributedText: attributedText)
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: "Release notes are unavailable for this update."))
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(18)
-            }
-
-        case let .unavailable(message):
-            VStack(alignment: .leading, spacing: 10) {
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-
-                if let detailURL {
-                    Button(String(localized: "Open Full Change Log")) {
-                        controller.openDetailURL(detailURL)
-                    }
-                    .buttonStyle(.link)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(18)
-        }
-    }
-
-    private func progressStrip(_ progress: ProgressPresentation) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(progress.label)
-                .font(.system(size: 13, weight: .medium))
-
-            if let value = progress.value {
-                ProgressView(value: value)
-                    .controlSize(.large)
-            } else {
-                ProgressView()
-                    .controlSize(.large)
-            }
-
-            if let detail = progress.detail {
-                Text(detail)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
     private var footer: some View {
-        HStack(spacing: 12) {
-            footerLeadingContent
-
-            Spacer()
-
-            footerButtons
+        Group {
+            if toolMetrics.bodyFontSize >= 20 {
+                VStack(alignment: .leading, spacing: 12) {
+                    footerLeadingContent
+                    HStack {
+                        Spacer()
+                        footerButtons
+                    }
+                }
+            } else {
+                HStack(spacing: 12) {
+                    footerLeadingContent
+                    Spacer()
+                    footerButtons
+                }
+            }
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 14)
     }
 
-    @ViewBuilder
-    private var footerLeadingContent: some View {
+    @ViewBuilder private var footerLeadingContent: some View {
         switch controller.phase {
         case .available:
             if updater.supportsAutomaticChecks, updater.allowsAutomaticUpdates {
@@ -450,70 +284,123 @@ struct SoftwareUpdatePanelView: View {
                         set: { updater.setAutomaticallyDownloadsUpdates($0) }
                     )
                 ) {
-                    Text(String(localized: "Automatically download and install future updates"))
-                        .font(.system(size: 13))
+                    Text(String(localized: "Automatically download future updates"))
+                        .font(toolMetrics.font())
                 }
                 .toggleStyle(.checkbox)
             } else if let supportingText {
                 Text(supportingText)
-                    .font(.system(size: 12))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
 
         default:
             if let supportingText {
                 Text(supportingText)
-                    .font(.system(size: 12))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder
-    private var footerButtons: some View {
+    @ViewBuilder private var footerButtons: some View {
         switch controller.phase {
         case .checking:
             Button(String(localized: "Cancel")) {
                 controller.chooseLater()
             }
+            .keyboardShortcut(.cancelAction)
 
         case let .available(context):
-            Button(String(localized: "Skip This Version")) {
-                controller.chooseSkip()
-            }
-            if let url = detailURL {
-                Button(String(localized: "View Full Change Log")) {
-                    controller.openDetailURL(url)
+            if toolMetrics.bodyFontSize >= 20 {
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button(String(localized: "Skip This Version")) {
+                            controller.chooseSkip()
+                        }
+                        Button(String(localized: "Later")) {
+                            controller.chooseLater()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                    }
+                    HStack(spacing: 8) {
+                        if let url = detailURL {
+                            Button(String(localized: "View Full Change Log")) {
+                                controller.openDetailURL(url)
+                            }
+                        }
+                        Button(primaryActionTitle) {
+                            performAvailablePrimaryAction(context)
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .controlSize(.large)
+                    }
                 }
+            } else {
+                Button(String(localized: "Skip This Version")) {
+                    controller.chooseSkip()
+                }
+                Button(String(localized: "Later")) {
+                    controller.chooseLater()
+                }
+                .keyboardShortcut(.cancelAction)
+                if let url = detailURL {
+                    Button(String(localized: "View Full Change Log")) {
+                        controller.openDetailURL(url)
+                    }
+                }
+                Button(primaryActionTitle) {
+                    performAvailablePrimaryAction(context)
+                }
+                .keyboardShortcut(.defaultAction)
+                .controlSize(.large)
             }
-            Button(primaryActionTitle) {
-                performAvailablePrimaryAction(context)
-            }
-            .keyboardShortcut(.defaultAction)
-            .controlSize(.large)
 
         case .downloading:
             Button(String(localized: "Cancel Download")) {
                 controller.chooseLater()
             }
+            .keyboardShortcut(.cancelAction)
 
         case .extracting:
             EmptyView()
 
         case .readyToInstall:
-            Button(String(localized: "Later")) {
-                controller.chooseLater()
-            }
-            if let url = detailURL {
-                Button(String(localized: "View Full Change Log")) {
-                    controller.openDetailURL(url)
+            if toolMetrics.bodyFontSize >= 20 {
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button(String(localized: "Later")) {
+                            controller.chooseLater()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                        if let url = detailURL {
+                            Button(String(localized: "View Full Change Log")) {
+                                controller.openDetailURL(url)
+                            }
+                        }
+                    }
+                    Button(String(localized: "Install and Relaunch")) {
+                        controller.chooseInstall()
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .controlSize(.large)
                 }
+            } else {
+                Button(String(localized: "Later")) {
+                    controller.chooseLater()
+                }
+                .keyboardShortcut(.cancelAction)
+                if let url = detailURL {
+                    Button(String(localized: "View Full Change Log")) {
+                        controller.openDetailURL(url)
+                    }
+                }
+                Button(String(localized: "Install and Relaunch")) {
+                    controller.chooseInstall()
+                }
+                .keyboardShortcut(.defaultAction)
+                .controlSize(.large)
             }
-            Button(String(localized: "Install and Relaunch")) {
-                controller.chooseInstall()
-            }
-            .keyboardShortcut(.defaultAction)
-            .controlSize(.large)
 
         case let .installing(_, applicationTerminated):
             if !applicationTerminated {
@@ -551,55 +438,258 @@ struct SoftwareUpdatePanelView: View {
         }
     }
 
-    private var supportingText: String? {
-        switch controller.phase {
-        case .checking:
-            String(localized: "You can cancel this check at any time.")
-        case .available, .readyToInstall:
-            String(localized: "Updates are signed and verified before Rockxy installs them.")
-        case .downloading:
-            String(localized: "Download progress is reported live by Sparkle.")
-        case .extracting:
-            String(localized: "Preparation runs locally on your Mac.")
-        case .installing:
-            String(localized: "Rockxy will relaunch after installation completes.")
-        case .noUpdate:
-            String(localized: "You can still review the full release history.")
-        case .error:
-            String(localized: "No captured traffic or license data is sent as part of update errors.")
-        case .hidden:
-            nil
-        }
-    }
+    private func updateDialog(
+        symbol: String,
+        symbolTint: Color,
+        title: String,
+        summary: String,
+        notesLabel: String,
+        notesVersionLabel: String,
+        notes: SoftwareUpdateReleaseNotesContent,
+        progress: ProgressPresentation?
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 18) {
+            hero(symbol: symbol, symbolTint: symbolTint, title: title, summary: summary)
 
-    private var detailURL: URL? {
-        switch controller.phase {
-        case let .available(context),
-             let .downloading(context, _, _),
-             let .extracting(context, _),
-             let .readyToInstall(context),
-             let .installing(context, _):
-            context.detailURL
-        case let .noUpdate(context):
-            context.detailURL
-        case .error:
-            AppUpdater.fullChangelogURL
-        case .checking, .hidden:
-            nil
-        }
-    }
+            releaseNotesGroup(
+                label: notesLabel,
+                versionLabel: notesVersionLabel,
+                content: notes
+            )
+            .layoutPriority(1)
 
-    private var primaryActionTitle: String {
-        switch controller.phase {
-        case let .available(context):
-            if context.isInformationOnly {
-                String(localized: "Learn More")
-            } else {
-                String(localized: "Install Update")
+            if let progress {
+                progressStrip(progress)
             }
-        default:
-            String(localized: "Continue")
         }
+        .padding(.horizontal, 28)
+        .padding(.top, 28)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func progressDialog(
+        context: SoftwareUpdateController.UpdateContext,
+        title: String,
+        summary: String,
+        detailLabel: String,
+        detailMessage: String,
+        progressLabel: String,
+        progress: Double?
+    )
+        -> some View
+    {
+        updateDialog(
+            symbol: "clock.arrow.circlepath",
+            symbolTint: .secondary,
+            title: title,
+            summary: summary,
+            notesLabel: detailLabel,
+            notesVersionLabel: versionPanelLabel(
+                version: context.latestVersion,
+                buildNumber: context.buildNumber,
+                fallback: String(localized: "Installing")
+            ),
+            notes: .plainText(detailMessage),
+            progress: ProgressPresentation(
+                label: progressLabel,
+                detail: progressDetail(for: controller.phase),
+                value: progress
+            )
+        )
+    }
+
+    private func errorContent(_ context: SoftwareUpdateController.ErrorContext) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            hero(
+                symbol: "exclamationmark.triangle.fill",
+                symbolTint: .orange,
+                title: context.title,
+                summary: context.summary
+            )
+
+            if let recoverySuggestion = context.recoverySuggestion {
+                releaseNotesGroup(
+                    label: String(localized: "Recovery Suggestion"),
+                    versionLabel: String(localized: "Error Details"),
+                    content: .plainText(recoverySuggestion)
+                )
+                .layoutPriority(1)
+            } else {
+                releaseNotesGroup(
+                    label: String(localized: "Update Details"),
+                    versionLabel: String(localized: "Error Details"),
+                    content: .unavailable(
+                        String(localized: "No additional recovery guidance is available for this error.")
+                    )
+                )
+                .layoutPriority(1)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 28)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func hero(
+        symbol: String,
+        symbolTint: Color,
+        title: String,
+        summary: String
+    )
+        -> some View
+    {
+        HStack(alignment: .top, spacing: 16) {
+            appIcon
+
+            statusBadge(symbol: symbol, tint: symbolTint)
+                .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(heroTitleFont)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(summary)
+                    .font(toolMetrics.font())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 560, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func statusBadge(symbol: String, tint: Color) -> some View {
+        Image(systemName: symbol)
+            .font(badgeSymbolFont)
+            .foregroundStyle(tint)
+            .frame(width: badgeDiameter, height: badgeDiameter)
+            .background(tint.opacity(0.12), in: Circle())
+            .overlay(
+                Circle()
+                    .stroke(tint.opacity(0.18), lineWidth: 1)
+            )
+    }
+
+    private func releaseNotesGroup(
+        label: String,
+        versionLabel: String,
+        content: SoftwareUpdateReleaseNotesContent
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(label)
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Text(versionLabel)
+                        .font(toolMetrics.metadataFont(weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(nsColor: .controlBackgroundColor))
+
+                Divider()
+
+                releaseNotesView(content)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(Color(nsColor: .textBackgroundColor))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private func releaseNotesView(_ content: SoftwareUpdateReleaseNotesContent) -> some View {
+        switch content {
+        case .loading:
+            VStack(spacing: 12) {
+                ProgressView()
+                Text(String(localized: "Loading release notes…"))
+                    .font(toolMetrics.font())
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(20)
+
+        case .html,
+             .plainText:
+            if let attributedText = content.nativeDisplayAttributedString(
+                fallbackMessage: String(localized: "Release notes are unavailable for this update."),
+                font: releaseNotesFont
+            ) {
+                NativeReleaseNotesTextView(attributedText: attributedText)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: "Release notes are unavailable for this update."))
+                        .font(toolMetrics.font())
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(18)
+            }
+
+        case let .unavailable(message):
+            VStack(alignment: .leading, spacing: 10) {
+                Text(message)
+                    .font(toolMetrics.font())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+
+                if let detailURL {
+                    Button(String(localized: "Open Full Change Log")) {
+                        controller.openDetailURL(detailURL)
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(18)
+        }
+    }
+
+    private func progressStrip(_ progress: ProgressPresentation) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(progress.label)
+                .font(toolMetrics.font(weight: .medium))
+
+            if let value = progress.value {
+                ProgressView(value: value)
+                    .controlSize(.large)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+            }
+
+            if let detail = progress.detail {
+                Text(detail)
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func versionPanelLabel(version: String?, buildNumber: String?, fallback: String) -> String {
@@ -660,11 +750,15 @@ struct SoftwareUpdatePanelView: View {
     }
 }
 
+// MARK: - ProgressPresentation
+
 private struct ProgressPresentation {
     let label: String
     let detail: String?
     let value: Double?
 }
+
+// MARK: - NativeReleaseNotesTextView
 
 private struct NativeReleaseNotesTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
@@ -683,7 +777,7 @@ private struct NativeReleaseNotesTextView: NSViewRepresentable {
         textView.isSelectable = true
         textView.isRichText = true
         textView.importsGraphics = false
-        textView.usesFindPanel = false
+        textView.usesFindPanel = true
         textView.allowsUndo = false
         textView.textContainerInset = NSSize(width: 18, height: 16)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -712,9 +806,7 @@ private struct NativeReleaseNotesTextView: NSViewRepresentable {
         guard let textStorage = textView.textStorage else {
             return
         }
-        if textStorage.length == attributedText.length,
-           textStorage.string == attributedText.string
-        {
+        if textStorage.isEqual(to: attributedText) {
             return
         }
         textStorage.setAttributedString(attributedText)

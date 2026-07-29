@@ -4,8 +4,19 @@ import CoreGraphics
 import Sparkle
 import SwiftUI
 
+// MARK: - SoftwareUpdateController
+
 @MainActor
 final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelegate {
+    // MARK: Lifecycle
+
+    init(configuration: RockxyUpdateConfiguration) {
+        self.configuration = configuration
+        super.init()
+    }
+
+    // MARK: Internal
+
     struct UpdateContext: Equatable {
         let title: String
         let summary: String
@@ -47,13 +58,22 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         case error(ErrorContext)
     }
 
-    @Published private(set) var phase: Phase = .hidden
+    /// How an interactive close (red button, Command-W, Escape) should resolve for a given phase.
+    enum InteractiveCloseOutcome: Equatable {
+        /// Invoke the phase's dismiss/later/cancel callback, then tear the window down.
+        case dismiss
+        /// Invoke the phase's acknowledgement callback, then tear the window down.
+        case acknowledge
+        /// Refuse the close and preserve the phase, context, window, and callbacks.
+        case deny
+    }
 
     let configuration: RockxyUpdateConfiguration
 
-    init(configuration: RockxyUpdateConfiguration) {
-        self.configuration = configuration
-        super.init()
+    @Published private(set) var phase: Phase = .hidden {
+        didSet {
+            syncCloseButtonEnablement()
+        }
     }
 
     var currentVersionSummary: String {
@@ -193,18 +213,16 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
     }
 
     func acknowledgeAndDismiss() {
-        activeAcknowledge?()
+        let acknowledgement = activeAcknowledge
         dismiss()
+        acknowledgement?()
     }
 
     func dismiss() {
         programmaticClose = true
         windowController?.close()
         programmaticClose = false
-        windowController = nil
-        phase = .hidden
-        activeUpdateContext = nil
-        resetCallbacks()
+        resetPresentationState()
     }
 
     func showInFocus() {
@@ -216,19 +234,22 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
     }
 
     func chooseInstall() {
-        activeChoiceReply?(.install)
+        let choiceReply = activeChoiceReply
         activeChoiceReply = nil
         activeDismiss = nil
+        choiceReply?(.install)
     }
 
     func chooseSkip() {
-        activeChoiceReply?(.skip)
+        let choiceReply = activeChoiceReply
         dismiss()
+        choiceReply?(.skip)
     }
 
     func chooseLater() {
-        activeDismiss?()
+        let dismissAction = activeDismiss
         dismiss()
+        dismissAction?()
     }
 
     func retryTermination() {
@@ -253,11 +274,14 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         if let latestItem, matchesRunningVersion {
             releaseNotes = SoftwareUpdateReleaseNotesContent.from(appcastItem: latestItem)
                 .resolvedForStaticDisplay(fallbackMessage: latestPublishedFallback)
-            detailURL = latestItem.fullReleaseNotesURL ?? latestItem.releaseNotesURL ?? latestItem.infoURL ?? AppUpdater.fullChangelogURL
+            detailURL = latestItem.fullReleaseNotesURL ?? latestItem.releaseNotesURL ?? latestItem.infoURL ?? AppUpdater
+                .fullChangelogURL
         } else {
             releaseNotes = .unavailable(matchesRunningVersion ? latestPublishedFallback : localBuildFallback)
             detailURL = matchesRunningVersion
-                ? (latestItem?.fullReleaseNotesURL ?? latestItem?.releaseNotesURL ?? latestItem?.infoURL ?? AppUpdater.fullChangelogURL)
+                ?
+                (latestItem?.fullReleaseNotesURL ?? latestItem?.releaseNotesURL ?? latestItem?.infoURL ?? AppUpdater
+                    .fullChangelogURL)
                 : AppUpdater.fullChangelogURL
         }
 
@@ -271,22 +295,52 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         )
     }
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        programmaticClose || phase.interactiveCloseOutcome != .deny
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard !programmaticClose else {
             return
         }
 
-        if phase.requiresAcknowledgement {
-            activeAcknowledge?()
-        } else if phase.canDismissInteractively {
-            activeDismiss?()
+        performInteractiveClose()
+    }
+
+    func requestInteractiveClose() {
+        guard phase.interactiveCloseOutcome != .deny else {
+            return
         }
 
-        phase = .hidden
-        activeUpdateContext = nil
-        windowController = nil
-        resetCallbacks()
+        if let window = windowController?.window {
+            window.performClose(nil)
+        } else {
+            performInteractiveClose()
+        }
     }
+
+    /// Resolve an interactive close (red button, Command-W, Escape) according to the current
+    /// phase's policy. Returns `false` when the close is denied and the session was preserved.
+    /// Callbacks fire at most once because `resetPresentationState()` clears them before returning.
+    @discardableResult
+    func performInteractiveClose() -> Bool {
+        switch phase.interactiveCloseOutcome {
+        case .deny:
+            return false
+        case .dismiss:
+            let dismissAction = activeDismiss
+            resetPresentationState()
+            dismissAction?()
+        case .acknowledge:
+            let acknowledgement = activeAcknowledge
+            resetPresentationState()
+            acknowledgement?()
+        }
+
+        return true
+    }
+
+    // MARK: Private
 
     private var windowController: NSWindowController?
     private var activeChoiceReply: ((SPUUserUpdateChoice) -> Void)?
@@ -298,20 +352,25 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
 
     private func showWindow() {
         if windowController == nil {
-            let rootView = SoftwareUpdatePanelView(controller: self)
+            let rootView = ToolWindowDisplayMetricsProvider {
+                SoftwareUpdatePanelView(controller: self)
+            }
             let hostingController = NSHostingController(rootView: rootView)
             let window = NSWindow(contentViewController: hostingController)
             window.title = String(localized: "Software Update")
-            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.titlebarAppearsTransparent = false
             window.titleVisibility = .visible
             window.isReleasedWhenClosed = false
             window.setContentSize(SoftwareUpdateWindowPositioning.contentSize)
+            window.contentMinSize = SoftwareUpdateWindowPositioning.minimumContentSize
             window.standardWindowButton(.zoomButton)?.isHidden = true
             window.toolbarStyle = .unifiedCompact
             window.delegate = self
             windowController = NSWindowController(window: window)
         }
+
+        syncCloseButtonEnablement()
 
         if let window = windowController?.window, !window.isVisible {
             positionWindowForPresentation(window)
@@ -320,6 +379,20 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         windowController?.showWindow(nil)
         windowController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func resetPresentationState() {
+        windowController = nil
+        phase = .hidden
+        activeUpdateContext = nil
+        resetCallbacks()
+    }
+
+    private func syncCloseButtonEnablement() {
+        guard let window = windowController?.window else {
+            return
+        }
+        window.standardWindowButton(.closeButton)?.isEnabled = phase.interactiveCloseOutcome != .deny
     }
 
     private func positionWindowForPresentation(_ window: NSWindow) {
@@ -353,8 +426,8 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
                   !candidate.isMiniaturized,
                   candidate.screen != nil,
                   candidate.level == .normal,
-                  candidate.canBecomeKey || candidate.canBecomeMain
-            else {
+                  candidate.canBecomeKey || candidate.canBecomeMain else
+            {
                 continue
             }
             return candidate
@@ -373,22 +446,24 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
     private func preferredReleaseNotes(
         current: SoftwareUpdateReleaseNotesContent,
         incoming: SoftwareUpdateReleaseNotesContent
-    ) -> SoftwareUpdateReleaseNotesContent {
+    )
+        -> SoftwareUpdateReleaseNotesContent
+    {
         switch (current, incoming) {
         case (.loading, _),
              (.unavailable, _):
-            return incoming
+            incoming
         case (.html, .loading),
              (.html, .unavailable),
              (.plainText, .loading),
              (.plainText, .unavailable):
-            return current
+            current
         case (.html, .html),
              (.html, .plainText),
              (.plainText, .html),
              (.plainText, .plainText):
             // Keep the appcast body instead of overwriting it with a full external release page.
-            return current
+            current
         }
     }
 
@@ -400,11 +475,14 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
             String(localized: "A new version of Rockxy is available")
         }
 
-        let context = UpdateContext(
+        return UpdateContext(
             title: title,
             summary: item.isInformationOnlyUpdate
                 ? String(localized: "Review the latest release details for Rockxy.")
-                : String(localized: "Rockxy \(item.displayVersionString) is now available. You’re currently using \(configuration.appVersion)."),
+                :
+                String(
+                    localized: "Rockxy \(item.displayVersionString) is now available. You’re currently using \(configuration.appVersion)."
+                ),
             currentVersion: configuration.appVersion,
             latestVersion: item.displayVersionString,
             buildNumber: item.versionString,
@@ -415,7 +493,6 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
             isInformationOnly: item.isInformationOnlyUpdate,
             downloadSize: item.contentLength > 0 ? Int64(item.contentLength) : nil
         )
-        return context
     }
 
     private func updatePhaseContext(_ transform: (UpdateContext) -> UpdateContext) {
@@ -469,14 +546,21 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
     }
 }
 
+// MARK: - SoftwareUpdateWindowPositioning
+
 enum SoftwareUpdateWindowPositioning {
+    // MARK: Internal
+
     static let contentSize = NSSize(width: 780, height: 610)
+    static let minimumContentSize = NSSize(width: 680, height: 600)
 
     static func positionedFrame(
         windowSize: NSSize,
         anchorFrame: NSRect?,
         visibleFrame: NSRect
-    ) -> NSRect {
+    )
+        -> NSRect
+    {
         let centeringFrame = anchorFrame ?? visibleFrame
         let proposedOrigin = NSPoint(
             x: centeringFrame.midX - windowSize.width / 2,
@@ -489,11 +573,15 @@ enum SoftwareUpdateWindowPositioning {
         )
     }
 
+    // MARK: Private
+
     private static func clampedOrigin(
         _ origin: NSPoint,
         windowSize: NSSize,
         visibleFrame: NSRect
-    ) -> NSPoint {
+    )
+        -> NSPoint
+    {
         let maximumX = visibleFrame.maxX - windowSize.width
         let maximumY = visibleFrame.maxY - windowSize.height
 
@@ -507,7 +595,9 @@ enum SoftwareUpdateWindowPositioning {
         _ value: CGFloat,
         minimum: CGFloat,
         maximum: CGFloat
-    ) -> CGFloat {
+    )
+        -> CGFloat
+    {
         guard maximum >= minimum else {
             return minimum + (maximum - minimum) / 2
         }
@@ -549,22 +639,25 @@ private extension SoftwareUpdateController.UpdateContext {
     }
 }
 
-private extension SoftwareUpdateController.Phase {
-    var canDismissInteractively: Bool {
+extension SoftwareUpdateController.Phase {
+    /// Pure, testable mapping from a phase to its interactive-close policy.
+    /// `checking`/`available`/`downloading`/`readyToInstall` resolve to the same dismiss/later/cancel
+    /// callback as their visible action; `noUpdate`/`error` acknowledge; `extracting`/`installing`
+    /// (and `hidden`) refuse an interactive close so an active Sparkle session is never stranded.
+    var interactiveCloseOutcome: SoftwareUpdateController.InteractiveCloseOutcome {
         switch self {
-        case .checking, .available, .readyToInstall:
-            true
-        default:
-            false
-        }
-    }
-
-    var requiresAcknowledgement: Bool {
-        switch self {
-        case .noUpdate, .error:
-            true
-        default:
-            false
+        case .checking,
+             .available,
+             .downloading,
+             .readyToInstall:
+            .dismiss
+        case .noUpdate,
+             .error:
+            .acknowledge
+        case .extracting,
+             .installing,
+             .hidden:
+            .deny
         }
     }
 }

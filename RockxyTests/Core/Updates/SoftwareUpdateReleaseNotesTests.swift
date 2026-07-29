@@ -4,6 +4,8 @@ import Foundation
 import Testing
 
 struct SoftwareUpdateReleaseNotesTests {
+    // MARK: Internal
+
     @Test("static display fallback turns loading into unavailable content")
     func staticDisplayFallbackResolvesLoading() {
         let content = SoftwareUpdateReleaseNotesContent.loading
@@ -71,7 +73,69 @@ struct SoftwareUpdateReleaseNotesTests {
         let helperFont = attributed.attribute(.font, at: helperRange.location, effectiveRange: nil) as? NSFont
         #expect(helperFont?.fontDescriptor.symbolicTraits.contains(NSFontDescriptor.SymbolicTraits.bold) == true)
 
-        let paragraphStyle = attributed.attribute(.paragraphStyle, at: helperRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let paragraphStyle = attributed.attribute(
+            .paragraphStyle,
+            at: helperRange.location,
+            effectiveRange: nil
+        ) as? NSParagraphStyle
         #expect(paragraphStyle?.lineBreakMode == .byWordWrapping)
+    }
+
+    @Test("plain-text body font follows the requested Appearance size and family")
+    func plainTextBodyFontFollowsRequestedSize() throws {
+        let content = SoftwareUpdateReleaseNotesContent.plainText("Release body line")
+
+        for size in [CGFloat(13), 20, 28] {
+            let attributed = try #require(
+                content.nativeDisplayAttributedString(font: SoftwareUpdateReleaseNotesFont(bodySize: size))
+            )
+            let font = attributed.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+            #expect(font?.pointSize == size)
+        }
+
+        let monospaced = try #require(
+            content.nativeDisplayAttributedString(
+                font: SoftwareUpdateReleaseNotesFont(bodySize: 20, usesMonospacedFamily: true)
+            )
+        )
+        let monospacedFont = try #require(monospaced.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(monospacedFont.pointSize == 20)
+        #expect(monospacedFont.fontDescriptor.symbolicTraits.contains(.monoSpace))
+    }
+
+    @Test("html body anchors to the requested size while headings scale relative to it")
+    func htmlBodyAndHeadingScaleWithRequestedSize() throws {
+        let content = SoftwareUpdateReleaseNotesContent.html(
+            "<h1>Heading</h1><p>Body copy here.</p>",
+            baseURL: nil
+        )
+
+        let base = try #require(content
+            .nativeDisplayAttributedString(font: SoftwareUpdateReleaseNotesFont(bodySize: 13)))
+        let scaled = try #require(content
+            .nativeDisplayAttributedString(font: SoftwareUpdateReleaseNotesFont(bodySize: 20)))
+
+        // Relative relationships are asserted (the exact system HTML body point size is not
+        // guaranteed across macOS versions; the plain-text test proves exact anchoring).
+        let baseBody = try #require(fontPointSize(in: base, containing: "Body"))
+        let scaledBody = try #require(fontPointSize(in: scaled, containing: "Body"))
+        #expect(scaledBody > baseBody)
+
+        let baseHeading = try #require(fontPointSize(in: base, containing: "Heading"))
+        let scaledHeading = try #require(fontPointSize(in: scaled, containing: "Heading"))
+        #expect(baseHeading > baseBody)
+        #expect(scaledHeading > scaledBody)
+        #expect(scaledHeading > baseHeading)
+    }
+
+    // MARK: Private
+
+    private func fontPointSize(in attributed: NSAttributedString, containing substring: String) -> CGFloat? {
+        let nsString = attributed.string as NSString
+        let range = nsString.range(of: substring)
+        guard range.location != NSNotFound else {
+            return nil
+        }
+        return (attributed.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont)?.pointSize
     }
 }
