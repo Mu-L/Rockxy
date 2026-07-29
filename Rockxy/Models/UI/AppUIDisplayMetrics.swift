@@ -231,17 +231,21 @@ struct DeveloperSetupDisplayMetrics: Equatable {
     }
 
     func font(weight: Font.Weight = .regular, monospaced: Bool = false) -> Font {
-        if monospaced || appMetrics.settings.useMonospacedFont {
-            return .system(size: bodyFontSize, weight: weight, design: .monospaced)
-        }
-        return .system(size: bodyFontSize, weight: weight)
+        font(size: bodyFontSize, weight: weight, monospaced: monospaced)
     }
 
     func secondaryFont(weight: Font.Weight = .regular, monospaced: Bool = false) -> Font {
+        font(size: secondaryFontSize, weight: weight, monospaced: monospaced)
+    }
+
+    /// Size-parameterized font that honors the Rockxy font-family preference
+    /// (`useMonospacedFont`) so every Developer Setup label scales and switches
+    /// family consistently. Snippet/code text should pass `monospaced: true`.
+    func font(size: CGFloat, weight: Font.Weight = .regular, monospaced: Bool = false) -> Font {
         if monospaced || appMetrics.settings.useMonospacedFont {
-            return .system(size: secondaryFontSize, weight: weight, design: .monospaced)
+            return .system(size: size, weight: weight, design: .monospaced)
         }
-        return .system(size: secondaryFontSize, weight: weight)
+        return .system(size: size, weight: weight)
     }
 }
 

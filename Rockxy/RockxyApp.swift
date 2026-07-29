@@ -92,15 +92,7 @@ struct RockxyApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .defaultSize(width: 920, height: 660)
 
-        Window(String(localized: "Developer Setup Hub"), id: "developerSetupHub") {
-            AppUIDisplayMetricsProvider {
-                DeveloperSetupWindowView(coordinator: mainCoordinator)
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 1_180, height: 760)
-        .defaultPosition(.center)
-        .windowToolbarStyle(.unifiedCompact)
+        developerSetupWindow
 
         Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
             ToolWindowDisplayMetricsProvider {
@@ -128,10 +120,10 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 760, height: 500)
+        .defaultSize(width: 760, height: 520)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
 
         Window(String(localized: "Manual Setup"), id: "manualSetup") {
             AppUIDisplayMetricsProvider {
@@ -139,10 +131,10 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 780, height: 540)
+        .defaultSize(width: 780, height: 560)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
 
         Window(String(localized: "Map Local"), id: "mapLocal") {
             ToolWindowDisplayMetricsProvider {
@@ -394,8 +386,47 @@ struct RockxyApp: App {
 
     @State private var lifecycleState = AppLifecycleState()
 
+    private var developerSetupWindow: some Scene {
+        DeveloperSetupWindowScene(coordinator: mainCoordinator)
+    }
+
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+}
+
+// MARK: - DeveloperSetupWindowScene
+
+/// Developer Setup is a utility workspace, so it opens at a compact, predictable
+/// size instead of restoring geometry that can make it rival the main window.
+private struct DeveloperSetupWindowScene: Scene {
+    // MARK: Internal
+
+    let coordinator: MainContentCoordinator
+
+    var body: some Scene {
+        developerSetupWindow
+    }
+
+    // MARK: Private
+
+    private var developerSetupWindow: some Scene {
+        let base = Window(String(localized: "Developer Setup"), id: "developerSetupHub") {
+            AppUIDisplayMetricsProvider {
+                DeveloperSetupWindowView(coordinator: coordinator)
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 1_000, height: 640)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unified(showsTitle: true))
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
@@ -1101,12 +1132,16 @@ struct RockxyMenuCommands: Commands {
     private var setupMenu: some Commands {
         CommandMenu(String(localized: "Setup")) {
             Button(String(localized: "Automatic Setup...")) {
+                _ = DeveloperSetupRouteStore.shared
+                    .requestAutomatic(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "automaticSetup")
             }
 
             Divider()
 
             Button(String(localized: "Manual Setup...")) {
+                DeveloperSetupRouteStore.shared
+                    .requestManual(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "manualSetup")
             }
         }

@@ -348,7 +348,7 @@ enum DeveloperSetupWorkflowCatalog {
                         localized: "Rockxy is listening on \(snapshot.effectiveListenAddress):\(snapshot.activePort)."
                     )
                     : String(localized: "Start Rockxy before you point \(target.title) traffic at the local proxy."),
-                actionTitle: String(localized: "Verify"),
+                actionTitle: snapshot.proxyStepActionTitle,
                 actionKind: .verifyProxy,
                 isComplete: snapshot.proxyRunning && snapshot.recordingEnabled,
                 isEnabled: true
@@ -371,18 +371,21 @@ enum DeveloperSetupWorkflowCatalog {
                 id: "snippet",
                 title: snippetTitle,
                 description: snippetDescription,
-                actionTitle: String(localized: "Copy"),
+                actionTitle: String(localized: "View Snippet"),
                 actionKind: .copySnippet,
                 isComplete: selectedSnippetID != nil,
                 isEnabled: selectedSnippetID != nil
             ),
             SetupStep(
                 id: "validate",
-                title: String(localized: "Verify local capture"),
+                title: String(localized: "Capture check"),
                 description: snapshot.verificationState == .success
-                    ? String(localized: "Rockxy captured the local validation probe and can reveal it in the main window.")
+                    ?
+                    String(
+                        localized: "Rockxy captured the local validation probe and can reveal it in the main window."
+                    )
                     : String(localized: "Run the local validation probe and wait for the first matching capture."),
-                actionTitle: String(localized: "Run Probe"),
+                actionTitle: String(localized: "Open Check"),
                 actionKind: .runValidation,
                 isComplete: snapshot.verificationState == .success,
                 isEnabled: true
@@ -463,9 +466,13 @@ enum DeveloperSetupWorkflowCatalog {
         case (.reactNative, .reactNativeFetchProbe):
             DeveloperSetupMobileSnippetCatalog.reactNativeFetchProbeSnippet(port: port, certPath: rawCertificatePath)
         case (.reactNative, .reactNativeAndroidNetworkSecurityConfig):
-            DeveloperSetupMobileSnippetCatalog.reactNativeAndroidNetworkSecurityConfigSnippet(certPath: rawCertificatePath)
+            DeveloperSetupMobileSnippetCatalog
+                .reactNativeAndroidNetworkSecurityConfigSnippet(certPath: rawCertificatePath)
         case (.reactNative, .reactNativeMetroChecklist):
-            DeveloperSetupMobileSnippetCatalog.reactNativeMetroChecklistSnippet(port: port, certPath: rawCertificatePath)
+            DeveloperSetupMobileSnippetCatalog.reactNativeMetroChecklistSnippet(
+                port: port,
+                certPath: rawCertificatePath
+            )
         default:
             nil
         }
@@ -524,7 +531,10 @@ enum DeveloperSetupWorkflowCatalog {
             host: probeSession.host,
             path: probeSession.path,
             urlString: probeSession.url.absoluteString,
-            instruction: validationInstruction(runtimeName: runtimeName, validationURL: probeSession.url.absoluteString),
+            instruction: validationInstruction(
+                runtimeName: runtimeName,
+                validationURL: probeSession.url.absoluteString
+            ),
             preferredSnippetID: preferredSnippetID
         )
     }
@@ -1183,7 +1193,7 @@ enum DeveloperSetupWorkflowCatalog {
     }
 
     private static func escapeForStringLiteral(_ value: String, language: StringLiteralLanguage) -> String {
-        let escaped = value.unicodeScalars.reduce(into: "") { result, scalar in
+        value.unicodeScalars.reduce(into: "") { result, scalar in
             switch scalar {
             case "\\":
                 result += "\\\\"
@@ -1198,17 +1208,6 @@ enum DeveloperSetupWorkflowCatalog {
             default:
                 result.append(String(scalar))
             }
-        }
-
-        switch language {
-        case .python,
-             .javaScript,
-             .ruby,
-             .go,
-             .rust,
-             .java,
-             .dart:
-            return escaped
         }
     }
 

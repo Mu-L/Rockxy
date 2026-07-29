@@ -2,154 +2,123 @@ import SwiftUI
 
 // MARK: - DeveloperSetupSourceList
 
+/// Native macOS sidebar list with system selection + keyboard navigation.
+/// Selection is driven by the view model; the parent supplies the search-filtered
+/// sections, so this view stays declarative.
 struct DeveloperSetupSourceList: View {
     // MARK: Internal
 
-    let selectedTarget: SetupTarget
+    @Binding var selection: SetupTarget.ID?
+
     let sections: [SetupTargetSection]
     let isPinned: (SetupTarget) -> Bool
-    let onSelect: (SetupTarget) -> Void
     let onTogglePinned: (SetupTarget) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    if sections.isEmpty {
-                        emptySearchState
-                    } else {
-                        ForEach(sections) { section in
-                            sectionView(category: section.category, targets: section.targets)
+        List(selection: $selection) {
+            if sections.isEmpty {
+                emptySearchState
+            } else {
+                ForEach(sections) { section in
+                    Section(section.category.title) {
+                        if section.targets.isEmpty {
+                            Text(emptySectionTitle(for: section.category))
+                                .font(setupMetrics.secondaryFont())
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            ForEach(section.targets, id: \.id) { target in
+                                row(for: target)
+                                    .tag(target.id)
+                            }
                         }
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 14)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+        .listStyle(.sidebar)
+        .font(setupMetrics.font())
+        .accessibilityLabel(String(localized: "Developer setup targets"))
     }
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var setupMetrics: DeveloperSetupDisplayMetrics {
+        DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var emptySearchState: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(String(localized: "No matching setups"))
-                .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
+                .font(setupMetrics.font(weight: .semibold))
             Text(String(localized: "Try another runtime, browser, framework, environment, or category name."))
-                .font(.system(size: setupMetrics.secondaryFontSize))
+                .font(setupMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
 
-    @ViewBuilder
-    private func sectionView(category: SetupTargetCategory, targets: [SetupTarget]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(category.title)
-                .font(.system(size: setupMetrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .padding(.horizontal, 8)
+    private func row(for target: SetupTarget) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: target.iconName)
+                .font(setupMetrics.font(size: setupMetrics.iconFontSize, weight: .medium))
+                .foregroundStyle(selection == target.id ? .primary : .secondary)
+                .frame(width: 18)
+                .accessibilityHidden(true)
 
-            if targets.isEmpty {
-                Text(emptySectionTitle(for: category))
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-            } else {
-                ForEach(targets, id: \.id) { target in
-                    ZStack(alignment: .trailing) {
-                        Button {
-                            onSelect(target)
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: target.iconName)
-                                    .font(.system(size: setupMetrics.iconFontSize, weight: .medium))
-                                    .foregroundStyle(selectedTarget.id == target.id ? .primary : .secondary)
-                                    .frame(width: 16)
-
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(target.title)
-                                        .font(.system(size: setupMetrics.bodyFontSize, weight: selectedTarget.id == target.id ? .semibold : .regular))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-
-                                    Text(target.supportStatus.title)
-                                        .font(.system(size: setupMetrics.metadataFontSize))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-
-                                Spacer(minLength: 32)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 7)
-                            .frame(minHeight: setupMetrics.sidebarRowHeight)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-
-                        pinButton(for: target)
-                            .padding(.trailing, 8)
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(selectedTarget.id == target.id ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.45) : .clear)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .contextMenu {
-                        Button(pinActionTitle(for: target)) {
-                            onTogglePinned(target)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(target.title)
+                    .font(setupMetrics.font(weight: selection == target.id ? .semibold : .regular))
+                    .fixedSize(horizontal: false, vertical: true)
+                if target.supportStatus == .guideOnly {
+                    Text(target.supportStatus.title)
+                        .font(setupMetrics.font(size: setupMetrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+            }
+
+            Spacer(minLength: 8)
+
+            if isPinned(target) || selection == target.id {
+                Button {
+                    onTogglePinned(target)
+                } label: {
+                    Image(systemName: isPinned(target) ? "pin.fill" : "pin")
+                        .font(setupMetrics.font(size: setupMetrics.metadataFontSize, weight: .semibold))
+                        .foregroundStyle(isPinned(target) ? Color(nsColor: .systemBlue) : Color.secondary)
+                }
+                .buttonStyle(.borderless)
+                .help(pinActionTitle(for: target))
+                .accessibilityLabel(pinActionTitle(for: target))
+            }
+        }
+        .frame(minHeight: setupMetrics.sidebarRowHeight)
+        .contentShape(Rectangle())
+        .help(target.shortSummary)
+        .accessibilityLabel(target.title)
+        .accessibilityValue(target.supportStatus.title)
+        .contextMenu {
+            Button(pinActionTitle(for: target)) {
+                onTogglePinned(target)
             }
         }
     }
 
-    @ViewBuilder
-    private func pinButton(for target: SetupTarget) -> some View {
-        Button {
-            onTogglePinned(target)
-        } label: {
-            Image(systemName: isPinned(target) ? "pin.fill" : "pin")
-                .font(.system(size: setupMetrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(isPinned(target) ? Color(nsColor: .systemBlue) : Color.secondary)
-                .frame(width: 20, height: 20)
-                .background(
-                    Circle()
-                        .fill(isPinned(target) ? Color(nsColor: .systemBlue).opacity(0.12) : Color.clear)
-                )
-        }
-        .buttonStyle(.plain)
-        .help(pinActionTitle(for: target))
-    }
-
     private func pinActionTitle(for target: SetupTarget) -> String {
         if isPinned(target) {
-            return String(localized: "Remove from Pinned")
+            return String(localized: "Unpin")
         }
-
-        return String(localized: "Pin to Pinned")
+        return String(localized: "Pin")
     }
 
     private func emptySectionTitle(for category: SetupTargetCategory) -> String {
         switch category {
         case .pinned:
             String(localized: "No pinned setups yet")
-        case .savedProfile:
-            String(localized: "No saved profiles yet")
         default:
             String(localized: "No setups in this section")
         }
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var setupMetrics: DeveloperSetupDisplayMetrics {
-        DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
     }
 }

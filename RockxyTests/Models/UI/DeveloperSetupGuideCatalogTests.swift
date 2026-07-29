@@ -295,13 +295,13 @@ struct DeveloperSetupGuideCatalogTests {
         #expect(anyTipMentionsRelaunch, "Simulator guide must call out relaunch / cold-launch / reinstall")
     }
 
-    @Test("iOS guides point certificate sharing at Developer Setup Hub")
-    func iosGuidesUseDeveloperSetupHubShareAction() throws {
+    @Test("iOS guides point certificate sharing at Developer Setup")
+    func iosGuidesUseDeveloperSetupShareAction() throws {
         let deviceGuide = try #require(DeveloperSetupGuideCatalog.content(for: .iosDevice))
         let simulatorGuide = try #require(DeveloperSetupGuideCatalog.content(for: .iosSimulator))
         let combinedTips = deviceGuide.setupTips + simulatorGuide.setupTips
 
-        #expect(combinedTips.contains(where: { $0.message.contains("Developer Setup Hub") }))
+        #expect(combinedTips.contains(where: { $0.message.contains("Developer Setup") }))
         #expect(combinedTips.contains(where: { $0.message.contains("Share Certificate") }))
         #expect(!combinedTips.contains(where: { $0.message.contains("certificate panel") }))
     }

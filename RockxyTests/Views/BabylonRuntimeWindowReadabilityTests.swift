@@ -22,7 +22,7 @@ struct BabylonRuntimeWindowReadabilityTests {
         )
         let scenesAfter = app[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Developer Setup Hub\"), id: \"developerSetupHub\")")
+            scenesAfter.range(of: "Window(String(localized: \"Developer Setup\"), id: \"developerSetupHub\")")
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
 

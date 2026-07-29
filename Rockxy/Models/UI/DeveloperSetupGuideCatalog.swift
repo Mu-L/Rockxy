@@ -76,7 +76,7 @@ enum DeveloperSetupGuideCatalog {
                     "ios-device-cert",
                     "Scan the temporary certificate link",
                     """
-                    In Developer Setup Hub, choose Share Certificate, scan the QR code in Safari, install \
+                    In Developer Setup, choose Share Certificate, scan the QR code in Safari, install \
                     the downloaded profile, then enable full trust under Settings > General > About > \
                     Certificate Trust Settings.
                     """
@@ -137,7 +137,7 @@ enum DeveloperSetupGuideCatalog {
                     "ios-sim-cert",
                     "Trust the root certificate inside the simulator",
                     """
-                    Use Share Certificate in Developer Setup Hub or export the Rockxy PEM, install it in \
+                    Use Share Certificate in Developer Setup or export the Rockxy PEM, install it in \
                     the simulator, then enable full trust under Settings > General > About > Certificate Trust Settings.
                     """
                 ),

@@ -16,49 +16,54 @@ struct DeveloperSetupWindowView: View {
     let coordinator: MainContentCoordinator
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
-            Divider()
-            infoBanner
-            Divider()
-            contentBody
-            Divider()
-            bottomBar
-        }
-        .frame(minWidth: 1_080, minHeight: 720)
-        .task {
-            applyPendingRouteIfNeeded()
-            await viewModel.refreshSnapshot()
-        }
-        .sheet(isPresented: Binding(
-            get: { viewModel.showsAutomationSheet && viewModel.currentAutomationPreview != nil },
-            set: { isPresented in
-                if !isPresented {
-                    viewModel.closeAutomationSheet()
+        NavigationSplitView {
+            DeveloperSetupSourceList(
+                selection: targetSelectionBinding,
+                sections: viewModel.filteredTargetSections,
+                isPinned: { viewModel.isPinned($0) },
+                onTogglePinned: { viewModel.togglePinned($0) }
+            )
+            .searchable(
+                text: $viewModel.sourceListSearchText,
+                isPresented: $searchPresented,
+                placement: .sidebar,
+                prompt: Text(String(localized: "Search setups"))
+            )
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+        } detail: {
+            detailColumn
+                .inspector(isPresented: $inspectorPresented) {
+                    inspectorColumn
+                        .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
                 }
+        }
+        .navigationTitle(String(localized: "Developer Setup"))
+        .toolbar { toolbarContent }
+        .frame(minWidth: 820, minHeight: 560)
+        .background {
+            Button("") {
+                searchPresented = true
             }
-        )) {
-            if let preview = viewModel.currentAutomationPreview {
-                DeveloperSetupAutomationSheet(
-                    target: viewModel.selectedTarget,
-                    preview: preview,
-                    onContinueManual: {
-                        viewModel.selectTab(.setup)
-                    }
-                )
+            .keyboardShortcut("f", modifiers: .command)
+            .hidden()
+            .accessibilityHidden(true)
+        }
+        .task {
+            if let route = routeStore.consumeHubRoute() {
+                await viewModel.applyHubRoute(route)
+            } else {
+                await viewModel.refreshSnapshot()
             }
         }
         .sheet(item: $presentedShareSession, onDismiss: {
-            presentedShareSession = nil
-            Task { await caShareController.stopSharing(clearSession: true) }
+            stopPresentedCertificateSharing()
         }) { shareSession in
             RootCAShareSheet(
                 session: shareSession,
                 fingerprint: caShareController.currentFingerprint,
                 onCopyURL: { copyRootCAShareURL(shareSession.publicURL) },
                 onStop: {
-                    presentedShareSession = nil
-                    Task { await caShareController.stopSharing(clearSession: true) }
+                    stopPresentedCertificateSharing(expectedSessionID: shareSession.id)
                 }
             )
         }
@@ -72,24 +77,56 @@ struct DeveloperSetupWindowView: View {
         .onChange(of: ReadinessCoordinator.shared.certReadiness) { _, _ in refreshSnapshot() }
         .onChange(of: ReadinessCoordinator.shared.proxyMode) { _, _ in refreshSnapshot() }
         .onChange(of: ReadinessCoordinator.shared.activeWarning) { _, _ in refreshSnapshot() }
-        .onChange(of: routeStore.pendingRoute) { _, _ in applyPendingRouteIfNeeded() }
+        .onChange(of: routeStore.hubRoute) { _, _ in
+            let route = routeStore.consumeHubRoute()
+            Task { await viewModel.applyHubRoute(route) }
+        }
+        .onChange(of: viewModel.selectedTarget.id) { _, _ in
+            stopAllCertificateSharing()
+            actionStatusMessage = nil
+        }
         .onDisappear {
             viewModel.cancelValidation(markCancelled: true)
+            stopAllCertificateSharing()
             Task { await viewModel.stopValidationProbe() }
-            Task { await caShareController.stopSharing(clearSession: true) }
         }
     }
 
     // MARK: Private
 
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @State private var viewModel: DeveloperSetupViewModel
     @State private var routeStore = DeveloperSetupRouteStore.shared
     @StateObject private var caShareController = CAShareController()
     @State private var certificateShareStatusMessage: String?
+    @State private var certificateShareGeneration = 0
+    @State private var actionStatusMessage: String?
     @State private var presentedShareSession: RootCADownloadSession?
+    @State private var presentedShareSessionID: RootCADownloadSession.ID?
+    @State private var inspectorPresented = false
+    @State private var searchPresented = false
+
+    private var setupMetrics: DeveloperSetupDisplayMetrics {
+        DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var targetSelectionBinding: Binding<SetupTarget.ID?> {
+        Binding(
+            get: { viewModel.selectedTarget.id },
+            set: { newValue in
+                guard let newValue, newValue != viewModel.selectedTarget.id,
+                      let target = SetupTarget.target(for: newValue) else
+                {
+                    return
+                }
+                Task { @MainActor in
+                    await viewModel.selectTarget(target)
+                    await viewModel.refreshSnapshot()
+                }
+            }
+        )
+    }
 
     private var deviceProxyHostText: String {
         viewModel.snapshot.reachableLANAddress ?? String(localized: "Unavailable")
@@ -101,204 +138,185 @@ struct DeveloperSetupWindowView: View {
                 localized: "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy."
             )
         }
-
         guard viewModel.snapshot.reachableLANAddress != nil else {
             return String(localized: "Connect this Mac to Wi-Fi or Ethernet to expose a reachable LAN IP.")
         }
-
         return String(
             localized: "Use this host and port when configuring a device, simulator, or client on the same network."
         )
     }
 
-    private var setupMetrics: DeveloperSetupDisplayMetrics {
-        DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
-    }
+    // MARK: Toolbar
 
-    private func applyPendingRouteIfNeeded() {
-        guard let route = routeStore.consumePendingRoute(),
-              let target = SetupTarget.target(for: route.targetID) else {
-            return
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            detailTabPicker
         }
-        Task { @MainActor in
-            await viewModel.selectTarget(target)
-            viewModel.selectTab(route.tab)
-        }
-    }
 
-    private var toolbar: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Developer Setup Hub"))
-                    .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                Text(viewModel.selectedTarget.title)
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            toolbarSearchField
-
-            Button(String(localized: "Copy")) {
-                copySnippetToPasteboard()
-            }
-            .buttonStyle(.bordered)
-            .disabled(!viewModel.toolbarCopyEnabled)
-
-            Button(String(localized: "Verify")) {
-                viewModel.selectTab(.validate)
-                viewModel.startValidation()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.toolbarVerifyEnabled)
-
-            Button(String(localized: "Open in Tools")) {
-                openSelectedTool()
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private var infoBanner: some View {
-        HStack(spacing: 6) {
-            Image(systemName: viewModel.selectedTarget
-                .supportStatus == .availableNow ? "checkmark.circle" : "info.circle")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.selectedTarget.supportStatus.bannerTitle)
-                    .font(.system(size: setupMetrics.secondaryFontSize, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(viewModel.infoBannerText)
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 12)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.quaternary.opacity(0.5))
-    }
-
-    private var contentBody: some View {
-        HStack(spacing: 0) {
-            DeveloperSetupSourceList(
-                selectedTarget: viewModel.selectedTarget,
-                sections: viewModel.filteredTargetSections,
-                isPinned: { target in
-                    viewModel.isPinned(target)
+        ToolbarItemGroup(placement: .primaryAction) {
+            Menu(String(localized: "Set Up…")) {
+                Button(String(localized: "Open Setup Guide…")) {
+                    openManualSetup()
                 }
-            ) { target in
-                Task { @MainActor in
-                    await viewModel.selectTarget(target)
-                    await viewModel.refreshSnapshot()
+                if viewModel.selectedTarget.isRuntimeTerminalTarget {
+                    Button(String(localized: "Open Configured Terminal…")) {
+                        openAutomaticSetup()
+                    }
                 }
-            } onTogglePinned: { target in
-                viewModel.togglePinned(target)
             }
-            .frame(width: 240)
+            .help(String(localized: "Open a guided or configured setup for this target"))
 
-            Divider()
-
-            VStack(spacing: 0) {
-                centerHeader
-                Divider()
-                centerContent
+            Button {
+                inspectorPresented.toggle()
+            } label: {
+                Image(systemName: "sidebar.trailing")
             }
-
-            Divider()
-
-            DeveloperSetupInspector(
-                snapshot: viewModel.snapshot,
-                activeIssue: viewModel.activeIssue,
-                setupModeActions: viewModel.setupModeActions,
-                supportsValidation: viewModel.supportsValidation,
-                showsCertificateShareAction: viewModel.selectedTarget.supportsCertificateSharing,
-                validationInstruction: viewModel.validationInstruction,
-                onOpenManualSetup: { openWindow(id: "manualSetup") },
-                onOpenAutomaticSetup: { openWindow(id: "automaticSetup") },
-                onRunTest: { viewModel.startValidation() },
-                onShareCertificate: { shareRootCAForSelectedTarget() },
-                onOpenCertificate: { openSettings() },
-                onOpenTools: { openSelectedTool() },
-                onRevealRequest: { viewModel.revealMatchedTransaction() }
-            )
-            .frame(width: 280)
+            .help(String(localized: "Toggle the readiness inspector"))
+            .accessibilityLabel(String(localized: "Toggle readiness inspector"))
         }
     }
 
-    private var centerHeader: some View {
+    // MARK: Bottom feedback
+
+    private var feedbackMessage: String? {
+        actionStatusMessage ?? certificateShareStatusMessage ?? viewModel.snapshot.readinessWarningMessage
+    }
+
+    private var proxyOverviewCaption: String {
+        viewModel.snapshot.proxyRunning
+            ? String(localized: "Rockxy is capturing traffic on this Mac.")
+            : String(localized: "Start Rockxy before pointing traffic at the proxy.")
+    }
+
+    private var proxyOverviewAction: (title: String, perform: () -> Void)? {
+        guard !viewModel.snapshot.proxyRunning else {
+            return nil
+        }
+        return (String(localized: "Start Proxy"), { coordinator.startProxy() })
+    }
+
+    private var endpointOverviewValue: String {
+        "\(viewModel.snapshot.effectiveListenAddress):\(viewModel.snapshot.activePort)"
+    }
+
+    private var endpointOverviewCaption: String {
+        viewModel.snapshot.proxyRunning
+            ? String(localized: "Rockxy is listening on this address now.")
+            : String(localized: "Rockxy will bind this address when the proxy starts.")
+    }
+
+    private var recordingOverviewCaption: String {
+        String(localized: "Requests must be recorded to run the capture check.")
+    }
+
+    private var recordingOverviewAction: (title: String, perform: () -> Void)? {
+        guard !viewModel.snapshot.recordingEnabled else {
+            return nil
+        }
+        return (String(localized: "Resume Recording"), {
+            if !coordinator.isRecording {
+                coordinator.toggleRecording()
+            }
+        })
+    }
+
+    private var certificateOverviewValue: String {
+        viewModel.snapshot.certificateTrusted
+            ? String(localized: "Trusted")
+            : String(localized: "Needs attention")
+    }
+
+    private var certificateOverviewCaption: String {
+        viewModel.snapshot.certificateFileReady
+            ? String(localized: "A root certificate is available for your client configuration.")
+            : String(localized: "Generate or export the root certificate before validating HTTPS traffic.")
+    }
+
+    private var certificateOverviewAction: (title: String, perform: () -> Void)? {
+        guard !viewModel.snapshot.certificateTrusted else {
+            return nil
+        }
+        let title = viewModel.selectedTarget.supportsCertificateSharing
+            ? String(localized: "Share Certificate")
+            : String(localized: "Open Certificate")
+        return (title, {
+            if viewModel.selectedTarget.supportsCertificateSharing {
+                shareRootCAForSelectedTarget()
+            } else {
+                openWindow(id: "certificateSetup")
+            }
+        })
+    }
+
+    private var deviceEndpointOverviewAction: (title: String, perform: () -> Void)? {
+        guard viewModel.snapshot.reachableLANAddress == nil else {
+            return nil
+        }
+        return (String(localized: "Open Proxy Settings"), { openWindow(id: "advancedProxySettings") })
+    }
+
+    // MARK: Guide
+
+    private var setupSteps: [SetupStep] {
+        viewModel.currentWorkflow.supportsSnippets ? viewModel.currentSetupSteps : []
+    }
+
+    private var setupGuideTips: [SetupGuideTip] {
+        viewModel.currentGuideContent?.setupTips ?? []
+    }
+
+    // MARK: Help
+
+    private var troubleshootingGuideTips: [SetupGuideTip] {
+        viewModel.currentGuideContent?.troubleshootingTips ?? []
+    }
+
+    // MARK: Detail column
+
+    private var detailColumn: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.selectedTarget.title)
-                        .font(.system(size: setupMetrics.titleFontSize, weight: .semibold))
-                    Text(viewModel.selectedTarget.shortSummary)
-                        .font(.system(size: setupMetrics.secondaryFontSize))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 12)
-
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack(spacing: 8) {
-                        supportBadge(
-                            title: viewModel.selectedTarget.supportStatus.title,
-                            fill: viewModel.selectedTarget.supportStatus == .availableNow
-                                ? Color(nsColor: .systemGreen).opacity(0.12)
-                                : Color(nsColor: .quaternaryLabelColor).opacity(0.12),
-                            stroke: viewModel.selectedTarget.supportStatus == .availableNow
-                                ? Color(nsColor: .systemGreen).opacity(0.28)
-                                : Color(nsColor: .separatorColor).opacity(0.4),
-                            textColor: viewModel.selectedTarget.supportStatus == .availableNow
-                                ? Color(nsColor: .systemGreen)
-                                : Color(nsColor: .secondaryLabelColor)
-                        )
-
-                        if viewModel.supportsAutomation {
-                            supportBadge(
-                                title: viewModel.selectedTarget.automationSupport.badgeTitle,
-                                fill: Color(nsColor: .systemBlue).opacity(0.12),
-                                stroke: Color(nsColor: .systemBlue).opacity(0.24),
-                                textColor: Color(nsColor: .systemBlue)
-                            )
-                        }
-                    }
-
-                    HStack(spacing: 12) {
-                        Picker("", selection: Binding(
-                            get: { viewModel.selectedTab },
-                            set: { viewModel.selectTab($0) }
-                        )) {
-                            ForEach(SetupDetailTab.allCases) { tab in
-                                Text(tab.title).tag(tab)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 430)
-
-                        if viewModel.supportsAutomation {
-                            Button(viewModel.selectedTarget.automationSupport.entryActionTitle) {
-                                openWindow(id: "automaticSetup")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                }
+            centerContent
+            if let message = feedbackMessage {
+                Divider()
+                feedbackBar(message)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var detailTabPicker: some View {
+        ViewThatFits(in: .horizontal) {
+            segmentedTabPicker
+            menuTabPicker
+        }
+    }
+
+    private var segmentedTabPicker: some View {
+        tabPickerBase
+            .pickerStyle(.segmented)
+            .frame(minWidth: 380)
+    }
+
+    private var menuTabPicker: some View {
+        tabPickerBase
+            .pickerStyle(.menu)
+            .fixedSize()
+    }
+
+    private var tabPickerBase: some View {
+        Picker(String(localized: "Section"), selection: Binding(
+            get: { viewModel.selectedTab },
+            set: { viewModel.selectTab($0) }
+        )) {
+            ForEach(SetupDetailTab.allCases) { tab in
+                Text(tab.title).tag(tab)
+            }
+        }
+        .labelsHidden()
     }
 
     private var centerContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 switch viewModel.selectedTab {
                 case .overview:
                     overviewContent
@@ -312,292 +330,106 @@ struct DeveloperSetupWindowView: View {
                     troubleshootingContent
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private var overviewContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            overviewGrid
-
-            detailCard(
-                title: String(localized: "Current support"),
-                systemImage: "checkmark.shield"
-            ) {
-                Text(viewModel.selectedTarget.currentSupportSummary)
-                    .font(.system(size: setupMetrics.bodyFontSize))
-                    .foregroundStyle(.primary)
-                Text(viewModel.selectedTarget.manualSummary)
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            }
-        }
+    private var inspectorColumn: some View {
+        DeveloperSetupInspector(
+            snapshot: viewModel.snapshot,
+            activeIssue: viewModel.activeIssue,
+            onIssueAction: { handleIssueAction($0) },
+            onReveal: { viewModel.revealMatchedTransaction() }
+        )
     }
 
-    private var overviewGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-        ], spacing: 12) {
-            statusCard(
-                title: String(localized: "Proxy"),
-                value: viewModel.snapshot.proxyRunning ? String(localized: "Running") : String(localized: "Stopped"),
-                caption: String(
-                    localized: "\(viewModel.snapshot.effectiveListenAddress):\(viewModel.snapshot.activePort)"
+    // MARK: Overview
+
+    private var overviewContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            overviewRow(
+                label: String(localized: "Proxy"),
+                value: viewModel.snapshot.proxyRunning
+                    ? String(localized: "Running")
+                    : String(localized: "Stopped"),
+                caption: proxyOverviewCaption,
+                action: proxyOverviewAction
+            )
+            Divider()
+            overviewRow(
+                label: String(localized: "Endpoint"),
+                value: endpointOverviewValue,
+                caption: endpointOverviewCaption,
+                action: nil
+            )
+            Divider()
+            overviewRow(
+                label: String(localized: "Recording"),
+                value: viewModel.snapshot.recordingEnabled
+                    ? String(localized: "Enabled")
+                    : String(localized: "Paused"),
+                caption: recordingOverviewCaption,
+                action: recordingOverviewAction
+            )
+            Divider()
+            overviewRow(
+                label: String(localized: "Certificate"),
+                value: certificateOverviewValue,
+                caption: certificateOverviewCaption,
+                action: certificateOverviewAction
+            )
+            if viewModel.selectedTarget.requiresReachableLANProxy {
+                Divider()
+                overviewRow(
+                    label: String(localized: "Device Endpoint"),
+                    value: deviceProxyHostText,
+                    caption: deviceProxyCaption,
+                    action: deviceEndpointOverviewAction
                 )
-            )
-            statusCard(
-                title: String(localized: "Recording"),
-                value: viewModel.snapshot.recordingEnabled ? String(localized: "Enabled") : String(localized: "Paused"),
-                caption: String(localized: "Requests must be recorded to validate the setup.")
-            )
-            statusCard(
-                title: String(localized: "Listen Address"),
-                value: viewModel.snapshot.effectiveListenAddress,
-                caption: String(localized: "This is the address Rockxy binds when the proxy starts.")
-            )
-            statusCard(
-                title: String(localized: "Device Proxy"),
-                value: deviceProxyHostText,
-                caption: deviceProxyCaption
-            )
-            statusCard(
-                title: String(localized: "Certificate"),
-                value: viewModel.snapshot
-                    .certificateTrusted ? String(localized: "Trusted") : String(localized: "Needs attention"),
-                caption: viewModel.snapshot.certificateFileReady
-                    ? String(localized: "A root certificate is available for your client configuration.")
-                    : String(localized: "Generate or export the root certificate before validating HTTPS traffic.")
-            )
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var setupContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             if viewModel.selectedTarget.supportStatus == .availableNow {
-                if viewModel.currentWorkflow.supportsSnippets {
-                    ForEach(viewModel.currentSetupSteps) { step in
-                        stepRow(step)
+                ForEach(Array(setupSteps.enumerated()), id: \.element.id) { index, step in
+                    if index > 0 {
+                        Divider()
                     }
+                    stepRow(step)
                 }
 
-                if let guideContent = viewModel.currentGuideContent, !guideContent.setupTips.isEmpty {
-                    guideTipSection(
-                        title: String(localized: "Manual guide"),
-                        systemImage: "list.bullet.rectangle",
-                        tips: guideContent.setupTips
-                    )
+                if !setupGuideTips.isEmpty {
+                    if !setupSteps.isEmpty {
+                        Divider()
+                    }
+                    tipSection(title: String(localized: "Manual guide"), tips: setupGuideTips)
                 }
 
                 if viewModel.selectedTarget.supportsCertificateSharing {
-                    certificateShareCard
+                    if !setupSteps.isEmpty || !setupGuideTips.isEmpty {
+                        Divider()
+                    }
+                    certificateShareSection
                 }
             } else {
-                guideOnlyContent(
+                guideOnlySection(
                     title: String(localized: "Manual guide"),
                     message: viewModel.selectedTarget.manualSummary
                 )
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var snippetsContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if viewModel.selectedTarget.supportStatus == .availableNow,
-               let currentSnippetText = viewModel.currentSnippetText
-            {
-                if viewModel.currentSnippetOptions.count > 1 {
-                    UtilitySegmentedHeader(width: 420) {
-                        Picker("", selection: $viewModel.selectedSnippetID) {
-                            ForEach(viewModel.currentSnippetOptions) { snippet in
-                                Text(snippet.title).tag(snippet.id)
-                            }
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 420)
-                    .padding(.horizontal, -16)
-                    .padding(.top, -4)
-                }
-
-                snippetMetadata
-
-                ScrollView(.horizontal) {
-                    Text(currentSnippetText)
-                        .font(.system(size: setupMetrics.snippetFontSize, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(nsColor: .textBackgroundColor))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color(nsColor: .separatorColor).opacity(0.6))
-                                )
-                        )
-                }
-            } else {
-                guideOnlyEmptyState(
-                    title: viewModel.usesGuideSetupContent
-                        ? String(localized: "No runtime snippet needed for this device flow")
-                        : String(localized: "No first-party snippet in Rockxy for this target yet"),
-                    message: viewModel.selectedTarget.currentSupportSummary
-                )
-            }
-        }
-    }
-
-    private var snippetMetadata: some View {
-        HStack(spacing: 16) {
-            metadataItem(title: String(localized: "Snippet"), value: viewModel.currentSnippetTitle)
-            metadataItem(
-                title: String(localized: "Trust"),
-                value: viewModel.snapshot
-                    .certificateTrusted ? String(localized: "Trusted") : String(localized: "Needs attention")
-            )
-            metadataItem(title: String(localized: "Certificate file"), value: viewModel.certificatePathStatusText)
-            metadataItem(title: String(localized: "Validation"), value: viewModel.snapshot.verificationState.title)
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var validateContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if viewModel.supportsValidation, let currentSnippetText = viewModel.currentValidationSnippetText {
-                detailCard(
-                    title: String(localized: "Local validation probe"),
-                    systemImage: "bolt.horizontal.circle"
-                ) {
-                    Text(viewModel.validationInstruction)
-                        .font(.system(size: setupMetrics.bodyFontSize))
-                    Text(viewModel.snapshot.verificationState.title)
-                        .font(.system(size: setupMetrics.secondaryFontSize))
-                        .foregroundStyle(.secondary)
-                    if let issue = viewModel.activeIssue {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(issue.title)
-                                .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                            Text(issue.message)
-                                .font(.system(size: setupMetrics.secondaryFontSize))
-                                .foregroundStyle(.secondary)
-                            Button(issue.actionTitle) {
-                                handleIssueAction(issue)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                }
-
-                ScrollView(.horizontal) {
-                    Text(currentSnippetText)
-                        .font(.system(size: setupMetrics.snippetFontSize, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(nsColor: .textBackgroundColor))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color(nsColor: .separatorColor).opacity(0.6))
-                                )
-                        )
-                }
-
-                HStack(spacing: 10) {
-                    Button(String(localized: "Run Local Probe")) {
-                        viewModel.startValidation()
-                    }
-                    .buttonStyle(.borderedProminent)
-
-                    if viewModel.snapshot.verificationState == .success,
-                       viewModel.snapshot.matchedTransactionID != nil
-                    {
-                        Button(String(localized: "Reveal in Main Window")) {
-                            viewModel.revealMatchedTransaction()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-            } else if let guideContent = viewModel.currentGuideContent, !guideContent.validationTips.isEmpty {
-                guideTipSection(
-                    title: String(localized: "Manual validation"),
-                    systemImage: "checklist",
-                    tips: guideContent.validationTips
-                )
-            } else {
-                guideOnlyEmptyState(
-                    title: String(localized: "Interactive validation is not available for this target"),
-                    message: viewModel.selectedTarget.manualSummary
-                )
-            }
-        }
-    }
-
-    private var troubleshootingContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let guideContent = viewModel.currentGuideContent, !guideContent.troubleshootingTips.isEmpty {
-                guideTipSection(
-                    title: String(localized: "Common issues"),
-                    systemImage: "wrench.and.screwdriver",
-                    tips: guideContent.troubleshootingTips
-                )
-            }
-
-            if viewModel.selectedTarget.supportStatus == .availableNow, viewModel.supportsValidation {
-                ForEach(viewModel.troubleshootingIssues) { issue in
-                    detailCard(title: issue.title, systemImage: "exclamationmark.triangle") {
-                        Text(issue.message)
-                            .font(.system(size: setupMetrics.bodyFontSize))
-                            .foregroundStyle(.primary)
-                        HStack(spacing: 8) {
-                            Button(issue.actionTitle) {
-                                handleIssueAction(issue)
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                }
-            } else if let guideContent = viewModel.currentGuideContent, !guideContent.troubleshootingTips.isEmpty {
-                EmptyView()
-            } else {
-                guideOnlyContent(
-                    title: String(localized: "Current limitation"),
-                    message: viewModel.selectedTarget.currentSupportSummary
-                )
-            }
-        }
-    }
-
-    private var bottomBar: some View {
-        HStack(spacing: 8) {
-            Text(certificateShareStatusMessage ?? viewModel.bottomStatusText)
-                .font(.system(size: setupMetrics.secondaryFontSize))
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 8)
-
-            if let warning = viewModel.snapshot.readinessWarningMessage {
-                Text(warning)
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private var certificateShareCard: some View {
-        detailCard(
-            title: String(localized: "Device certificate"),
-            systemImage: "qrcode"
-        ) {
+    private var certificateShareSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader(String(localized: "Device certificate"))
             Text(
                 String(
                     localized: """
@@ -606,16 +438,17 @@ struct DeveloperSetupWindowView: View {
                     """
                 )
             )
-            .font(.system(size: setupMetrics.bodyFontSize))
-            .foregroundStyle(.primary)
+            .font(setupMetrics.font())
+            .fixedSize(horizontal: false, vertical: true)
 
             Text(
                 String(
                     localized: "The link only serves the public PEM, expires automatically, and stops when this sheet closes."
                 )
             )
-            .font(.system(size: setupMetrics.secondaryFontSize))
+            .font(setupMetrics.secondaryFont())
             .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
                 Button(String(localized: "Share Certificate")) {
@@ -623,185 +456,374 @@ struct DeveloperSetupWindowView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button(String(localized: "Open Certificate Settings")) {
-                    openSettings()
+                Button(String(localized: "Open Certificate Guide")) {
+                    openWindow(id: "certificateSetup")
                 }
-                .buttonStyle(.bordered)
             }
-        }
-    }
-
-    private var toolbarSearchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: setupMetrics.controlFontSize))
-                .foregroundStyle(.secondary)
-
-            TextField(String(localized: "Search setups"), text: $viewModel.sourceListSearchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: setupMetrics.controlFontSize))
-                .frame(width: 180)
-
-            if !viewModel.sourceListSearchText.isEmpty {
-                Button {
-                    viewModel.sourceListSearchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: setupMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.85))
-        )
-    }
-
-    private func statusCard(title: String, value: String, caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: setupMetrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: setupMetrics.titleFontSize, weight: .semibold))
-            Text(caption)
-                .font(.system(size: setupMetrics.secondaryFontSize))
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
+        .padding(.vertical, 10)
+    }
+
+    // MARK: Snippets
+
+    private var snippetsContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if viewModel.selectedTarget.supportStatus == .availableNow,
+               let currentSnippetText = viewModel.currentSnippetText
+            {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        snippetSelector
+                        Spacer(minLength: 12)
+                        copySnippetButton
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        snippetSelector
+                        copySnippetButton
+                    }
+                }
+
+                snippetBox(currentSnippetText)
+            } else {
+                emptyStateSection(
+                    title: viewModel.usesGuideSetupContent
+                        ? String(localized: "No runtime snippet needed for this device flow")
+                        : String(localized: "No first-party snippet in Rockxy for this target yet"),
+                    message: viewModel.selectedTarget.currentSupportSummary
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var snippetSelector: some View {
+        Picker(String(localized: "Snippet"), selection: $viewModel.selectedSnippetID) {
+            ForEach(viewModel.currentSnippetOptions) { snippet in
+                Text(snippet.title).tag(snippet.id)
+            }
+        }
+        .pickerStyle(.menu)
+        .fixedSize()
+        .disabled(viewModel.currentSnippetOptions.count <= 1)
+    }
+
+    private var copySnippetButton: some View {
+        Button(String(localized: "Copy Snippet")) {
+            copySnippetToPasteboard()
+        }
+        .keyboardShortcut("c", modifiers: [.command, .shift])
+    }
+
+    // MARK: Check
+
+    private var validateContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if viewModel.supportsValidation, let currentSnippetText = viewModel.currentValidationSnippetText {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Run this probe while Rockxy waits for the request."))
+                        .font(setupMetrics.font())
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        String(localized: "Checks proxy capture only; it does not identify the source app or process.")
+                    )
+                    .font(setupMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                snippetBox(currentSnippetText)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        checkActions
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        checkActions
+                    }
+                }
+
+                Text(viewModel.snapshot.verificationState.title)
+                    .font(setupMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+
+                if let issue = viewModel.activeIssue {
+                    Divider()
+                    issueBlock(issue)
+                }
+            } else if let guideContent = viewModel.currentGuideContent, !guideContent.validationTips.isEmpty {
+                tipSection(title: String(localized: "Manual validation"), tips: guideContent.validationTips)
+            } else {
+                emptyStateSection(
+                    title: String(localized: "Interactive validation is not available for this target"),
+                    message: viewModel.selectedTarget.manualSummary
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private var checkActions: some View {
+        Button(String(localized: "Copy Command")) {
+            copySnippetToPasteboard()
+        }
+
+        Button(String(localized: "Start Check")) {
+            viewModel.startValidation()
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!viewModel.toolbarVerifyEnabled || viewModel.activeIssue != nil)
+        .keyboardShortcut("r", modifiers: .command)
+
+        if viewModel.snapshot.verificationState == .success,
+           viewModel.snapshot.matchedTransactionID != nil
+        {
+            Button(String(localized: "Reveal in Main Window")) {
+                viewModel.revealMatchedTransaction()
+            }
+        }
+    }
+
+    private var troubleshootingContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !troubleshootingGuideTips.isEmpty {
+                tipSection(title: String(localized: "Common issues"), tips: troubleshootingGuideTips)
+            }
+
+            if viewModel.selectedTarget.supportStatus == .availableNow, viewModel.supportsValidation {
+                ForEach(Array(viewModel.troubleshootingIssues.enumerated()), id: \.element.id) { index, issue in
+                    if index > 0 || !troubleshootingGuideTips.isEmpty {
+                        Divider()
+                    }
+                    issueBlock(issue)
+                }
+            } else if troubleshootingGuideTips.isEmpty {
+                guideOnlySection(
+                    title: String(localized: "Current limitation"),
+                    message: viewModel.selectedTarget.currentSupportSummary
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func feedbackBar(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Text(message)
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private func stepRow(_ step: SetupStep) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: step.isComplete ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(step.isComplete ? .green : .secondary)
-                .font(.system(size: setupMetrics.iconFontSize, weight: .medium))
-                .padding(.top, 2)
+                .font(setupMetrics.font(size: setupMetrics.iconFontSize, weight: .medium))
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(step.title)
-                    .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                Text(step.description)
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 12)
-
-            Button(step.actionTitle) {
-                handleStepAction(step)
-            }
-            .buttonStyle(.bordered)
-            .disabled(!step.isEnabled)
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-    }
-
-    private func detailCard(title: String, systemImage: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-    }
-
-    private func supportBadge(title: String, fill: Color, stroke: Color, textColor: Color) -> some View {
-        Text(title)
-            .font(.system(size: setupMetrics.metadataFontSize, weight: .semibold))
-            .foregroundStyle(textColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(fill)
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(stroke)
-            )
-    }
-
-    private func guideOnlyContent(title: String, message: String) -> some View {
-        detailCard(title: title, systemImage: "info.circle") {
-            Text(message)
-                .font(.system(size: setupMetrics.bodyFontSize))
-            Text(
-                String(
-                    localized: "Rockxy shows this target now so the long-term hub taxonomy stays stable, but this target remains guidance-only today."
-                )
-            )
-            .font(.system(size: setupMetrics.secondaryFontSize))
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    private func guideTipSection(title: String, systemImage: String, tips: [SetupGuideTip]) -> some View {
-        detailCard(title: title, systemImage: systemImage) {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(tips) { tip in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tip.title)
-                            .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Text(tip.message)
-                            .font(.system(size: setupMetrics.secondaryFontSize))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    stepText(step)
+                    Spacer(minLength: 12)
+                    stepButton(step)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    stepText(step)
+                    stepButton(step)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
     }
 
-    private func guideOnlyEmptyState(title: String, message: String) -> some View {
-        VStack(alignment: .center, spacing: 10) {
-            Image(systemName: "square.dashed")
-                .font(.system(size: setupMetrics.prominentIconFontSize))
-                .foregroundStyle(.tertiary)
-            Text(title)
-                .font(.system(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
+    private func stepText(_ step: SetupStep) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(step.title)
+                .font(setupMetrics.font(weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(step.description)
+                .font(setupMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func stepButton(_ step: SetupStep) -> some View {
+        Button(step.actionTitle) {
+            handleStepAction(step)
+        }
+        .disabled(!step.isEnabled)
+    }
+
+    private func issueBlock(_ issue: SetupIssue) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(issue.title)
+                .font(setupMetrics.font(weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(issue.message)
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(issue.actionTitle) {
+                handleIssueAction(issue)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: Reusable components
+
+    private func overviewRow(
+        label: String,
+        value: String,
+        caption: String?,
+        action: (title: String, perform: () -> Void)?
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 6) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    overviewRowLabel(label)
+                    Spacer(minLength: 12)
+                    overviewRowValue(value)
+                    if let action {
+                        Button(action.title) { action.perform() }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        overviewRowLabel(label)
+                        Spacer(minLength: 12)
+                        overviewRowValue(value)
+                    }
+                    if let action {
+                        Button(action.title) { action.perform() }
+                    }
+                }
+            }
+
+            if let caption {
+                Text(caption)
+                    .font(setupMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+    }
+
+    private func overviewRowLabel(_ label: String) -> some View {
+        Text(label)
+            .font(setupMetrics.font(weight: .medium))
+            .foregroundStyle(.secondary)
+    }
+
+    private func overviewRowValue(_ value: String) -> some View {
+        Text(value)
+            .font(setupMetrics.font(weight: .semibold))
+            .multilineTextAlignment(.trailing)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func snippetBox(_ text: String) -> some View {
+        ScrollView(.horizontal) {
+            Text(text)
+                .font(setupMetrics.font(size: setupMetrics.snippetFontSize, monospaced: true))
+                .textSelection(.enabled)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color(nsColor: .separatorColor).opacity(0.6))
+                        )
+                )
+        }
+        .accessibilityLabel(String(localized: "Generated setup snippet"))
+        .accessibilityValue(text)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
+    }
+
+    private func tipSection(title: String, tips: [SetupGuideTip]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(title)
+            ForEach(tips) { tip in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tip.title)
+                        .font(setupMetrics.font(weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(tip.message)
+                        .font(setupMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+    }
+
+    private func guideOnlySection(title: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader(title)
             Text(message)
-                .font(.system(size: setupMetrics.secondaryFontSize))
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
+                .font(setupMetrics.font())
+                .fixedSize(horizontal: false, vertical: true)
+            Text(viewModel.selectedTarget.currentSupportSummary)
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, minHeight: 260)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
     }
 
-    private func metadataItem(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func emptyStateSection(title: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: setupMetrics.metadataFontSize, weight: .semibold))
+                .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: setupMetrics.secondaryFontSize))
-                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(message)
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 10)
+    }
+
+    private func openManualSetup() {
+        routeStore.requestManual(targetID: viewModel.selectedTarget.id)
+        openWindow(id: "manualSetup")
+    }
+
+    private func openAutomaticSetup() {
+        // Unsupported (non runtime-terminal) targets are rejected by the store, so
+        // the automatic window never opens for a device/browser/framework target.
+        guard routeStore.requestAutomatic(targetID: viewModel.selectedTarget.id) else {
+            return
+        }
+        openWindow(id: "automaticSetup")
     }
 
     private func copySnippetToPasteboard() {
@@ -810,24 +832,31 @@ struct DeveloperSetupWindowView: View {
         }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+        actionStatusMessage = viewModel.selectedTab == .validate
+            ? String(localized: "Probe command copied.")
+            : String(localized: "Snippet copied.")
     }
 
     private func handleStepAction(_ step: SetupStep) {
-        viewModel.performStepAction(step)
-
         switch step.actionKind {
         case .verifyProxy:
-            refreshSnapshot()
+            if !coordinator.isProxyRunning {
+                coordinator.startProxy()
+            } else if !coordinator.isRecording {
+                coordinator.toggleRecording()
+            } else {
+                refreshSnapshot()
+            }
         case .openCertificate:
             if viewModel.selectedTarget.supportsCertificateSharing {
                 shareRootCAForSelectedTarget()
             } else {
-                openSettings()
+                openWindow(id: "certificateSetup")
             }
         case .copySnippet:
-            copySnippetToPasteboard()
+            viewModel.selectTab(.snippets)
         case .runValidation:
-            viewModel.startValidation()
+            viewModel.selectTab(.validate)
         }
     }
 
@@ -835,9 +864,12 @@ struct DeveloperSetupWindowView: View {
         switch issue {
         case .runtimeNotInstalled:
             viewModel.selectTab(.setup)
-        case .proxyStopped,
-             .recordingPaused:
-            refreshSnapshot()
+        case .proxyStopped:
+            coordinator.startProxy()
+        case .recordingPaused:
+            if !coordinator.isRecording {
+                coordinator.toggleRecording()
+            }
         case .deviceProxyUnreachable:
             openWindow(id: "advancedProxySettings")
         case .certificateNotTrusted,
@@ -845,7 +877,7 @@ struct DeveloperSetupWindowView: View {
             if viewModel.selectedTarget.supportsCertificateSharing {
                 shareRootCAForSelectedTarget()
             } else {
-                openSettings()
+                openWindow(id: "certificateSetup")
             }
         case .noTrafficDetected,
              .localProbeUnavailable,
@@ -863,33 +895,55 @@ struct DeveloperSetupWindowView: View {
         }
     }
 
-    private func openSelectedTool() {
-        if let issue = viewModel.activeIssue,
-           issue == .certificateNotTrusted || issue == .certificateExportUnavailable
-        {
-            if viewModel.selectedTarget.supportsCertificateSharing {
-                shareRootCAForSelectedTarget()
-            } else {
-                openSettings()
-            }
-            return
-        }
-        openWindow(id: "advancedProxySettings")
-    }
-
     private func shareRootCAForSelectedTarget() {
+        certificateShareGeneration += 1
+        let generation = certificateShareGeneration
         Task { @MainActor in
             do {
                 certificateShareStatusMessage = String(localized: "Preparing certificate sharing link...")
                 let session = try await caShareController.startSharing()
+                guard certificateShareGeneration == generation else {
+                    return
+                }
                 presentedShareSession = session
+                presentedShareSessionID = session.id
                 certificateShareStatusMessage =
                     String(localized: "Certificate sharing link started for \(viewModel.selectedTarget.title).")
                 await viewModel.refreshSnapshot()
             } catch {
+                guard certificateShareGeneration == generation else {
+                    return
+                }
                 certificateShareStatusMessage = certificateShareFailureMessage(for: error)
             }
         }
+    }
+
+    private func stopPresentedCertificateSharing(
+        expectedSessionID: RootCADownloadSession.ID? = nil
+    ) {
+        let sessionID = expectedSessionID ?? presentedShareSessionID
+        guard let sessionID else {
+            return
+        }
+        certificateShareGeneration += 1
+        presentedShareSession = nil
+        presentedShareSessionID = nil
+        certificateShareStatusMessage = nil
+        Task {
+            await caShareController.stopSharing(
+                clearSession: true,
+                expectedSessionID: sessionID
+            )
+        }
+    }
+
+    private func stopAllCertificateSharing() {
+        certificateShareGeneration += 1
+        presentedShareSession = nil
+        presentedShareSessionID = nil
+        certificateShareStatusMessage = nil
+        Task { await caShareController.stopSharing(clearSession: true) }
     }
 
     private func copyRootCAShareURL(_ url: URL) {

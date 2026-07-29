@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - DeveloperSetupAutomaticWindowView
@@ -12,103 +13,106 @@ struct DeveloperSetupAutomaticWindowView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
                 header
                 Divider()
                 terminalSection
-                browserSection
+                footer
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-
-            Divider()
-            footer
         }
-        .frame(width: 760, height: 500)
+        .frame(minWidth: 620, minHeight: 440)
         .background(Color(nsColor: .windowBackgroundColor))
+        .font(setupMetrics.font())
         .centerOverRockxyMainWindowOnAppear()
         .task {
+            viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
             viewModel.refresh()
+        }
+        .onChange(of: routeStore.automaticRoute) { _, _ in
+            viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
         }
     }
 
     // MARK: Private
 
     @State private var viewModel: DeveloperSetupSessionSetupViewModel
+    @State private var routeStore = DeveloperSetupRouteStore.shared
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var setupMetrics: DeveloperSetupDisplayMetrics {
         DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var openTerminalTitle: String {
+        viewModel.selectedTerminalApp == .custom
+            ? String(localized: "Copy Setup Command")
+            : String(localized: "Open Prepared Terminal…")
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "gearshape.2.fill")
-                    .font(.system(size: setupMetrics.prominentIconFontSize, weight: .regular))
+                    .font(setupMetrics.font(size: setupMetrics.prominentIconFontSize))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
-                Text(String(localized: "Automatic Setup"))
-                    .font(.system(size: setupMetrics.titleFontSize, weight: .semibold))
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Automatic Setup"))
+                        .font(setupMetrics.font(size: setupMetrics.titleFontSize, weight: .semibold))
+                    Text(viewModel.target.title)
+                        .font(setupMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                benefitRow(
-                    systemImage: "bolt.fill",
-                    text: String(localized: "One click prepares HTTP proxy and certificate hints for a scoped dev session.")
+            if viewModel.isRuntimeTerminalTarget {
+                Text(
+                    String(
+                        localized: "Rockxy prepares a scoped shell for \(viewModel.target.title) pointed at the local proxy."
+                    )
                 )
-                benefitRow(
-                    systemImage: "checkmark.circle.fill",
-                    text: String(localized: "Capture HTTP(s) traffic from Node.js, Python, Ruby, Go, cURL, terminals, and browsers.")
-                )
-                benefitRow(
-                    systemImage: "lock.shield.fill",
-                    text: String(localized: "Safe by default: affects the launched session, not your OS settings.")
-                )
+                .font(setupMetrics.font())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
     private var terminalSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Terminal App"))
-                .font(.system(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
+            Text(String(localized: "\(viewModel.target.title) terminal session"))
+                .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(String(localized: "Open a prepared terminal session that points supported tools at Rockxy."))
-                    .font(.system(size: setupMetrics.bodyFontSize))
-                    .foregroundStyle(.secondary)
-
-                Text(String(localized: "Supports Node.js, Ruby, Python, Go, cURL, and shell workflows that do not follow the system proxy."))
-                    .font(.system(size: setupMetrics.bodyFontSize))
-                    .foregroundStyle(.secondary)
+                Text(
+                    String(
+                        localized: "Open a prepared terminal that points \(viewModel.target.title) at Rockxy before you run your app or script."
+                    )
+                )
+                .font(setupMetrics.font())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
                 Divider()
 
-                HStack(spacing: 12) {
-                    Text(String(localized: "Use"))
-                        .foregroundStyle(.secondary)
-
-                    Picker("", selection: $viewModel.selectedTerminalApp) {
-                        ForEach(SetupTerminalApp.allCases) { terminalApp in
-                            Text(terminalApp.title).tag(terminalApp)
-                        }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        Text(String(localized: "Use"))
+                            .foregroundStyle(.secondary)
+                        terminalPicker
+                        terminalActionButton
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 170)
-
-                    Text(String(localized: "and"))
-                        .foregroundStyle(.secondary)
-
-                    Button(String(localized: "Open Prepared Terminal...")) {
-                        viewModel.openPreparedTerminal()
+                    VStack(alignment: .leading, spacing: 10) {
+                        terminalPicker
+                        terminalActionButton
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
             }
             .padding(14)
@@ -119,83 +123,36 @@ struct DeveloperSetupAutomaticWindowView: View {
         }
     }
 
-    private var browserSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Web Browsers"))
-                .font(.system(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(String(localized: "Open a prepared browser profile with Rockxy proxy and certificate guidance scoped to that profile."))
-                    .font(.system(size: setupMetrics.bodyFontSize))
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 12) {
-                    Picker("", selection: $viewModel.selectedBrowserApp) {
-                        ForEach(SetupBrowserApp.allCases) { browserApp in
-                            Text(browserApp.title)
-                                .tag(browserApp)
-                                .disabled(!browserApp.isEnabled)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 260)
-
-                    Button(String(localized: "Open Browser...")) {
-                        viewModel.openPreparedBrowser()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!viewModel.selectedBrowserApp.isEnabled)
-                }
+    private var terminalPicker: some View {
+        Picker(String(localized: "Terminal app"), selection: $viewModel.selectedTerminalApp) {
+            ForEach(SetupTerminalApp.allCases) { terminalApp in
+                Text(terminalApp.title).tag(terminalApp)
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-            )
         }
+        .pickerStyle(.menu)
+        .accessibilityLabel(String(localized: "Terminal app"))
+    }
+
+    private var terminalActionButton: some View {
+        Button(openTerminalTitle) {
+            Task { await viewModel.openPreparedTerminal() }
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.defaultAction)
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.statusMessage ?? String(localized: "Rockxy will generate a scoped setup script before launching."))
-                    .font(.system(size: setupMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-                Text(String(localized: "Proxy: \(viewModel.proxyEndpointText). \(viewModel.certificateStatusText)"))
-                    .font(.system(size: setupMetrics.metadataFontSize))
-                    .foregroundStyle(.tertiary)
-            }
-
-            Spacer(minLength: 12)
-
-            Button(String(localized: "How does it work?")) {
-                viewModel.copyManualCommand()
-            }
-            .buttonStyle(.bordered)
-
-            Button(String(localized: "Troubleshooting")) {
-                viewModel.copyManualCommand()
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func benefitRow(systemImage: String, text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: setupMetrics.iconFontSize, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color(nsColor: .systemGreen))
-                .frame(width: 18)
-
-            Text(text)
-                .font(.system(size: setupMetrics.bodyFontSize))
-                .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(viewModel
+                .statusMessage ?? String(localized: "Rockxy generates a scoped setup script before launching."))
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(String(localized: "Proxy: \(viewModel.proxyEndpointText). \(viewModel.certificateStatusText)"))
+                .font(setupMetrics.font(size: setupMetrics.metadataFontSize))
+                .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

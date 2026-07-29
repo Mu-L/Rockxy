@@ -11,20 +11,39 @@ final class CAShareController: ObservableObject {
     @Published var currentFingerprint: String?
 
     func startSharing() async throws -> RootCADownloadSession {
+        operationGeneration += 1
+        let generation = operationGeneration
+        await shareServer.stop()
+        guard operationGeneration == generation else {
+            throw CancellationError()
+        }
+
         currentSession = nil
         currentFingerprint = nil
 
         try await CertificateManager.shared.ensureRootCA()
+        guard operationGeneration == generation else {
+            throw CancellationError()
+        }
         guard let pem = try await CertificateManager.shared.getRootCAPEM() else {
             throw RootCADownloadError.noRootCA
         }
+        guard operationGeneration == generation else {
+            throw CancellationError()
+        }
 
         let snapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: false)
+        guard operationGeneration == generation else {
+            throw CancellationError()
+        }
         let fingerprint = try RootCAFingerprintVerifier.verifiedFingerprint(
             certificatePEM: pem,
             expectedFingerprint: snapshot.fingerprintSHA256
         )
         let session = try await shareServer.start(certificatePEM: pem)
+        guard operationGeneration == generation else {
+            throw CancellationError()
+        }
 
         currentFingerprint = fingerprint
         currentSession = session
@@ -46,12 +65,19 @@ final class CAShareController: ObservableObject {
         Self.logger.info("Copied Root CA share URL to the pasteboard.")
     }
 
-    func stopSharing(clearSession: Bool) async {
-        await shareServer.stop()
+    func stopSharing(
+        clearSession: Bool,
+        expectedSessionID: RootCADownloadSession.ID? = nil
+    ) async {
+        if let expectedSessionID, currentSession?.id != expectedSessionID {
+            return
+        }
+        operationGeneration += 1
         if clearSession {
             currentSession = nil
             currentFingerprint = nil
         }
+        await shareServer.stop()
     }
 
     static func userFacingMessage(for error: Error) -> String {
@@ -77,6 +103,7 @@ final class CAShareController: ObservableObject {
     }
 
     private let shareServer = RootCADownloadServer()
+    private var operationGeneration = 0
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "CAShareController"
