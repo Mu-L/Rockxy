@@ -4,46 +4,48 @@ import SwiftUI
 // MARK: - MacCertificateSetupGuideView
 
 struct MacCertificateSetupGuideView: View {
-    @Environment(\.openSettings) private var openSettings
-    @State private var selectedTab = Tab.automatic
-    @State private var snapshot: RootCAStatusSnapshot?
-    @State private var isWorking = false
-    @State private var errorMessage: String?
-    @State private var manualTrustCopyMessage: String?
+    // MARK: Internal
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            modeBar
             Divider()
-            Picker(String(localized: "Setup Mode"), selection: $selectedTab) {
-                ForEach(Tab.allCases) { tab in
-                    Text(tab.title).tag(tab)
+
+            switch selectedTab {
+            case .automatic:
+                ScrollView {
+                    automaticContent
+                        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                        .padding(.top, toolMetrics.headerTopPadding + 10)
+                        .padding(.bottom, toolMetrics.headerTopPadding)
+                }
+            case .manual:
+                ScrollView {
+                    manualContent
+                        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                        .padding(.top, toolMetrics.headerTopPadding + 10)
+                        .padding(.bottom, toolMetrics.headerTopPadding)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 360)
-            .padding(.top, 14)
-
-            Group {
-                switch selectedTab {
-                case .automatic:
-                    automaticTab
-                case .manual:
-                    manualTab
-                }
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 14)
-
-            Spacer(minLength: 10)
-            footer
         }
-        .frame(minWidth: 820, minHeight: 500)
+        .frame(minWidth: 600, minHeight: 460)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .font(toolMetrics.font())
         .task { await refreshStatus(validate: true) }
+        .onChange(of: selectedTab) { _, _ in manualTrustCopyMessage = nil }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard activeOperation == nil else {
+                return
+            }
+            Task { await refreshStatus(validate: true) }
+        }
         .alert(String(localized: "Certificate Setup Failed"), isPresented: Binding(
             get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
+            set: {
+                if !$0 {
+                    errorMessage = nil
+                }
+            }
         )) {
             Button(String(localized: "OK"), role: .cancel) {}
         } message: {
@@ -51,223 +53,148 @@ struct MacCertificateSetupGuideView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "laptopcomputer")
-                .font(.system(size: 32, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-            Text(String(localized: "Mac Setup Guide"))
-                .font(.system(size: 28, weight: .regular))
-            Spacer()
+    // MARK: Private
+
+    private enum Tab: CaseIterable, Identifiable {
+        case automatic
+        case manual
+
+        // MARK: Internal
+
+        var id: Self {
+            self
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 16)
-    }
 
-    private var automaticTab: some View {
-        VStack(spacing: 14) {
-            statusCard
-
-            HStack(spacing: 12) {
-                Button {
-                    Task { await installAndTrust() }
-                } label: {
-                    Label(String(localized: "Install and Trust"), systemImage: "checkmark.shield")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isWorking || CertificateSetupState(snapshot: snapshot ?? .empty).isReady)
-
-                Button {
-                    Task { await refreshStatus(validate: true) }
-                } label: {
-                    Label(String(localized: "Recheck"), systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isWorking)
+        var title: String {
+            switch self {
+            case .automatic:
+                String(localized: "Automatic")
+            case .manual:
+                String(localized: "Manual")
             }
         }
     }
 
-    private var statusCard: some View {
-        let state = CertificateSetupState(snapshot: snapshot ?? .empty)
-        return VStack(spacing: 10) {
-            Image(systemName: state.systemImageName)
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(state.isReady ? .green : .orange)
-                .symbolRenderingMode(.hierarchical)
+    private enum Operation {
+        case generating
+        case installing
+        case checking
 
-            Text(String(localized: "Install and Trust Rockxy CA Certificate in Keychain Access"))
-                .font(.title3.weight(.semibold))
+        // MARK: Internal
 
-            Text(state.message)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            VStack(spacing: 6) {
-                Text(state.title)
-                    .font(.headline)
-                if let fingerprint = snapshot?.fingerprintSHA256 {
-                    Text(fingerprint)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+        var statusMessage: String {
+            switch self {
+            case .generating:
+                String(localized: "Generating the Rockxy certificate…")
+            case .installing:
+                String(localized: "Installing and trusting the certificate…")
+            case .checking:
+                String(localized: "Checking certificate trust…")
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(22)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(.separator, lineWidth: 1)
         }
     }
 
-    private var manualTab: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            guideSection(
-                number: 1,
-                title: String(localized: "Generate and Add Rockxy CA Certificate to System Keychain"),
-                symbol: "checkmark.shield.fill",
-                lines: [
-                    String(localized: "Choose System or login keychain in Keychain Access."),
-                    String(localized: "Use Install and Trust to generate the CA, or export the PEM file and drag it into Keychain Access.")
-                ]
+    @Environment(\.openSettings) private var openSettings
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @State private var selectedTab = Tab.automatic
+    @State private var snapshot: RootCAStatusSnapshot?
+    @State private var hasLoadedSnapshot = false
+    @State private var activeOperation: Operation?
+    @State private var errorMessage: String?
+    @State private var manualTrustCopyMessage: String?
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var currentState: CertificateSetupState {
+        CertificateSetupState(snapshot: snapshot ?? .empty)
+    }
+
+    private var primaryActionTitle: String {
+        switch currentState {
+        case .missing:
+            String(localized: "Generate, Install & Trust")
+        case .generatedOnly:
+            String(localized: "Install & Trust")
+        case .installedNotTrusted:
+            String(localized: "Repair Trust")
+        case .installedAndTrusted:
+            String(localized: "Installed & Trusted")
+        }
+    }
+
+    private var primaryActionIcon: String {
+        currentState.isReady ? "checkmark.shield.fill" : "checkmark.shield"
+    }
+
+    private var systemValidationText: String {
+        guard let snapshot, snapshot.hasTrustSettings else {
+            return String(localized: "Not Checked")
+        }
+        return snapshot.isSystemTrustValidated
+            ? String(localized: "Passed")
+            : String(localized: "Failed")
+    }
+
+    private var systemValidationColor: Color {
+        guard let snapshot, snapshot.hasTrustSettings else {
+            return .secondary
+        }
+        return snapshot.isSystemTrustValidated ? .green : .red
+    }
+
+    private var expiryColor: Color {
+        guard let expiryDate = snapshot?.notValidAfter else {
+            return .primary
+        }
+        if expiryDate < Date() {
+            return .red
+        }
+        return expiryDate.timeIntervalSinceNow < 30 * 24 * 3_600 ? .orange : .primary
+    }
+
+    private var expiryWarningMessage: String? {
+        guard let expiryDate = snapshot?.notValidAfter else {
+            return nil
+        }
+        if expiryDate < Date() {
+            return String(
+                localized: "This certificate has expired. Generate and trust a new certificate to restore HTTPS interception."
             )
-
-            guideSection(
-                number: 2,
-                title: String(localized: "Trust the Rockxy CA Certificate"),
-                symbol: "key.fill",
-                lines: [
-                    String(localized: "Open Keychain Access and search for Rockxy CA."),
-                    String(localized: "Open the certificate, expand Trust, set Secure Sockets Layer to Always Trust, then close and save.")
-                ]
-            )
-
-            terminalAlternativeSection
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(.separator, lineWidth: 1)
+        let daysRemaining = Int(expiryDate.timeIntervalSinceNow / (24 * 3_600))
+        guard daysRemaining < 30 else {
+            return nil
         }
+        return String(
+            localized: "This certificate expires in \(daysRemaining) days. Replace it soon to avoid interrupting HTTPS interception."
+        )
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Button {
-                CertificateExportPanelPresenter().export(format: .rootCertificatePEM)
-            } label: {
-                Label(String(localized: "Export PEM"), systemImage: "square.and.arrow.up")
-            }
-            .buttonStyle(.bordered)
-
-            Spacer()
-
-            if let snapshot {
-                let state = CertificateSetupState(snapshot: snapshot)
-                Label(state.message, systemImage: state.systemImageName)
-                    .font(.callout)
-                    .foregroundStyle(state.isReady ? .green : .secondary)
-                    .lineLimit(1)
-
-                if state.isReady {
-                    Button(String(localized: "Manage Certificates")) {
-                        openGeneralSettings()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            }
-
-            if let helpURL = URL(string: "https://github.com/RockxyApp/Rockxy/wiki") {
-                HelpLink(destination: helpURL)
-            }
+    private var truncatedFingerprint: String {
+        guard let fingerprint = snapshot?.fingerprintSHA256 else {
+            return "—"
         }
-        .padding(.horizontal, 28)
-        .padding(.bottom, 16)
+        guard fingerprint.count > 28 else {
+            return fingerprint
+        }
+        return String(fingerprint.prefix(28)) + "…"
     }
 
-    private var terminalAlternativeSection: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "terminal")
-                .font(.system(size: 22, weight: .medium))
-                .frame(width: 28)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(String(localized: "3. Terminal Alternative"))
-                    .font(.headline)
-                Text(String(localized: "Open your favorite Terminal app."))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Text(String(localized: "Copy and paste this command:"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                commandSnippetBox(manualTrustCommand)
-                Text(
-                    String(
-                        localized: "Automatically trusts the Rockxy CA in your System keychain. Administrator approval is required."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Button(String(localized: "Copy")) {
-                        copyManualTrustCommand()
-                    }
-                    .buttonStyle(.bordered)
-
-                    if let manualTrustCopyMessage {
-                        Text(manualTrustCopyMessage)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
+    private var statusIconSize: CGFloat {
+        max(26, toolMetrics.bodyFontSize + 14)
     }
 
-    private func commandSnippetBox(_ command: String) -> some View {
-        ScrollView(.horizontal) {
-            Text(command)
-                .font(.system(size: 12, design: .monospaced))
-                .textSelection(.enabled)
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(height: 58)
-        .frame(maxWidth: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    private var stepIconSize: CGFloat {
+        max(18, toolMetrics.bodyFontSize + 5)
     }
 
-    private func guideSection(number: Int, title: String, symbol: String, lines: [String]) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 22, weight: .medium))
-                .frame(width: 28)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("\(number). \(title)")
-                    .font(.headline)
-                ForEach(lines, id: \.self) { line in
-                    Text(line)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
+    private var commandBoxHeight: CGFloat {
+        max(56, toolMetrics.bodyFontSize + 40)
     }
+
+    // MARK: Behavior
 
     private var manualTrustCommand: String {
         [
@@ -277,6 +204,600 @@ struct MacCertificateSetupGuideView: View {
             "-k /Library/Keychains/System.keychain",
             shellQuoted(CertificateStore.rootCACertificateURL.path)
         ].joined(separator: " ")
+    }
+
+    private var stepContentInset: CGFloat {
+        stepIconSize + toolMetrics.controlSpacing + 2
+    }
+
+    // MARK: Mode
+
+    private var modeBar: some View {
+        ZStack {
+            modePicker
+
+            HStack {
+                Spacer()
+                if let helpURL = URL(string: "https://github.com/RockxyApp/Rockxy/wiki") {
+                    HelpLink(destination: helpURL)
+                }
+            }
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerTopPadding)
+    }
+
+    private var modePicker: some View {
+        ViewThatFits(in: .horizontal) {
+            modePickerBase
+                .pickerStyle(.segmented)
+                .frame(width: 320)
+            modePickerBase
+                .pickerStyle(.menu)
+                .fixedSize()
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityLabel(String(localized: "Setup Mode"))
+    }
+
+    private var modePickerBase: some View {
+        Picker(String(localized: "Setup Mode"), selection: $selectedTab) {
+            ForEach(Tab.allCases) { tab in
+                Text(tab.title).tag(tab)
+            }
+        }
+        .labelsHidden()
+    }
+
+    // MARK: Readiness
+
+    @ViewBuilder private var readinessSection: some View {
+        if hasLoadedSnapshot {
+            let state = currentState
+            HStack(alignment: .top, spacing: toolMetrics.controlSpacing + 4) {
+                Image(systemName: state.systemImageName)
+                    .font(.system(size: statusIconSize, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(state.isReady ? Color.green : Color.orange)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(state.title)
+                        .font(toolMetrics.font(weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(state.message)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(alignment: .top, spacing: toolMetrics.controlSpacing + 4) {
+                ProgressView()
+                    .controlSize(.regular)
+                    .frame(width: statusIconSize, height: statusIconSize)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Checking Certificate"))
+                        .font(toolMetrics.font(weight: .semibold))
+                    Text(String(localized: "Reading the certificate, Keychain, and macOS trust state."))
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: Automatic
+
+    private var automaticContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 14) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 28) {
+                            readinessSection
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            diagnosticsGrid
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+
+                        VStack(alignment: .leading, spacing: 14) {
+                            readinessSection
+                            diagnosticsGrid
+                        }
+                    }
+
+                    validationCallout
+
+                    if let activeOperation {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(activeOperation.statusMessage)
+                                .font(toolMetrics.secondaryFont())
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    Divider()
+                    automaticActionRow
+                }
+                .padding(6)
+            } label: {
+                Label(String(localized: "Certificate Readiness"), systemImage: "checkmark.shield")
+                    .font(toolMetrics.font(weight: .semibold))
+            }
+
+            if snapshot?.hasGeneratedCertificate == true {
+                GroupBox {
+                    certificateDetails
+                        .padding(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } label: {
+                    Label(String(localized: "Certificate Details"), systemImage: "info.circle")
+                        .font(toolMetrics.font(weight: .semibold))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: 680)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var automaticActionRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                automaticPrimaryActions
+                Spacer(minLength: toolMetrics.controlSpacing)
+                certificateUtilityActions
+            }
+
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    automaticPrimaryActions
+                }
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    certificateUtilityActions
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var automaticPrimaryActions: some View {
+        Button {
+            Task { await installAndTrust() }
+        } label: {
+            Label(primaryActionTitle, systemImage: primaryActionIcon)
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.defaultAction)
+        .disabled(activeOperation != nil || currentState.isReady || !hasLoadedSnapshot)
+
+        Button {
+            Task { await recheckStatus() }
+        } label: {
+            Label(String(localized: "Recheck"), systemImage: "arrow.clockwise")
+        }
+        .disabled(activeOperation != nil)
+    }
+
+    @ViewBuilder private var certificateUtilityActions: some View {
+        if snapshot?.hasGeneratedCertificate == true {
+            exportPEMButton
+            manageCertificatesButton
+        }
+    }
+
+    private var diagnosticsGrid: some View {
+        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+            diagnosticRow(
+                label: String(localized: "Certificate"),
+                value: snapshot?.hasGeneratedCertificate == true
+                    ? String(localized: "Generated")
+                    : String(localized: "Not Generated"),
+                isComplete: snapshot?.hasGeneratedCertificate == true
+            )
+            diagnosticRow(
+                label: String(localized: "Keychain"),
+                value: snapshot?.isInstalledInKeychain == true
+                    ? String(localized: "Installed")
+                    : String(localized: "Not Installed"),
+                isComplete: snapshot?.isInstalledInKeychain == true
+            )
+            diagnosticRow(
+                label: String(localized: "Trust Settings"),
+                value: snapshot?.hasTrustSettings == true
+                    ? String(localized: "Present")
+                    : String(localized: "Missing"),
+                isComplete: snapshot?.hasTrustSettings == true
+            )
+            diagnosticRow(
+                label: String(localized: "TLS Validation"),
+                value: systemValidationText,
+                isComplete: snapshot?.isSystemTrustValidated == true,
+                color: systemValidationColor
+            )
+        }
+        .opacity(hasLoadedSnapshot ? 1 : 0.45)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var validationCallout: some View {
+        if let snapshot,
+           snapshot.hasTrustSettings,
+           !snapshot.isSystemTrustValidated
+        {
+            let message = snapshot.lastValidationErrorMessage
+                ?? String(
+                    localized: "Trust settings exist, but macOS TLS validation still fails. Repair trust, then recheck the certificate."
+                )
+            callout(
+                message: message,
+                systemImage: "exclamationmark.triangle.fill",
+                color: .red
+            )
+        }
+    }
+
+    private var certificateDetails: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+                detailRow(
+                    label: String(localized: "Common Name"),
+                    value: snapshot?.commonName ?? "—"
+                )
+                detailRow(
+                    label: String(localized: "Valid From"),
+                    value: snapshot?.notValidBefore?.formatted(date: .abbreviated, time: .omitted) ?? "—"
+                )
+                detailRow(
+                    label: String(localized: "Valid Until"),
+                    value: snapshot?.notValidAfter?.formatted(date: .abbreviated, time: .omitted) ?? "—",
+                    color: expiryColor
+                )
+                detailRow(
+                    label: String(localized: "SHA-256"),
+                    value: truncatedFingerprint,
+                    monospaced: true,
+                    accessibilityValue: snapshot?.fingerprintSHA256
+                )
+            }
+
+            if let expiryWarningMessage {
+                callout(
+                    message: expiryWarningMessage,
+                    systemImage: "clock.badge.exclamationmark",
+                    color: expiryColor
+                )
+            }
+        }
+    }
+
+    // MARK: Manual
+
+    private var manualContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    readinessSection
+
+                    if let activeOperation {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(activeOperation.statusMessage)
+                                .font(toolMetrics.secondaryFont())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Divider()
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: toolMetrics.controlSpacing) {
+                            recheckButton
+                            if snapshot?.hasGeneratedCertificate == true {
+                                manageCertificatesButton
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                            recheckButton
+                            if snapshot?.hasGeneratedCertificate == true {
+                                manageCertificatesButton
+                            }
+                        }
+                    }
+                }
+                .padding(6)
+            } label: {
+                Label(String(localized: "Current Status"), systemImage: "gauge.with.dots.needle.67percent")
+                    .font(toolMetrics.font(weight: .semibold))
+            }
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 14) {
+                    manualStep(
+                        number: 1,
+                        isComplete: snapshot?.isInstalledInKeychain == true,
+                        title: String(localized: "Add the Rockxy CA to the System keychain"),
+                        lines: [
+                            String(localized: "Generate the certificate if needed, then export it as a PEM file."),
+                            String(
+                                localized: "Open Keychain Access, choose System under System Keychains, and drag the PEM into the certificate list."
+                            )
+                        ]
+                    )
+
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: toolMetrics.controlSpacing) {
+                            manualCertificateActions
+                        }
+                        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                            manualCertificateActions
+                        }
+                    }
+                    .padding(.leading, stepContentInset)
+
+                    Divider()
+
+                    manualStep(
+                        number: 2,
+                        isComplete: snapshot?.isSystemTrustValidated == true,
+                        title: String(localized: "Trust the certificate"),
+                        lines: [
+                            String(
+                                localized: "Search for Rockxy CA, open the certificate, and expand Trust."
+                            ),
+                            String(
+                                localized: "Set When using this certificate to Always Trust, then close the window and approve the change."
+                            )
+                        ]
+                    )
+
+                    openKeychainButton
+                        .padding(.leading, stepContentInset)
+
+                    if let snapshot,
+                       snapshot.hasTrustSettings,
+                       !snapshot.isSystemTrustValidated
+                    {
+                        callout(
+                            message: snapshot.lastValidationErrorMessage
+                                ?? String(
+                                    localized: "macOS still rejects the certificate. Confirm the trust setting, then recheck."
+                                ),
+                            systemImage: "exclamationmark.triangle.fill",
+                            color: .red
+                        )
+                        .padding(.leading, stepContentInset)
+                    }
+                }
+                .padding(6)
+            } label: {
+                Label(String(localized: "Keychain Access"), systemImage: "key")
+                    .font(toolMetrics.font(weight: .semibold))
+            }
+
+            GroupBox {
+                terminalAlternative
+                    .padding(6)
+            } label: {
+                Label(String(localized: "Terminal"), systemImage: "terminal")
+                    .font(toolMetrics.font(weight: .semibold))
+            }
+        }
+        .frame(maxWidth: 680)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder private var manualCertificateActions: some View {
+        if snapshot?.hasGeneratedCertificate != true {
+            Button {
+                Task { await generateCertificate() }
+            } label: {
+                Label(String(localized: "Generate Certificate"), systemImage: "plus.circle")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(activeOperation != nil || !hasLoadedSnapshot)
+        }
+
+        exportPEMButton
+    }
+
+    private var recheckButton: some View {
+        Button {
+            Task { await recheckStatus() }
+        } label: {
+            Label(String(localized: "Recheck"), systemImage: "arrow.clockwise")
+        }
+        .disabled(activeOperation != nil || !hasLoadedSnapshot)
+    }
+
+    private var openKeychainButton: some View {
+        Button {
+            openKeychainAccess()
+        } label: {
+            Label(String(localized: "Open Keychain Access"), systemImage: "arrow.up.forward.app")
+        }
+    }
+
+    private var terminalAlternative: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: "Trust with Terminal"))
+                .font(toolMetrics.font(weight: .semibold))
+            Text(
+                String(
+                    localized: "Use this command if you prefer Terminal or Keychain Access cannot complete the trust change."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            commandBox(manualTrustCommand)
+
+            Text(
+                String(
+                    localized: "Automatically trusts the Rockxy CA in your System keychain. Administrator approval is required."
+                )
+            )
+            .font(toolMetrics.metadataFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: toolMetrics.controlSpacing) {
+                Button(String(localized: "Copy")) {
+                    copyManualTrustCommand()
+                }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(snapshot?.hasGeneratedCertificate != true)
+
+                if let manualTrustCopyMessage {
+                    Text(manualTrustCopyMessage)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Shared actions
+
+    private var exportPEMButton: some View {
+        Button {
+            CertificateExportPanelPresenter().export(format: .rootCertificatePEM)
+        } label: {
+            Label(String(localized: "Export PEM"), systemImage: "square.and.arrow.up")
+        }
+        .disabled(activeOperation != nil || snapshot?.hasGeneratedCertificate != true)
+        .help(String(localized: "Save the public Rockxy root CA as a PEM file"))
+    }
+
+    private var manageCertificatesButton: some View {
+        Button(String(localized: "Manage Certificates")) {
+            openGeneralSettings()
+        }
+        .help(String(localized: "Open certificate management in General settings"))
+    }
+
+    private func diagnosticRow(
+        label: String,
+        value: String,
+        isComplete: Bool,
+        color: Color? = nil
+    )
+        -> some View
+    {
+        GridRow {
+            Text(label)
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.trailing)
+
+            HStack(spacing: 5) {
+                Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isComplete ? Color.green : Color.secondary)
+                    .accessibilityHidden(true)
+                Text(value)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(color ?? (isComplete ? Color.primary : Color.secondary))
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func detailRow(
+        label: String,
+        value: String,
+        monospaced: Bool = false,
+        color: Color = .primary,
+        accessibilityValue: String? = nil
+    )
+        -> some View
+    {
+        GridRow {
+            Text(label)
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.trailing)
+            Text(value)
+                .font(toolMetrics.secondaryFont(monospaced: monospaced))
+                .foregroundStyle(color)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityValue(accessibilityValue ?? value)
+        }
+    }
+
+    private func callout(message: String, systemImage: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(color)
+                .font(toolMetrics.metadataFont())
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(color)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func manualStep(number: Int, isComplete: Bool, title: String, lines: [String]) -> some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing + 2) {
+            stepBadge(number, isComplete: isComplete)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(toolMetrics.font(weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func stepBadge(_ number: Int, isComplete: Bool) -> some View {
+        Image(systemName: isComplete ? "checkmark.circle.fill" : "\(number).circle.fill")
+            .font(.system(size: stepIconSize))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(isComplete ? Color.green : Color.secondary)
+            .accessibilityHidden(true)
+    }
+
+    private func commandBox(_ command: String) -> some View {
+        ScrollView(.horizontal) {
+            Text(command)
+                .font(toolMetrics.font(monospaced: true))
+                .textSelection(.enabled)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: commandBoxHeight)
+        .frame(maxWidth: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .accessibilityLabel(String(localized: "Manual trust command"))
+        .accessibilityValue(command)
     }
 
     private func shellQuoted(_ value: String) -> String {
@@ -297,9 +818,31 @@ struct MacCertificateSetupGuideView: View {
         openSettings()
     }
 
+    private func openKeychainAccess() {
+        guard let url = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: "com.apple.keychainaccess"
+        ),
+            NSWorkspace.shared.open(url) else
+        {
+            errorMessage = String(localized: "Keychain Access is unavailable.")
+            return
+        }
+    }
+
+    private func generateCertificate() async {
+        activeOperation = .generating
+        defer { activeOperation = nil }
+        do {
+            try await CertificateManager.shared.ensureRootCA()
+            await refreshStatus(validate: false)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func installAndTrust() async {
-        isWorking = true
-        defer { isWorking = false }
+        activeOperation = .installing
+        defer { activeOperation = nil }
         do {
             try await CertificateManager.shared.installAndTrust()
             await refreshStatus(validate: true)
@@ -308,24 +851,15 @@ struct MacCertificateSetupGuideView: View {
         }
     }
 
-    private func refreshStatus(validate: Bool) async {
-        snapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: validate)
+    private func recheckStatus() async {
+        activeOperation = .checking
+        defer { activeOperation = nil }
+        await refreshStatus(validate: true)
     }
 
-    private enum Tab: CaseIterable, Identifiable {
-        case automatic
-        case manual
-
-        var id: Self { self }
-
-        var title: String {
-            switch self {
-            case .automatic:
-                String(localized: "Automatic")
-            case .manual:
-                String(localized: "Manual")
-            }
-        }
+    private func refreshStatus(validate: Bool) async {
+        snapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: validate)
+        hasLoadedSnapshot = true
     }
 }
 

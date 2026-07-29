@@ -94,15 +94,7 @@ struct RockxyApp: App {
 
         developerSetupWindow
 
-        Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
-            ToolWindowDisplayMetricsProvider {
-                MacCertificateSetupGuideView()
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 860, height: 540)
-        .defaultPosition(.center)
-        .windowToolbarStyle(.unifiedCompact)
+        macCertificateSetupGuideWindow
 
         Window(String(localized: "Custom Certificates"), id: "customCertificates") {
             ToolWindowDisplayMetricsProvider {
@@ -390,8 +382,45 @@ struct RockxyApp: App {
         DeveloperSetupWindowScene(coordinator: mainCoordinator)
     }
 
+    private var macCertificateSetupGuideWindow: some Scene {
+        MacCertificateSetupGuideWindowScene()
+    }
+
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+}
+
+// MARK: - MacCertificateSetupGuideWindowScene
+
+/// Certificate setup is a focused utility, so it opens at a predictable size
+/// instead of inheriting geometry from a previous app session.
+private struct MacCertificateSetupGuideWindowScene: Scene {
+    // MARK: Internal
+
+    var body: some Scene {
+        macCertificateSetupGuideWindow
+    }
+
+    // MARK: Private
+
+    private var macCertificateSetupGuideWindow: some Scene {
+        let base = Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
+            ToolWindowDisplayMetricsProvider {
+                MacCertificateSetupGuideView()
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 720, height: 500)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
