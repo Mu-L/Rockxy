@@ -4,8 +4,8 @@ import SwiftUI
 /// Privacy settings showing honest disclosure about data storage, exports, and telemetry.
 struct PrivacySettingsTab: View {
     var body: some View {
-        Form {
-            Section {
+        SettingsPane {
+            SettingsSectionCard(String(localized: "Data Storage")) {
                 VStack(alignment: .leading, spacing: 12) {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -49,11 +49,9 @@ struct PrivacySettingsTab: View {
                         Image(systemName: "folder")
                     }
                 }
-            } header: {
-                Text(String(localized: "Data Storage"))
             }
 
-            Section {
+            SettingsSectionCard(String(localized: "Exports & Sharing")) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(localized: "Exports Contain Full Traffic Data"))
@@ -74,11 +72,9 @@ struct PrivacySettingsTab: View {
                 } icon: {
                     Image(systemName: "square.and.arrow.up")
                 }
-            } header: {
-                Text(String(localized: "Exports & Sharing"))
             }
 
-            Section {
+            SettingsSectionCard(String(localized: "Analytics & Telemetry")) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -106,18 +102,18 @@ struct PrivacySettingsTab: View {
                 } icon: {
                     Image(systemName: "lock.shield")
                 }
-            } header: {
-                Text(String(localized: "Analytics & Telemetry"))
             }
 
-            Button(String(localized: "Privacy Policy")) {
-                if let url = URL(string: "https://www.rockxy.io/privacy") {
-                    NSWorkspace.shared.open(url)
+            HStack {
+                Spacer()
+                Button(String(localized: "Privacy Policy")) {
+                    if let url = URL(string: "https://www.rockxy.io/privacy") {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
+                .buttonStyle(.link)
             }
-            .buttonStyle(.link)
         }
-        .formStyle(.grouped)
         .font(settingsMetrics.font())
     }
 

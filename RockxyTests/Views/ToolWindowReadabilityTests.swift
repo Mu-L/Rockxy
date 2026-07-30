@@ -72,13 +72,20 @@ struct ToolWindowReadabilityTests {
     @Test("Settings display metrics derive from Appearance font size")
     func settingsDisplayMetricsDeriveFromAppearanceFontSize() {
         // swiftlint:disable large_tuple
-        let cases: [(fontSize: Int, width: CGFloat, height: CGFloat, labelWidth: CGFloat, controlHeight: CGFloat)] = [
-            (10, 820, 600, 160, 24),
-            (12, 820, 600, 160, 24),
-            (13, 820, 600, 160, 25),
-            (14, 820, 600, 160, 26),
-            (20, 820, 600, 160, 32),
-            (28, 820, 600, 160, 40),
+        let cases: [(
+            fontSize: Int,
+            sidebarMin: CGFloat,
+            minWidth: CGFloat,
+            minHeight: CGFloat,
+            labelWidth: CGFloat,
+            controlHeight: CGFloat
+        )] = [
+            (10, 196, 896, 500, 160, 24),
+            (12, 196, 896, 500, 160, 24),
+            (13, 196, 896, 500, 160, 25),
+            (14, 202, 902, 500, 168, 26),
+            (20, 238, 970, 502, 216, 32),
+            (28, 286, 1_082, 550, 280, 40),
         ]
         // swiftlint:enable large_tuple
 
@@ -90,9 +97,21 @@ struct ToolWindowReadabilityTests {
             #expect(metrics.bodyFontSize == CGFloat(item.fontSize))
             #expect(metrics.secondaryFontSize == max(10, CGFloat(item.fontSize - 1)))
             #expect(metrics.metadataFontSize == max(10, CGFloat(item.fontSize - 2)))
-            #expect(metrics.windowWidth == item.width)
-            #expect(metrics.windowHeight == item.height)
+
+            // Adaptive, bounded window geometry replaces the pinned 820x600 shell.
+            #expect(metrics.sidebarMinWidth == item.sidebarMin)
+            #expect(metrics.sidebarIdealWidth == item.sidebarMin)
+            #expect(metrics.sidebarMaxWidth == item.sidebarMin + 96)
+            #expect(metrics.contentMinWidth == item.minWidth - item.sidebarMin)
+            #expect(metrics.windowMinWidth == item.minWidth)
+            #expect(metrics.windowIdealWidth == item.minWidth + 132)
+            #expect(metrics.windowMinHeight == item.minHeight)
+            #expect(metrics.windowIdealHeight == item.minHeight + 96)
+
+            // Field labels/indents adapt with font size (identical at the 13pt default).
             #expect(metrics.labelWidth == item.labelWidth)
+            #expect(metrics.wideLabelWidth == item.labelWidth + 22)
+            #expect(metrics.rowLeading == item.labelWidth + 16)
             #expect(metrics.controlHeight == item.controlHeight)
             #expect(metrics.fieldWidth(200) >= 200)
             #expect(metrics.menuWidth(120) >= 120)
@@ -217,8 +236,12 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains("Button(String(localized: \"Fetch Models\"))"))
         #expect(!source.contains("LazyVGrid("))
         #expect(components.contains("SettingsDisplayMetrics"))
-        #expect(components.contains("controlBackgroundColor"))
-        #expect(components.contains("separatorColor).opacity(0.62)"))
+        // SettingsSectionCard is a restrained native GroupBox, and field rows/indents
+        // adapt with the Appearance font size instead of a fixed inset card.
+        #expect(components.contains("GroupBox"))
+        #expect(components.contains("settingsMetrics.labelWidth"))
+        #expect(components.contains("settingsMetrics.rowLeading"))
+        #expect(!components.contains("separatorColor).opacity(0.62)"))
     }
 
     @Test("Ollama setup uses a compact native installation sheet")
@@ -693,15 +716,6 @@ struct ToolWindowReadabilityTests {
         #expect(policyNoticeSource.contains("struct PolicyLockNotice"))
         #expect(!externalSource.contains("struct PolicyLockNotice"))
         #expect(storeSource.contains("configuration draftConfiguration"))
-    }
-
-    @Test("Settings shell keeps fixed dimensions while font size changes")
-    func settingsShellKeepsFixedDimensionsWhileFontSizeChanges() throws {
-        let source = try readProjectFile("Rockxy/Views/Settings/SettingsView.swift")
-
-        #expect(source.contains(".frame(width: settingsMetrics.windowWidth, height: settingsMetrics.windowHeight)"))
-        #expect(!source.contains(".frame(minWidth: settingsMetrics.windowWidth"))
-        #expect(!source.contains(".frame(minHeight: settingsMetrics.windowHeight"))
     }
 
     @Test("Tool window forms avoid fixed compact typography")

@@ -11,36 +11,21 @@ struct GeneralSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text(String(localized: "Proxy"))
-                    .font(settingsMetrics.font(weight: .medium))
+        SettingsPane {
+            SettingsSectionCard(String(localized: "Proxy")) {
+                generalControlsSection
+            }
 
-                sectionCard {
-                    generalControlsSection
-                }
+            SettingsSectionCard(String(localized: "Root CA Certificate")) {
+                certificateSection
 
-                Text(String(localized: "Root CA Certificate"))
-                    .font(settingsMetrics.font(weight: .medium))
-
-                sectionCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        certificateSection
-
-                        if case let .success(message) = certificateStatus {
-                            certificateFeedbackRow(message: message, color: .green)
-                        } else if case let .error(message) = certificateStatus {
-                            certificateFeedbackRow(message: message, color: .red)
-                        }
-                    }
+                if case let .success(message) = certificateStatus {
+                    certificateFeedbackRow(message: message, color: .green)
+                } else if case let .error(message) = certificateStatus {
+                    certificateFeedbackRow(message: message, color: .red)
                 }
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 20)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: proxyPort) { _, newValue in
             AppSettingsManager.shared.updateProxyPort(newValue)
         }
@@ -111,27 +96,6 @@ struct GeneralSettingsTab: View {
         SettingsDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private func sectionCard<Content: View>(
-        @ViewBuilder content: () -> Content
-    )
-        -> some View
-    {
-        VStack(alignment: .leading, spacing: 12) {
-            content()
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(nsColor: .controlBackgroundColor).opacity(0.82),
-            in: RoundedRectangle(cornerRadius: 8)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.5)
-        }
-    }
-
     private var certificateSection: some View {
         CertificateStatusPanel(
             snapshot: certSnapshot,
@@ -142,7 +106,7 @@ struct GeneralSettingsTab: View {
 
     private var generalControlsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            settingsRow(label: String(localized: "Port Number:")) {
+            SettingsFieldRow(String(localized: "Port Number:")) {
                 TextField("", value: $proxyPort, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .font(settingsMetrics.font(monospaced: true))
@@ -150,58 +114,29 @@ struct GeneralSettingsTab: View {
                     .frame(minHeight: settingsMetrics.controlHeight)
             }
 
-            checkboxRow(
-                isOn: $recordOnLaunch,
-                title: String(localized: "Auto Start Recording Traffic at Launch"),
-                description: String(
-                    localized: "Start capturing network traffic as soon as the app launches."
-                )
-            )
+            SettingsIndentedContent {
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle(
+                        String(localized: "Auto Start Recording Traffic at Launch"),
+                        isOn: $recordOnLaunch
+                    )
+                    .toggleStyle(.checkbox)
+                    Text(
+                        String(localized: "Start capturing network traffic as soon as the app launches.")
+                    )
+                    .font(settingsMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
-            HStack {
-                Color.clear.frame(width: settingsMetrics.rowLeading)
+            SettingsIndentedContent {
                 Button(String(localized: "Advanced Proxy Setting…")) {
                     openWindow(id: "advancedProxySettings")
                 }
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func settingsRow(
-        label: String,
-        @ViewBuilder content: () -> some View
-    )
-        -> some View
-    {
-        HStack(alignment: .top, spacing: 0) {
-            Text(label)
-                .font(settingsMetrics.font(weight: .medium))
-                .frame(width: settingsMetrics.labelWidth, alignment: .trailing)
-                .padding(.trailing, 16)
-                .padding(.top, 2)
-            content()
-        }
-    }
-
-    private func checkboxRow(
-        isOn: Binding<Bool>,
-        title: String,
-        description: String
-    )
-        -> some View
-    {
-        HStack(alignment: .top, spacing: 0) {
-            Color.clear.frame(width: settingsMetrics.rowLeading)
-            VStack(alignment: .leading, spacing: 4) {
-                Toggle(title, isOn: isOn)
-                    .toggleStyle(.checkbox)
-                Text(description)
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
     }
 
     private func certificateFeedbackRow(message: String, color: Color) -> some View {

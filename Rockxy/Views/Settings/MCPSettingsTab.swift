@@ -10,19 +10,22 @@ struct MCPSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        SettingsPane {
+            SettingsSectionCard(String(localized: "MCP Server")) {
                 mcpServerSection
-                mcpConfigurationSection
-                sectionDivider
-                privacySection
-                sectionDivider
-                aboutSection
-                Spacer()
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 24)
-            .padding(.bottom, 24)
+
+            SettingsSectionCard(String(localized: "Client Configuration")) {
+                mcpConfigurationSection
+            }
+
+            SettingsSectionCard(String(localized: "Privacy")) {
+                privacySection
+            }
+
+            SettingsSectionCard(String(localized: "About MCP")) {
+                aboutSection
+            }
         }
         .onChange(of: mcpEnabled) { _, newValue in
             AppSettingsManager.shared.updateMCPServerEnabled(newValue)
@@ -90,17 +93,10 @@ struct MCPSettingsTab: View {
             .path
     }
 
-    private var sectionDivider: some View {
-        Divider().padding(.horizontal, 0)
-    }
-
     // MARK: - MCP Server Section
 
     private var mcpServerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "MCP Server"))
-                .font(settingsMetrics.font(weight: .bold))
-
             Toggle(
                 String(localized: "Enable MCP Server"),
                 isOn: $mcpEnabled
@@ -148,9 +144,10 @@ struct MCPSettingsTab: View {
     private var mcpConfigurationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(String(localized: "MCP Configuration"))
-                    .font(settingsMetrics.secondaryFont(weight: .medium))
+                Text(String(localized: "Copy this JSON into a compatible client's MCP configuration."))
+                    .font(settingsMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button {
                     copyConfigToClipboard()
@@ -164,28 +161,21 @@ struct MCPSettingsTab: View {
                 }
             }
 
-            Text(configJSON)
-                .font(settingsMetrics.secondaryFont(monospaced: true))
-                .lineSpacing(4)
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                )
-
-            Text(
-                String(
-                    localized: "Add this to your MCP-compatible tool configuration file."
-                )
-            )
-            .font(settingsMetrics.secondaryFont())
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.horizontal) {
+                Text(configJSON)
+                    .font(settingsMetrics.secondaryFont(monospaced: true))
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .textSelection(.enabled)
+                    .padding(14)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .textBackgroundColor))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -193,9 +183,6 @@ struct MCPSettingsTab: View {
 
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(String(localized: "Privacy"))
-                .font(settingsMetrics.font(weight: .bold))
-
             Toggle(
                 String(localized: "Redact Sensitive Data Before Sending to AI"),
                 isOn: $mcpRedactSensitiveData
@@ -217,10 +204,6 @@ struct MCPSettingsTab: View {
 
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "About MCP Integration"))
-                .font(settingsMetrics.secondaryFont(weight: .semibold))
-                .foregroundStyle(.tertiary)
-
             Text(
                 String(
                     localized: """

@@ -363,6 +363,8 @@ struct RockxyApp: App {
                 SettingsView()
             }
         }
+        .windowResizability(.contentMinSize)
+        .windowToolbarStyle(.unifiedCompact)
     }
 
     // MARK: Private

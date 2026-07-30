@@ -434,12 +434,64 @@ struct SettingsDisplayMetrics: Equatable {
         max(10, appMetrics.primaryFontSize - 2)
     }
 
-    var windowWidth: CGFloat {
-        820
+    // MARK: Window geometry (adaptive)
+
+    // The Settings window is a resizable sidebar/content shell, not a pinned card.
+    // Geometry grows with the Rockxy font size so the nine categories and their
+    // panes stay usable at 13 / 20 / 28pt without clipping or forcing a tiny sidebar.
+
+    var sidebarMinWidth: CGFloat {
+        max(196, bodyFontSize * 6 + 118)
     }
 
-    var windowHeight: CGFloat {
-        600
+    var sidebarIdealWidth: CGFloat {
+        sidebarMinWidth
+    }
+
+    var sidebarMaxWidth: CGFloat {
+        sidebarMinWidth + 96
+    }
+
+    var contentMinWidth: CGFloat {
+        // Accommodates the widest shared label + 420pt field row, section
+        // insets, and the standalone 640pt GitHub guidance block.
+        max(700, labelWidth + 16 + 420 + contentPadding * 2 + 24)
+    }
+
+    var windowMinWidth: CGFloat {
+        sidebarMinWidth + contentMinWidth
+    }
+
+    var windowIdealWidth: CGFloat {
+        windowMinWidth + 132
+    }
+
+    var windowMinHeight: CGFloat {
+        // Panes scroll vertically, so the minimum stays usable on compact
+        // displays even when Rockxy's app font is set to 28pt.
+        max(500, bodyFontSize * 6 + 382)
+    }
+
+    var windowIdealHeight: CGFloat {
+        windowMinHeight + 96
+    }
+
+    // MARK: Content density
+
+    var sectionSpacing: CGFloat {
+        18
+    }
+
+    var sectionContentSpacing: CGFloat {
+        14
+    }
+
+    var paneHeaderSpacing: CGFloat {
+        4
+    }
+
+    var paneContentPadding: CGFloat {
+        20
     }
 
     var contentPadding: CGFloat {
@@ -447,11 +499,11 @@ struct SettingsDisplayMetrics: Equatable {
     }
 
     var labelWidth: CGFloat {
-        160
+        max(160, bodyFontSize * 8 + 56)
     }
 
     var wideLabelWidth: CGFloat {
-        182
+        labelWidth + 22
     }
 
     var rowLeading: CGFloat {

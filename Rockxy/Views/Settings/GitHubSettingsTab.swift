@@ -7,24 +7,18 @@ struct GitHubSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+        SettingsPane {
+            SettingsSectionCard(String(localized: "Account")) {
                 permissionSection
-                    .padding(.top, 26)
-                    .padding(.bottom, 34)
-
-                Divider()
-
-                defaultsSection
-                    .padding(.top, 36)
-                    .padding(.bottom, 28)
-
-                advancedSection
-                    .padding(.top, 8)
-
-                Spacer(minLength: 20)
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            SettingsSectionCard(String(localized: "Publishing Defaults")) {
+                defaultsSection
+            }
+
+            SettingsSectionCard(String(localized: "Access & Help")) {
+                advancedSection
+            }
         }
         .sheet(isPresented: $showPersonalAccessTokenSheet) {
             PersonalAccessTokenFallbackSheet(viewModel: viewModel)
@@ -112,7 +106,6 @@ struct GitHubSettingsTab: View {
                 }
             }
         }
-        .padding(.horizontal, settingsMetrics.contentPadding + 12)
     }
 
     private var defaultsSection: some View {
@@ -163,7 +156,6 @@ struct GitHubSettingsTab: View {
                 }
             }
         }
-        .padding(.horizontal, settingsMetrics.contentPadding + 12)
     }
 
     private var advancedSection: some View {
@@ -193,7 +185,6 @@ struct GitHubSettingsTab: View {
                 }
             }
         }
-        .padding(.horizontal, settingsMetrics.contentPadding + 12)
     }
 
     private func alignedRow<Content: View>(
