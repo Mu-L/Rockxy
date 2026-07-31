@@ -35,7 +35,7 @@ struct MapLocalModelTests {
             name: "Untitled",
             matchCondition: RuleMatchCondition(urlPattern: pattern),
             action: .mapLocal(
-                filePath: "/Users/stephen/Library/Application Support/Rockxy/map-local/default_message.json"
+                filePath: "/tmp/rockxy-map-local/default_message.json"
             )
         )
 
