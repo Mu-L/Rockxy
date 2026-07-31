@@ -5,27 +5,99 @@ import SwiftASN1
 import Testing
 import X509
 
+// MARK: - TestStoreError
+
+private enum TestStoreError: Error {
+    case injectedDelete
+    case injectedPersistence
+}
+
 // MARK: - MemorySecureDataStore
 
 private final class MemorySecureDataStore: SecureDataStore, @unchecked Sendable {
     func save(_ data: Data, account: String) throws {
         lock.withLock {
+            saveCount += 1
             values[account] = data
         }
     }
 
     func load(account: String) throws -> Data? {
-        lock.withLock { values[account] }
+        lock.withLock {
+            loadCount += 1
+            return values[account]
+        }
     }
 
     func delete(account: String) throws {
-        _ = lock.withLock {
+        try lock.withLock {
+            deleteCount += 1
+            if failingDeleteAccounts.contains(account) {
+                throw TestStoreError.injectedDelete
+            }
             values.removeValue(forKey: account)
         }
     }
 
+    func failDelete(account: String) {
+        lock.withLock {
+            _ = failingDeleteAccounts.insert(account)
+        }
+    }
+
+    func data(account: String) -> Data? {
+        lock.withLock { values[account] }
+    }
+
+    func accounts() -> Set<String> {
+        lock.withLock { Set(values.keys) }
+    }
+
+    func operationCounts() -> (save: Int, load: Int, delete: Int) {
+        lock.withLock { (saveCount, loadCount, deleteCount) }
+    }
+
     private let lock = NSLock()
     private var values: [String: Data] = [:]
+    private var failingDeleteAccounts = Set<String>()
+    private var saveCount = 0
+    private var loadCount = 0
+    private var deleteCount = 0
+}
+
+// MARK: - FaultingMetadataWriter
+
+private final class FaultingMetadataWriter: CustomCertificateMetadataWriter, @unchecked Sendable {
+    func write(_ data: Data, to url: URL) throws {
+        try lock.withLock {
+            writeCount += 1
+            if shouldFail {
+                throw TestStoreError.injectedPersistence
+            }
+            if let failingWriteNumber, writeCount == failingWriteNumber {
+                throw TestStoreError.injectedPersistence
+            }
+            try base.write(data, to: url)
+        }
+    }
+
+    func failWrites() {
+        lock.withLock {
+            shouldFail = true
+        }
+    }
+
+    func failAfterSuccessfulWrites(_ count: Int) {
+        lock.withLock {
+            failingWriteNumber = writeCount + count + 1
+        }
+    }
+
+    private let lock = NSLock()
+    private let base = FileCustomCertificateMetadataWriter()
+    private var shouldFail = false
+    private var writeCount = 0
+    private var failingWriteNumber: Int?
 }
 
 // MARK: - CustomCertificateManagerTests
@@ -36,7 +108,7 @@ struct CustomCertificateManagerTests {
         let manager = makeManager()
         let root = try RootCAGenerator.generate()
 
-        _ = try manager.importRoot(
+        let metadata = try manager.importRoot(
             displayName: "Custom Root",
             certificatePEM: try pem(root.certificate),
             privateKeyPEM: root.privateKey.pemRepresentation
@@ -45,6 +117,11 @@ struct CustomCertificateManagerTests {
         let issuer = try #require(try manager.activeRootIssuer())
         #expect(issuer.certificate.subject == root.certificate.subject)
         #expect(issuer.privateKey.publicKey.subjectPublicKeyInfoBytes == root.certificate.publicKey.subjectPublicKeyInfoBytes)
+
+        let snapshot = try #require(try manager.activeRootIssuerSnapshot())
+        #expect(snapshot.certificate.subject == root.certificate.subject)
+        #expect(snapshot.privateKey.publicKey.subjectPublicKeyInfoBytes == root.certificate.publicKey.subjectPublicKeyInfoBytes)
+        #expect(snapshot.fingerprintSHA256 == metadata.fingerprintSHA256)
     }
 
     @Test("normalizes DER certificate imports into PEM identity material")
@@ -147,11 +224,205 @@ struct CustomCertificateManagerTests {
         #expect(manager.serverIdentity(for: "delete.example.com") == nil)
     }
 
+    @Test("replacing an exact normalized host removes the superseded private key")
+    func replacementRemovesSupersededPrivateKey() throws {
+        let fixture = makeFixture()
+        let firstIdentity = try makeLeafIdentity(host: "api.example.com")
+        let secondIdentity = try makeLeafIdentity(host: "api.example.com")
+        let firstEntry = try fixture.manager.importServerIdentity(
+            hostPattern: " API.Example.com ",
+            displayName: "First",
+            certificatePEM: firstIdentity.certificatePEM,
+            privateKeyPEM: firstIdentity.privateKeyPEM
+        )
+
+        let secondEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "api.example.com",
+            displayName: "Second",
+            certificatePEM: secondIdentity.certificatePEM,
+            privateKeyPEM: secondIdentity.privateKeyPEM
+        )
+
+        #expect(fixture.manager.metadata(kind: .server) == [secondEntry])
+        #expect(fixture.store.data(account: firstEntry.keychainAccount) == nil)
+        #expect(fixture.store.data(account: secondEntry.keychainAccount) != nil)
+    }
+
+    @Test("replacement persistence failure preserves old metadata and removes the new private key")
+    func replacementPersistenceFailureRollsBack() throws {
+        let writer = FaultingMetadataWriter()
+        let fixture = makeFixture(metadataWriter: writer)
+        let firstIdentity = try makeLeafIdentity(host: "api.example.com")
+        let secondIdentity = try makeLeafIdentity(host: "api.example.com")
+        let firstEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "api.example.com",
+            displayName: "First",
+            certificatePEM: firstIdentity.certificatePEM,
+            privateKeyPEM: firstIdentity.privateKeyPEM
+        )
+        let accountsBeforeReplacement = fixture.store.accounts()
+        writer.failWrites()
+
+        #expect(throws: TestStoreError.self) {
+            try fixture.manager.importServerIdentity(
+                hostPattern: "API.EXAMPLE.COM",
+                displayName: "Second",
+                certificatePEM: secondIdentity.certificatePEM,
+                privateKeyPEM: secondIdentity.privateKeyPEM
+            )
+        }
+
+        #expect(fixture.manager.metadata(kind: .server) == [firstEntry])
+        #expect(fixture.store.accounts() == accountsBeforeReplacement)
+        #expect(fixture.store.data(account: firstEntry.keychainAccount) != nil)
+    }
+
+    @Test("delete-all key failure restores prior keys, metadata, and persisted snapshot")
+    func deleteAllFailureDoesNotPartiallyPublish() throws {
+        let fixture = makeFixture()
+        let firstIdentity = try makeLeafIdentity(host: "one.example.com")
+        let secondIdentity = try makeLeafIdentity(host: "two.example.com")
+        let firstEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "one.example.com",
+            displayName: "One",
+            certificatePEM: firstIdentity.certificatePEM,
+            privateKeyPEM: firstIdentity.privateKeyPEM
+        )
+        let secondEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "two.example.com",
+            displayName: "Two",
+            certificatePEM: secondIdentity.certificatePEM,
+            privateKeyPEM: secondIdentity.privateKeyPEM
+        )
+        fixture.store.failDelete(account: secondEntry.keychainAccount)
+
+        #expect(throws: TestStoreError.self) {
+            try fixture.manager.deleteAll(kind: .server)
+        }
+
+        #expect(fixture.manager.metadata(kind: .server) == [firstEntry, secondEntry])
+        #expect(fixture.store.data(account: firstEntry.keychainAccount) != nil)
+        #expect(fixture.store.data(account: secondEntry.keychainAccount) != nil)
+
+        let reloaded = CustomCertificateManager(
+            storageURL: fixture.storageURL,
+            secureStore: fixture.store
+        )
+        #expect(reloaded.metadata(kind: .server) == [firstEntry, secondEntry])
+    }
+
+    @Test("rollback failure surfaces a non-sensitive recovery error")
+    func rollbackFailureIsExplicit() throws {
+        let writer = FaultingMetadataWriter()
+        let fixture = makeFixture(metadataWriter: writer)
+        let firstIdentity = try makeLeafIdentity(host: "one.example.com")
+        let secondIdentity = try makeLeafIdentity(host: "two.example.com")
+        let firstEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "one.example.com",
+            displayName: "One",
+            certificatePEM: firstIdentity.certificatePEM,
+            privateKeyPEM: firstIdentity.privateKeyPEM
+        )
+        let secondEntry = try fixture.manager.importServerIdentity(
+            hostPattern: "two.example.com",
+            displayName: "Two",
+            certificatePEM: secondIdentity.certificatePEM,
+            privateKeyPEM: secondIdentity.privateKeyPEM
+        )
+        fixture.store.failDelete(account: secondEntry.keychainAccount)
+        writer.failAfterSuccessfulWrites(1)
+
+        #expect(throws: CustomCertificateTransactionError.self) {
+            try fixture.manager.deleteAll(kind: .server)
+        }
+
+        #expect(fixture.manager.metadata(kind: .server) == [firstEntry, secondEntry])
+        #expect(fixture.store.data(account: firstEntry.keychainAccount) != nil)
+        #expect(fixture.store.data(account: secondEntry.keychainAccount) != nil)
+    }
+
+    @Test("deleting an unknown identifier performs no persistence or secure-store work")
+    func deletingUnknownIdentifierIsNoOp() throws {
+        let fixture = makeFixture()
+        let identity = try makeLeafIdentity(host: "known.example.com")
+        let entry = try fixture.manager.importServerIdentity(
+            hostPattern: "known.example.com",
+            displayName: "Known",
+            certificatePEM: identity.certificatePEM,
+            privateKeyPEM: identity.privateKeyPEM
+        )
+        let operationCounts = fixture.store.operationCounts()
+
+        try fixture.manager.delete(id: UUID())
+
+        #expect(fixture.manager.metadata(kind: .server) == [entry])
+        let finalCounts = fixture.store.operationCounts()
+        #expect(finalCounts.save == operationCounts.save)
+        #expect(finalCounts.load == operationCounts.load)
+        #expect(finalCounts.delete == operationCounts.delete)
+    }
+
+    @Test("deleting metadata retains a private key account still referenced by another entry")
+    func deletionRetainsSharedAccount() throws {
+        let fixture = makeFixture()
+        let identity = try makeLeafIdentity(host: "shared.example.com")
+        let imported = try fixture.manager.importServerIdentity(
+            hostPattern: "shared.example.com",
+            displayName: "Imported",
+            certificatePEM: identity.certificatePEM,
+            privateKeyPEM: identity.privateKeyPEM
+        )
+        let retained = CustomCertificateMetadata(
+            id: UUID(),
+            kind: .client,
+            displayName: "Shared Account",
+            hostPattern: "shared.example.com",
+            certificatePEM: imported.certificatePEM,
+            keychainAccount: imported.keychainAccount,
+            createdAt: imported.createdAt.addingTimeInterval(1),
+            notValidBefore: imported.notValidBefore,
+            notValidAfter: imported.notValidAfter,
+            fingerprintSHA256: imported.fingerprintSHA256
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileCustomCertificateMetadataWriter().write(
+            encoder.encode([imported, retained]),
+            to: fixture.storageURL
+        )
+        let manager = CustomCertificateManager(
+            storageURL: fixture.storageURL,
+            secureStore: fixture.store
+        )
+        let deleteCount = fixture.store.operationCounts().delete
+
+        try manager.delete(id: imported.id)
+
+        #expect(manager.metadata() == [retained])
+        #expect(fixture.store.data(account: retained.keychainAccount) != nil)
+        #expect(fixture.store.operationCounts().delete == deleteCount)
+    }
+
     private func makeManager() -> CustomCertificateManager {
+        makeFixture().manager
+    }
+
+    private func makeFixture(
+        metadataWriter: any CustomCertificateMetadataWriter = FileCustomCertificateMetadataWriter()
+    ) -> (manager: CustomCertificateManager, store: MemorySecureDataStore, storageURL: URL) {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("RockxyCustomCertificateTests-\(UUID().uuidString)")
             .appendingPathComponent("custom.json")
-        return CustomCertificateManager(storageURL: url, secureStore: MemorySecureDataStore())
+        let store = MemorySecureDataStore()
+        return (
+            CustomCertificateManager(
+                storageURL: url,
+                secureStore: store,
+                metadataWriter: metadataWriter
+            ),
+            store,
+            url
+        )
     }
 
     private func makeLeafIdentity(host: String) throws -> (certificatePEM: String, privateKeyPEM: String) {

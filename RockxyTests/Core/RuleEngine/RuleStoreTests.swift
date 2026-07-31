@@ -23,7 +23,12 @@ struct RuleStoreTests {
             ProxyRule(
                 name: "Block Rule",
                 isEnabled: true,
-                matchCondition: RuleMatchCondition(urlPattern: ".*blocked.*"),
+                matchCondition: RuleMatchCondition(
+                    urlPattern: ".*blocked.*",
+                    sourceURLPattern: "*blocked*",
+                    matchType: .wildcard,
+                    includeSubpaths: true
+                ),
                 action: .block(statusCode: 403)
             ),
             ProxyRule(
@@ -40,6 +45,9 @@ struct RuleStoreTests {
         #expect(loaded.count == 2)
         #expect(loaded[0].name == "Block Rule")
         #expect(loaded[0].isEnabled == true)
+        #expect(loaded[0].matchCondition.sourceURLPattern == "*blocked*")
+        #expect(loaded[0].matchCondition.matchType == .wildcard)
+        #expect(loaded[0].matchCondition.includeSubpaths == true)
         #expect(loaded[1].name == "Throttle Rule")
         #expect(loaded[1].isEnabled == false)
     }

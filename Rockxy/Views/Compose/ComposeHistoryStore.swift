@@ -10,7 +10,7 @@ import os
 /// Request history can contain sensitive payloads. The live in-memory history keeps
 /// exact request headers so same-session restore is lossless, but persisted entries
 /// redact Authorization/Cookie-style headers before the JSON file is written.
-final class ComposeHistoryStore {
+final class ComposeHistoryStore: @unchecked Sendable {
     // MARK: Lifecycle
 
     init(
@@ -37,48 +37,52 @@ final class ComposeHistoryStore {
     let bodySizeLimit: Int
 
     func load() -> [ComposeHistoryEntry] {
+        if let cachedEntries = persistenceCoordinator.cachedEntries(for: fileURL) {
+            return cachedEntries
+        }
+        let loadedEntries: [ComposeHistoryEntry]
         guard fileManager.fileExists(atPath: fileURL.path) else {
-            return []
+            return persistenceCoordinator.cacheLoadedEntriesIfAbsent([], for: fileURL)
         }
         do {
             let data = try Data(contentsOf: fileURL)
-            return try decoder.decode([ComposeHistoryEntry].self, from: data)
+            loadedEntries = try decoder.decode([ComposeHistoryEntry].self, from: data)
         } catch {
             Self.logger.error("Failed to load compose history: \(error.localizedDescription)")
-            return []
+            loadedEntries = []
         }
+        return persistenceCoordinator.cacheLoadedEntriesIfAbsent(loadedEntries, for: fileURL)
     }
 
-    func save(_ entries: [ComposeHistoryEntry]) throws {
-        let cappedEntries = Array(entries.prefix(maxEntries)).map(entryForPersistence)
-        let data = try encoder.encode(cappedEntries)
-        try fileManager.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try data.write(to: fileURL, options: .atomic)
+    func save(_ entries: [ComposeHistoryEntry]) async throws {
+        let revision = persistenceCoordinator.prepareSave(entries, for: fileURL)
+        let maxEntries = maxEntries
+        let bodySizeLimit = bodySizeLimit
+        let data = try await Task.detached(priority: .utility) {
+            let cappedEntries = Array(entries.prefix(maxEntries)).map {
+                Self.entryForPersistence($0, bodySizeLimit: bodySizeLimit)
+            }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            return try encoder.encode(cappedEntries)
+        }.value
+        try await persistenceCoordinator.write(data, to: fileURL, revision: revision)
+    }
+
+    func boundedEntry(_ entry: ComposeHistoryEntry) async -> ComposeHistoryEntry {
+        let bodySizeLimit = bodySizeLimit
+        return await Task.detached(priority: .utility) {
+            Self.boundedEntry(entry, bodySizeLimit: bodySizeLimit)
+        }.value
     }
 
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "ComposeHistoryStore")
-    private static let sensitiveHeaderNames: Set<String> = [
-        "authorization",
-        "cookie",
-        "proxy-authorization",
-        "set-cookie",
-    ]
-
     private let fileURL: URL
     private let fileManager: FileManager
-
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return encoder
-    }()
-
     private let decoder = JSONDecoder()
+    private let persistenceCoordinator = ComposeHistoryPersistenceCoordinator.shared
 
     private static func defaultFileURL() -> URL {
         if RockxyIdentity.isRunningTests {
@@ -87,19 +91,24 @@ final class ComposeHistoryStore {
         return RockxyIdentity.current.appSupportPath("compose-history.json")
     }
 
-    private func entryForPersistence(_ entry: ComposeHistoryEntry) -> ComposeHistoryEntry {
-        let bodySnapshot = capped(entry.body)
-        let responseSnapshot = entry.responseBody.map(capped)
+    private static func boundedEntry(
+        _ entry: ComposeHistoryEntry,
+        bodySizeLimit: Int
+    ) -> ComposeHistoryEntry {
+        let bodySnapshot = capped(entry.body, maximumBytes: bodySizeLimit)
+        let responseSnapshot = entry.responseBody.map {
+            capped($0, maximumBytes: bodySizeLimit)
+        }
         return ComposeHistoryEntry(
             id: entry.id,
             method: entry.method,
             url: entry.url,
-            headers: redacted(entry.headers),
+            headers: entry.headers,
             queryItems: entry.queryItems,
             body: bodySnapshot.value,
             bodyContentType: entry.bodyContentType,
             statusCode: entry.statusCode,
-            responseHeaders: entry.responseHeaders.map(redacted),
+            responseHeaders: entry.responseHeaders,
             responseBody: responseSnapshot?.value,
             bodyTruncated: entry.bodyTruncated || bodySnapshot.truncated,
             responseBodyTruncated: entry.responseBodyTruncated || (responseSnapshot?.truncated ?? false),
@@ -107,34 +116,124 @@ final class ComposeHistoryStore {
         )
     }
 
-    private func redacted(_ headers: [EditableReplayHeader]) -> [EditableReplayHeader] {
+    private static func entryForPersistence(
+        _ entry: ComposeHistoryEntry,
+        bodySizeLimit: Int
+    ) -> ComposeHistoryEntry {
+        let boundedEntry = boundedEntry(entry, bodySizeLimit: bodySizeLimit)
+        return ComposeHistoryEntry(
+            id: boundedEntry.id,
+            method: boundedEntry.method,
+            url: boundedEntry.url,
+            headers: redacted(boundedEntry.headers),
+            queryItems: boundedEntry.queryItems,
+            body: boundedEntry.body,
+            bodyContentType: boundedEntry.bodyContentType,
+            statusCode: boundedEntry.statusCode,
+            responseHeaders: boundedEntry.responseHeaders.map(redacted),
+            responseBody: boundedEntry.responseBody,
+            bodyTruncated: boundedEntry.bodyTruncated,
+            responseBodyTruncated: boundedEntry.responseBodyTruncated,
+            timestamp: boundedEntry.timestamp
+        )
+    }
+
+    private static func redacted(_ headers: [EditableReplayHeader]) -> [EditableReplayHeader] {
         headers.map { header in
-            guard Self.sensitiveHeaderNames.contains(header.name.lowercased()) else {
+            guard SensitiveDataRedactor.sensitiveHeaders.contains(header.name.lowercased()) else {
                 return header
             }
             return EditableReplayHeader(
                 id: header.id,
                 name: header.name,
                 value: String(localized: "<redacted before saving>"),
-                isEnabled: header.isEnabled
+                isEnabled: false
             )
         }
     }
 
-    private func capped(_ text: String) -> (value: String, truncated: Bool) {
-        guard text.utf8.count > bodySizeLimit else {
+    private static func capped(
+        _ text: String,
+        maximumBytes: Int
+    ) -> (value: String, truncated: Bool) {
+        guard text.utf8.count > maximumBytes else {
             return (text, false)
         }
         var result = ""
         var byteCount = 0
         for character in text {
             let characterByteCount = String(character).utf8.count
-            guard byteCount + characterByteCount <= bodySizeLimit else {
+            guard byteCount + characterByteCount <= maximumBytes else {
                 break
             }
             result.append(character)
             byteCount += characterByteCount
         }
         return (result, true)
+    }
+}
+
+// MARK: - ComposeHistoryPersistenceCoordinator
+
+private final class ComposeHistoryPersistenceCoordinator: @unchecked Sendable {
+    // MARK: Internal
+
+    static let shared = ComposeHistoryPersistenceCoordinator()
+
+    func cachedEntries(for fileURL: URL) -> [ComposeHistoryEntry]? {
+        lock.lock()
+        defer { lock.unlock() }
+        return cachedEntriesByURL[fileURL]
+    }
+
+    func cacheLoadedEntriesIfAbsent(
+        _ entries: [ComposeHistoryEntry],
+        for fileURL: URL
+    ) -> [ComposeHistoryEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cachedEntries = cachedEntriesByURL[fileURL] {
+            return cachedEntries
+        }
+        cachedEntriesByURL[fileURL] = entries
+        return entries
+    }
+
+    func prepareSave(_ entries: [ComposeHistoryEntry], for fileURL: URL) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        let revision = (revisionByURL[fileURL] ?? 0) + 1
+        revisionByURL[fileURL] = revision
+        cachedEntriesByURL[fileURL] = entries
+        return revision
+    }
+
+    func write(_ data: Data, to fileURL: URL, revision: Int) async throws {
+        try await writer.write(data, to: fileURL, revision: revision)
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private let writer = ComposeHistoryWriter()
+    private var cachedEntriesByURL: [URL: [ComposeHistoryEntry]] = [:]
+    private var revisionByURL: [URL: Int] = [:]
+}
+
+// MARK: - ComposeHistoryWriter
+
+private actor ComposeHistoryWriter {
+    private var latestRevisionByURL: [URL: Int] = [:]
+
+    func write(_ data: Data, to fileURL: URL, revision: Int) throws {
+        guard revision > (latestRevisionByURL[fileURL] ?? 0) else {
+            return
+        }
+        latestRevisionByURL[fileURL] = revision
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: fileURL, options: .atomic)
     }
 }

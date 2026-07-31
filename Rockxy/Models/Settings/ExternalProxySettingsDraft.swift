@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - ExternalProxyProtocolSelection
 
-enum ExternalProxyProtocolSelection: CaseIterable, Identifiable {
+enum ExternalProxyProtocolSelection: CaseIterable, Hashable, Identifiable {
     case automatic
     case http
     case https
@@ -92,14 +92,83 @@ struct ExternalProxySettingsDraft: Equatable {
     var usesAuthentication = false
     var username = ""
     var password = ""
+    var hasStoredCredentials = false
+    var storedUsername = ""
     var bypassText = ""
     var bypassLocalhost = true
 
     var parsedBypassPatterns: [String] {
-        bypassText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        var seen: Set<String> = []
+        return bypassText
+            .components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
+            .map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            }
+            .filter { pattern in
+                !pattern.isEmpty && seen.insert(pattern).inserted
+            }
+    }
+
+    var bypassEntriesUsed: Int {
+        parsedBypassPatterns.count
+    }
+
+    var needsReplacementPassword: Bool {
+        guard usesAuthentication else {
+            return false
+        }
+        if !hasStoredCredentials {
+            return password.isEmpty
+        }
+        return username != storedUsername && password.isEmpty
+    }
+
+    init(
+        isEnabled: Bool = false,
+        selectedProtocol: ExternalProxyProtocolSelection = .http,
+        host: String = "",
+        portText: String = "8080",
+        pacURL: String = "",
+        usesAuthentication: Bool = false,
+        username: String = "",
+        password: String = "",
+        hasStoredCredentials: Bool = false,
+        storedUsername: String = "",
+        bypassText: String = "",
+        bypassLocalhost: Bool = true
+    ) {
+        self.isEnabled = isEnabled
+        self.selectedProtocol = selectedProtocol
+        self.host = host
+        self.portText = portText
+        self.pacURL = pacURL
+        self.usesAuthentication = usesAuthentication
+        self.username = username
+        self.password = password
+        self.hasStoredCredentials = hasStoredCredentials
+        self.storedUsername = storedUsername
+        self.bypassText = bypassText
+        self.bypassLocalhost = bypassLocalhost
+    }
+
+    init(
+        configuration: UpstreamProxyConfiguration,
+        storedCredentialUsername: String?
+    ) {
+        let configuredUsername = configuration.username ?? ""
+        self.init(
+            isEnabled: configuration.isEnabled,
+            selectedProtocol: ExternalProxyProtocolSelection(configuration.type),
+            host: configuration.host,
+            portText: "\(configuration.port)",
+            pacURL: configuration.pacURL ?? "",
+            usesAuthentication: configuration.hasCredentials,
+            username: configuredUsername,
+            hasStoredCredentials: storedCredentialUsername != nil,
+            storedUsername: storedCredentialUsername ?? "",
+            bypassText: configuration.bypassHostPatterns.joined(separator: ", "),
+            bypassLocalhost: configuration.bypassLocalhost
+        )
     }
 
     func configuration() throws -> UpstreamProxyConfiguration {
@@ -111,7 +180,7 @@ struct ExternalProxySettingsDraft: Equatable {
             host: host,
             port: parsedPort,
             pacURL: selectedProtocol == .automatic ? pacURL : nil,
-            hasCredentials: usesAuthentication,
+            hasCredentials: usesAuthentication && (hasStoredCredentials || !password.isEmpty),
             username: usesAuthentication ? username : nil,
             bypassHostPatterns: parsedBypassPatterns,
             bypassLocalhost: bypassLocalhost
@@ -119,7 +188,7 @@ struct ExternalProxySettingsDraft: Equatable {
     }
 
     func credentials() -> UpstreamProxyCredentials? {
-        guard usesAuthentication else {
+        guard usesAuthentication, !password.isEmpty else {
             return nil
         }
         return UpstreamProxyCredentials(username: username, password: password)

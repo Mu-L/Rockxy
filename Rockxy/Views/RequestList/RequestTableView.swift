@@ -23,9 +23,10 @@ struct RequestTableView: NSViewRepresentable {
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
-    var onSelectionChanged: ((Set<UUID>) -> Void)?
+    var onSelectionChanged: ((Set<UUID>, UUID?) -> Void)?
     var onDoubleClick: ((HTTPTransaction) -> Void)?
     var mainCoordinator: MainContentCoordinator?
+    var headerColumns: [HeaderColumn] = []
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -54,16 +55,14 @@ struct RequestTableView: NSViewRepresentable {
             tableView.addTableColumn(column)
         }
 
-        if let store = mainCoordinator?.headerColumnStore {
-            for headerCol in store.enabledColumns {
-                let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(headerCol.columnIdentifier))
-                col.title = headerCol.headerName
-                col.width = 100
-                col.minWidth = 50
-                col.resizingMask = .userResizingMask
-                col.sortDescriptorPrototype = NSSortDescriptor(key: headerCol.columnIdentifier, ascending: true)
-                tableView.addTableColumn(col)
-            }
+        for headerCol in headerColumns.filter(\.isEnabled) {
+            let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(headerCol.columnIdentifier))
+            col.title = headerCol.headerName
+            col.width = 100
+            col.minWidth = 50
+            col.resizingMask = .userResizingMask
+            col.sortDescriptorPrototype = NSSortDescriptor(key: headerCol.columnIdentifier, ascending: true)
+            tableView.addTableColumn(col)
         }
 
         // Apply built-in column visibility
@@ -152,9 +151,6 @@ struct RequestTableView: NSViewRepresentable {
         coordinator.scheduleInitialAutosizeIfNeeded(in: tableView)
 
         coordinator.syncHeaderColumns(in: tableView)
-        if displayChange != nil {
-            coordinator.applyHeaderMetrics(to: tableView)
-        }
         coordinator.syncSelection(to: selectedIDs, in: tableView)
 
         // Re-apply HeaderColumnStore visibility on every update (single source of truth)
@@ -167,11 +163,21 @@ struct RequestTableView: NSViewRepresentable {
             }
         }
 
-        // Sync per-workspace sort state into AppKit (e.g., after workspace switch)
-        coordinator.syncSortDescriptors(
-            from: mainCoordinator?.activeSortDescriptors ?? [],
-            into: tableView
+        // Sync per-workspace sort state into AppKit (e.g., after workspace switch).
+        // A removed custom column must not leave the traffic list sorted invisibly.
+        let currentSortDescriptors = mainCoordinator?.activeSortDescriptors ?? []
+        let reconciledSortDescriptors = coordinator.sortDescriptors(
+            currentSortDescriptors,
+            availableIn: tableView
         )
+        if reconciledSortDescriptors != currentSortDescriptors,
+           let mainCoordinator
+        {
+            mainCoordinator.activeSortDescriptors = reconciledSortDescriptors
+            mainCoordinator.activeWorkspace.lastDeriveWasAppendOnly = false
+            mainCoordinator.deriveFilteredRows()
+        }
+        coordinator.syncSortDescriptors(from: reconciledSortDescriptors, into: tableView)
 
         if displayChange?.rowHeightChanged == true,
            let scrollAnchor
@@ -385,6 +391,7 @@ extension RequestTableView {
         private var autosizeGeneration = 0
         private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
         private var pendingContextSelectionIDs: Set<UUID>?
+        private var pendingContextPrimaryID: UUID?
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -647,7 +654,13 @@ extension RequestTableView {
 
             lastSyncedSelectionIDs = ids
             parent.selectedIDs = ids
-            parent.onSelectionChanged?(ids)
+            let primaryRow = selected.contains(tableView.clickedRow)
+                ? tableView.clickedRow
+                : tableView.selectedRow
+            let primaryID = primaryRow >= 0 && primaryRow < rows.count
+                ? rows[primaryRow].id
+                : nil
+            parent.onSelectionChanged?(ids, primaryID)
         }
 
         func tableView(_ tableView: NSTableView, sizeToFitWidthOfColumn column: Int) -> CGFloat {
@@ -809,13 +822,15 @@ extension RequestTableView {
                 return
             }
             pendingContextSelectionIDs = nil
+            let primaryID = pendingContextPrimaryID
+            pendingContextPrimaryID = nil
             DispatchQueue.main.async { [weak self] in
                 guard let self else {
                     return
                 }
                 self.lastSyncedSelectionIDs = ids
                 self.parent.selectedIDs = ids
-                self.parent.onSelectionChanged?(ids)
+                self.parent.onSelectionChanged?(ids, primaryID)
             }
         }
 
@@ -1130,37 +1145,41 @@ extension RequestTableView {
 
         func syncHeaderColumns(in tableView: NSTableView) {
             MainActor.assumeIsolated {
-                guard let store = mainCoordinator?.headerColumnStore else {
-                    return
-                }
-
-                let enabledIDs = Set(store.enabledColumns.map(\.columnIdentifier))
+                let enabledColumns = parent.headerColumns.filter(\.isEnabled)
+                let enabledIDs = Set(enabledColumns.map(\.columnIdentifier))
                 let existingCustomIDs = Set(
                     tableView.tableColumns
                         .map(\.identifier.rawValue)
                         .filter { $0.hasPrefix("reqHeader.") || $0.hasPrefix("resHeader.") }
                 )
 
+                var columnsChanged = false
                 for colID in existingCustomIDs.subtracting(enabledIDs) {
                     if let col = tableView.tableColumns.first(where: { $0.identifier.rawValue == colID }) {
                         tableView.removeTableColumn(col)
+                        columnsChanged = true
                     }
                 }
 
-                for colID in enabledIDs.subtracting(existingCustomIDs) {
-                    if let headerCol = store.enabledColumns.first(where: { $0.columnIdentifier == colID }) {
-                        let col = NSTableColumn(
-                            identifier: NSUserInterfaceItemIdentifier(headerCol.columnIdentifier)
-                        )
-                        col.title = headerCol.headerName
-                        col.width = 100
-                        col.minWidth = 50
-                        col.resizingMask = .userResizingMask
-                        col.sortDescriptorPrototype = NSSortDescriptor(
-                            key: headerCol.columnIdentifier, ascending: true
-                        )
-                        tableView.addTableColumn(col)
-                    }
+                for headerCol in enabledColumns
+                    where !existingCustomIDs.contains(headerCol.columnIdentifier)
+                {
+                    let col = NSTableColumn(
+                        identifier: NSUserInterfaceItemIdentifier(headerCol.columnIdentifier)
+                    )
+                    col.title = headerCol.headerName
+                    col.width = 100
+                    col.minWidth = 50
+                    col.resizingMask = .userResizingMask
+                    col.sortDescriptorPrototype = NSSortDescriptor(
+                        key: headerCol.columnIdentifier, ascending: true
+                    )
+                    tableView.addTableColumn(col)
+                    columnsChanged = true
+                }
+
+                if columnsChanged {
+                    applyHeaderMetrics(to: tableView)
                 }
             }
         }
@@ -1172,6 +1191,21 @@ extension RequestTableView {
             isUpdatingSortDescriptors = true
             tableView.sortDescriptors = descriptors
             isUpdatingSortDescriptors = false
+        }
+
+        func sortDescriptors(
+            _ descriptors: [NSSortDescriptor],
+            availableIn tableView: NSTableView
+        )
+            -> [NSSortDescriptor]
+        {
+            let availableColumnIDs = Set(tableView.tableColumns.map(\.identifier.rawValue))
+            return descriptors.filter { descriptor in
+                guard let key = descriptor.key else {
+                    return true
+                }
+                return availableColumnIDs.contains(key)
+            }
         }
 
         @objc
@@ -1194,7 +1228,7 @@ extension RequestTableView {
             }
             let source: HeaderColumnSource = sourceStr == "request" ? .request : .response
             MainActor.assumeIsolated {
-                mainCoordinator?.headerColumnStore.addColumn(headerName: name, source: source)
+                _ = mainCoordinator?.headerColumnStore.addColumn(headerName: name, source: source)
             }
         }
 
@@ -1689,6 +1723,7 @@ extension RequestTableView {
             tableView.selectRowIndexes(selection, byExtendingSelection: false)
             isUpdatingSelection = false
             pendingContextSelectionIDs = ids
+            pendingContextPrimaryID = rows[clickedRow].id
         }
 
         // MARK: - Column Header Context Menu

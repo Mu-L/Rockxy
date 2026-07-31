@@ -165,4 +165,23 @@ struct MapLocalQuickCreateTests {
         #expect(draft.inferredExtension == "json")
         #expect(draft.responseContentType == "application/json")
     }
+
+    @Test("Transaction builder captures response status and inferred extension")
+    @MainActor
+    func capturesResponseStatusAndExtension() {
+        let transaction = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://api.example.com/v2/orders",
+            statusCode: 201
+        )
+        transaction.response = TestFixtures.makeResponse(
+            statusCode: 201,
+            headers: [HTTPHeader(name: "Content-Type", value: "application/json")],
+            body: Data(#"{"id":1}"#.utf8)
+        )
+
+        let draft = MapLocalDraftBuilder.fromTransaction(transaction)
+        #expect(draft.responseStatusCode == 201)
+        #expect(draft.inferredExtension == "json")
+    }
 }

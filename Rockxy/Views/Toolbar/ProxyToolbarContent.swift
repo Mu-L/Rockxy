@@ -4,7 +4,7 @@ import SwiftUI
 
 // MARK: - ProxyToolbarContent
 
-/// Main window toolbar providing start/stop, Dev Hub access, and inspector
+/// Main window toolbar providing start/stop, Developer Setup access, and inspector
 /// layout toggle buttons, plus the central proxy status indicator.
 struct ProxyToolbarContent: ToolbarContent {
     @Environment(\.openWindow) private var openWindow
@@ -36,7 +36,7 @@ struct ProxyToolbarContent: ToolbarContent {
             } label: {
                 Label(String(localized: "Dev Hub"), systemImage: "command")
             }
-            .help(String(localized: "Open Developer Setup Hub"))
+            .help(String(localized: "Open Developer Setup"))
 
             Divider()
 

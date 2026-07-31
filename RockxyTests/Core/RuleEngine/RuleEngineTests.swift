@@ -318,6 +318,66 @@ struct RuleEngineTests {
         }
     }
 
+    @Test("Modify Header tool gate skips modify header rules only")
+    func modifyHeaderToolGateSkipsOnlyModifyHeaderRules() async throws {
+        let engine = RuleEngine()
+        let modifyRule = ProxyRule(
+            name: "Inject Debug Header",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .modifyHeader(operations: [
+                HeaderOperation(type: .add, headerName: "X-Debug", headerValue: "1"),
+            ])
+        )
+        let throttleRule = ProxyRule(
+            name: "Throttle",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .throttle(delayMs: 250)
+        )
+        await engine.addRule(modifyRule)
+        await engine.addRule(throttleRule)
+
+        let url = try #require(URL(string: "https://example.com/test"))
+        let enabledResult = await engine.evaluate(method: "GET", url: url, headers: [])
+        guard case .modifyHeader = enabledResult else {
+            Issue.record("Expected modify header rule while Modify Headers tool is enabled")
+            return
+        }
+
+        await engine.setModifyHeaderToolEnabled(false)
+        let disabledResult = await engine.evaluate(method: "GET", url: url, headers: [])
+        if case let .throttle(delayMs) = disabledResult {
+            #expect(delayMs == 250)
+        } else {
+            Issue.record("Expected non-modify-header rule to remain active")
+        }
+    }
+
+    @Test("Modify Header reorder preserves unrelated global slots")
+    func modifyHeaderReorderPreservesUnrelatedSlots() async {
+        let engine = RuleEngine()
+        let block = ProxyRule(
+            name: "Block",
+            matchCondition: RuleMatchCondition(urlPattern: ".*"),
+            action: .block(statusCode: 403)
+        )
+        let headerA = Self.modifyHeaderRule(named: "A")
+        let throttle = ProxyRule(
+            name: "Throttle",
+            matchCondition: RuleMatchCondition(urlPattern: ".*"),
+            action: .throttle(delayMs: 100)
+        )
+        let headerB = Self.modifyHeaderRule(named: "B")
+        let headerC = Self.modifyHeaderRule(named: "C")
+        await engine.replaceAll([block, headerA, throttle, headerB, headerC])
+
+        await engine.reorderModifyHeaderRules(orderedIDs: [headerC.id, headerA.id, headerB.id])
+
+        let reordered = await engine.allRules
+        #expect(reordered.map(\.id) == [block.id, headerC.id, throttle.id, headerA.id, headerB.id])
+    }
+
     @Test("Add rule and evaluate successfully")
     func addRuleAndEvaluate() async throws {
         let engine = RuleEngine()
@@ -356,5 +416,16 @@ struct RuleEngineTests {
         await engine.removeRule(id: rule.id)
         let rulesAfterRemove = await engine.allRules
         #expect(rulesAfterRemove.isEmpty)
+    }
+
+    private static func modifyHeaderRule(named name: String) -> ProxyRule {
+        ProxyRule(
+            name: name,
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .modifyHeader(operations: [
+                HeaderOperation(type: .add, headerName: "X-\(name)", headerValue: "1"),
+            ])
+        )
     }
 }

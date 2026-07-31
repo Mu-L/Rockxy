@@ -71,7 +71,7 @@ enum AllowListSettingsCodec {
         category: "AllowListSettingsCodec"
     )
 
-    private static let maxRegexLength = 2_048
+    private static let maxRegexLength = AllowListRulePatternValidation.maxRegexLength
 
     private static func extractJSONEntries(from value: Any) -> [Entry] {
         if let strings = value as? [String] {

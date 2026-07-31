@@ -34,6 +34,11 @@ enum RuleSyncService {
         await syncAll()
     }
 
+    static func reorderModifyHeaderRules(orderedIDs: [UUID]) async {
+        await RuleEngine.shared.reorderModifyHeaderRules(orderedIDs: orderedIDs)
+        await syncAll()
+    }
+
     static func setRuleEnabled(id: UUID, enabled: Bool) async {
         await RuleEngine.shared.setEnabled(id: id, enabled: enabled)
         await syncAll()
@@ -141,6 +146,11 @@ enum RuleSyncService {
         await RuleEngine.shared.setNetworkConditionsToolEnabled(enabled)
     }
 
+    static func setModifyHeaderToolEnabled(_ enabled: Bool) async {
+        UserDefaults.standard.set(enabled, forKey: "modifyHeaderToolEnabled")
+        await RuleEngine.shared.setModifyHeaderToolEnabled(enabled)
+    }
+
     static func loadFromDisk() async {
         // Read and apply the breakpoint-tool flag BEFORE loading rules so the
         // rule engine has the correct evaluation gate in place when rules are
@@ -157,6 +167,8 @@ enum RuleSyncService {
             forKey: "networkConditionsToolEnabled"
         ) as? Bool ?? true
         await RuleEngine.shared.setNetworkConditionsToolEnabled(networkConditionsEnabled)
+        let modifyHeaderEnabled = UserDefaults.standard.object(forKey: "modifyHeaderToolEnabled") as? Bool ?? true
+        await RuleEngine.shared.setModifyHeaderToolEnabled(modifyHeaderEnabled)
         do {
             try await RuleEngine.shared.loadRules(from: RuleStore())
             await syncAll()

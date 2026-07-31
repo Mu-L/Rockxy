@@ -93,6 +93,7 @@ struct ModifyHeaderEditorView: View {
 
             validationMessages
         }
+        .font(toolMetrics.font())
     }
 
     // MARK: Private
@@ -102,11 +103,15 @@ struct ModifyHeaderEditorView: View {
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var phaseWidth: CGFloat {
-        toolMetrics.menuWidth(92)
+        operationMenuWidth
     }
 
     private var operationWidth: CGFloat {
-        toolMetrics.menuWidth(104)
+        operationMenuWidth
+    }
+
+    private var operationMenuWidth: CGFloat {
+        toolMetrics.menuWidth(112)
     }
 
     private var fieldMinWidth: CGFloat {
@@ -117,8 +122,20 @@ struct ModifyHeaderEditorView: View {
         max(24, toolMetrics.compactButtonSize)
     }
 
+    private var orderWidth: CGFloat {
+        24
+    }
+
+    private var reorderWidth: CGFloat {
+        toolMetrics.compactButtonSize
+    }
+
     private var rowSpacing: CGFloat {
         toolMetrics.controlSpacing
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var helperText: some View {
@@ -148,8 +165,8 @@ struct ModifyHeaderEditorView: View {
             headerRow
 
             VStack(spacing: 6) {
-                ForEach(operations) { operation in
-                    operationRow(operation)
+                ForEach(Array(operations.enumerated()), id: \.element.id) { index, operation in
+                    operationRow(operation, index: index)
                 }
             }
             .padding(8)
@@ -164,6 +181,8 @@ struct ModifyHeaderEditorView: View {
 
     private var headerRow: some View {
         HStack(spacing: rowSpacing) {
+            Text(verbatim: "#")
+                .frame(width: orderWidth, alignment: .trailing)
             Text(String(localized: "Phase"))
                 .frame(width: phaseWidth, alignment: .leading)
             Text(String(localized: "Operation"))
@@ -173,10 +192,11 @@ struct ModifyHeaderEditorView: View {
             Text(String(localized: "Header Value"))
                 .frame(minWidth: fieldMinWidth, maxWidth: .infinity, alignment: .leading)
             Spacer()
+                .frame(width: reorderWidth)
+            Spacer()
                 .frame(width: removeWidth)
         }
-        .font(toolMetrics.tableHeaderFont())
-        .fontWeight(.semibold)
+        .font(toolMetrics.font(weight: .semibold))
         .foregroundStyle(Color(nsColor: .labelColor))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -193,6 +213,7 @@ struct ModifyHeaderEditorView: View {
         }
         .buttonStyle(.plain)
         .controlSize(.small)
+        .font(toolMetrics.font())
         .foregroundStyle(Color.accentColor)
         .padding(.horizontal, 2)
     }
@@ -216,47 +237,75 @@ struct ModifyHeaderEditorView: View {
         }
     }
 
-    private func operationRow(_ operation: EditableHeaderOperation) -> some View {
+    private func operationRow(_ operation: EditableHeaderOperation, index: Int) -> some View {
         HStack(spacing: rowSpacing) {
-            Picker("", selection: Binding(
-                get: { operation.phase },
-                set: { operation.phase = $0 }
-            )) {
-                Text(String(localized: "Request")).tag(HeaderModifyPhase.request)
-                Text(String(localized: "Response")).tag(HeaderModifyPhase.response)
-                Text(String(localized: "Both")).tag(HeaderModifyPhase.both)
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(width: phaseWidth)
-            .controlSize(.small)
+            Text("\(index + 1)")
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .frame(width: orderWidth, alignment: .trailing)
+                .accessibilityLabel(String(localized: "Operation \(index + 1)"))
 
-            Picker("", selection: Binding(
-                get: { operation.type },
-                set: { operation.type = $0 }
-            )) {
-                Text(HeaderOperationType.replace.editorLabel).tag(HeaderOperationType.replace)
-                Text(HeaderOperationType.add.editorLabel).tag(HeaderOperationType.add)
-                Text(HeaderOperationType.remove.editorLabel).tag(HeaderOperationType.remove)
+            Menu {
+                ForEach(HeaderModifyPhase.allCases, id: \.self) { phase in
+                    Button {
+                        operation.phase = phase
+                    } label: {
+                        menuCheckmarkLabel(phaseLabel(phase), isSelected: operation.phase == phase)
+                    }
+                }
+            } label: {
+                dataEntryMenuLabel(phaseLabel(operation.phase), width: phaseWidth)
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(width: operationWidth)
-            .controlSize(.small)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .font(toolMetrics.font())
+            .controlSize(.regular)
+            .frame(width: phaseWidth, height: toolMetrics.formControlHeight)
+
+            Menu {
+                ForEach(HeaderOperationType.allCases, id: \.self) { type in
+                    Button {
+                        operation.type = type
+                    } label: {
+                        menuCheckmarkLabel(type.editorLabel, isSelected: operation.type == type)
+                    }
+                }
+            } label: {
+                dataEntryMenuLabel(operation.type.editorLabel, width: operationWidth)
+            }
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+            .font(toolMetrics.font())
+            .controlSize(.regular)
+            .frame(width: operationWidth, height: toolMetrics.formControlHeight)
 
             TextField(
-                String(localized: "Header name"),
+                String(localized: "e.g. X-Debug-Mode"),
                 text: Binding(
                     get: { operation.headerName },
                     set: { operation.headerName = $0 }
                 )
             )
-            .font(toolMetrics.font(monospaced: true))
+            .font(toolMetrics.font())
             .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .frame(minWidth: fieldMinWidth, minHeight: toolMetrics.formControlHeight)
+            .controlSize(.regular)
+            .frame(minWidth: fieldMinWidth)
+            .frame(height: toolMetrics.formControlHeight)
 
             headerValueField(for: operation)
+
+            Button {
+                move(operation, by: reorderDelta(for: index))
+            } label: {
+                Image(systemName: reorderIconName(for: index))
+                    .font(toolMetrics.secondaryFont())
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .disabled(operations.count < 2)
+            .help(reorderHelp(for: index))
+            .accessibilityLabel(reorderAccessibilityLabel(for: index))
+            .frame(width: reorderWidth, height: toolMetrics.formControlHeight)
 
             Button(role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -269,36 +318,109 @@ struct ModifyHeaderEditorView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
             .help(String(localized: "Remove operation"))
-            .frame(width: removeWidth)
+            .accessibilityLabel(String(localized: "Remove operation \(index + 1)"))
+            .frame(width: removeWidth, height: toolMetrics.formControlHeight)
         }
+        .frame(minHeight: toolMetrics.formControlHeight)
     }
 
-    @ViewBuilder private func headerValueField(for operation: EditableHeaderOperation) -> some View {
+    @ViewBuilder
+    private func headerValueField(for operation: EditableHeaderOperation) -> some View {
         if operation.type == .remove {
             Text(String(localized: "Not used"))
-                .font(toolMetrics.font(monospaced: true))
+                .font(toolMetrics.font())
                 .foregroundStyle(.secondary)
-                .frame(minWidth: fieldMinWidth, minHeight: toolMetrics.formControlHeight, alignment: .leading)
+                .frame(minWidth: fieldMinWidth, alignment: .leading)
+                .frame(height: toolMetrics.formControlHeight, alignment: .leading)
                 .padding(.horizontal, 7)
                 .background(Color(nsColor: .controlBackgroundColor))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
         } else {
             TextField(
-                String(localized: "Header value"),
+                String(localized: "e.g. enabled"),
                 text: Binding(
                     get: { operation.headerValue },
                     set: { operation.headerValue = $0 }
                 )
             )
-            .font(toolMetrics.font(monospaced: true))
+            .font(toolMetrics.font())
             .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .frame(minWidth: fieldMinWidth, minHeight: toolMetrics.formControlHeight)
+            .controlSize(.regular)
+            .frame(minWidth: fieldMinWidth)
+            .frame(height: toolMetrics.formControlHeight)
         }
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func move(_ operation: EditableHeaderOperation, by delta: Int) {
+        guard let index = operations.firstIndex(where: { $0.id == operation.id }) else {
+            return
+        }
+        let target = index + delta
+        guard operations.indices.contains(target) else {
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            operations.swapAt(index, target)
+        }
+    }
+
+    private func reorderDelta(for index: Int) -> Int {
+        index == operations.count - 1 ? -1 : 1
+    }
+
+    private func reorderIconName(for index: Int) -> String {
+        index == operations.count - 1 ? "chevron.up" : "chevron.down"
+    }
+
+    private func reorderHelp(for index: Int) -> String {
+        index == operations.count - 1
+            ? String(localized: "Move operation up")
+            : String(localized: "Move operation down")
+    }
+
+    private func reorderAccessibilityLabel(for index: Int) -> String {
+        index == operations.count - 1
+            ? String(localized: "Move operation \(index + 1) up")
+            : String(localized: "Move operation \(index + 1) down")
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+            Text(title)
+        }
+    }
+
+    private func phaseLabel(_ phase: HeaderModifyPhase) -> String {
+        switch phase {
+        case .request:
+            String(localized: "Request")
+        case .response:
+            String(localized: "Response")
+        case .both:
+            String(localized: "Both")
+        }
     }
 }
 

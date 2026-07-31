@@ -5,25 +5,36 @@ import SwiftUI
 // MARK: - BreakpointEditorView
 
 /// Right panel of the Breakpoints window — edits the selected paused item's draft.
-/// Shows method/URL/status pickers and tabbed content (Headers, Body, Query)
-/// adapted from the original BreakpointSheetView.
+/// Shows phase-aware message controls and tabbed content for the selected item.
 struct BreakpointEditorView: View {
     // MARK: Internal
 
     @Bindable var manager: BreakpointManager
 
-    let windowModel: BreakpointWindowModel
+    @Binding var canApplySelectedChanges: Bool
 
     var body: some View {
         Group {
-            switch windowModel.selectionMode {
-            case .none:
-                emptyState
-            case let .pausedItem(itemId):
+            if let itemId = manager.selectedItemId {
                 pausedItemEditor(itemId: itemId)
+            } else {
+                emptyState
             }
         }
         .font(toolMetrics.font())
+        .onChange(of: manager.selectedItemId) { _, _ in
+            refreshApplyAvailability()
+        }
+        .onChange(of: selectedTab) { _, newValue in
+            guard let selectedItemId = manager.selectedItemId else {
+                return
+            }
+            if newValue == .raw {
+                syncRawMessageFromDraft(itemId: selectedItemId, force: true)
+            } else {
+                refreshApplyAvailability()
+            }
+        }
     }
 
     // MARK: Private
@@ -59,13 +70,10 @@ struct BreakpointEditorView: View {
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var emptyState: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "cursorarrow.click.2")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-            Text(String(localized: "Create breakpoint from context menu or Tools menu."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
+        ContentUnavailableView {
+            Label(String(localized: "Select Paused Traffic"), systemImage: "cursorarrow.click.2")
+        } description: {
+            Text(String(localized: "Choose an item from the queue to inspect and edit its message."))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -77,7 +85,12 @@ struct BreakpointEditorView: View {
             VStack(spacing: 0) {
                 alertBanner(item: item)
                 Divider()
+                if !item.editableDraft.isBodyEditable {
+                    binaryBodyNotice
+                    Divider()
+                }
                 requestLine(itemId: itemId)
+                    .disabled(!item.editableDraft.isBodyEditable)
                 Divider()
                 tabContent(itemId: itemId)
             }
@@ -89,38 +102,78 @@ struct BreakpointEditorView: View {
 
     private func alertBanner(item: PausedBreakpointItem) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: "pause.circle.fill")
                 .foregroundStyle(.orange)
             Text(item.phase == .request
-                ? String(localized: "Request paused at breakpoint")
-                : String(localized: "Response paused at breakpoint"))
-                .font(toolMetrics.font())
+                ? String(localized: "Request paused for review")
+                : String(localized: "Response paused for review"))
+                .font(toolMetrics.font(weight: .semibold))
                 .foregroundStyle(.primary)
             Spacer()
+            if let matchedRuleName = item.matchedRuleName, !matchedRuleName.isEmpty {
+                Text(matchedRuleName)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
             ElapsedTimeBadge(since: item.createdAt)
         }
         .padding(12)
         .background(Color.orange.opacity(0.12))
     }
 
+    private var binaryBodyNotice: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Original payload protected"))
+                    .font(toolMetrics.secondaryFont(weight: .semibold))
+                Text(
+                    String(
+                        localized: "This body is not UTF-8 text, so Rockxy cannot safely apply edits. Continue Original preserves every byte."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
+    }
+
     private func requestLine(itemId: UUID) -> some View {
-        HStack(spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             if itemPhase(itemId: itemId) == .request {
                 methodPicker(itemId: itemId)
-                urlField(itemId: itemId)
+                requestURLField(itemId: itemId)
             } else {
                 statusCodePicker(itemId: itemId)
-                urlField(itemId: itemId)
+                readOnlyURL(itemId: itemId)
             }
         }
-        .padding(12)
+        .padding(10)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     private func methodPicker(itemId: UUID) -> some View {
-        Picker("", selection: Binding(
-            get: { draftFor(itemId)?.method ?? "GET" },
+        let currentMethod = draftFor(itemId)?.method ?? "GET"
+        return Picker("", selection: Binding(
+            get: { currentMethod },
             set: { newValue in manager.updateDraft(id: itemId) { $0.method = newValue } }
         )) {
+            if !Self.httpMethods.contains(currentMethod) {
+                Text(currentMethod).tag(currentMethod)
+            }
             ForEach(Self.httpMethods, id: \.self) { method in
                 Text(method).tag(method)
             }
@@ -129,7 +182,28 @@ struct BreakpointEditorView: View {
         .frame(width: toolMetrics.menuWidth(100))
     }
 
-    private func urlField(itemId: UUID) -> some View {
+    @ViewBuilder
+    private func requestURLField(itemId: UUID) -> some View {
+        if draftFor(itemId)?.fixedHTTPSAuthority != nil || draftFor(itemId)?.isHTTPS == true {
+            Text(httpsAuthority(itemId: itemId))
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .help(String(localized: "The HTTPS authority is fixed for this connection"))
+
+            TextField(String(localized: "Path and query"), text: Binding(
+                get: { httpsPathAndQuery(itemId: itemId) },
+                set: { updateHTTPSPathAndQuery($0, itemId: itemId) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font(monospaced: true))
+            .frame(minHeight: toolMetrics.formControlHeight)
+        } else {
+            editableURLField(itemId: itemId)
+        }
+    }
+
+    private func editableURLField(itemId: UUID) -> some View {
         TextField(String(localized: "URL"), text: Binding(
             get: { draftFor(itemId)?.url ?? "" },
             set: { newValue in manager.updateDraft(id: itemId) { $0.url = newValue } }
@@ -139,11 +213,31 @@ struct BreakpointEditorView: View {
         .frame(minHeight: toolMetrics.formControlHeight)
     }
 
+    private func readOnlyURL(itemId: UUID) -> some View {
+        HStack(spacing: 8) {
+            Text(String(localized: "URL"))
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(draftFor(itemId)?.url ?? "")
+                .font(toolMetrics.font(monospaced: true))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .help(draftFor(itemId)?.url ?? "")
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: toolMetrics.formControlHeight)
+    }
+
     private func statusCodePicker(itemId: UUID) -> some View {
-        Picker("", selection: Binding(
-            get: { draftFor(itemId)?.statusCode ?? 200 },
+        let currentStatusCode = draftFor(itemId)?.statusCode ?? 200
+        return Picker("", selection: Binding(
+            get: { currentStatusCode },
             set: { newValue in manager.updateDraft(id: itemId) { $0.statusCode = newValue } }
         )) {
+            if !Self.statusCodes.contains(where: { $0.code == currentStatusCode }) {
+                Text(String(currentStatusCode)).tag(currentStatusCode)
+            }
             ForEach(Self.statusCodes, id: \.code) { status in
                 Text("\(status.code) \(status.text)").tag(status.code)
             }
@@ -189,6 +283,7 @@ struct BreakpointEditorView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .disabled(draftFor(itemId)?.isBodyEditable == false)
         }
     }
 
@@ -252,62 +347,92 @@ struct BreakpointEditorView: View {
     }
 
     private func bodyEditor(itemId: UUID) -> some View {
-        TextEditor(text: Binding(
-            get: { draftFor(itemId)?.body ?? "" },
-            set: { newValue in manager.updateDraft(id: itemId) { $0.body = newValue } }
-        ))
-        .font(toolMetrics.font(monospaced: true))
-        .padding(8)
+        Group {
+            if draftFor(itemId)?.isBodyEditable == false {
+                protectedBodyState
+            } else {
+                TextEditor(text: Binding(
+                    get: { draftFor(itemId)?.body ?? "" },
+                    set: { newValue in manager.updateDraft(id: itemId) { $0.body = newValue } }
+                ))
+                .font(toolMetrics.font(monospaced: true))
+                .padding(8)
+                .background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                }
+                .padding(12)
+            }
+        }
     }
 
-    private func rawEditor(itemId: UUID) -> some View {
-        let kind = rawKind(for: itemId)
-        let validation = BreakpointRawMessage.validation(for: rawMessage, kind: kind)
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Label(validation.message, systemImage: "circle.fill")
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(validation.isValid ? Color.green : Color.red)
-                Spacer()
-                Menu {
-                    Button(String(localized: "Save current message as new template...")) {
-                        pendingTemplateKind = kind
-                        pendingTemplateRawMessage = rawMessage
-                        saveTemplateName = defaultTemplateName(for: kind)
-                        isSaveTemplateSheetPresented = true
-                    }
-                    Divider()
-                    ForEach(templateStore.templates(for: kind)) { template in
-                        Button(template.name.isEmpty ? String(localized: "Untitled") : template.name) {
-                            applyTemplate(template, to: itemId)
-                        }
-                    }
-                } label: {
-                    Label(String(localized: "Template"), systemImage: "doc.text")
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+    private var protectedBodyState: some View {
+        ContentUnavailableView {
+            Label(String(localized: "Binary Body"), systemImage: "doc.badge.lock")
+        } description: {
+            Text(String(localized: "Editing is unavailable for this payload. Continue Original preserves it unchanged."))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 
-            MapLocalHTTPMessageEditor(text: Binding(
-                get: { rawMessage },
-                set: { updateRawMessage($0, itemId: itemId) }
-            ), editorSettings: toolMetrics.codeEditorSettings)
-            .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35)))
-            .padding(.horizontal, 12)
-            .padding(.bottom, 12)
-        }
-        .onAppear { syncRawMessageFromDraft(itemId: itemId, force: true) }
-        .onChange(of: manager.selectedItemId) { _, _ in
-            syncRawMessageFromDraft(itemId: itemId, force: true)
-        }
-        .onChange(of: selectedTab) { _, newValue in
-            if newValue == .raw {
-                syncRawMessageFromDraft(itemId: itemId, force: rawMessageItemID != itemId)
+    @ViewBuilder
+    private func rawEditor(itemId: UUID) -> some View {
+        if draftFor(itemId)?.isBodyEditable == false {
+            protectedBodyState
+        } else {
+            let kind = rawKind(for: itemId)
+            let validation = BreakpointRawMessage.validation(for: rawMessage, kind: kind)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Label(validation.message, systemImage: "circle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(validation.isValid ? Color.green : Color.red)
+                    Spacer()
+                    Menu {
+                        Button(String(localized: "Save current message as new template...")) {
+                            pendingTemplateKind = kind
+                            pendingTemplateRawMessage = rawMessage
+                            saveTemplateName = defaultTemplateName(for: kind)
+                            isSaveTemplateSheetPresented = true
+                        }
+                        Divider()
+                        ForEach(templateStore.templates(for: kind)) { template in
+                            let validation = template.validation
+                            Button {
+                                applyTemplate(template, to: itemId)
+                            } label: {
+                                Label(
+                                    template.name.isEmpty ? String(localized: "Untitled") : template.name,
+                                    systemImage: validation.isValid ? "doc.text" : "exclamationmark.triangle"
+                                )
+                            }
+                            .disabled(!validation.isValid)
+                            .help(validation.message)
+                        }
+                    } label: {
+                        Label(String(localized: "Template"), systemImage: "doc.text")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
+                MapLocalHTTPMessageEditor(text: Binding(
+                    get: { rawMessage },
+                    set: { updateRawMessage($0, itemId: itemId) }
+                ), editorSettings: toolMetrics.codeEditorSettings)
+                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35)))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
             }
-        }
-        .sheet(isPresented: $isSaveTemplateSheetPresented) {
-            saveTemplateSheet
+            .onAppear { syncRawMessageFromDraft(itemId: itemId, force: true) }
+            .onChange(of: manager.selectedItemId) { _, _ in
+                syncRawMessageFromDraft(itemId: itemId, force: true)
+            }
+            .sheet(isPresented: $isSaveTemplateSheetPresented) {
+                saveTemplateSheet
+            }
         }
     }
 
@@ -406,6 +531,48 @@ struct BreakpointEditorView: View {
         manager.pausedItems.first(where: { $0.id == itemId })?.editableDraft
     }
 
+    private func httpsAuthority(itemId: UUID) -> String {
+        if let authority = draftFor(itemId)?.fixedHTTPSAuthority {
+            return "https://\(authority)"
+        }
+        guard let url = draftFor(itemId)?.url,
+              let components = URLComponents(string: url),
+              let scheme = components.scheme,
+              let host = components.host
+        else {
+            return String(localized: "HTTPS connection")
+        }
+
+        var authority = "\(scheme)://\(host)"
+        if let port = components.port {
+            authority += ":\(port)"
+        }
+        return authority
+    }
+
+    private func httpsPathAndQuery(itemId: UUID) -> String {
+        guard let url = draftFor(itemId)?.url,
+              let components = URLComponents(string: url)
+        else {
+            return "/"
+        }
+
+        var value = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+        if let query = components.percentEncodedQuery, !query.isEmpty {
+            value += "?\(query)"
+        }
+        return value
+    }
+
+    private func updateHTTPSPathAndQuery(_ value: String, itemId: UUID) {
+        guard let currentURL = draftFor(itemId)?.url,
+              let updatedURL = BreakpointRequestData.applyingOriginForm(value, to: currentURL)
+        else {
+            return
+        }
+        manager.updateDraft(id: itemId) { $0.url = updatedURL }
+    }
+
     private func headerValue(itemId: UUID, headerId: UUID) -> EditableHeader? {
         draftFor(itemId)?.headers.first(where: { $0.id == headerId })
     }
@@ -441,6 +608,16 @@ struct BreakpointEditorView: View {
         itemPhase(itemId: itemId) == .response ? .response : .request
     }
 
+    private func refreshApplyAvailability() {
+        guard let selectedItemId = manager.selectedItemId,
+              let draft = draftFor(selectedItemId)
+        else {
+            canApplySelectedChanges = false
+            return
+        }
+        canApplySelectedChanges = draft.isBodyEditable
+    }
+
     private func syncRawMessageFromDraft(itemId: UUID, force: Bool = false) {
         guard force || rawMessageItemID != itemId,
               let draft = draftFor(itemId)
@@ -449,13 +626,16 @@ struct BreakpointEditorView: View {
         }
         rawMessageItemID = itemId
         rawMessage = BreakpointRawMessage.rawMessage(from: draft, kind: rawKind(for: itemId))
+        canApplySelectedChanges = draft.isBodyEditable
     }
 
     private func updateRawMessage(_ newValue: String, itemId: UUID) {
         rawMessageItemID = itemId
         rawMessage = newValue
         let kind = rawKind(for: itemId)
-        guard BreakpointRawMessage.validation(for: newValue, kind: kind).isValid else {
+        let validation = BreakpointRawMessage.validation(for: newValue, kind: kind)
+        canApplySelectedChanges = validation.isValid
+        guard validation.isValid else {
             return
         }
         manager.updateDraft(id: itemId) { draft in
@@ -466,9 +646,18 @@ struct BreakpointEditorView: View {
     }
 
     private func applyTemplate(_ template: BreakpointTemplate, to itemId: UUID) {
+        guard let application = template.applicationPayload,
+              application.kind == rawKind(for: itemId),
+              draftFor(itemId) != nil
+        else {
+            return
+        }
+        manager.updateDraft(id: itemId) { draft in
+            draft = application.applying(to: draft)
+        }
         rawMessageItemID = itemId
         rawMessage = template.rawMessage
-        updateRawMessage(template.rawMessage, itemId: itemId)
+        canApplySelectedChanges = true
     }
 
     private var saveTemplateSheet: some View {

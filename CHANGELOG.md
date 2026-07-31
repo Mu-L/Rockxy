@@ -26,6 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Rebuilt Developer Setup as a compact native macOS workflow with a focused target sidebar, adaptive five-part guide, contextual actions, and an optional readiness inspector that honors the Rockxy font-size preference up to 28 pt.
+- Made Manual and Automatic Setup windows target-aware and resizable: Manual Setup now shows the selected target's own workflow or guide instead of always falling back to the generic terminal flow, and Automatic Setup only opens for shipped terminal runtimes and names the selected target.
+- Made Developer Setup launch outcomes honest — prepared-terminal and browser launches now wait for the launched process and report a nonzero exit as a failure instead of always reporting success.
+- Renamed the ambiguous "Verify"/"Run Local Probe" action to "Start Check", gave copy actions context-specific labels and feedback, and removed duplicate status, actions, and verbose validation copy.
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 

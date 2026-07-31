@@ -6,415 +6,555 @@ struct ExternalProxySettingsView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Toggle(String(localized: "Enable External Proxy Tool"), isOn: $isEnabled)
-                .toggleStyle(.checkbox)
-                .font(toolMetrics.font(weight: .medium))
-
-            HStack(alignment: .top, spacing: 28) {
-                protocolList
-                configurationPanel
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            behaviorNotice
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
+                    protocolSection
+                    endpointSection
+                    bypassSection
+                }
+                .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
             }
 
-            bypassSection
-
-            if let statusMessage {
-                StatusDisclosure(message: statusMessage, isError: statusIsError)
+            if viewModel.status != nil || viewModel.hasExternalConflict {
+                Divider()
+                statusSection
             }
 
-            HStack {
-                Button {
-                    showHelp = true
-                } label: {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: max(22, toolMetrics.bodyFontSize + 9)))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(String(localized: "Upstream Proxy Help"))
-
-                Spacer()
-
-                Button(String(localized: "Test Connection")) {
-                    testConnection()
-                }
-                .disabled(isTesting || !isEnabled)
-
-                Button(String(localized: "Cancel")) {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button(String(localized: "Done")) {
-                    saveAndDismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
+            Divider()
+            footer
         }
         .font(toolMetrics.font())
-        .padding(28)
-        .frame(width: toolMetrics.fieldWidth(900))
-        .onAppear(perform: loadDraft)
-        .alert(String(localized: "Upstream Proxy"), isPresented: $showHelp) {
-            Button(String(localized: "OK")) {}
-        } message: {
-            Text(
-                String(
-                    localized: "Automatic, HTTP, and HTTPS upstream proxy are available. SOCKS5, authentication, and bypass entry count follow Rockxy feature limits."
-                )
+        .frame(width: toolMetrics.fieldWidth(900), height: 680)
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .upstreamProxyConfigurationDidChange,
+                object: UpstreamProxyStore.shared
             )
+        ) { _ in
+            viewModel.handleExternalConfigurationChange()
         }
     }
 
     // MARK: Private
 
+    private enum FocusField: Hashable {
+        case pacURL
+        case host
+        case port
+        case username
+        case password
+        case bypass
+    }
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @State private var store = UpstreamProxyStore.shared
-    @State private var selectedProtocol: ExternalProxyProtocolSelection = .http
-    @State private var isEnabled = false
-    @State private var host = ""
-    @State private var port = "8080"
-    @State private var pacURL = ""
-    @State private var username = ""
-    @State private var password = ""
-    @State private var usesAuthentication = false
-    @State private var bypassText = ""
-    @State private var bypassLocalhost = true
-    @State private var statusMessage: String?
-    @State private var statusIsError = false
-    @State private var isTesting = false
-    @State private var showHelp = false
+    @State private var viewModel = UpstreamProxySettingsViewModel()
+    @FocusState private var focusedField: FocusField?
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private var httpServerLabel: String {
-        switch selectedProtocol {
-        case .https:
-            String(localized: "HTTPS Proxy Server:")
-        case .automatic,
-             .http,
-             .socks5:
-            String(localized: "HTTP Proxy Server:")
-        }
-    }
+    private var header: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "External Proxy"))
+                    .font(toolMetrics.font(weight: .medium))
 
-    private var httpServerPlaceholder: String {
-        switch selectedProtocol {
-        case .https:
-            String(localized: "HTTPS Proxy Server:")
-        case .automatic,
-             .http,
-             .socks5:
-            String(localized: "HTTP Proxy Server:")
-        }
-    }
-
-    private var protocolList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Select a protocol to configure:"))
-                .font(toolMetrics.font())
-
-            VStack(spacing: 0) {
-                ForEach(ExternalProxyProtocolSelection.allCases) { row in
-                    Button {
-                        select(row)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: checkboxSymbol(for: row))
-                                .font(toolMetrics.font(weight: .medium))
-                                .foregroundStyle(
-                                    selectedProtocol == row ? Color.white : Color(nsColor: .tertiaryLabelColor)
-                                )
-                                .frame(width: 18)
-
-                            Text(row.displayName)
-                                .font(toolMetrics.font(weight: selectedProtocol == row ? .semibold : .regular))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.9)
-
-                            if row == .socks5, !store.canSelectSOCKS5 {
-                                Image(systemName: "lock.fill")
-                                    .font(toolMetrics.metadataFont())
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .foregroundStyle(rowForeground(row))
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
-                        .background(selectedProtocol == row ? Color.accentColor : Color.clear)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .frame(width: toolMetrics.fieldWidth(350), height: 230, alignment: .top)
-            .background(Color(nsColor: .textBackgroundColor))
-            .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-        }
-    }
-
-    @ViewBuilder private var configurationPanel: some View {
-        switch selectedProtocol {
-        case .automatic:
-            VStack(alignment: .leading, spacing: 10) {
-                Text(String(localized: "Proxy Configuration URL:"))
-                    .font(toolMetrics.font())
-                TextField(String(localized: "http://my-server.com/proxy.pac"), text: $pacURL)
-                    .textFieldStyle(.roundedBorder)
-                    .font(toolMetrics.font())
-                    .frame(maxWidth: toolMetrics.fieldWidth(470), minHeight: toolMetrics.formControlHeight)
-                Text(
-                    String(
-                        localized: "If your network administrator provided you with the address of an automatic proxy configuration (.pac) file, enter it above."
-                    )
-                )
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        case .http,
-             .https:
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 16) {
-                    labeledTextField(httpServerLabel, placeholder: httpServerPlaceholder, text: $host)
-                    labeledTextField(String(localized: "Port:"), placeholder: "8080", text: $port, width: 96)
-                }
-
-                Toggle(String(localized: "Proxy server requires password"), isOn: $usesAuthentication)
-                    .toggleStyle(.checkbox)
-                    .disabled(!store.canEnableAuthentication)
-
-                if !store.canEnableAuthentication {
-                    PolicyLockNotice(
-                        title: String(localized: "Authentication unavailable"),
-                        message: String(
-                            localized: "Authentication is available in the Rockxy Pro. Credentials are not saved."
-                        )
-                    )
-                } else if usesAuthentication {
-                    HStack(spacing: 12) {
-                        labeledTextField(String(localized: "Username:"), text: $username)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "Password:"))
-                                .font(toolMetrics.font())
-                            SecureField(String(localized: "Password"), text: $password)
-                                .textFieldStyle(.roundedBorder)
-                                .font(toolMetrics.font())
-                                .frame(minHeight: toolMetrics.formControlHeight)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        case .socks5:
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "SOCKS Proxy Server"))
-                        .font(toolMetrics.font())
-                    HStack(spacing: 8) {
-                        TextField(String(localized: "127.0.0.1"), text: $host)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font())
-                            .frame(maxWidth: toolMetrics.fieldWidth(390), minHeight: toolMetrics.formControlHeight)
-                            .disabled(!store.canSelectSOCKS5)
-                        Text(":")
-                            .font(toolMetrics.font(weight: .semibold))
-                        TextField(String(localized: "8080"), text: $port)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font(monospaced: true))
-                            .frame(width: toolMetrics.fieldWidth(86))
-                            .frame(minHeight: toolMetrics.formControlHeight)
-                            .disabled(!store.canSelectSOCKS5)
-                    }
-                }
-
-                Toggle(String(localized: "Proxy Server requires password"), isOn: $usesAuthentication)
-                    .toggleStyle(.checkbox)
-                    .disabled(true)
-
-                HStack(spacing: 12) {
-                    Text(String(localized: "Username:"))
-                        .foregroundStyle(.secondary)
-                        .frame(width: toolMetrics.formCompactLabelWidth, alignment: .leading)
-                    TextField("", text: $username)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                        .disabled(true)
-                }
-
-                HStack(spacing: 12) {
-                    Text(String(localized: "Password:"))
-                        .foregroundStyle(.secondary)
-                        .frame(width: toolMetrics.formCompactLabelWidth, alignment: .leading)
-                    SecureField("", text: $password)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                        .disabled(true)
-                }
-
-                Text(String(localized: "SOCKS Proxy has not supported Authentication yet."))
+                Text(String(localized: "Route eligible captured traffic through an upstream proxy."))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if !store.canSelectSOCKS5 {
-                    PolicyLockNotice(
-                        title: String(localized: "SOCKS5 unavailable"),
-                        message: String(localized: "SOCKS5 upstream proxy is unavailable in this build.")
-                    )
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            Spacer()
+
+            Toggle(
+                String(localized: "Enable External Proxy"),
+                isOn: draftBinding(\.isEnabled)
+            )
+            .toggleStyle(.switch)
+            .accessibilityHint(
+                String(localized: "Changes take effect only after you apply these settings.")
+            )
         }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
     }
 
-    private var bypassSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(String(localized: "Bypass List for External Proxies:"))
-                    .font(toolMetrics.font())
-                Spacer()
-                Text(String(localized: "\(store.bypassEntriesUsed) of \(store.bypassEntriesLimit) used"))
-                    .font(toolMetrics.metadataFont(weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            TextEditor(text: $bypassText)
-                .font(toolMetrics.font(monospaced: true))
-                .frame(height: 88)
-                .scrollContentBackground(.hidden)
-                .background(Color(nsColor: .textBackgroundColor))
-                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+    private var behaviorNotice: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .foregroundStyle(.secondary)
 
             Text(
                 String(
-                    localized: "Support wildcard (* and ?). Separate by comma. Community baseline allows 3 bypass entries."
+                    localized:
+                    """
+                    Applied settings affect new eligible captured connections. Upstream bypass entries are still \
+                    captured by Rockxy; Rockxy connects to those destinations directly instead of using the upstream \
+                    proxy.
+                    """
                 )
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
-            Toggle(String(localized: "Always bypass external proxies for localhost"), isOn: $bypassLocalhost)
-                .toggleStyle(.checkbox)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    private var protocolSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Protocol"))
+                .font(toolMetrics.tableHeaderFont())
+
+            if toolMetrics.bodyFontSize >= 20 {
+                Picker(
+                    String(localized: "Upstream proxy protocol"),
+                    selection: protocolBinding
+                ) {
+                    protocolOptions
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: toolMetrics.menuWidth(360))
+                .accessibilityHint(fieldAccessibilityHint(
+                    for: .protocolSelection,
+                    fallback: String(localized: "Select the upstream proxy protocol.")
+                ))
+            } else {
+                Picker(
+                    String(localized: "Upstream proxy protocol"),
+                    selection: protocolBinding
+                ) {
+                    protocolOptions
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .accessibilityHint(fieldAccessibilityHint(
+                    for: .protocolSelection,
+                    fallback: String(localized: "Select the upstream proxy protocol.")
+                ))
+            }
+
+            if !viewModel.canSelectSOCKS5 {
+                PolicyLockNotice(
+                    title: String(localized: "SOCKS5 unavailable"),
+                    message: String(
+                        localized: "This build keeps SOCKS5 visible for configuration compatibility, but it cannot be selected or applied."
+                    )
+                )
+            }
+
+            fieldError(.protocolSelection)
+        }
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
+    }
+
+    @ViewBuilder
+    private var protocolOptions: some View {
+        ForEach(ExternalProxyProtocolSelection.allCases) { protocolSelection in
+            Text(protocolOptionName(protocolSelection))
+                .tag(protocolSelection)
+                .disabled(protocolSelection == .socks5 && !viewModel.canSelectSOCKS5)
         }
     }
 
-    private func labeledTextField(
-        _ title: String,
-        placeholder: String? = nil,
-        text: Binding<String>,
-        width: CGFloat? = nil
-    )
-        -> some View
-    {
+    private var endpointSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            Text(endpointSectionTitle)
+                .font(toolMetrics.tableHeaderFont())
+
+            switch viewModel.draft.selectedProtocol {
+            case .automatic:
+                pacConfiguration
+            case .http,
+                 .https,
+                 .socks5:
+                serverConfiguration
+            }
+        }
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
+    }
+
+    private var endpointSectionTitle: String {
+        switch viewModel.draft.selectedProtocol {
+        case .automatic:
+            String(localized: "Automatic Configuration")
+        case .http:
+            String(localized: "HTTP Proxy")
+        case .https:
+            String(localized: "HTTPS Proxy")
+        case .socks5:
+            String(localized: "SOCKS5 Proxy")
+        }
+    }
+
+    private var pacConfiguration: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(String(localized: "PAC URL"))
                 .font(toolMetrics.font())
-            TextField(placeholder ?? title, text: text)
-                .textFieldStyle(.roundedBorder)
-                .font(toolMetrics.font())
-                .frame(width: width.map { toolMetrics.fieldWidth($0) })
-                .frame(minHeight: toolMetrics.formControlHeight)
+            TextField(
+                String(localized: "https://proxy.example.com/proxy.pac"),
+                text: draftBinding(\.pacURL)
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font())
+            .frame(height: toolMetrics.formControlHeight)
+            .focused($focusedField, equals: .pacURL)
+            .accessibilityLabel(String(localized: "Proxy automatic configuration URL"))
+            .accessibilityHint(fieldAccessibilityHint(
+                for: .pacURL,
+                fallback: String(localized: "Enter an HTTP or HTTPS PAC file URL.")
+            ))
+
+            if let message = viewModel.validationMessage(for: .pacURL) {
+                validationText(message)
+            } else {
+                Text(String(localized: "Rockxy downloads this PAC file when resolving a new route."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    private func select(_ row: ExternalProxyProtocolSelection) {
-        selectedProtocol = row
-        if row == .socks5, host.isEmpty {
-            host = "127.0.0.1"
+    private var serverConfiguration: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Host"))
+                        .font(toolMetrics.font())
+                    TextField(
+                        String(localized: "proxy.example.com"),
+                        text: draftBinding(\.host)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .frame(height: toolMetrics.formControlHeight)
+                    .focused($focusedField, equals: .host)
+                    .accessibilityLabel(String(localized: "Upstream proxy host"))
+                    .accessibilityHint(fieldAccessibilityHint(
+                        for: .host,
+                        fallback: String(localized: "Enter a hostname or IP address without a URL scheme.")
+                    ))
+                    fieldError(.host)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Port"))
+                        .font(toolMetrics.font())
+                    TextField(
+                        String(localized: "8080"),
+                        text: draftBinding(\.portText)
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font(monospaced: true))
+                    .frame(width: toolMetrics.fieldWidth(110), height: toolMetrics.formControlHeight)
+                    .focused($focusedField, equals: .port)
+                    .accessibilityLabel(String(localized: "Upstream proxy port"))
+                    .accessibilityHint(fieldAccessibilityHint(
+                        for: .port,
+                        fallback: String(localized: "Enter a port between 1 and 65535.")
+                    ))
+                    fieldError(.port)
+                }
+            }
+
+            Divider()
+
+            authenticationSection
         }
-        if port.isEmpty {
-            port = "8080"
+    }
+
+    private var authenticationSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            Toggle(
+                String(localized: "Proxy requires authentication"),
+                isOn: draftBinding(\.usesAuthentication)
+            )
+            .toggleStyle(.checkbox)
+            .disabled(viewModel.isAuthenticationToggleDisabled)
+            .accessibilityHint(fieldAccessibilityHint(
+                for: .authentication,
+                fallback: String(localized: "Use saved credentials for the upstream proxy.")
+            ))
+
+            if !viewModel.canEnableAuthentication {
+                PolicyLockNotice(
+                    title: String(localized: "Authentication unavailable"),
+                    message: String(
+                        localized:
+                        """
+                        This build does not allow upstream proxy credentials. Existing saved credentials remain in \
+                        secure storage until authentication is removed and applied.
+                        """
+                    )
+                )
+            } else if viewModel.draft.usesAuthentication {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(localized: "Username"))
+                            .font(toolMetrics.font())
+                        TextField(
+                            String(localized: "Username"),
+                            text: draftBinding(\.username)
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .frame(height: toolMetrics.formControlHeight)
+                        .focused($focusedField, equals: .username)
+                        .accessibilityHint(fieldAccessibilityHint(
+                            for: .username,
+                            fallback: String(localized: "Enter the upstream proxy username.")
+                        ))
+                        fieldError(.username)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(localized: "Password"))
+                            .font(toolMetrics.font())
+                        SecureField(
+                            viewModel.draft.hasStoredCredentials
+                                ? String(localized: "Leave blank to keep saved password")
+                                : String(localized: "Password"),
+                            text: draftBinding(\.password)
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .frame(height: toolMetrics.formControlHeight)
+                        .focused($focusedField, equals: .password)
+                        .accessibilityHint(fieldAccessibilityHint(
+                            for: .password,
+                            fallback: viewModel.draft.hasStoredCredentials
+                                ? String(localized: "Leave blank to keep the saved password.")
+                                : String(localized: "Enter the upstream proxy password.")
+                        ))
+                        fieldError(.password)
+                    }
+                }
+            }
+
+            fieldError(.authentication)
         }
-        statusMessage = nil
-        statusIsError = false
     }
 
-    private func rowForeground(_ row: ExternalProxyProtocolSelection) -> Color {
-        if selectedProtocol == row {
-            return .white
+    private var bypassSection: some View {
+        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+            HStack {
+                Text(String(localized: "Upstream Bypass"))
+                    .font(toolMetrics.tableHeaderFont())
+
+                Spacer()
+
+                Text(
+                    String(
+                        localized: "\(viewModel.bypassEntriesUsed) of \(viewModel.bypassEntriesLimit) entries"
+                    )
+                )
+                .font(toolMetrics.metadataFont(weight: .medium))
+                .foregroundStyle(
+                    viewModel.bypassEntriesUsed > viewModel.bypassEntriesLimit
+                        ? Color.red
+                        : Color.secondary
+                )
+            }
+
+            TextEditor(text: draftBinding(\.bypassText))
+                .font(toolMetrics.font(monospaced: true))
+                .frame(height: 88)
+                .scrollContentBackground(.hidden)
+                .padding(4)
+                .background(Color(nsColor: .textBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+                .focused($focusedField, equals: .bypass)
+                .accessibilityLabel(String(localized: "Upstream proxy bypass host patterns"))
+                .accessibilityHint(fieldAccessibilityHint(
+                    for: .bypass,
+                    fallback: String(localized: "Separate host patterns with commas or new lines.")
+                ))
+
+            fieldError(.bypass)
+
+            Text(
+                String(
+                    localized: "Separate host patterns with commas or new lines. Wildcards * and ? are supported; duplicates are removed when applied."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+
+            Toggle(
+                String(localized: "Always bypass the upstream proxy for localhost"),
+                isOn: draftBinding(\.bypassLocalhost)
+            )
+            .toggleStyle(.checkbox)
         }
-        return .primary
+        .padding(toolMetrics.formHorizontalPadding)
+        .panelStyle()
     }
 
-    private func checkboxSymbol(for row: ExternalProxyProtocolSelection) -> String {
-        selectedProtocol == row ? "checkmark.square.fill" : "square.fill"
+    @ViewBuilder
+    private var statusSection: some View {
+        if viewModel.hasExternalConflict {
+            HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(.orange)
+
+                Text(
+                    String(
+                        localized: "The saved Upstream Proxy configuration changed while you were editing."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+
+                Spacer()
+
+                Button(String(localized: "Keep Editing")) {
+                    viewModel.keepEditingAfterExternalChange()
+                }
+
+                Button(String(localized: "Reload")) {
+                    viewModel.reloadExternalConfiguration()
+                }
+            }
+            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+            .padding(.vertical, toolMetrics.controlSpacing)
+        } else if let status = viewModel.status {
+            StatusDisclosure(status: status)
+                .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                .padding(.vertical, toolMetrics.controlSpacing)
+        }
     }
 
-    private func loadDraft() {
-        let configuration = store.configuration
-        selectedProtocol = ExternalProxyProtocolSelection(configuration.type)
-        isEnabled = configuration.isEnabled
-        host = configuration.host
-        port = "\(configuration.port)"
-        username = configuration.username ?? ""
-        pacURL = configuration.pacURL ?? ""
-        usesAuthentication = configuration.hasCredentials
-        bypassText = configuration.bypassHostPatterns.joined(separator: ", ")
-        bypassLocalhost = configuration.bypassLocalhost
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Text(
+                viewModel.isDirty
+                    ? String(localized: "Unsaved changes")
+                    : String(localized: "Saved configuration")
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+
+            Spacer()
+
+            footerActions
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
-    private func makeDraft() -> ExternalProxySettingsDraft {
-        ExternalProxySettingsDraft(
-            isEnabled: isEnabled,
-            selectedProtocol: selectedProtocol,
-            host: host,
-            portText: port,
-            pacURL: pacURL,
-            usesAuthentication: usesAuthentication,
-            username: username,
-            password: password,
-            bypassText: bypassText,
-            bypassLocalhost: bypassLocalhost
+    private var footerActions: some View {
+        HStack(spacing: Theme.Layout.controlSpacing) {
+            Button(
+                viewModel.isTesting
+                    ? String(localized: "Testing…")
+                    : String(localized: "Test Connection")
+            ) {
+                Task {
+                    await viewModel.testConnection()
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .disabled(!viewModel.canTest)
+
+            Button {
+                dismiss()
+            } label: {
+                footerButtonLabel(String(localized: "Cancel"))
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Button {
+                applyAndDismiss()
+            } label: {
+                footerButtonLabel(String(localized: "Apply"))
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(!viewModel.canApply)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: toolMetrics.footerButtonWidth - (toolMetrics.controlSpacing * 3)
+            )
+    }
+
+    private var protocolBinding: Binding<ExternalProxyProtocolSelection> {
+        Binding(
+            get: { viewModel.draft.selectedProtocol },
+            set: { selection in
+                guard selection != .socks5 || viewModel.canSelectSOCKS5 else {
+                    return
+                }
+                viewModel.draft.selectedProtocol = selection
+            }
         )
     }
 
-    private func saveAndDismiss() {
-        do {
-            try saveDraft()
-            dismiss()
-        } catch {
-            statusMessage = error.localizedDescription
-            statusIsError = true
+    private func protocolOptionName(
+        _ selection: ExternalProxyProtocolSelection
+    ) -> String {
+        guard selection == .socks5, !viewModel.canSelectSOCKS5 else {
+            return selection.displayName
+        }
+        return String(localized: "\(selection.displayName) — Unavailable")
+    }
+
+    private func draftBinding<Value>(
+        _ keyPath: WritableKeyPath<ExternalProxySettingsDraft, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { viewModel.draft[keyPath: keyPath] },
+            set: { viewModel.draft[keyPath: keyPath] = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private func fieldError(_ field: UpstreamProxySettingsField) -> some View {
+        if let message = viewModel.validationMessage(for: field) {
+            validationText(message)
         }
     }
 
-    private func saveDraft() throws {
-        let draft = makeDraft()
-        let configuration = try draft.configuration()
-        let credentials = draft.credentials()
-        try store.saveConfiguration(configuration, credentials: credentials)
-        statusMessage = String(localized: "External Proxy settings saved.")
-        statusIsError = false
+    private func validationText(_ message: String) -> some View {
+        Text(message)
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func testConnection() {
-        Task {
-            isTesting = true
-            defer { isTesting = false }
-            do {
-                try saveDraft()
-                let result = await store.testConnection()
-                switch result {
-                case let .success(testResult):
-                    statusMessage = testResult.displayMessage
-                    statusIsError = false
-                case let .failure(error):
-                    statusMessage = error.localizedDescription
-                    statusIsError = true
-                }
-            } catch {
-                statusMessage = error.localizedDescription
-                statusIsError = true
-            }
+    private func fieldAccessibilityHint(
+        for field: UpstreamProxySettingsField,
+        fallback: String
+    ) -> String {
+        viewModel.validationMessage(for: field) ?? fallback
+    }
+
+    private func applyAndDismiss() {
+        do {
+            try viewModel.apply()
+            dismiss()
+        } catch {
+            // The view model keeps field-level errors visible. Unexpected store
+            // failures are surfaced through the same status region.
         }
     }
 }
@@ -422,8 +562,7 @@ struct ExternalProxySettingsView: View {
 // MARK: - StatusDisclosure
 
 private struct StatusDisclosure: View {
-    let message: String
-    let isError: Bool
+    let status: UpstreamProxySettingsStatus
 
     var body: some View {
         HStack(spacing: 8) {
@@ -433,11 +572,9 @@ private struct StatusDisclosure: View {
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(isError ? .primary : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
     }
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -445,45 +582,32 @@ private struct StatusDisclosure: View {
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
-}
 
-// MARK: - PolicyLockNotice
-
-struct PolicyLockNotice: View {
-    let title: String
-    let message: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock.fill")
-                .font(toolMetrics.metadataFont(weight: .semibold))
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(toolMetrics.secondaryFont(weight: .semibold))
-                Text(message)
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    private var isError: Bool {
+        if case .failure = status {
+            return true
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        return false
     }
 
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private var message: String {
+        switch status {
+        case let .success(message),
+             let .failure(message):
+            message
+        }
     }
 }
 
-private extension UpstreamProxyTestResult {
-    var displayMessage: String {
-        let milliseconds = duration.components.seconds * 1_000 + duration.components.attoseconds / 1_000_000_000_000_000
-        let typeName = resolvedPACRoute?.displayName ?? negotiatedType?.displayName ?? String(localized: "Direct")
-        return String(localized: "Connected to \(targetHost):\(targetPort) through \(typeName) in \(milliseconds) ms.")
+private extension View {
+    func panelStyle() -> some View {
+        background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
     }
 }

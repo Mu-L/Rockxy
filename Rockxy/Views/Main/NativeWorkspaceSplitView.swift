@@ -47,6 +47,38 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
 
     // MARK: Internal
 
+    // MARK: - Coordinator
+
+    final class Coordinator {
+        // MARK: Internal
+
+        func recordInitialPresentation(sidebar: Bool, inspector: Bool) {
+            lastAppliedSidebarPresentation = sidebar
+            lastAppliedInspectorPresentation = inspector
+        }
+
+        func shouldApplySidebarPresentation(_ isPresented: Bool) -> Bool {
+            guard lastAppliedSidebarPresentation != isPresented else {
+                return false
+            }
+            lastAppliedSidebarPresentation = isPresented
+            return true
+        }
+
+        func shouldApplyInspectorPresentation(_ isPresented: Bool) -> Bool {
+            guard lastAppliedInspectorPresentation != isPresented else {
+                return false
+            }
+            lastAppliedInspectorPresentation = isPresented
+            return true
+        }
+
+        // MARK: Private
+
+        private var lastAppliedSidebarPresentation: Bool?
+        private var lastAppliedInspectorPresentation: Bool?
+    }
+
     @Binding var isSidebarPresented: Bool
     @Binding var isInspectorPresented: Bool
 
@@ -117,7 +149,9 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
         _ proposal: ProposedViewSize,
         nsViewController: NativeWorkspaceSplitViewController,
         context: Context
-    ) -> CGSize? {
+    )
+        -> CGSize?
+    {
         let naturalWidth = sidebarIdealWidth + workspaceMinimumWidth + inspectorIdealWidth
         let resolved = proposal.replacingUnspecifiedDimensions(
             by: CGSize(width: naturalWidth, height: MainWindowLayoutMetrics.defaultHeight)
@@ -132,7 +166,9 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
 
     private func hostingController<Content: View>(
         content: @escaping () -> Content
-    ) -> NSHostingController<NativeWorkspaceDeferredContent<Content>> {
+    )
+        -> NSHostingController<NativeWorkspaceDeferredContent<Content>>
+    {
         let controller = NSHostingController(
             rootView: NativeWorkspaceDeferredContent(content: content)
         )
@@ -156,34 +192,6 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
             }
             inspectorPresentation.wrappedValue = isVisible
         }
-    }
-
-    // MARK: - Coordinator
-
-    final class Coordinator {
-        func recordInitialPresentation(sidebar: Bool, inspector: Bool) {
-            lastAppliedSidebarPresentation = sidebar
-            lastAppliedInspectorPresentation = inspector
-        }
-
-        func shouldApplySidebarPresentation(_ isPresented: Bool) -> Bool {
-            guard lastAppliedSidebarPresentation != isPresented else {
-                return false
-            }
-            lastAppliedSidebarPresentation = isPresented
-            return true
-        }
-
-        func shouldApplyInspectorPresentation(_ isPresented: Bool) -> Bool {
-            guard lastAppliedInspectorPresentation != isPresented else {
-                return false
-            }
-            lastAppliedInspectorPresentation = isPresented
-            return true
-        }
-
-        private var lastAppliedSidebarPresentation: Bool?
-        private var lastAppliedInspectorPresentation: Bool?
     }
 }
 
@@ -210,6 +218,111 @@ struct NativeWorkspaceSplitLayout {
     let inspectorMaximumWidth: CGFloat
 }
 
+// MARK: - NativeWorkspaceSplitSizing
+
+/// Pure sizing math for the workspace split's initial layout pass.
+///
+/// Kept free of AppKit state so startup readiness and ideal-divider placement can be
+/// verified deterministically without a live window.
+enum NativeWorkspaceSplitSizing {
+    struct IdealPlacement: Equatable {
+        var leadingDividerPosition: CGFloat?
+        var trailingDividerPosition: CGFloat?
+    }
+
+    /// Bounds are usable once both dimensions are finite and strictly positive.
+    ///
+    /// Reads the raw stored size rather than `CGRect.width`/`.height`, which standardize a
+    /// negative size and report it as positive — a raw-negative provisional frame must be
+    /// rejected, not silently accepted.
+    static func isLayoutReady(_ bounds: CGRect) -> Bool {
+        let width = bounds.size.width
+        let height = bounds.size.height
+        return width.isFinite
+            && height.isFinite
+            && width > 0
+            && height > 0
+    }
+
+    /// Whether `totalWidth` can seat every currently requested presented pane at its declared
+    /// minimum thickness, including the workspace minimum and each active divider.
+    ///
+    /// A merely positive, finite width is not sufficient readiness: an early provisional AppKit
+    /// layout pass can report a positive-but-too-narrow width. Consuming pending visibility and
+    /// latching the initial layout there seats the panes at their minima and blocks the later,
+    /// correctly-sized pass from applying ideal widths.
+    static func canSeatRequestedMinima(
+        totalWidth: CGFloat,
+        dividerThickness: CGFloat,
+        sidebarPresented: Bool,
+        inspectorPresented: Bool,
+        sidebarMinimumWidth: CGFloat,
+        workspaceMinimumWidth: CGFloat,
+        inspectorMinimumWidth: CGFloat
+    )
+        -> Bool
+    {
+        guard totalWidth.isFinite, totalWidth > 0 else {
+            return false
+        }
+
+        let sidebarWidth = sidebarPresented ? sidebarMinimumWidth : 0
+        let inspectorWidth = inspectorPresented ? inspectorMinimumWidth : 0
+        let leadingDivider = sidebarPresented ? dividerThickness : 0
+        let trailingDivider = inspectorPresented ? dividerThickness : 0
+
+        let required = sidebarWidth
+            + inspectorWidth
+            + leadingDivider
+            + trailingDivider
+            + workspaceMinimumWidth
+        return totalWidth >= required
+    }
+
+    /// Ideal divider positions for the presented panes, or `nil` when the split view is too
+    /// narrow to seat every presented pane at its declared minimum thickness (dividers
+    /// included). Returning `nil` tells the caller to defer to AppKit constraints instead of
+    /// forcing a position that would drive a pane — and its geometry — negative.
+    static func idealPlacement(
+        totalWidth: CGFloat,
+        dividerThickness: CGFloat,
+        sidebarPresented: Bool,
+        inspectorPresented: Bool,
+        sidebarIdealWidth: CGFloat,
+        inspectorIdealWidth: CGFloat,
+        sidebarMinimumWidth: CGFloat,
+        workspaceMinimumWidth: CGFloat,
+        inspectorMinimumWidth: CGFloat
+    )
+        -> IdealPlacement?
+    {
+        guard totalWidth.isFinite, totalWidth > 0 else {
+            return nil
+        }
+
+        let sidebarWidth = sidebarPresented ? max(sidebarIdealWidth, sidebarMinimumWidth) : 0
+        let inspectorWidth = inspectorPresented ? max(inspectorIdealWidth, inspectorMinimumWidth) : 0
+        let leadingDivider = sidebarPresented ? dividerThickness : 0
+        let trailingDivider = inspectorPresented ? dividerThickness : 0
+
+        let workspaceWidth = totalWidth
+            - sidebarWidth
+            - inspectorWidth
+            - leadingDivider
+            - trailingDivider
+        guard workspaceWidth >= workspaceMinimumWidth else {
+            return nil
+        }
+
+        return IdealPlacement(
+            leadingDividerPosition: sidebarPresented ? sidebarWidth : nil,
+            trailingDividerPosition: inspectorPresented
+                ? totalWidth - inspectorWidth - trailingDivider
+                : nil
+        )
+    }
+}
+
 // MARK: - NativeWorkspaceSplitViewController
 
 @MainActor
@@ -219,12 +332,59 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
     var onSidebarVisibilityChanged: ((Bool) -> Void)?
     var onInspectorVisibilityChanged: ((Bool) -> Void)?
 
+    var toolbarConfiguration: NativeWorkspaceToolbarConfiguration?
+
     var isSidebarPresented: Bool {
         sidebarItem.map { !$0.isCollapsed } ?? false
     }
 
     var isInspectorPresented: Bool {
         inspectorItem.map { !$0.isCollapsed } ?? false
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        installWindowChromeIfNeeded()
+        guard !didApplyInitialLayout else {
+            return
+        }
+        let bounds = splitView.bounds
+        guard NativeWorkspaceSplitSizing.isLayoutReady(bounds),
+              NativeWorkspaceSplitSizing.canSeatRequestedMinima(
+                  totalWidth: bounds.width,
+                  dividerThickness: splitView.dividerThickness,
+                  sidebarPresented: requestedSidebarVisibility,
+                  inspectorPresented: requestedInspectorVisibility,
+                  sidebarMinimumWidth: sidebarMinimumWidth,
+                  workspaceMinimumWidth: workspaceMinimumWidth,
+                  inspectorMinimumWidth: inspectorMinimumWidth
+              ) else
+        {
+            return
+        }
+        didApplyInitialLayout = true
+
+        if let pendingInitialSidebarVisibility {
+            self.pendingInitialSidebarVisibility = nil
+            setSidebarPresented(pendingInitialSidebarVisibility, animated: false)
+        }
+        if let pendingInitialInspectorVisibility {
+            self.pendingInitialInspectorVisibility = nil
+            setInspectorPresented(pendingInitialInspectorVisibility, animated: false)
+        }
+
+        if !hasAutosavedFrames {
+            applyIdealInitialPositions(totalWidth: bounds.width)
+        }
+        isApplyingInitialState = false
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        installWindowChromeIfNeeded()
+        DispatchQueue.main.async { [weak self] in
+            self?.installWindowChromeIfNeeded()
+        }
     }
 
     func configure(
@@ -273,14 +433,18 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
         self.inspectorItem = inspectorItem
         self.sidebarIdealWidth = layout.sidebarIdealWidth
         self.inspectorIdealWidth = layout.inspectorIdealWidth
+        sidebarMinimumWidth = layout.sidebarMinimumWidth
+        workspaceMinimumWidth = layout.workspaceMinimumWidth
+        inspectorMinimumWidth = layout.inspectorMinimumWidth
         requestedSidebarVisibility = isSidebarPresented
         requestedInspectorVisibility = isInspectorPresented
         pendingInitialSidebarVisibility = isSidebarPresented
         pendingInitialInspectorVisibility = isInspectorPresented
         observeCollapseState(of: sidebarItem, isSidebar: true)
         observeCollapseState(of: inspectorItem, isSidebar: false)
-        setSidebarPresented(isSidebarPresented, animated: false)
-        setInspectorPresented(isInspectorPresented, animated: false)
+        // Initial collapse/divider state is deferred to the first valid layout pass
+        // (`viewDidLayout`). Applying it here, while the controller has zero-sized bounds,
+        // is what produced startup `Invalid view geometry` faults.
     }
 
     func setSidebarPresented(_ isPresented: Bool, animated: Bool) {
@@ -293,48 +457,23 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
         set(item: inspectorItem, presented: isPresented, animated: animated)
     }
 
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        installWindowChromeIfNeeded()
-        guard !didApplyInitialLayout else {
-            return
-        }
-        didApplyInitialLayout = true
-
-        if !hasAutosavedFrames {
-            if pendingInitialSidebarVisibility == true {
-                splitView.setPosition(sidebarIdealWidth, ofDividerAt: 0)
-            }
-            if pendingInitialInspectorVisibility == true,
-               splitView.bounds.width > sidebarIdealWidth + inspectorIdealWidth
-            {
-                splitView.setPosition(
-                    splitView.bounds.width - inspectorIdealWidth,
-                    ofDividerAt: 1
-                )
-            }
-        }
-
-        if let pendingInitialSidebarVisibility {
-            self.pendingInitialSidebarVisibility = nil
-            setSidebarPresented(pendingInitialSidebarVisibility, animated: false)
-        }
-        if let pendingInitialInspectorVisibility {
-            self.pendingInitialInspectorVisibility = nil
-            setInspectorPresented(pendingInitialInspectorVisibility, animated: false)
-        }
-        isApplyingInitialState = false
-    }
-
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        installWindowChromeIfNeeded()
-        DispatchQueue.main.async { [weak self] in
-            self?.installWindowChromeIfNeeded()
-        }
-    }
-
     // MARK: Private
+
+    private weak var sidebarItem: NSSplitViewItem?
+    private weak var inspectorItem: NSSplitViewItem?
+    private var collapseObservations: [NSKeyValueObservation] = []
+    private var sidebarIdealWidth: CGFloat = 250
+    private var inspectorIdealWidth: CGFloat = 380
+    private var sidebarMinimumWidth: CGFloat = 0
+    private var workspaceMinimumWidth: CGFloat = 0
+    private var inspectorMinimumWidth: CGFloat = 0
+    private var requestedSidebarVisibility = true
+    private var requestedInspectorVisibility = false
+    private var pendingInitialSidebarVisibility: Bool?
+    private var pendingInitialInspectorVisibility: Bool?
+    private var hasAutosavedFrames = false
+    private var didApplyInitialLayout = false
+    private var isApplyingInitialState = true
 
     private func installWindowChromeIfNeeded() {
         guard let window = view.window else {
@@ -345,6 +484,31 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
             workspaceSplitController: self,
             toolbarConfiguration: toolbarConfiguration
         )
+    }
+
+    private func applyIdealInitialPositions(totalWidth: CGFloat) {
+        guard let placement = NativeWorkspaceSplitSizing.idealPlacement(
+            totalWidth: totalWidth,
+            dividerThickness: splitView.dividerThickness,
+            sidebarPresented: isSidebarPresented,
+            inspectorPresented: isInspectorPresented,
+            sidebarIdealWidth: sidebarIdealWidth,
+            inspectorIdealWidth: inspectorIdealWidth,
+            sidebarMinimumWidth: sidebarMinimumWidth,
+            workspaceMinimumWidth: workspaceMinimumWidth,
+            inspectorMinimumWidth: inspectorMinimumWidth
+        ) else {
+            // The window is too narrow to seat every presented pane at its minimum.
+            // Skip ideal placement and let AppKit constraints choose a safe layout.
+            return
+        }
+
+        if let leading = placement.leadingDividerPosition {
+            splitView.setPosition(leading, ofDividerAt: 0)
+        }
+        if let trailing = placement.trailingDividerPosition {
+            splitView.setPosition(trailing, ofDividerAt: 1)
+        }
     }
 
     private func set(item: NSSplitViewItem?, presented: Bool, animated: Bool) {
@@ -392,18 +556,4 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
             onInspectorVisibilityChanged?(isVisible)
         }
     }
-
-    private weak var sidebarItem: NSSplitViewItem?
-    private weak var inspectorItem: NSSplitViewItem?
-    var toolbarConfiguration: NativeWorkspaceToolbarConfiguration?
-    private var collapseObservations: [NSKeyValueObservation] = []
-    private var sidebarIdealWidth: CGFloat = 250
-    private var inspectorIdealWidth: CGFloat = 380
-    private var requestedSidebarVisibility = true
-    private var requestedInspectorVisibility = false
-    private var pendingInitialSidebarVisibility: Bool?
-    private var pendingInitialInspectorVisibility: Bool?
-    private var hasAutosavedFrames = false
-    private var didApplyInitialLayout = false
-    private var isApplyingInitialState = true
 }

@@ -112,10 +112,20 @@ actor DeveloperSetupProbeServer {
     }
 
     func start(targetID: SetupTarget.ID) async throws -> DeveloperSetupProbeSession {
-        await stop()
+        lifecycleGeneration += 1
+        let generation = lifecycleGeneration
+        let previousChannel = serverChannel
+        let previousGroup = eventLoopGroup
+        serverChannel = nil
+        eventLoopGroup = nil
+        activeSession = nil
+        await close(channel: previousChannel, group: previousGroup)
+
+        guard lifecycleGeneration == generation else {
+            throw CancellationError()
+        }
 
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        eventLoopGroup = group
 
         let placeholderSession = DeveloperSetupProbeSession.make(port: 0, targetID: targetID)
         let bootstrap = ServerBootstrap(group: group)
@@ -142,23 +152,41 @@ actor DeveloperSetupProbeServer {
                 token: placeholderSession.token
             )
 
+            guard lifecycleGeneration == generation else {
+                try? await channel.close().get()
+                throw CancellationError()
+            }
+
+            eventLoopGroup = group
             serverChannel = channel
             activeSession = session
             developerSetupProbeLogger.info("Developer Setup probe server started on 127.0.0.1:\(port)")
             return session
         } catch {
-            try? await group.shutdownGracefully()
-            eventLoopGroup = nil
-            activeSession = nil
+            await close(channel: nil, group: group)
+            if lifecycleGeneration == generation {
+                eventLoopGroup = nil
+                serverChannel = nil
+                activeSession = nil
+            }
             throw error
         }
     }
 
     func stop() async {
+        lifecycleGeneration += 1
         activeSession = nil
         let channel = serverChannel
+        let group = eventLoopGroup
         serverChannel = nil
+        eventLoopGroup = nil
+        await close(channel: channel, group: group)
+    }
 
+    private func close(
+        channel: Channel?,
+        group: MultiThreadedEventLoopGroup?
+    ) async {
         if let channel {
             do {
                 try await channel.close().get()
@@ -167,16 +195,16 @@ actor DeveloperSetupProbeServer {
             }
         }
 
-        if let group = eventLoopGroup {
+        if let group {
             do {
                 try await group.shutdownGracefully()
             } catch {
                 developerSetupProbeLogger.error("Failed to shut down Developer Setup probe event loop: \(error.localizedDescription)")
             }
-            eventLoopGroup = nil
         }
     }
 
+    private var lifecycleGeneration = 0
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var serverChannel: Channel?
 }

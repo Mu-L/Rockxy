@@ -31,6 +31,9 @@ struct BlockListSettingsCodecTests {
             return false
         })
         #expect(rules.first?.matchCondition.urlPattern?.contains(".*") == true)
+        #expect(rules.first?.matchCondition.sourceURLPattern == "*.example.com/ads/*")
+        #expect(rules.first?.matchCondition.matchType == .wildcard)
+        #expect(rules.first?.matchCondition.includeSubpaths == true)
     }
 
     @Test("imports structured Proxyman entries with action and method")
@@ -50,6 +53,9 @@ struct BlockListSettingsCodecTests {
         #expect(rule.isEnabled == false)
         #expect(rule.matchCondition.method == "GET")
         #expect(rule.matchCondition.urlPattern == #"^https://tracker\.example/.*$"#)
+        #expect(rule.matchCondition.sourceURLPattern == #"^https://tracker\.example/.*$"#)
+        #expect(rule.matchCondition.matchType == .regex)
+        #expect(rule.matchCondition.includeSubpaths == false)
         if case let .block(statusCode) = rule.action {
             #expect(statusCode == 0)
         } else {

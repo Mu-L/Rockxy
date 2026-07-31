@@ -62,51 +62,41 @@ struct RockxyApp: App {
 
         Window(String(localized: "Advanced Proxy Settings"), id: "advancedProxySettings") {
             ToolWindowDisplayMetricsProvider {
-                AdvancedProxySettingsView()
+                AdvancedProxySettingsView(coordinator: mainCoordinator)
             }
         }
         .commandsRemoved()
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Babylon Pairing"), id: "babylonPairing") {
-            BabylonPairingView()
+            ToolWindowDisplayMetricsProvider {
+                BabylonPairingView()
+            }
         }
-        .defaultSize(width: 560, height: 360)
+        .commandsRemoved()
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .defaultSize(width: 460, height: 420)
 
         Window(String(localized: "Babylon Runtime"), id: "babylonRuntime") {
-            BabylonRuntimeView()
+            ToolWindowDisplayMetricsProvider {
+                BabylonRuntimeView()
+            }
         }
-        .defaultSize(width: 760, height: 520)
+        .commandsRemoved()
         .windowResizability(.contentSize)
-
-        Window(String(localized: "Developer Setup Hub"), id: "developerSetupHub") {
-            AppUIDisplayMetricsProvider {
-                DeveloperSetupWindowView(coordinator: mainCoordinator)
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 1_180, height: 760)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
+        .defaultSize(width: 920, height: 660)
 
-        Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
-            ToolWindowDisplayMetricsProvider {
-                MacCertificateSetupGuideView()
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 860, height: 540)
-        .defaultPosition(.center)
-        .windowToolbarStyle(.unifiedCompact)
+        developerSetupWindow
 
-        Window(String(localized: "Custom Certificates"), id: "customCertificates") {
-            ToolWindowDisplayMetricsProvider {
-                CustomCertificatesView()
-            }
-        }
-        .commandsRemoved()
-        .defaultSize(width: 940, height: 600)
-        .defaultPosition(.center)
-        .windowToolbarStyle(.unifiedCompact)
+        macCertificateSetupGuideWindow
+
+        customCertificatesWindow
 
         Window(String(localized: "Automatic Setup"), id: "automaticSetup") {
             AppUIDisplayMetricsProvider {
@@ -114,10 +104,10 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 760, height: 500)
+        .defaultSize(width: 760, height: 520)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
 
         Window(String(localized: "Manual Setup"), id: "manualSetup") {
             AppUIDisplayMetricsProvider {
@@ -125,10 +115,10 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 780, height: 540)
+        .defaultSize(width: 780, height: 560)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
 
         Window(String(localized: "Map Local"), id: "mapLocal") {
             ToolWindowDisplayMetricsProvider {
@@ -198,7 +188,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "SSL Proxying List"), id: "sslProxyingList") {
+        Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList") {
             ToolWindowDisplayMetricsProvider {
                 SSLProxyingListView()
             }
@@ -208,7 +198,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Bypass Proxy List"), id: "bypassProxyList") {
+        Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList") {
             ToolWindowDisplayMetricsProvider {
                 BypassProxyListView()
             }
@@ -216,6 +206,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "External Proxy Settings"), id: "externalProxySettings") {
             ToolWindowDisplayMetricsProvider {
@@ -225,6 +216,8 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 900, height: 680)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "SOCKS Proxy Settings"), id: "socksProxySettings") {
             ToolWindowDisplayMetricsProvider {
@@ -234,6 +227,8 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 640, height: 280)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Allow List"), id: "allowList") {
             ToolWindowDisplayMetricsProvider {
@@ -253,6 +248,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .defaultSize(width: 1_240, height: 820)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Scripting"), id: "scriptingList") {
             ToolWindowDisplayMetricsProvider {
@@ -260,9 +256,9 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .windowResizability(.contentSize)
         .defaultPosition(.center)
-        .defaultSize(width: 1_200, height: 672)
+        .defaultSize(width: 1_120, height: 700)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Script Editor"), id: "scriptEditor") {
             ToolWindowDisplayMetricsProvider {
@@ -270,28 +266,35 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 1_120, height: 690)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+        .rockxyDisablingRestorationOnModernMacOS()
 
-        Window(String(localized: "Body Previewer Tabs"), id: "bodyPreviewerTabs") {
+        Window(String(localized: "Inspector Preview Tabs"), id: "bodyPreviewerTabs") {
             ToolWindowDisplayMetricsProvider {
-                PreviewerTabSettingsView()
+                PreviewerTabSettingsView(store: mainCoordinator.previewTabStore)
             }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 820, height: 560)
+        .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Custom Columns"), id: "customColumns") {
+        Window(String(localized: "Custom Header Columns"), id: "customColumns") {
             ToolWindowDisplayMetricsProvider {
-                CustomHeaderColumnsView()
+                CustomHeaderColumnsView(store: mainCoordinator.headerColumnStore)
             }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 900, height: 620)
+        .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Protobuf Settings"), id: "protobufSettings") {
+        Window(String(localized: "Protobuf Mapping"), id: "protobufSettings") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSettingsWindowView()
             }
@@ -299,9 +302,10 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 940, height: 620)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Protobuf Schema List"), id: "protobufSchemaList") {
+        Window(String(localized: "Local Protobuf Schemas"), id: "protobufSchemaList") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSchemaListWindowView()
             }
@@ -309,6 +313,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .defaultSize(width: 820, height: 560)
         .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Breakpoint Rules"), id: "breakpointRules") {
@@ -331,7 +336,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Template"), id: "breakpointTemplates") {
+        Window(String(localized: "Breakpoint Templates"), id: "breakpointTemplates") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointTemplateWindowView()
             }
@@ -347,8 +352,9 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 800, height: 500)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         composeWindow
 
@@ -357,6 +363,8 @@ struct RockxyApp: App {
                 SettingsView()
             }
         }
+        .windowResizability(.contentMinSize)
+        .windowToolbarStyle(.unifiedCompact)
     }
 
     // MARK: Private
@@ -367,8 +375,117 @@ struct RockxyApp: App {
 
     @State private var lifecycleState = AppLifecycleState()
 
+    private var developerSetupWindow: some Scene {
+        DeveloperSetupWindowScene(coordinator: mainCoordinator)
+    }
+
+    private var macCertificateSetupGuideWindow: some Scene {
+        MacCertificateSetupGuideWindowScene()
+    }
+
+    private var customCertificatesWindow: some Scene {
+        CustomCertificatesWindowScene()
+    }
+
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+}
+
+// MARK: - CustomCertificatesWindowScene
+
+/// Certificate identities are managed in a focused utility window with
+/// predictable geometry rather than restoring a stale, oversized workspace.
+private struct CustomCertificatesWindowScene: Scene {
+    var body: some Scene {
+        customCertificatesWindow
+    }
+
+    private var customCertificatesWindow: some Scene {
+        let base = Window(String(localized: "Custom Certificates"), id: "customCertificates") {
+            ToolWindowDisplayMetricsProvider {
+                CustomCertificatesView()
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 900, height: 620)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
+    }
+}
+
+// MARK: - MacCertificateSetupGuideWindowScene
+
+/// Certificate setup is a focused utility, so it opens at a predictable size
+/// instead of inheriting geometry from a previous app session.
+private struct MacCertificateSetupGuideWindowScene: Scene {
+    // MARK: Internal
+
+    var body: some Scene {
+        macCertificateSetupGuideWindow
+    }
+
+    // MARK: Private
+
+    private var macCertificateSetupGuideWindow: some Scene {
+        let base = Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
+            ToolWindowDisplayMetricsProvider {
+                MacCertificateSetupGuideView()
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 720, height: 500)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
+    }
+}
+
+// MARK: - DeveloperSetupWindowScene
+
+/// Developer Setup is a utility workspace, so it opens at a compact, predictable
+/// size instead of restoring geometry that can make it rival the main window.
+private struct DeveloperSetupWindowScene: Scene {
+    // MARK: Internal
+
+    let coordinator: MainContentCoordinator
+
+    var body: some Scene {
+        developerSetupWindow
+    }
+
+    // MARK: Private
+
+    private var developerSetupWindow: some Scene {
+        let base = Window(String(localized: "Developer Setup"), id: "developerSetupHub") {
+            AppUIDisplayMetricsProvider {
+                DeveloperSetupWindowView(coordinator: coordinator)
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 1_000, height: 640)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unified(showsTitle: true))
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
@@ -392,13 +509,30 @@ private struct ComposeWindowScene: Scene {
             }
         }
         .commandsRemoved()
-        .defaultSize(width: 900, height: 600)
+        .defaultSize(width: 1_120, height: 720)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         if #available(macOS 15.0, *) {
             return base.restorationBehavior(.disabled)
         } else {
             return base
+        }
+    }
+}
+
+// MARK: - Scene restoration helper
+
+private extension Scene {
+    /// Disable window-state restoration on macOS 15+ so intent-dependent windows
+    /// (like the Script Editor) never re-open empty after a relaunch. On macOS 14
+    /// the window may auto-restore (acceptable degradation), mirroring the
+    /// Compose / Certificate scene wrappers.
+    func rockxyDisablingRestorationOnModernMacOS() -> some Scene {
+        if #available(macOS 15.0, *) {
+            return restorationBehavior(.disabled)
+        } else {
+            return self
         }
     }
 }
@@ -868,12 +1002,12 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "SSL Proxying List…")) {
+            Button(String(localized: "HTTPS Decryption…")) {
                 openWindow(id: "sslProxyingList")
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
 
-            Button(String(localized: "Bypass Proxy List…")) {
+            Button(String(localized: "Full Proxy Bypass…")) {
                 openWindow(id: "bypassProxyList")
             }
             .keyboardShortcut("b", modifiers: [.command, .option])
@@ -887,12 +1021,6 @@ struct RockxyMenuCommands: Commands {
 
                 Button(String(localized: "External Proxy Settings…")) {
                     openWindow(id: "externalProxySettings")
-                }
-
-                Divider()
-
-                Button(String(localized: "SOCKS Proxy Settings…")) {
-                    openWindow(id: "socksProxySettings")
                 }
             }
 
@@ -958,7 +1086,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Body Previewer Tabs…")) {
+            Button(String(localized: "Inspector Preview Tabs…")) {
                 openWindow(id: "bodyPreviewerTabs")
             }
 
@@ -1079,12 +1207,16 @@ struct RockxyMenuCommands: Commands {
     private var setupMenu: some Commands {
         CommandMenu(String(localized: "Setup")) {
             Button(String(localized: "Automatic Setup...")) {
+                _ = DeveloperSetupRouteStore.shared
+                    .requestAutomatic(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "automaticSetup")
             }
 
             Divider()
 
             Button(String(localized: "Manual Setup...")) {
+                DeveloperSetupRouteStore.shared
+                    .requestManual(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "manualSetup")
             }
         }

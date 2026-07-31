@@ -170,24 +170,40 @@ actor ScriptPluginManager {
 
     func reloadPlugin(id: String) async throws {
         guard plugins.contains(where: { $0.id == id }) else {
-            return
+            throw ScriptPluginError.pluginNotFound(id)
         }
         await runtime.unloadPlugin(id: id)
 
         let refreshedPlugins = await discovery.discoverPlugins()
-        guard let refreshed = refreshedPlugins.first(where: { $0.id == id }),
-              let index = plugins.firstIndex(where: { $0.id == id }) else
-        {
-            return
+        guard let refreshed = refreshedPlugins.first(where: { $0.id == id }) else {
+            let message = String(localized: "The script bundle could not be found after reloading.")
+            if let currentIndex = plugins.firstIndex(where: { $0.id == id }) {
+                plugins[currentIndex].status = .error(message)
+                plugins[currentIndex].lastError = message
+            }
+            publishSnapshot()
+            throw ScriptPluginError.pluginNotFound(id)
         }
 
-        plugins[index] = refreshed
-        if refreshed.isEnabled {
+        guard let index = plugins.firstIndex(where: { $0.id == id }) else {
+            throw ScriptPluginError.pluginNotFound(id)
+        }
+        let shouldBeEnabled = plugins[index].isEnabled
+        var updated = refreshed
+        updated.isEnabled = shouldBeEnabled
+        updated.status = shouldBeEnabled ? .loading : .disabled
+        plugins[index] = updated
+        if shouldBeEnabled {
             do {
-                try await runtime.loadPlugin(refreshed)
-                if let j = plugins.firstIndex(where: { $0.id == id }) {
-                    plugins[j].status = .active
+                try await runtime.loadPlugin(updated)
+                guard let j = plugins.firstIndex(where: { $0.id == id }),
+                      plugins[j].isEnabled else
+                {
+                    await runtime.unloadPlugin(id: id)
+                    Self.logger.info("Plugin \(id) removed or disabled during reload — unloaded")
+                    return
                 }
+                plugins[j].status = .active
             } catch {
                 if let j = plugins.firstIndex(where: { $0.id == id }) {
                     plugins[j].status = .error(error.localizedDescription)

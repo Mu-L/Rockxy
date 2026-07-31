@@ -69,11 +69,11 @@ Saved Focus Sets:
 - can be applied, edited, duplicated, expanded to inspect their rules, or deleted;
 - keep their active selection separate in each workspace.
 
-Applying a Focus Set only changes which rows are visible. Capture continues, and the underlying transactions remain available to other workspaces.
+Applying a Focus Set changes the current workspace's visible rows and the pool from which AI Assistant may automatically discover related traffic. Capture continues, the underlying transactions remain available to other workspaces, and requests you explicitly select remain eligible for Assistant review.
 
 ## Noise Control
 
-Noise Control hides traffic that should remain captured but stay out of the current workspace's working set.
+Noise Control hides traffic that should remain captured but stay out of the current workspace's visible working set and automatically discovered AI Assistant context.
 
 In the sidebar's **Focus** mode, choose **Configure** beside **Noise Control**, then mute either:
 
@@ -85,7 +85,7 @@ You can also right-click a domain in **Browse** and choose **Mute Source**.
 Muted sources apply throughout the current workspace, regardless of which Focus Set is active. Use **Unmute** for one source or **Unmute All** to restore them.
 
 <Note>
-Focus Set exclusions belong only to that Focus Set. Noise Control is workspace-wide. Neither feature deletes traffic or prevents it from being captured.
+Focus Set exclusions belong only to that Focus Set. Noise Control is workspace-wide. Neither feature deletes traffic or prevents it from being captured. Review Data can include normally excluded related traffic once without changing either setting.
 </Note>
 
 ## Practical debugging patterns

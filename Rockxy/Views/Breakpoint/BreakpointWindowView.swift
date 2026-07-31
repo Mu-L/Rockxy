@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Presents the breakpoint window for breakpoint review and editing.
+// Presents the native queue used to review and resolve breakpoint-paused traffic.
 
 // MARK: - BreakpointQueueLayoutMode
 
@@ -25,18 +25,17 @@ private enum BreakpointQueueLayoutMode: String, CaseIterable {
     var help: String {
         switch self {
         case .horizontal:
-            String(localized: "Switch Layout Mode: Vertical")
+            String(localized: "Switch to stacked layout")
         case .vertical:
-            String(localized: "Switch Layout Mode: Horizontal")
+            String(localized: "Switch to side-by-side layout")
         }
     }
 }
 
 // MARK: - BreakpointWindowView
 
-/// Standalone window for managing breakpoint-paused requests.
-/// The queue mirrors a native macOS proxy table while the editor keeps the
-/// existing breakpoint editing workflow on the selected item.
+/// Standalone window for reviewing paused traffic without interrupting the
+/// user's current selection when additional breakpoint hits arrive.
 struct BreakpointWindowView: View {
     // MARK: Internal
 
@@ -44,14 +43,35 @@ struct BreakpointWindowView: View {
         VStack(spacing: 0) {
             mainContent
             Divider()
-            queueToolbar
-            Divider()
             actionBar
         }
         .font(toolMetrics.font())
-        .frame(minWidth: 960, minHeight: 560)
+        .frame(
+            minWidth: max(1_060, toolMetrics.bodyFontSize * 34 + 618),
+            minHeight: max(640, toolMetrics.bodyFontSize * 18 + 406)
+        )
+        .onAppear(perform: normalizePersistedLayoutMode)
         .onExitCommand {
             dismiss()
+        }
+        .confirmationDialog(
+            String(localized: "Abort all paused traffic?"),
+            isPresented: $isAbortAllConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button(
+                String(localized: "Abort All with 503"),
+                role: .destructive
+            ) {
+                manager.resolveAll(decision: .abort)
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(
+                String(
+                    localized: "\(manager.pausedItems.count) paused items will receive a 503 Service Unavailable response."
+                )
+            )
         }
     }
 
@@ -61,10 +81,10 @@ struct BreakpointWindowView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @AppStorage("breakpointQueueLayoutMode") private var layoutModeRaw = BreakpointQueueLayoutMode.horizontal.rawValue
+    @State private var canApplySelectedChanges = true
+    @State private var isAbortAllConfirmationPresented = false
 
     private let manager = BreakpointManager.shared
-    private let windowModel = BreakpointWindowModel.shared
-    private let queueRatio: CGFloat = 0.4
 
     private var layoutMode: BreakpointQueueLayoutMode {
         get { BreakpointQueueLayoutMode(rawValue: layoutModeRaw) ?? .horizontal }
@@ -73,43 +93,68 @@ struct BreakpointWindowView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        GeometryReader { geometry in
-            switch layoutMode {
-            case .horizontal:
-                HStack(spacing: 0) {
-                    queueTable
-                        .frame(width: max(360, geometry.size.width * queueRatio))
-                    Divider()
-                    editor
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            case .vertical:
-                VStack(spacing: 0) {
-                    queueTable
-                        .frame(height: max(180, geometry.size.height * queueRatio))
-                    Divider()
-                    editor
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+        switch layoutMode {
+        case .horizontal:
+            HSplitView {
+                queuePanel
+                    .frame(minWidth: 320, idealWidth: 380, maxWidth: 480)
+                editor
+                    .frame(minWidth: 660)
+            }
+        case .vertical:
+            VSplitView {
+                queuePanel
+                    .frame(minHeight: 210, idealHeight: 260)
+                editor
+                    .frame(minHeight: 380)
             }
         }
-        .onAppear(perform: normalizePersistedLayoutMode)
     }
 
-    private var queueTable: some View {
-        BreakpointQueueTableView(manager: manager, centersEmptyState: layoutMode == .vertical)
-    }
+    private var queuePanel: some View {
+        VStack(spacing: 0) {
+            queueHeader
+            Divider()
 
-    private var editor: some View {
-        BreakpointEditorView(manager: manager, windowModel: windowModel)
-    }
-
-    private var queueToolbar: some View {
-        HStack(spacing: 8) {
-            Button(String(localized: "Manage Rules")) {
-                openWindow(id: "breakpointRules")
+            ZStack {
+                if manager.pausedItems.isEmpty {
+                    ContentUnavailableView {
+                        Label(String(localized: "No Paused Traffic"), systemImage: "pause.circle")
+                    } description: {
+                        Text(String(localized: "Traffic matching an enabled breakpoint rule will appear here."))
+                    } actions: {
+                        Button(String(localized: "Manage Rules")) {
+                            openWindow(id: "breakpointRules")
+                        }
+                    }
+                } else {
+                    List(selection: queueSelection) {
+                        ForEach(manager.pausedItems) { item in
+                            BreakpointQueueRow(item: item)
+                                .tag(item.id)
+                        }
+                    }
+                    .listStyle(.inset(alternatesRowBackgrounds: true))
+                }
             }
-            .keyboardShortcut("b", modifiers: .command)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
+
+            Divider()
+            queueFooter
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var queueHeader: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Paused Traffic"))
+                    .font(toolMetrics.font(weight: .semibold))
+                Text(queueSummary)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 
@@ -119,16 +164,55 @@ struct BreakpointWindowView: View {
                 Label(String(localized: "Switch Layout"), systemImage: layoutMode.systemImage)
                     .labelStyle(.iconOnly)
             }
+            .buttonStyle(.borderless)
             .help(layoutMode.help)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, 10)
+    }
 
-            Divider()
-                .frame(height: toolMetrics.footerControlHeight - 4)
+    private var queueFooter: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Button {
+                manager.selectPreviousItem()
+            } label: {
+                Label(String(localized: "Previous Item"), systemImage: "chevron.up")
+                    .labelStyle(.iconOnly)
+            }
+            .keyboardShortcut("[", modifiers: .command)
+            .disabled(!manager.hasPausedItems)
+            .help(String(localized: "Previous Item (⌘[)"))
+
+            Button {
+                manager.selectNextItem()
+            } label: {
+                Label(String(localized: "Next Item"), systemImage: "chevron.down")
+                    .labelStyle(.iconOnly)
+            }
+            .keyboardShortcut("]", modifiers: .command)
+            .disabled(!manager.hasPausedItems)
+            .help(String(localized: "Next Item (⌘])"))
+
+            Spacer()
+
+            Button(String(localized: "Manage Rules")) {
+                openWindow(id: "breakpointRules")
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
 
             moreMenu
         }
+        .controlSize(.small)
+        .frame(minHeight: toolMetrics.footerControlHeight)
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .padding(.vertical, 7)
+    }
+
+    private var editor: some View {
+        BreakpointEditorView(
+            manager: manager,
+            canApplySelectedChanges: $canApplySelectedChanges
+        )
     }
 
     private var actionBar: some View {
@@ -136,23 +220,20 @@ struct BreakpointWindowView: View {
             Button {
                 resolveSelected(.cancel)
             } label: {
-                Label(String(localized: "Continue"), systemImage: "play.fill")
+                Label(String(localized: "Continue Original"), systemImage: "play.fill")
+                    .frame(minWidth: 132)
             }
+            .help(String(localized: "Discard edits and continue with the original message"))
             .disabled(!hasSelection)
 
-            Button {
+            Button(role: .destructive) {
                 resolveSelected(.abort)
             } label: {
-                Label(String(localized: "Abort"), systemImage: "xmark.octagon")
+                Label(String(localized: "Abort with 503"), systemImage: "xmark.octagon")
+                    .frame(minWidth: 132)
             }
             .keyboardShortcut(".", modifiers: .command)
-            .disabled(!hasSelection)
-
-            Button {
-                resolveSelected(.cancel)
-            } label: {
-                Label(String(localized: "Skip Once"), systemImage: "forward.frame")
-            }
+            .help(String(localized: "Stop this transaction with a 503 Service Unavailable response"))
             .disabled(!hasSelection)
 
             Spacer()
@@ -160,85 +241,43 @@ struct BreakpointWindowView: View {
             Button {
                 resolveSelected(.execute)
             } label: {
-                Label(String(localized: "Execute"), systemImage: "arrowshape.turn.up.right.fill")
+                Label(String(localized: "Apply Changes & Continue"), systemImage: "arrowshape.turn.up.right.fill")
+                    .frame(minWidth: 180)
             }
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!hasSelection)
+            .buttonStyle(.borderedProminent)
+            .help(applyButtonHelp)
+            .disabled(!canApplySelection)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .controlSize(.regular)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Execute")) {
-                resolveSelected(.execute)
-            }
-            .keyboardShortcut(.return, modifiers: .command)
-            .disabled(!hasSelection)
-
-            Button(String(localized: "Execute All")) {
-                manager.resolveAll(decision: .execute)
-            }
-            .keyboardShortcut(.return, modifiers: [.command, .shift])
-            .disabled(!manager.hasPausedItems)
-
-            Divider()
-
-            Button(String(localized: "Continue")) {
-                resolveSelected(.cancel)
-            }
-            .disabled(!hasSelection)
-
-            Button(String(localized: "Continue All")) {
+            Button(String(localized: "Continue All Original")) {
                 manager.resolveAll(decision: .cancel)
             }
-            .keyboardShortcut(".", modifiers: [.command, .shift])
+            .disabled(!manager.hasPausedItems)
+
+            Button(String(localized: "Abort All with 503"), role: .destructive) {
+                isAbortAllConfirmationPresented = true
+            }
             .disabled(!manager.hasPausedItems)
 
             Divider()
 
-            Button(String(localized: "Abort")) {
-                resolveSelected(.abort)
-            }
-            .keyboardShortcut(".", modifiers: .command)
-            .disabled(!hasSelection)
-
-            Button(String(localized: "Abort All")) {
-                manager.resolveAll(decision: .abort)
-            }
-            .keyboardShortcut("\\", modifiers: [.command, .shift])
-            .disabled(!manager.hasPausedItems)
-
-            Divider()
-
-            Button(String(localized: "Previous Item")) {
-                manager.selectPreviousItem()
-            }
-            .keyboardShortcut("[", modifiers: .command)
-            .disabled(!manager.hasPausedItems)
-
-            Button(String(localized: "Next Item")) {
-                manager.selectNextItem()
-            }
-            .keyboardShortcut("]", modifiers: .command)
-            .disabled(!manager.hasPausedItems)
-
-            Divider()
-
-            Menu(String(localized: "Advanced Settings")) {
-                Button(layoutMode.help) {
-                    layoutMode = layoutMode.next
-                }
-                Button(String(localized: "Templates...")) {
-                    openWindow(id: "breakpointTemplates")
-                }
+            Button(layoutMode.help) {
+                layoutMode = layoutMode.next
             }
 
-            Divider()
+            Button(String(localized: "Templates…")) {
+                openWindow(id: "breakpointTemplates")
+            }
 
-            Button(String(localized: "Add Rule")) {
+            Button(String(localized: "Manage Rules…")) {
                 openWindow(id: "breakpointRules")
             }
         } label: {
@@ -248,8 +287,54 @@ struct BreakpointWindowView: View {
         .fixedSize()
     }
 
+    private var queueSelection: Binding<UUID?> {
+        Binding(
+            get: { manager.selectedItemId },
+            set: { manager.selectedItemId = $0 }
+        )
+    }
+
+    private var queueSummary: String {
+        let count = manager.pausedItems.count
+        if count == 1 {
+            return String(localized: "1 item waiting")
+        }
+        return String(localized: "\(count) items waiting")
+    }
+
     private var hasSelection: Bool {
-        manager.selectedItemId != nil
+        guard let selectedItemId = manager.selectedItemId else {
+            return false
+        }
+        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
+    }
+
+    private var canApplySelection: Bool {
+        guard canApplySelectedChanges,
+              let selectedItemId = manager.selectedItemId,
+              let item = manager.pausedItems.first(where: { $0.id == selectedItemId })
+        else {
+            return false
+        }
+        return item.editableDraft.isBodyEditable
+    }
+
+    private var applyButtonHelp: String {
+        guard hasSelection else {
+            return String(localized: "Select paused traffic to apply changes")
+        }
+        if let selectedItemId = manager.selectedItemId,
+           let item = manager.pausedItems.first(where: { $0.id == selectedItemId }),
+           !item.editableDraft.isBodyEditable
+        {
+            return String(
+                localized: "This message cannot be safely edited. Continue Original preserves its payload."
+            )
+        }
+        if !canApplySelectedChanges {
+            return String(localized: "Fix or discard the invalid Raw message before applying changes")
+        }
+        return String(localized: "Apply the edited message and continue (⌘↩)")
     }
 
     private func resolveSelected(_ decision: BreakpointDecision) {
@@ -270,223 +355,131 @@ struct BreakpointWindowView: View {
     }
 }
 
-// MARK: - BreakpointQueueTableView
+// MARK: - BreakpointQueueRow
 
-private struct BreakpointQueueTableView: View {
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    @Bindable var manager: BreakpointManager
-    let centersEmptyState: Bool
-
-    private struct Column {
-        let title: String
-        let minWidth: CGFloat
-        let preferredWidth: CGFloat
-    }
-
-    private let columns: [Column] = [
-        Column(title: String(localized: "ID"), minWidth: 44, preferredWidth: 54),
-        Column(title: String(localized: "URL"), minWidth: 220, preferredWidth: 360),
-        Column(title: String(localized: "Client"), minWidth: 90, preferredWidth: 150),
-        Column(title: String(localized: "Method"), minWidth: 70, preferredWidth: 86),
-        Column(title: String(localized: "Status"), minWidth: 74, preferredWidth: 96),
-        Column(title: String(localized: "Code"), minWidth: 52, preferredWidth: 64),
-        Column(title: String(localized: "Time"), minWidth: 78, preferredWidth: 102),
-        Column(title: String(localized: "Duration"), minWidth: 78, preferredWidth: 102),
-        Column(title: String(localized: "Request"), minWidth: 70, preferredWidth: 86),
-        Column(title: String(localized: "Response"), minWidth: 78, preferredWidth: 94),
-        Column(title: String(localized: "Query Name"), minWidth: 90, preferredWidth: 136),
-    ]
+private struct BreakpointQueueRow: View {
+    let item: PausedBreakpointItem
 
     var body: some View {
-        GeometryReader { geometry in
-            let columnWidths = effectiveColumnWidths(for: geometry.size.width)
-            let contentWidth = max(tableWidth(for: columnWidths), geometry.size.width)
-            let contentHeight = max(geometry.size.height, headerHeight + 1)
+        HStack(alignment: .top, spacing: 10) {
+            phaseBadge
 
-            ScrollView([.horizontal, .vertical]) {
-                ZStack(alignment: .topLeading) {
-                    VStack(spacing: 0) {
-                        headerRow(columnWidths: columnWidths)
-                            .frame(width: contentWidth, alignment: .leading)
-                        Divider()
-                        ForEach(manager.pausedItems) { item in
-                            queueRow(item, columnWidths: columnWidths)
-                            Divider()
-                        }
-                    }
-                    .frame(width: contentWidth, alignment: .topLeading)
-                    .frame(minHeight: contentHeight, alignment: .topLeading)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 7) {
+                    Text(primaryValue)
+                        .font(toolMetrics.secondaryFont(weight: .semibold, monospaced: true))
+                        .foregroundStyle(primaryColor)
 
-                    if manager.pausedItems.isEmpty {
-                        emptyState
-                            .frame(
-                                width: geometry.size.width,
-                                height: max(0, contentHeight - headerHeight - 1),
-                                alignment: centersEmptyState ? .center : .leading
-                            )
-                            .padding(.top, headerHeight + 1)
-                    }
+                    Text(displayHost)
+                        .font(toolMetrics.secondaryFont(weight: .medium))
+                        .lineLimit(1)
                 }
-                .frame(width: contentWidth, alignment: .topLeading)
-                .frame(minHeight: contentHeight, alignment: .topLeading)
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-        }
-        .background(Color(nsColor: .textBackgroundColor))
-    }
 
-    private func tableWidth(for columnWidths: [CGFloat]) -> CGFloat {
-        columnWidths.reduce(0, +)
-    }
+                Text(displayPath)
+                    .font(toolMetrics.secondaryFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
 
-    private func effectiveColumnWidths(for availableWidth: CGFloat) -> [CGFloat] {
-        let preferredTotal = columns.reduce(CGFloat.zero) { $0 + $1.preferredWidth }
-        let minimumTotal = columns.reduce(CGFloat.zero) { $0 + $1.minWidth }
-
-        guard availableWidth < preferredTotal else {
-            return columns.map(\.preferredWidth)
-        }
-        guard availableWidth > minimumTotal else {
-            return columns.map(\.minWidth)
-        }
-
-        let flexibleTotal = preferredTotal - minimumTotal
-        let availableFlex = availableWidth - minimumTotal
-        return columns.map { column in
-            let columnFlex = column.preferredWidth - column.minWidth
-            return column.minWidth + (columnFlex / flexibleTotal * availableFlex)
-        }
-    }
-
-    private var headerHeight: CGFloat {
-        max(32, toolMetrics.tableRowHeight)
-    }
-
-    private var emptyState: some View {
-        VStack(alignment: centersEmptyState ? .center : .leading, spacing: 8) {
-            Text(String(localized: "No Breakpoints"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .semibold))
-            Text(String(localized: "Click \"Manage Rules\" button to create your first Breakpoint Rules"))
-                .font(toolMetrics.font())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .multilineTextAlignment(centersEmptyState ? .center : .leading)
-        .padding(.horizontal, centersEmptyState ? 24 : 16)
-    }
-
-    private func headerRow(columnWidths: [CGFloat]) -> some View {
-        HStack(spacing: 0) {
-            ForEach(Array(columns.enumerated()), id: \.offset) { offset, column in
-                Text(column.title)
-                    .font(toolMetrics.tableHeaderFont())
-                    .foregroundStyle(.primary)
-                    .frame(width: columnWidths[offset], height: headerHeight, alignment: .leading)
-                    .padding(.leading, 8)
-                    .overlay(alignment: .trailing) {
-                        Divider().frame(height: max(20, toolMetrics.tableRowHeight - 8))
+                HStack(spacing: 8) {
+                    Label(item.client, systemImage: "desktopcomputer")
+                    if !item.queryName.isEmpty {
+                        Label(item.queryName, systemImage: "text.magnifyingglass")
                     }
+                    Spacer(minLength: 4)
+                    ElapsedTimeLabel(since: item.createdAt)
+                }
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func queueRow(_ item: PausedBreakpointItem, columnWidths: [CGFloat]) -> some View {
-        let isSelected = manager.selectedItemId == item.id
-        return HStack(spacing: 0) {
-            Group {
-                cell("\(item.sequenceNumber)", width: columnWidths[0], monospaced: true)
-                cell(item.url, width: columnWidths[1], monospaced: true, help: item.url)
-                cell(item.client, width: columnWidths[2])
-                cell(item.method, width: columnWidths[3], monospaced: true)
-                cell(String(localized: "Paused"), width: columnWidths[4], color: .orange)
-                cell(
-                    item.statusCode.map(String.init) ?? "",
-                    width: columnWidths[5],
-                    color: statusColor(for: item.statusCode)
-                )
-            }
-            Group {
-                timeCell(item.createdAt, width: columnWidths[6])
-                durationCell(item.createdAt, width: columnWidths[7])
-                phaseCell(item.phase == .request ? "REQ" : "", width: columnWidths[8])
-                phaseCell(item.phase == .response ? "RES" : "", width: columnWidths[9])
-                cell(item.queryName, width: columnWidths[10])
-            }
-        }
-        .frame(height: toolMetrics.tableRowHeight)
-        .background(isSelected ? Color.accentColor.opacity(0.18) : rowBackground(for: item))
+        .padding(.vertical, 5)
         .contentShape(Rectangle())
-        .onTapGesture {
-            manager.selectedItemId = item.id
+        .accessibilityElement(children: .combine)
+    }
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var phaseBadge: some View {
+        Text(item.phase == .request ? "REQ" : "RES")
+            .font(toolMetrics.metadataFont(weight: .semibold, monospaced: true))
+            .foregroundStyle(item.phase == .request ? Color.green : Color.blue)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                (item.phase == .request ? Color.green : Color.blue)
+                    .opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 4)
+            )
+    }
+
+    private var primaryValue: String {
+        if item.phase == .request {
+            return item.editableDraft.method
+        }
+        return String(item.editableDraft.statusCode)
+    }
+
+    private var primaryColor: Color {
+        guard item.phase == .response else {
+            return .primary
+        }
+        switch item.editableDraft.statusCode {
+        case 200 ..< 300: return .green
+        case 300 ..< 400: return .blue
+        case 400 ..< 500: return .orange
+        case 500...: return .red
+        default: return .secondary
         }
     }
 
-    private func cell(
-        _ value: String,
-        width: CGFloat,
-        color: Color = .primary,
-        monospaced: Bool = false,
-        help: String? = nil
-    )
-        -> some View
-    {
-        Text(value)
-            .font(monospaced ? toolMetrics.secondaryFont(monospaced: true) : toolMetrics.secondaryFont())
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .help(help ?? value)
-            .frame(width: width, alignment: .leading)
-            .padding(.leading, 8)
+    private var displayComponents: URLComponents? {
+        URLComponents(string: item.editableDraft.url)
     }
 
-    private func timeCell(_ date: Date, width: CGFloat) -> some View {
-        Text(date, format: .dateTime.hour().minute().second())
-            .font(toolMetrics.secondaryFont(monospaced: true))
-            .monospacedDigit()
-            .frame(width: width, alignment: .leading)
-            .padding(.leading, 8)
+    private var displayHost: String {
+        var value = displayComponents?.host ?? item.host
+        if let port = displayComponents?.port {
+            value += ":\(port)"
+        }
+        return value.isEmpty ? String(localized: "Unknown Host") : value
     }
 
-    private func durationCell(_ date: Date, width: CGFloat) -> some View {
-        ElapsedTimeLabel(since: date)
-            .frame(width: width, alignment: .leading)
-            .padding(.leading, 8)
-    }
-
-    private func phaseText(_ value: String) -> some View {
-        Text(value)
-            .font(toolMetrics.font(weight: .semibold, monospaced: true))
-            .foregroundStyle(value == "REQ" ? Color.green : Color.blue)
-    }
-
-    private func phaseCell(_ value: String, width: CGFloat) -> some View {
-        phaseText(value)
-            .frame(width: width, alignment: .leading)
-            .padding(.leading, 8)
+    private var displayPath: String {
+        guard let components = displayComponents else {
+            return item.editableDraft.url
+        }
+        var value = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+        if let query = components.percentEncodedQuery, !query.isEmpty {
+            value += "?\(query)"
+        }
+        return value
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
+}
 
-    private func rowBackground(for item: PausedBreakpointItem) -> Color {
-        item.sequenceNumber.isMultiple(of: 2)
-            ? Color(nsColor: .textBackgroundColor)
-            : Color(nsColor: .controlBackgroundColor).opacity(0.45)
+// MARK: - ElapsedTimeLabel
+
+/// Live-updating elapsed time shared by the queue and selected-item banner.
+struct ElapsedTimeLabel: View {
+    let since: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: since, by: 1)) { context in
+            let elapsed = Int(context.date.timeIntervalSince(since))
+            Text(String(format: "%d:%02d", elapsed / 60, elapsed % 60))
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+        }
     }
 
-    private func statusColor(for statusCode: Int?) -> Color {
-        guard let statusCode else {
-            return Color.secondary
-        }
-        switch statusCode {
-        case 200 ..< 300: return Color.green
-        case 300 ..< 400: return Color.blue
-        case 400 ..< 500: return Color.orange
-        case 500...: return Color.red
-        default: return Color.secondary
-        }
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }

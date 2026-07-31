@@ -54,24 +54,62 @@ enum HelperConnectionError: LocalizedError {
 final class SigningPreflightCache {
     // MARK: Internal
 
-    var provider: () -> SigningDiagnostics.Result = { SigningDiagnostics.diagnose() }
+    var provider: @Sendable () -> SigningDiagnostics.Result = { SigningDiagnostics.diagnose() }
 
-    func evaluate() -> SigningDiagnostics.Result {
-        if let cached {
-            return cached
+    /// Return the memoized diagnosis, running the live provider off the main actor.
+    ///
+    /// Concurrent callers coalesce onto a single detached diagnosis per generation. If the
+    /// cache is invalidated while a diagnosis is in flight, that result is discarded and the
+    /// caller retries against the current generation so a stale result can never repopulate
+    /// the cache.
+    func evaluate() async -> SigningDiagnostics.Result {
+        while true {
+            if let cached {
+                return cached
+            }
+
+            let generationAtStart = generation
+            let task: Task<SigningDiagnostics.Result, Never>
+            if let inFlightTask, inFlightGeneration == generationAtStart {
+                task = inFlightTask
+            } else {
+                let provider = provider
+                let newTask = Task.detached(priority: .userInitiated) { provider() }
+                inFlightTask = newTask
+                inFlightGeneration = generationAtStart
+                task = newTask
+            }
+
+            let result = await task.value
+
+            guard generation == generationAtStart else {
+                // Invalidated while this diagnosis was in flight — discard the stale
+                // generation and retry against the current one.
+                continue
+            }
+
+            cached = result
+            if inFlightGeneration == generationAtStart {
+                inFlightTask = nil
+                inFlightGeneration = nil
+            }
+            return result
         }
-        let result = provider()
-        cached = result
-        return result
     }
 
     func invalidate() {
         cached = nil
+        generation += 1
+        inFlightTask = nil
+        inFlightGeneration = nil
     }
 
     // MARK: Private
 
     private var cached: SigningDiagnostics.Result?
+    private var generation = 0
+    private var inFlightTask: Task<SigningDiagnostics.Result, Never>?
+    private var inFlightGeneration: Int?
 }
 
 // MARK: - HelperConnection
@@ -170,7 +208,7 @@ final class HelperConnection {
 
     /// Override system HTTP and HTTPS proxy to 127.0.0.1 on the given port.
     func overrideSystemProxy(port: Int) async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         let ownerPID = Int32(ProcessInfo.processInfo.processIdentifier)
         Self.logger.info("Calling helper overrideSystemProxy for port \(port)")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -215,7 +253,7 @@ final class HelperConnection {
 
     /// Restore the original system proxy settings that were saved before the override.
     func restoreSystemProxy() async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         Self.logger.info("Calling helper restoreSystemProxy")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
@@ -259,7 +297,7 @@ final class HelperConnection {
 
     /// Query structured helper info: version, build number, and protocol version.
     func getHelperInfo() async throws -> HelperInfo {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = OSAllocatedUnfairLock(initialState: false)
 
@@ -299,7 +337,7 @@ final class HelperConnection {
 
     /// Query the current proxy status from the helper: (isOverridden, port).
     func getProxyStatus() async throws -> (isOverridden: Bool, port: Int) {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = OSAllocatedUnfairLock(initialState: false)
 
@@ -336,7 +374,7 @@ final class HelperConnection {
     /// Tell the helper to restore proxy settings and prepare for removal,
     /// then invalidate the XPC connection.
     func uninstallHelper() async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
 
@@ -381,7 +419,7 @@ final class HelperConnection {
 
     /// Set the system proxy bypass domain list via the helper tool.
     func setBypassDomains(_ domains: [String]) async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         Self.logger.info("Calling helper setBypassDomains with \(domains.count) domain(s)")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
@@ -425,7 +463,7 @@ final class HelperConnection {
 
     /// Install a root CA certificate in the system keychain and trust it for SSL.
     func installRootCertificate(derData: Data) async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         Self.logger.info("Calling helper installRootCertificate (\(derData.count) bytes)")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
@@ -469,7 +507,7 @@ final class HelperConnection {
 
     /// Remove the Rockxy root CA certificate and trust settings from the system keychain.
     func removeRootCertificate() async throws {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         Self.logger.info("Calling helper removeRootCertificate")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumed = OSAllocatedUnfairLock(initialState: false)
@@ -513,7 +551,7 @@ final class HelperConnection {
 
     /// Verify that a certificate with the given SHA-256 fingerprint is trusted in the system keychain.
     func verifyRootCertificateTrusted(fingerprint: String) async throws -> Bool {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = OSAllocatedUnfairLock(initialState: false)
 
@@ -550,7 +588,7 @@ final class HelperConnection {
     /// Remove stale Rockxy Root CA certificates from the system keychain,
     /// keeping only the one matching activeFingerprint. Returns count of removed certs.
     func cleanupStaleCertificates(activeFingerprint: String) async throws -> Int {
-        let proxy = try getProxy()
+        let proxy = try await getProxy()
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = OSAllocatedUnfairLock(initialState: false)
 
@@ -606,8 +644,8 @@ final class HelperConnection {
 
     /// Evaluate the signing preflight cache and throw a typed error if the
     /// current app has a signing issue relative to the installed helper.
-    private func signingPreflight() throws {
-        let result = signingCache.evaluate()
+    private func signingPreflight() async throws {
+        let result = await signingCache.evaluate()
         switch result {
         case let .appSignatureInvalid(detail):
             throw HelperConnectionError.appSignatureInvalid(detail)
@@ -622,8 +660,8 @@ final class HelperConnection {
     }
 
     /// Create or reuse an NSXPCConnection to the helper's Mach service.
-    private func getProxy() throws -> any RockxyHelperProtocol {
-        try signingPreflight()
+    private func getProxy() async throws -> any RockxyHelperProtocol {
+        try await signingPreflight()
         let conn: NSXPCConnection
         if let existing = connection {
             conn = existing

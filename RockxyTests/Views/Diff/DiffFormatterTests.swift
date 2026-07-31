@@ -57,6 +57,18 @@ struct DiffFormatterTests {
         #expect(sections[0].1.contains("No timing data"))
     }
 
+    @Test("Measured duration is used when phase timing is unavailable")
+    func measuredDurationFallback() {
+        let transaction = TestFixtures.makeTransaction()
+        transaction.timingInfo = nil
+        transaction.measuredDuration = 0.125
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .timing)
+
+        #expect(sections[0].1.contains("125.0ms"))
+        #expect(sections[0].1.contains("Detailed phase timing unavailable"))
+    }
+
     @Test("No response shows fallback")
     func noResponseFallback() {
         let transaction = TestFixtures.makeTransaction(statusCode: nil)
@@ -79,12 +91,163 @@ struct DiffFormatterTests {
         let transaction = TestFixtures.makeTransaction()
         transaction.response = TestFixtures.makeResponse(
             statusCode: 200,
-            body: "{\"name\":\"Alice\",\"age\":30}".data(using: .utf8)
+            body: Data("{\"name\":\"Alice\",\"age\":30}".utf8)
         )
         let sections = DiffFormatter.format(transaction: transaction, target: .response)
         let bodySection = sections.first { $0.0 == "Body" }
         #expect(bodySection?.1.contains("\"name\"") == true)
         #expect(bodySection?.1.contains("\n") == true)
+    }
+
+    @Test("Equal-size binary bodies compare by captured content")
+    func equalSizeBinaryBodiesRemainDistinct() {
+        let left = TestFixtures.makeTransaction()
+        left.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            body: Data([0xFF, 0x00, 0x01])
+        )
+        let right = TestFixtures.makeTransaction()
+        right.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            body: Data([0xFF, 0x00, 0x02])
+        )
+
+        let result = DiffFormatter.diff(left: left, right: right, target: .response)
+
+        #expect(result.differenceCount > 0)
+    }
+
+    @Test("Truncated response body is explicit in comparison")
+    func truncatedResponseIsExplicit() {
+        let transaction = TestFixtures.makeTransaction()
+        var response = TestFixtures.makeResponse(
+            statusCode: 200,
+            body: Data("partial".utf8)
+        )
+        response.bodyTruncated = true
+        transaction.response = response
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let bodySection = sections.first { $0.0 == "Body" }
+
+        #expect(bodySection?.1.contains("Capture truncated") == true)
+    }
+
+    @Test("Truncated response with no retained body remains explicit")
+    func truncatedEmptyResponseIsExplicit() {
+        let transaction = TestFixtures.makeTransaction()
+        var response = TestFixtures.makeResponse(statusCode: 200, body: nil)
+        response.bodyTruncated = true
+        transaction.response = response
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let bodySection = sections.first { $0.0 == "Body" }
+
+        #expect(bodySection?.1.contains("No response body") == true)
+        #expect(bodySection?.1.contains("Capture truncated") == true)
+    }
+
+    @Test("Binary content type is hashed even when its bytes form valid text")
+    func binaryContentTypeUsesDigest() {
+        let transaction = TestFixtures.makeTransaction()
+        transaction.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "application/octet-stream")],
+            body: Data("abc".utf8)
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let body = sections.first { $0.0 == "Body" }?.1
+
+        #expect(body?.contains("Binary body") == true)
+        #expect(body?.contains("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") == true)
+    }
+
+    @Test("Control bytes are classified as binary without relying on UTF-8 failure")
+    func controlBytesUseDigest() {
+        let transaction = TestFixtures.makeTransaction()
+        transaction.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain")],
+            body: Data([0x61, 0x00, 0x62])
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let body = sections.first { $0.0 == "Body" }?.1
+
+        #expect(body?.contains("Binary body") == true)
+        #expect(body?.contains("SHA-256") == true)
+    }
+
+    @Test("Control bytes beyond the first four KiB are still classified as binary")
+    func laterControlBytesUseDigest() {
+        let transaction = TestFixtures.makeTransaction()
+        var bytes = Array(repeating: UInt8(ascii: "a"), count: 5_000)
+        bytes[4_500] = 0
+        transaction.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain")],
+            body: Data(bytes)
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let body = sections.first { $0.0 == "Body" }?.1
+
+        #expect(body?.contains("Binary body") == true)
+    }
+
+    @Test("Large textual bodies use a bounded preview and captured-body digest")
+    func largeBodyPreviewIsBounded() {
+        let body = Data(
+            String(repeating: "a", count: DiffFormatter.maximumBodyPreviewBytes + 128).utf8
+        )
+        let transaction = TestFixtures.makeTransaction()
+        transaction.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain; charset=utf-8")],
+            body: body
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let bodyText = sections.first { $0.0 == "Body" }?.1
+
+        #expect(bodyText?.contains("Body preview limited") == true)
+        #expect(bodyText?.contains("SHA-256 (all captured bytes)") == true)
+        #expect((bodyText?.count ?? 0) < DiffFormatter.maximumBodyPreviewBytes + 512)
+    }
+
+    @Test("Large bodies with equal previews and different tails remain distinct")
+    func largeBodyTailDifference() {
+        let shared = Data(repeating: UInt8(ascii: "a"), count: DiffFormatter.maximumBodyPreviewBytes)
+        let left = TestFixtures.makeTransaction()
+        left.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain")],
+            body: shared + Data("left".utf8)
+        )
+        let right = TestFixtures.makeTransaction()
+        right.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain")],
+            body: shared + Data("right".utf8)
+        )
+
+        let result = DiffFormatter.diff(left: left, right: right, target: .response)
+
+        #expect(result.differenceCount > 0)
+        #expect(result.allLines.contains { $0.content.contains("SHA-256") })
+    }
+
+    @Test("Text previews stay textual when the byte limit cuts a multibyte scalar")
+    func textPreviewTrimsPartialUTF8Scalar() {
+        let text = String(repeating: "a", count: DiffFormatter.maximumBodyPreviewBytes - 1)
+            + "é"
+            + "tail"
+        let transaction = TestFixtures.makeTransaction()
+        transaction.response = TestFixtures.makeResponse(
+            headers: [HTTPHeader(name: "Content-Type", value: "text/plain; charset=utf-8")],
+            body: Data(text.utf8)
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let body = sections.first { $0.0 == "Body" }?.1
+
+        #expect(body?.contains("Body preview limited") == true)
+        #expect(body?.contains("Binary body") == false)
     }
 
     @Test("Diff between two transactions produces structured result")
@@ -121,5 +284,23 @@ struct DiffFormatterTests {
         let requestLine = sections.first { $0.0 == "Request Line" }
         #expect(requestLine?.1.contains("HTTP/1.1") == true)
         #expect(requestLine?.1.contains("HTTP/HTTP/") == false)
+    }
+
+    @Test("Export formatter preserves section order and diff markers")
+    func exportFormatter() {
+        let result = DiffResult(sections: [
+            DiffSection(title: "Body", lines: [
+                DiffLine(lineNumber: 1, content: "same", type: .unchanged),
+                DiffLine(lineNumber: 2, content: "before", type: .removed),
+                DiffLine(lineNumber: 3, content: "after", type: .added),
+            ]),
+        ])
+
+        let output = DiffExportFormatter.text(for: result)
+
+        #expect(output.contains("--- Body ---"))
+        #expect(output.contains("  same"))
+        #expect(output.contains("- before"))
+        #expect(output.contains("+ after"))
     }
 }

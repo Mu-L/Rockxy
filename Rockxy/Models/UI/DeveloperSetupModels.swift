@@ -9,7 +9,6 @@ enum SetupTargetCategory: String, CaseIterable, Identifiable {
     case device
     case framework
     case environment
-    case savedProfile
 
     // MARK: Internal
 
@@ -31,8 +30,6 @@ enum SetupTargetCategory: String, CaseIterable, Identifiable {
             String(localized: "Frameworks")
         case .environment:
             String(localized: "Environments")
-        case .savedProfile:
-            String(localized: "Saved Profiles")
         }
     }
 }
@@ -53,7 +50,6 @@ struct SetupTargetSection: Identifiable, Equatable {
 enum SetupSupportStatus: String, Equatable {
     case availableNow
     case guideOnly
-    case notYetSupported
 
     // MARK: Internal
 
@@ -63,8 +59,6 @@ enum SetupSupportStatus: String, Equatable {
             String(localized: "Available now")
         case .guideOnly:
             String(localized: "Guide only")
-        case .notYetSupported:
-            String(localized: "Not yet supported")
         }
     }
 
@@ -74,8 +68,6 @@ enum SetupSupportStatus: String, Equatable {
             String(localized: "Setup guide available")
         case .guideOnly:
             String(localized: "Guide-only target")
-        case .notYetSupported:
-            String(localized: "Not yet supported")
         }
     }
 }
@@ -85,7 +77,6 @@ enum SetupSupportStatus: String, Equatable {
 enum SetupAutomationSupport: String, Equatable {
     case none
     case runtimeTerminal
-    case deviceAutomation
 
     // MARK: Internal
 
@@ -95,8 +86,6 @@ enum SetupAutomationSupport: String, Equatable {
             String(localized: "Manual Setup")
         case .runtimeTerminal:
             String(localized: "Automatic Setup")
-        case .deviceAutomation:
-            String(localized: "Automatic Device Setup")
         }
     }
 
@@ -104,8 +93,7 @@ enum SetupAutomationSupport: String, Equatable {
         switch self {
         case .none:
             String(localized: "Manual Setup")
-        case .runtimeTerminal,
-             .deviceAutomation:
+        case .runtimeTerminal:
             String(localized: "Automatic Setup")
         }
     }
@@ -120,19 +108,6 @@ enum SetupAutomationSupport: String, Equatable {
             String(localized: "Use Manual Setup")
         case .runtimeTerminal:
             String(localized: "Automatic Setup…")
-        case .deviceAutomation:
-            String(localized: "Automatic Device Setup…")
-        }
-    }
-
-    var sheetPrimaryActionTitle: String {
-        switch self {
-        case .none:
-            String(localized: "Use Manual Setup")
-        case .runtimeTerminal:
-            String(localized: "Open Prepared Terminal")
-        case .deviceAutomation:
-            String(localized: "Start Automatic Device Setup")
         }
     }
 }
@@ -157,13 +132,13 @@ enum SetupDetailTab: String, CaseIterable, Identifiable, Hashable {
         case .overview:
             String(localized: "Overview")
         case .setup:
-            String(localized: "Setup")
+            String(localized: "Guide")
         case .snippets:
             String(localized: "Snippets")
         case .validate:
-            String(localized: "Validate")
+            String(localized: "Check")
         case .troubleshooting:
-            String(localized: "Troubleshooting")
+            String(localized: "Help")
         }
     }
 }
@@ -221,7 +196,7 @@ struct SetupModeActionState: Equatable {
         isAutomaticEnabled = target.automationSupport.isAvailable
         automaticCaption = target.automationSupport.isAvailable
             ? String(localized: "Open a scoped Rockxy-prepared session for this target.")
-            : String(localized: "Manual Setup is available for this target; Automatic Setup is not shipped here yet.")
+            : String(localized: "Automatic Setup applies to terminal runtimes. Use Manual Setup for this target.")
     }
 
     // MARK: Internal
@@ -291,7 +266,9 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
     var message: String {
         switch self {
         case .runtimeNotInstalled:
-            String(localized: "Install the selected runtime, toolchain, or client on this Mac before validating this manual flow.")
+            String(
+                localized: "Install the selected runtime, toolchain, or client on this Mac before validating this manual flow."
+            )
         case .proxyStopped:
             String(localized: "Start the Rockxy proxy before validating captured traffic.")
         case .recordingPaused:
@@ -310,11 +287,17 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
         case .noTrafficDetected:
             String(localized: "Run the test request again and make sure it points at the Rockxy proxy port.")
         case .localProbeUnavailable:
-            String(localized: "Rockxy could not start the local validation probe on 127.0.0.1. Close and reopen Developer Setup Hub, then try again.")
+            String(
+                localized: "Rockxy could not start the local validation probe. Reopen Developer Setup, then try again."
+            )
         case .localProbeNotCaptured:
-            String(localized: "Run the local probe again and make sure the selected runtime sends it through Rockxy's proxy port.")
+            String(
+                localized: "Run the local probe again and make sure the selected runtime sends it through Rockxy's proxy port."
+            )
         case .allowListBlockedValidation:
-            String(localized: "Allow List is active and does not allow the local validation probe URL, so Rockxy forwards it but does not record it.")
+            String(
+                localized: "Allow List is active and does not allow the local validation probe URL, so Rockxy forwards it but does not record it."
+            )
         case .wrongSnippetChosen:
             String(localized: "Switch to the snippet that matches the runtime, library, or tool you are using.")
         case .manualValidationOnly:
@@ -328,12 +311,13 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
         switch self {
         case .runtimeNotInstalled:
             String(localized: "View Setup")
-        case .proxyStopped,
-             .recordingPaused:
-            String(localized: "Verify Proxy")
+        case .proxyStopped:
+            String(localized: "Start Proxy")
+        case .recordingPaused:
+            String(localized: "Resume Recording")
         case .certificateNotTrusted,
              .certificateExportUnavailable:
-            String(localized: "Open Certificate")
+            String(localized: "Open Certificate Guide")
         case .deviceProxyUnreachable:
             String(localized: "Open Proxy Settings")
         case .noTrafficDetected:
@@ -402,26 +386,7 @@ enum VerificationState: Equatable {
 // MARK: - SetupSnapshot
 
 struct SetupSnapshot: Equatable {
-    var supportStatus: SetupSupportStatus
-    var runtimeReady: Bool
-    var runtimeStatusNote: String?
-    var proxyRunning: Bool
-    var recordingEnabled: Bool
-    var activePort: Int
-    var effectiveListenAddress: String
-    var reachableLANAddress: String?
-    var certificateGenerated: Bool
-    var certificateTrusted: Bool
-    var certificateExportable: Bool
-    var certificateFileReady: Bool
-    var proxyMode: ProxyMode
-    var readinessWarningMessage: String?
-    var selectedSnippetID: SetupSnippetID?
-    var verificationState: VerificationState
-    var matchedTransactionID: UUID?
-    var matchedHost: String?
-    var matchedMethod: String?
-    var matchedPath: String?
+    // MARK: Lifecycle
 
     init(
         supportStatus: SetupSupportStatus,
@@ -466,24 +431,38 @@ struct SetupSnapshot: Equatable {
         self.matchedMethod = matchedMethod
         self.matchedPath = matchedPath
     }
-}
 
-// MARK: - SetupAutomationStep
+    // MARK: Internal
 
-struct SetupAutomationStep: Identifiable, Equatable {
-    let id: String
-    let title: String
-    let description: String
-}
+    var supportStatus: SetupSupportStatus
+    var runtimeReady: Bool
+    var runtimeStatusNote: String?
+    var proxyRunning: Bool
+    var recordingEnabled: Bool
+    var activePort: Int
+    var effectiveListenAddress: String
+    var reachableLANAddress: String?
+    var certificateGenerated: Bool
+    var certificateTrusted: Bool
+    var certificateExportable: Bool
+    var certificateFileReady: Bool
+    var proxyMode: ProxyMode
+    var readinessWarningMessage: String?
+    var selectedSnippetID: SetupSnippetID?
+    var verificationState: VerificationState
+    var matchedTransactionID: UUID?
+    var matchedHost: String?
+    var matchedMethod: String?
+    var matchedPath: String?
 
-// MARK: - SetupAutomationPreview
-
-struct SetupAutomationPreview: Equatable {
-    let title: String
-    let summary: String
-    let primaryActionTitle: String
-    let supplementaryNote: String
-    let steps: [SetupAutomationStep]
+    var proxyStepActionTitle: String {
+        if !proxyRunning {
+            return String(localized: "Start Proxy")
+        }
+        return recordingEnabled
+            ? String(localized: "Refresh Status")
+            : String(localized: "Resume Recording")
+    }
 }
 
 // MARK: - SetupTarget
@@ -532,6 +511,12 @@ struct SetupTarget: Identifiable, Hashable {
 
     var supportStatus: SetupSupportStatus {
         manualSupport
+    }
+
+    /// True only for shipped terminal-runtime targets, i.e. the targets for
+    /// which Automatic Setup can prepare a scoped shell session.
+    var isRuntimeTerminalTarget: Bool {
+        automationSupport == .runtimeTerminal
     }
 
     var supportsCertificateSharing: Bool {

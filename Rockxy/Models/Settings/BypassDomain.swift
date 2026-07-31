@@ -31,6 +31,12 @@ struct BypassDomain: Identifiable, Codable, Hashable {
             return false
         }
 
+        if Self.isIPv4PrefixWildcard(normalizedDomain) {
+            let prefix = String(normalizedDomain.dropLast())
+            return normalizedHost.hasPrefix(prefix)
+                && Self.isIPv4Address(normalizedHost)
+        }
+
         if Self.shouldMatchSubdomains(normalizedDomain) {
             return normalizedHost == normalizedDomain || normalizedHost.hasSuffix(".\(normalizedDomain)")
         }
@@ -49,6 +55,24 @@ struct BypassDomain: Identifiable, Codable, Hashable {
         }
 
         return [normalizedDomain]
+    }
+
+    /// Supports the IPv4-prefix form used by macOS proxy exceptions and Rockxy's
+    /// built-in link-local preset, for example `169.254.*`.
+    static func isIPv4PrefixWildcard(_ value: String) -> Bool {
+        guard value.hasSuffix(".*") else {
+            return false
+        }
+        let prefix = value.dropLast(2)
+        let octets = prefix.split(separator: ".", omittingEmptySubsequences: false)
+        guard (1 ... 3).contains(octets.count) else {
+            return false
+        }
+        return octets.allSatisfy { octet in
+            !octet.isEmpty
+                && octet.allSatisfy(\.isNumber)
+                && (0 ... 255).contains(Int(octet) ?? -1)
+        }
     }
 
     private static func shouldMatchSubdomains(_ domain: String) -> Bool {

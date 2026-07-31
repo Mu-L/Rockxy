@@ -146,7 +146,7 @@ struct AnthropicStreamDecoder {
             updateInputUsage(message?["usage"] as? [String: Any])
             return [.started(responseID: responseID)]
         case "content_block_start":
-            return startContentBlock(object)
+            return try startContentBlock(object)
         case "content_block_delta":
             return try contentDelta(object)
         case "content_block_stop":
@@ -194,7 +194,7 @@ struct AnthropicStreamDecoder {
         cachedInputTokens = usage?["cache_read_input_tokens"] as? Int ?? cachedInputTokens
     }
 
-    private mutating func startContentBlock(_ object: [String: Any]) -> [AssistantStreamEvent] {
+    private mutating func startContentBlock(_ object: [String: Any]) throws -> [AssistantStreamEvent] {
         guard let index = object["index"] as? Int,
               let block = object["content_block"] as? [String: Any],
               block["type"] as? String == "tool_use",
@@ -202,6 +202,9 @@ struct AnthropicStreamDecoder {
               let name = block["name"] as? String else
         {
             return []
+        }
+        guard tools[index] != nil || tools.count < AssistantExecutionLimits.maxToolCalls else {
+            throw AssistantProviderError.malformedResponse("Too many active Anthropic tool calls")
         }
         tools[index] = ToolBuffer(id: id, name: name, arguments: "")
         return [.toolCallDelta(id: id, name: name, argumentsDelta: "")]
@@ -221,10 +224,14 @@ struct AnthropicStreamDecoder {
         {
             return []
         }
-        guard tool.arguments.utf8.count + partial.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes else {
+        let updatedArguments = tool.arguments + partial
+        guard updatedArguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes,
+              aggregateToolArgumentBytes(replacing: index, with: updatedArguments)
+              <= AssistantExecutionLimits.maxAggregateToolArgumentBytes else
+        {
             throw AssistantProviderError.malformedResponse("Anthropic tool arguments exceeded Rockxy's size limit")
         }
-        tool.arguments += partial
+        tool.arguments = updatedArguments
         tools[index] = tool
         return [.toolCallDelta(id: tool.id, name: nil, argumentsDelta: partial)]
     }
@@ -238,5 +245,16 @@ struct AnthropicStreamDecoder {
             name: tool.name,
             arguments: tool.arguments
         ))]
+    }
+
+    private func aggregateToolArgumentBytes(
+        replacing index: Int,
+        with arguments: String
+    )
+        -> Int
+    {
+        tools.reduce(arguments.utf8.count) { partial, entry in
+            entry.key == index ? partial : partial + entry.value.arguments.utf8.count
+        }
     }
 }

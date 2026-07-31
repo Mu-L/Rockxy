@@ -12,6 +12,40 @@ struct ProtobufRuleEditorSession: Identifiable {
     let mode: Mode
 }
 
+// MARK: - ProtobufLocalOnlyNotice
+
+/// Truthful capability banner shared by the Protobuf mapping and schema windows: heuristic wire
+/// decoding works today, but saved mappings and schemas are not applied to captured traffic.
+struct ProtobufLocalOnlyNotice: View {
+    // MARK: Internal
+
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.blue)
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.blue.opacity(0.07))
+    }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+}
+
 // MARK: - ProtobufSettingsWindowView
 
 struct ProtobufSettingsWindowView: View {
@@ -20,66 +54,66 @@ struct ProtobufSettingsWindowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            ProtobufLocalOnlyNotice(message: Self.capabilityNotice)
+            Divider()
             rulesTable
-            shortcutHelp
+            Divider()
             footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_240, height: 660)
+        .frame(
+            minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
+            minHeight: max(560, toolMetrics.bodyFontSize * 16 + 344)
+        )
         .sheet(item: $editorSession) { session in
             ProtobufRuleEditorSheet(
                 session: session,
                 schemas: schemaStore.schemas,
-                canUploadSchema: schemaStore.canUploadSchema,
-                onAddSchema: { openWindow(id: "protobufSchemaList") },
                 onSave: saveRule
             )
-        }
-        .onDeleteCommand {
-            mappingStore.removeSelectedRule()
+            .environment(\.appUIDisplayMetrics, appMetrics)
         }
     }
 
     // MARK: Private
 
+    private static let capabilityNotice = String(
+        localized:
+        """
+        These mapping definitions are stored locally on this Mac. This build decodes Protobuf with \
+        heuristics only — saved mappings and schemas are not applied to captured traffic.
+        """
+    )
+
     @Environment(\.openWindow) private var openWindow
     @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @State private var mappingStore = ProtobufMappingRuleStore()
+    @State private var mappingStore = ProtobufMappingRuleStore.shared
     @State private var schemaStore = ProtobufSchemaStore.shared
     @State private var editorSession: ProtobufRuleEditorSession?
-    @State private var errorMessage: String?
 
-    private var toggleLabel: String {
-        guard let selectedRule = mappingStore.selectedRule else {
-            return String(localized: "Enable Rule")
-        }
-        return selectedRule.isEnabled ? String(localized: "Disable Rule") : String(localized: "Enable Rule")
+    private var footerHint: String {
+        let count = mappingStore.rules.count
+        let countText = count == 1
+            ? String(localized: "1 definition")
+            : String(localized: "\(count) definitions")
+        return "\(countText) · ⌘N \(String(localized: "New")) · ⌘↩ \(String(localized: "Edit"))"
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
-            Text(String(localized: "Protobuf Mapping Rules"))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .medium))
-
-            Text(String(localized: "Define Protobuf Message Type for each Protobuf Request/Response."))
-                .font(toolMetrics.font())
-
-            Text(
-                String(
-                    localized: "Each request is checked against the rules from top to bottom, stopping when a match is found."
-                )
-            )
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
-
-            if !schemaStore.canUploadSchema {
-                PolicyLockNotice(
-                    title: String(localized: "Schema upload unavailable"),
-                    message: String(
-                        localized: "Mapping rules can be prepared, but uploaded schema decoding is disabled by the current app policy."
-                    )
-                )
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Protobuf Mapping"))
+                    .font(toolMetrics.font(weight: .medium))
+                Text(String(localized: "Associate a request pattern with a Protobuf message type and schema."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
@@ -87,86 +121,109 @@ struct ProtobufSettingsWindowView: View {
     }
 
     private var rulesTable: some View {
-        ZStack {
-            Table(mappingStore.rules, selection: $mappingStore.selectedRuleID) {
-                TableColumn(String(localized: "URL")) { rule in
-                    HStack(spacing: 6) {
-                        Image(systemName: rule.isEnabled ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(rule.isEnabled ? .green : .secondary)
-                        Text(rule.urlPattern)
-                            .lineLimit(1)
-                    }
-                }
-                TableColumn(String(localized: "Method")) { rule in
-                    Text(rule.method.displayName)
-                }
-                .width(96)
-                TableColumn(String(localized: "Payload Encoding")) { rule in
-                    Text(rule.payloadEncoding.displayName)
-                }
-                .width(150)
-                TableColumn(String(localized: "Message Type")) { rule in
-                    Text(rule.messageType.isEmpty ? String(localized: "Auto") : rule.messageType)
-                }
-                .width(180)
-                TableColumn(String(localized: "Schema")) { rule in
-                    Text(mappingStore.schemaName(for: rule.schemaID, schemas: schemaStore.schemas))
-                        .foregroundStyle(rule.schemaID == nil ? .secondary : .primary)
-                }
-                .width(180)
-            }
-            .contextMenu(forSelectionType: UUID.self) { ids in
-                tableContextMenu(ids: ids)
-            }
-
-            if mappingStore.rules.isEmpty {
-                Text(String(localized: "Click \"+\" or ⌘N to add new entry"))
-                    .font(.system(size: toolMetrics.emptyStateFontSize))
+        Table(mappingStore.rules, selection: $mappingStore.selectedRuleID) {
+            TableColumn(String(localized: "Runtime")) { _ in
+                Text(String(localized: "Not applied"))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
-        }
-        .frame(minHeight: 380)
-        .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-    }
+            .width(min: 94, ideal: 110)
 
-    private var shortcutHelp: some View {
-        Text(String(localized: "New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ␣"))
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
+            TableColumn(String(localized: "URL")) { rule in
+                Text(rule.urlPattern)
+                    .font(toolMetrics.font(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rule.urlPattern)
+            }
+            .width(min: 160, ideal: 240)
+
+            TableColumn(String(localized: "Method")) { rule in
+                Text(rule.method.displayName)
+            }
+            .width(min: max(96, toolMetrics.bodyFontSize * 6), ideal: max(120, toolMetrics.bodyFontSize * 8))
+
+            TableColumn(String(localized: "Payload")) { rule in
+                Text(rule.payloadEncoding.displayName)
+            }
+            .width(min: max(120, toolMetrics.bodyFontSize * 8), ideal: max(150, toolMetrics.bodyFontSize * 10))
+
+            TableColumn(String(localized: "Message Type")) { rule in
+                Text(rule.messageType.isEmpty ? String(localized: "Auto") : rule.messageType)
+                    .font(toolMetrics.font(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .width(min: 150, ideal: 190)
+
+            TableColumn(String(localized: "Schema")) { rule in
+                schemaCell(for: rule)
+            }
+            .width(min: 150, ideal: 180)
+        }
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            tableContextMenu(ids: ids)
+        } primaryAction: { ids in
+            if let id = ids.first {
+                openEditorForRule(id)
+            }
+        }
+        .overlay {
+            if mappingStore.rules.isEmpty {
+                ContentUnavailableView(
+                    String(localized: "No Mapping Definitions"),
+                    systemImage: "doc.text.magnifyingglass",
+                    description: Text(String(localized: "Click \"+\" or press ⌘N to add a definition."))
+                )
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
     }
 
     private var footer: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            addRemoveControl
-
-            Button(String(localized: "Protobuf Schema…")) {
-                openWindow(id: "protobufSchemaList")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                footerLeadingContent
+                Spacer()
+                footerActions
             }
-
-            Button {
-                // Help content is intentionally lightweight until user-facing docs are wired into Help.
-            } label: {
-                Image(systemName: "questionmark.circle")
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                footerLeadingContent
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    Spacer()
+                    footerActions
+                }
             }
-            .buttonStyle(.bordered)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            moreMenu
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var footerLeadingContent: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            addRemoveControl
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var footerActions: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Button(String(localized: "Local Schemas…")) {
+                openWindow(id: "protobufSchemaList")
+            }
+            .buttonStyle(.bordered)
+            moreMenu
+        }
     }
 
     private var addRemoveControl: some View {
@@ -181,7 +238,8 @@ struct ProtobufSettingsWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Mapping Rule"))
+            .help(String(localized: "New Definition"))
+            .accessibilityLabel(String(localized: "New mapping definition"))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -197,12 +255,18 @@ struct ProtobufSettingsWindowView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: .command)
             .disabled(mappingStore.selectedRuleID == nil)
-            .help(String(localized: "Delete Mapping Rule"))
+            .help(String(localized: "Delete Definition"))
+            .accessibilityLabel(String(localized: "Delete selected mapping definition"))
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
         .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
     }
 
     private var moreMenu: some View {
@@ -210,9 +274,6 @@ struct ProtobufSettingsWindowView: View {
             Button(String(localized: "New…")) {
                 editorSession = ProtobufRuleEditorSession(mode: .create)
             }
-            .keyboardShortcut("n", modifiers: .command)
-
-            Divider()
 
             Button(String(localized: "Edit…")) {
                 openEditorForSelection()
@@ -226,20 +287,11 @@ struct ProtobufSettingsWindowView: View {
             .keyboardShortcut("d", modifiers: .command)
             .disabled(mappingStore.selectedRuleID == nil)
 
-            Button(toggleLabel) {
-                if let id = mappingStore.selectedRuleID {
-                    mappingStore.toggleRule(id: id)
-                }
-            }
-            .keyboardShortcut(.space, modifiers: [])
-            .disabled(mappingStore.selectedRuleID == nil)
-
             Divider()
 
             Button(String(localized: "Delete"), role: .destructive) {
                 mappingStore.removeSelectedRule()
             }
-            .keyboardShortcut(.delete, modifiers: .command)
             .disabled(mappingStore.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
@@ -249,31 +301,42 @@ struct ProtobufSettingsWindowView: View {
             }
         }
         .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .fixedSize()
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func schemaCell(for rule: ProtobufMappingRule) -> some View {
+        let reference = mappingStore.schemaReference(for: rule.schemaID, schemas: schemaStore.schemas)
+        let color: Color = switch reference {
+        case .notSelected: .secondary
+        case .selected: .primary
+        case .missing: .orange
+        }
+        return HStack(spacing: 5) {
+            if reference == .missing {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: toolMetrics.smallIconFontSize))
+                    .foregroundStyle(.orange)
+            }
+            Text(reference.displayLabel)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .foregroundStyle(color)
+        }
+        .help(reference.displayLabel)
     }
 
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
-        Button(String(localized: "Edit…")) {
-            if let id = ids.first {
+        if let id = ids.first, mappingStore.rules.contains(where: { $0.id == id }) {
+            Button(String(localized: "Edit…")) {
                 openEditorForRule(id)
             }
-        }
-        Button(String(localized: "Duplicate")) {
-            mappingStore.selectedRuleID = ids.first
-            mappingStore.duplicateSelectedRule()
-        }
-        Button(toggleLabel) {
-            if let id = ids.first {
-                mappingStore.toggleRule(id: id)
+            Button(String(localized: "Duplicate")) {
+                mappingStore.duplicateRule(id: id)
             }
-        }
-        Divider()
-        Button(String(localized: "Delete"), role: .destructive) {
-            if let id = ids.first {
+            Divider()
+            Button(String(localized: "Delete"), role: .destructive) {
                 mappingStore.removeRule(id: id)
             }
         }
@@ -294,20 +357,14 @@ struct ProtobufSettingsWindowView: View {
         editorSession = ProtobufRuleEditorSession(mode: .edit(rule))
     }
 
-    private func saveRule(_ rule: ProtobufMappingRule) {
-        do {
-            switch editorSession?.mode {
-            case .create:
-                try mappingStore.addRule(rule)
-            case .edit:
-                try mappingStore.updateRule(rule)
-            case nil:
-                break
-            }
-            editorSession = nil
-            errorMessage = nil
-        } catch {
-            errorMessage = error.localizedDescription
+    private func saveRule(_ rule: ProtobufMappingRule) throws {
+        switch editorSession?.mode {
+        case .create:
+            try mappingStore.addRule(rule)
+        case .edit:
+            try mappingStore.updateRule(rule)
+        case nil:
+            throw ProtobufMappingRuleStoreError.ruleNoLongerExists
         }
     }
 }
@@ -317,21 +374,45 @@ struct ProtobufSettingsWindowView: View {
 private struct ProtobufRuleEditorSheet: View {
     // MARK: Internal
 
+    enum Field: Hashable {
+        case url
+        case messageType
+        case requestMessageType
+        case responseMessageType
+    }
+
     let session: ProtobufRuleEditorSession
     let schemas: [ProtobufSchemaDescriptor]
-    let canUploadSchema: Bool
-    let onAddSchema: () -> Void
-    let onSave: (ProtobufMappingRule) -> Void
+    let onSave: (ProtobufMappingRule) throws -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            matchingRuleSection
-            protobufSection
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 3) {
+                    Text(editorTitle)
+                        .font(toolMetrics.font(weight: .medium))
+                    Text(
+                        String(
+                            localized: "This saved definition is not applied to captured traffic in this build."
+                        )
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    matchingRuleSection
+                    protobufSection
+                }
+                .padding(.horizontal, toolMetrics.formHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
+
+            Divider()
             footer
         }
         .font(toolMetrics.font())
-        .padding(toolMetrics.formHorizontalPadding + 10)
-        .frame(minWidth: max(1_040, toolMetrics.bodyFontSize * 26 + 702))
+        .frame(
+            minWidth: max(720, toolMetrics.bodyFontSize * 24 + 432),
+            minHeight: max(460, toolMetrics.bodyFontSize * 14 + 278)
+        )
         .onAppear(perform: loadSession)
     }
 
@@ -339,7 +420,9 @@ private struct ProtobufRuleEditorSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @FocusState private var focusedField: Field?
     @State private var ruleID = UUID()
+    @State private var isEnabled = true
     @State private var urlPattern = "/v1/*"
     @State private var method: HTTPMethodFilter = .any
     @State private var matchType: RuleMatchType = .wildcard
@@ -350,6 +433,16 @@ private struct ProtobufRuleEditorSheet: View {
     @State private var requestMessageType = ""
     @State private var responseMessageType = ""
     @State private var payloadEncoding: ProtobufPayloadEncoding = .auto
+    @State private var inlineError: String?
+
+    private var editorTitle: String {
+        switch session.mode {
+        case .create:
+            String(localized: "New Mapping Definition")
+        case .edit:
+            String(localized: "Edit Mapping Definition")
+        }
+    }
 
     private var sessionButtonTitle: String {
         switch session.mode {
@@ -360,193 +453,298 @@ private struct ProtobufRuleEditorSheet: View {
         }
     }
 
-    private var matchingRuleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(String(localized: "Matching Rule"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .medium))
+    private var schemaReference: ProtobufSchemaReference {
+        guard let schemaID else {
+            return .notSelected
+        }
+        guard let schema = schemas.first(where: { $0.id == schemaID }) else {
+            return .missing
+        }
+        return .selected(schema.fileName)
+    }
 
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Text(String(localized: "Matching Rule:"))
-                        .lineLimit(1)
-                        .frame(width: wideLabelWidth, alignment: .trailing)
-                    TextField(String(localized: "/v1/*"), text: $urlPattern)
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var matchingRuleSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Matching Rule"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                fieldGroup(String(localized: "URL pattern")) {
+                    TextField("/v1/*", text: $urlPattern)
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
-                        .frame(minHeight: toolMetrics.formControlHeight)
+                        .focused($focusedField, equals: .url)
+                        .accessibilityLabel(String(localized: "URL pattern"))
                 }
 
-                HStack(spacing: 12) {
-                    Spacer()
-                        .frame(width: wideLabelWidth)
-                    Picker(String(localized: "Method"), selection: $method) {
-                        ForEach(HTTPMethodFilter.allCases) { method in
-                            Text(method.displayName).tag(method)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                        inlineField(String(localized: "Method")) {
+                            methodPicker
                         }
-                    }
-                    .frame(width: toolMetrics.menuWidth(140))
-
-                    Picker(String(localized: "Match Type"), selection: $matchType) {
-                        ForEach(RuleMatchType.allCases, id: \.self) { type in
-                            Text(type.displayName).tag(type)
+                        inlineField(String(localized: "Match type")) {
+                            matchTypePicker
                         }
+                        wildcardHint
+                        Spacer()
                     }
-                    .frame(width: toolMetrics.menuWidth(170))
-
-                    Text(String(localized: "Support wildcard * and ?."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(String(localized: "Test your Rule")) {}
-                        .buttonStyle(.link)
+                    VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                        inlineField(String(localized: "Method")) {
+                            methodPicker
+                        }
+                        inlineField(String(localized: "Match type")) {
+                            matchTypePicker
+                        }
+                        wildcardHint
+                    }
                 }
 
-                HStack {
-                    Spacer()
-                        .frame(width: wideLabelWidth)
-                    Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                        .toggleStyle(.checkbox)
-                }
+                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
+                    .toggleStyle(.checkbox)
+                    .font(toolMetrics.font())
             }
-            .padding(18)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    private var methodPicker: some View {
+        Picker("", selection: $method) {
+            ForEach(HTTPMethodFilter.allCases) { method in
+                Text(method.displayName).tag(method)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(
+            width: max(toolMetrics.menuWidth(140), toolMetrics.bodyFontSize * 8),
+            height: toolMetrics.formControlHeight
+        )
+        .accessibilityLabel(String(localized: "HTTP method"))
+    }
+
+    private var matchTypePicker: some View {
+        Picker("", selection: $matchType) {
+            ForEach(RuleMatchType.allCases, id: \.self) { type in
+                Text(type.displayName).tag(type)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(
+            width: max(toolMetrics.menuWidth(160), toolMetrics.bodyFontSize * 10),
+            height: toolMetrics.formControlHeight
+        )
+        .accessibilityLabel(String(localized: "Match type"))
+    }
+
+    @ViewBuilder private var wildcardHint: some View {
+        if matchType == .wildcard {
+            Text(String(localized: "Supports * and ?."))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
         }
     }
 
     private var protobufSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(String(localized: "Protobuf"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .medium))
+                .font(toolMetrics.font(weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    Text(String(localized: "Schema:"))
-                        .lineLimit(1)
-                        .frame(width: wideLabelWidth, alignment: .trailing)
-                    Button(String(localized: "Add Schema…")) {
-                        onAddSchema()
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                    inlineField(String(localized: "Schema")) {
+                        Picker("", selection: $schemaID) {
+                            Text(String(localized: "Not selected")).tag(UUID?.none)
+                            if let schemaID, !schemas.contains(where: { $0.id == schemaID }) {
+                                Text(String(localized: "Missing Schema")).tag(Optional(schemaID))
+                            }
+                            ForEach(schemas) { schema in
+                                Text(schema.fileName).tag(Optional(schema.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(
+                            width: max(toolMetrics.menuWidth(240), toolMetrics.bodyFontSize * 12),
+                            height: toolMetrics.formControlHeight
+                        )
+                        .accessibilityLabel(String(localized: "Local schema"))
                     }
-                    .disabled(!canUploadSchema)
-
-                    if !canUploadSchema {
-                        Label(String(localized: "Schema upload unavailable"), systemImage: "lock.fill")
+                    if schemaReference == .missing {
+                        Label(String(localized: "Missing Schema"), systemImage: "exclamationmark.triangle.fill")
                             .font(toolMetrics.secondaryFont())
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .foregroundStyle(.orange)
                     }
+                    Spacer()
                 }
 
-                HStack(spacing: 12) {
-                    Text(String(localized: "Message Type:"))
-                        .lineLimit(1)
-                        .frame(width: wideLabelWidth, alignment: .trailing)
-                    Picker(String(localized: "Schema"), selection: $schemaID) {
-                        Text(String(localized: "Not selected")).tag(UUID?.none)
-                        ForEach(schemas) { schema in
-                            Text(schema.fileName).tag(Optional(schema.id))
-                        }
-                    }
-                    .frame(width: toolMetrics.menuWidth(240))
-                    TextField(String(localized: "package.Message"), text: $messageType)
+                fieldGroup(String(localized: "Message type")) {
+                    TextField("package.Message", text: $messageType)
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                    if schemaID == nil {
-                        Label(
-                            String(localized: "Not found in Schema List"),
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
+                        .focused($focusedField, equals: .messageType)
+                        .accessibilityLabel(String(localized: "Message type"))
                 }
 
-                HStack {
-                    Spacer()
-                        .frame(width: wideFieldLeading)
-                    Text(String(localized: "If the Message Type does not exist, add the Schema first."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack {
-                    Spacer()
-                        .frame(width: wideFieldLeading)
-                    Toggle(
-                        String(localized: "Use different Message Type for Request / Response"),
-                        isOn: $useDifferentMessageTypes
-                    )
-                    .toggleStyle(.checkbox)
-                }
+                Toggle(
+                    String(localized: "Use different message types for request and response"),
+                    isOn: $useDifferentMessageTypes
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
 
                 if useDifferentMessageTypes {
-                    HStack(spacing: 12) {
-                        Text(String(localized: "Request:"))
-                            .lineLimit(1)
-                            .frame(width: wideLabelWidth, alignment: .trailing)
-                        TextField(String(localized: "package.Request"), text: $requestMessageType)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font(monospaced: true))
-                            .frame(minHeight: toolMetrics.formControlHeight)
-                        Text(String(localized: "Response:"))
-                            .lineLimit(1)
-                        TextField(String(localized: "package.Response"), text: $responseMessageType)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font(monospaced: true))
-                            .frame(minHeight: toolMetrics.formControlHeight)
+                    HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                        fieldGroup(String(localized: "Request")) {
+                            TextField("package.Request", text: $requestMessageType)
+                                .textFieldStyle(.roundedBorder)
+                                .font(toolMetrics.font(monospaced: true))
+                                .focused($focusedField, equals: .requestMessageType)
+                                .accessibilityLabel(String(localized: "Request message type"))
+                        }
+                        fieldGroup(String(localized: "Response")) {
+                            TextField("package.Response", text: $responseMessageType)
+                                .textFieldStyle(.roundedBorder)
+                                .font(toolMetrics.font(monospaced: true))
+                                .focused($focusedField, equals: .responseMessageType)
+                                .accessibilityLabel(String(localized: "Response message type"))
+                        }
                     }
                 }
 
-                HStack(spacing: 12) {
-                    Text(String(localized: "Payload Type:"))
-                        .lineLimit(1)
-                        .frame(width: wideLabelWidth, alignment: .trailing)
-                    Picker(String(localized: "Payload Type"), selection: $payloadEncoding) {
-                        ForEach(ProtobufPayloadEncoding.allCases) { encoding in
-                            Text(encoding.displayName).tag(encoding)
+                inlineField(String(localized: "Payload")) {
+                    if toolMetrics.bodyFontSize >= 20 {
+                        Picker("", selection: $payloadEncoding) {
+                            payloadEncodingOptions
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(
+                            width: max(toolMetrics.menuWidth(240), toolMetrics.bodyFontSize * 12),
+                            height: toolMetrics.formControlHeight
+                        )
+                        .accessibilityLabel(String(localized: "Payload encoding"))
+                    } else {
+                        Picker("", selection: $payloadEncoding) {
+                            payloadEncodingOptions
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.radioGroup)
+                        .horizontalRadioGroupLayout()
+                        .frame(minHeight: toolMetrics.formControlHeight)
+                        .accessibilityLabel(String(localized: "Payload encoding"))
                     }
-                    .pickerStyle(.radioGroup)
-                    .horizontalRadioGroupLayout()
                 }
             }
-            .padding(18)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    @ViewBuilder private var payloadEncodingOptions: some View {
+        ForEach(ProtobufPayloadEncoding.allCases) { encoding in
+            Text(encoding.displayName).tag(encoding)
         }
     }
 
     private var footer: some View {
-        HStack {
-            Button {
-                // Help intentionally mirrors the reference window's compact affordance.
-            } label: {
-                Image(systemName: "questionmark.circle")
+        VStack(alignment: .leading, spacing: 6) {
+            if let inlineError {
+                Label(inlineError, systemImage: "exclamationmark.triangle.fill")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.bordered)
 
-            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
+                }
+                .keyboardShortcut(.cancelAction)
 
-            Button(String(localized: "Cancel")) {
-                dismiss()
+                Button {
+                    attemptSave()
+                } label: {
+                    footerButtonLabel(sessionButtonTitle)
+                }
+                .keyboardShortcut(.defaultAction)
             }
-            .keyboardShortcut(.cancelAction)
-
-            Button(sessionButtonTitle) {
-                onSave(makeRule())
-            }
-            .keyboardShortcut(.defaultAction)
         }
+        .padding(.horizontal, toolMetrics.formHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    private func inlineField(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+        }
+    }
+
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .frame(height: toolMetrics.formControlHeight)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
     }
 
     private func loadSession() {
         guard case let .edit(rule) = session.mode else {
+            Task { @MainActor in
+                await Task.yield()
+                focusedField = .url
+            }
             return
         }
         ruleID = rule.id
+        isEnabled = rule.isEnabled
         urlPattern = rule.urlPattern
         method = rule.method
         matchType = rule.matchType
@@ -560,8 +758,8 @@ private struct ProtobufRuleEditorSheet: View {
     }
 
     private func makeRule() -> ProtobufMappingRule {
-        ProtobufMappingRule(
-            id: ruleID,
+        let base = ProtobufMappingRule(id: ruleID, isEnabled: isEnabled, urlPattern: urlPattern)
+        return base.withEditedFields(
             urlPattern: urlPattern,
             method: method,
             matchType: matchType,
@@ -574,15 +772,39 @@ private struct ProtobufRuleEditorSheet: View {
         )
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func attemptSave() {
+        let rule = makeRule()
+        do {
+            try ProtobufMappingRuleStore.validate(rule)
+        } catch let error as ProtobufMappingRuleValidationError {
+            inlineError = error.errorDescription
+            focusedField = focusedField(for: error)
+            return
+        } catch {
+            inlineError = error.localizedDescription
+            return
+        }
+
+        do {
+            try onSave(rule)
+            dismiss()
+        } catch {
+            inlineError = error.localizedDescription
+        }
     }
 
-    private var wideLabelWidth: CGFloat {
-        toolMetrics.formWideLabelWidth
-    }
-
-    private var wideFieldLeading: CGFloat {
-        wideLabelWidth + toolMetrics.controlSpacing + 4
+    private func focusedField(for error: ProtobufMappingRuleValidationError) -> Field {
+        guard error == .invalidMessageType else {
+            return .url
+        }
+        if !ProtobufMappingRuleStore.isMessageTypeValid(messageType) {
+            return .messageType
+        }
+        if useDifferentMessageTypes,
+           !ProtobufMappingRuleStore.isMessageTypeValid(requestMessageType)
+        {
+            return .requestMessageType
+        }
+        return .responseMessageType
     }
 }

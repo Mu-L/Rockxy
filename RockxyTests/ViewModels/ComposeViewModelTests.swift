@@ -15,6 +15,37 @@ struct MockComposeExecutor: ComposeRequestExecutor {
     }
 }
 
+// MARK: - OversizedComposeResponseURLProtocol
+
+private final class OversizedComposeResponseURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let url = request.url,
+              let response = HTTPURLResponse(
+                  url: url,
+                  statusCode: 200,
+                  httpVersion: nil,
+                  headerFields: nil
+              ) else
+        {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("12345".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 // MARK: - ComposeViewModelTests
 
 @MainActor
@@ -122,6 +153,120 @@ struct ComposeViewModelTests {
         }
     }
 
+    @Test("A request canceled before send begins never reaches the executor")
+    func preCancelledSendDoesNotExecute() async {
+        let callCount = ManagedAtomic(0)
+        let executor = MockComposeExecutor { _, _ in
+            _ = callCount.increment()
+            throw URLError(.cancelled)
+        }
+        let vm = ComposeViewModel(executor: executor)
+        vm.url = "https://api.example.com/mutate"
+
+        let sendTask = Task { @MainActor in
+            withUnsafeCurrentTask { task in
+                task?.cancel()
+            }
+            await vm.send()
+        }
+        await sendTask.value
+
+        #expect(callCount.currentValue == 0)
+        #expect(vm.history.isEmpty)
+        if case .empty = vm.responseState {} else {
+            Issue.record("Expected a pre-cancelled send to leave the response empty")
+        }
+    }
+
+    @Test("Compose response streaming enforces its hard byte cap")
+    func responseStreamingEnforcesHardCap() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OversizedComposeResponseURLProtocol.self]
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/large")))
+        let responses = BoundedComposeRequestOperation.responses(
+            for: request,
+            configuration: configuration,
+            followsRedirects: true,
+            maximumBytes: 4
+        )
+
+        await #expect(throws: ComposeResponseError.bodyTooLarge(limitBytes: 4)) {
+            for try await _ in responses {}
+        }
+    }
+
+    @Test("Compose response streaming enforces the cumulative byte cap")
+    func responseStreamingEnforcesCumulativeHardCap() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/large")))
+        let (responses, continuation) =
+            AsyncThrowingStream<(Data, HTTPURLResponse), Error>.makeStream()
+        let operation = BoundedComposeRequestOperation(
+            request: request,
+            configuration: configuration,
+            followsRedirects: true,
+            maximumBytes: 4,
+            continuation: continuation
+        )
+        let session = URLSession(configuration: configuration)
+        let dataTask = session.dataTask(with: request)
+
+        operation.urlSession(session, dataTask: dataTask, didReceive: Data("123".utf8))
+        operation.urlSession(session, dataTask: dataTask, didReceive: Data("45".utf8))
+
+        await #expect(throws: ComposeResponseError.bodyTooLarge(limitBytes: 4)) {
+            for try await _ in responses {}
+        }
+        session.invalidateAndCancel()
+    }
+
+    @Test("Compose response streaming applies the selected redirect policy")
+    func responseStreamingRedirectPolicy() throws {
+        let redirectedRequest = URLRequest(
+            url: try #require(URL(string: "https://api.example.com/final"))
+        )
+
+        #expect(
+            BoundedComposeRequestOperation.redirectedRequest(
+                redirectedRequest,
+                followsRedirects: false
+            ) == nil
+        )
+        #expect(
+            BoundedComposeRequestOperation.redirectedRequest(
+                redirectedRequest,
+                followsRedirects: true
+            ) == redirectedRequest
+        )
+    }
+
+    @Test("Compose response streaming cancellation wins when requested before start")
+    func responseStreamingCancelBeforeStart() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        let request = URLRequest(url: try #require(URL(string: "https://api.example.com/cancel")))
+        let (responses, continuation) =
+            AsyncThrowingStream<(Data, HTTPURLResponse), Error>.makeStream()
+        let operation = BoundedComposeRequestOperation(
+            request: request,
+            configuration: configuration,
+            followsRedirects: true,
+            maximumBytes: 1_024,
+            continuation: continuation
+        )
+
+        operation.cancel()
+        operation.start()
+
+        do {
+            for try await _ in responses {
+                Issue.record("Expected cancellation before any response was delivered")
+            }
+            Issue.record("Expected cancellation to terminate the response stream with an error")
+        } catch {
+            #expect(error is CancellationError)
+        }
+    }
+
     @Test("Send with invalid URL shows error state")
     func sendInvalidURL() async {
         let vm = ComposeViewModel()
@@ -186,6 +331,88 @@ struct ComposeViewModelTests {
         } else {
             Issue.record("Expected second send to still win after first completes")
         }
+    }
+
+    @Test("Retargeting the draft invalidates an older in-flight response")
+    func retargetedDraftRejectsStaleResponse() async throws {
+        let firstContinuation: AsyncStream<Void>.Continuation
+        let firstStream: AsyncStream<Void>
+        (firstStream, firstContinuation) = AsyncStream<Void>.makeStream()
+
+        let callCount = ManagedAtomic(0)
+        let firstResponse = try makeResponse(statusCode: 200)
+        let secondResponse = try makeResponse(statusCode: 201)
+        let executor = MockComposeExecutor { _, _ in
+            if callCount.increment() == 1 {
+                for await _ in firstStream {
+                    break
+                }
+                return (Data("stale".utf8), firstResponse)
+            }
+            return (Data("current".utf8), secondResponse)
+        }
+
+        let vm = ComposeViewModel(executor: executor, historyStore: makeHistoryStore())
+        vm.url = "https://api.example.com/old"
+        let firstTask = Task { @MainActor in
+            await vm.send()
+        }
+
+        while callCount.currentValue == 0 {
+            await Task.yield()
+        }
+
+        vm.resetDraft()
+        vm.url = "https://api.example.com/current"
+        await vm.send()
+
+        firstContinuation.yield()
+        firstContinuation.finish()
+        await firstTask.value
+
+        if case let .success(result) = vm.responseState {
+            #expect(result.statusCode == 201)
+            #expect(result.bodyText == "current")
+        } else {
+            Issue.record("Expected the retargeted draft response to remain visible")
+        }
+        #expect(vm.history.count == 1)
+        #expect(vm.history.first?.url == "https://api.example.com/current")
+    }
+
+    @Test("Cancel invalidates an in-flight response without recording history")
+    func cancelInvalidatesInFlightResponse() async throws {
+        let continuation: AsyncStream<Void>.Continuation
+        let stream: AsyncStream<Void>
+        (stream, continuation) = AsyncStream<Void>.makeStream()
+        let callCount = ManagedAtomic(0)
+        let response = try makeResponse(statusCode: 200)
+        let executor = MockComposeExecutor { _, _ in
+            _ = callCount.increment()
+            for await _ in stream {
+                break
+            }
+            return (Data("late".utf8), response)
+        }
+        let vm = ComposeViewModel(executor: executor, historyStore: makeHistoryStore())
+        vm.url = "https://api.example.com/cancel"
+
+        let sendTask = Task { @MainActor in
+            await vm.send()
+        }
+        while callCount.currentValue == 0 {
+            await Task.yield()
+        }
+
+        vm.cancelActiveSend()
+        continuation.yield()
+        continuation.finish()
+        await sendTask.value
+
+        if case .empty = vm.responseState {} else {
+            Issue.record("Expected cancel to restore the empty response state")
+        }
+        #expect(vm.history.isEmpty)
     }
 
     // MARK: - Binary Response Fallback
@@ -351,6 +578,23 @@ struct ComposeViewModelTests {
         #expect(capture.followsRedirects == false)
     }
 
+    @Test("TRACE remains a real outbound HTTP method")
+    func traceMethodIsForwarded() async throws {
+        let capture = RequestCapture()
+        let response = try makeResponse()
+        let executor = MockComposeExecutor { request, followsRedirects in
+            capture.record(request: request, followsRedirects: followsRedirects)
+            return (Data(), response)
+        }
+        let vm = ComposeViewModel(executor: executor)
+        vm.method = "TRACE"
+        vm.url = "https://api.example.com/trace"
+
+        await vm.send()
+
+        #expect(capture.request?.httpMethod == "TRACE")
+    }
+
     @Test("No timeout maps to a non-expiring request interval")
     func noTimeoutUsesNonExpiringInterval() async throws {
         let capture = RequestCapture()
@@ -465,6 +709,24 @@ struct ComposeViewModelTests {
         #expect(vm.body == #"{"ok":true}"#)
     }
 
+    @Test("Import cURL rejects file-backed bodies but preserves data-raw literals")
+    func importCurlRejectsFileBackedBodies() throws {
+        let vm = ComposeViewModel()
+        vm.url = "https://api.example.com/keep"
+
+        #expect(throws: ComposeImportError.fileBackedBodyUnsupported) {
+            try vm.importCurlCommand(
+                "curl https://api.example.com/upload --data-binary @payload.bin"
+            )
+        }
+        #expect(vm.url == "https://api.example.com/keep")
+
+        try vm.importCurlCommand(
+            "curl https://api.example.com/upload --data-raw @literal"
+        )
+        #expect(vm.body == "@literal")
+    }
+
     @Test("Import cURL rejects empty, non-cURL, and URL-less commands without clearing draft")
     func importCurlRejectsInvalidCommands() {
         let vm = ComposeViewModel()
@@ -490,17 +752,66 @@ struct ComposeViewModelTests {
     // MARK: - Body Loading And Formatting
 
     @Test("Load body from file imports UTF-8 text")
-    func loadBodyFromFile() throws {
+    func loadBodyFromFile() async throws {
         let vm = ComposeViewModel()
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("rockxy-compose-body-\(UUID().uuidString).txt")
         try Data("from file".utf8).write(to: fileURL)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        try vm.loadBodyFromFile(url: fileURL)
+        try await vm.loadBodyFromFile(url: fileURL)
 
         #expect(vm.body == "from file")
         #expect(vm.lastFormattingError == nil)
+    }
+
+    @Test("Body file import rejects files above its configured size limit")
+    func loadBodyFromFileRejectsOversizedInput() async throws {
+        let vm = ComposeViewModel(bodyImportSizeLimit: 4)
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-compose-body-large-\(UUID().uuidString).txt")
+        try Data("12345".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        await #expect(throws: ImportSizeError.self) {
+            try await vm.loadBodyFromFile(url: fileURL)
+        }
+        #expect(vm.body.isEmpty)
+        #expect(vm.lastFormattingError?.contains("Maximum supported size") == true)
+    }
+
+    @Test("Body file import rejects non UTF-8 text without replacing the draft")
+    func loadBodyFromFileRejectsBinaryInput() async throws {
+        let vm = ComposeViewModel()
+        vm.body = "keep me"
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-compose-body-binary-\(UUID().uuidString).bin")
+        try Data([0xFF, 0xFE, 0x00]).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        await #expect(throws: ComposeBodyImportError.self) {
+            try await vm.loadBodyFromFile(url: fileURL)
+        }
+        #expect(vm.body == "keep me")
+        #expect(vm.lastFormattingError?.contains("UTF-8") == true)
+    }
+
+    @Test("A deliberate UTF-8 replacement unlocks a captured binary body")
+    func loadBodyFromFileReplacesUnsupportedBinaryBody() async throws {
+        let transaction = TestFixtures.makeTransaction(method: "POST")
+        transaction.request.body = Data([0xFF, 0xFE, 0x00])
+        let vm = ComposeViewModel()
+        vm.prefill(from: transaction)
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-compose-body-replacement-\(UUID().uuidString).txt")
+        try Data("replacement".utf8).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        try await vm.loadBodyFromFile(url: fileURL)
+
+        #expect(vm.body == "replacement")
+        #expect(vm.sourceHasUnsupportedBinaryBody == false)
+        #expect(vm.isUnsupportedForReplay == false)
     }
 
     @Test("JSON prettier formats valid JSON and preserves invalid body")
@@ -600,10 +911,10 @@ struct ComposeViewModelTests {
         #expect(vm.queryItems.isEmpty)
 
         let removeID = try #require(vm.history.first?.id)
-        vm.removeHistoryEntry(id: removeID)
+        await vm.removeHistoryEntry(id: removeID)
         #expect(vm.history.count == 19)
 
-        vm.clearHistory()
+        await vm.clearHistory()
         #expect(vm.history.isEmpty)
     }
 
@@ -659,6 +970,24 @@ struct ComposeViewModelTests {
         #expect(vm.isUnsupportedForReplay == true)
         if case .unsupported = vm.responseState {} else {
             Issue.record("Expected unsupported state for WebSocket transaction")
+        }
+    }
+
+    @Test("Binary captured request body is not silently replayed as empty text")
+    func binaryRequestBodyPrefillUnsupported() {
+        let transaction = TestFixtures.makeTransaction(method: "POST")
+        transaction.request.body = Data([0xFF, 0xFE, 0x00])
+        let vm = ComposeViewModel()
+
+        vm.prefill(from: transaction)
+
+        #expect(vm.sourceHasUnsupportedBinaryBody == true)
+        #expect(vm.body.isEmpty)
+        #expect(vm.isUnsupportedForReplay == true)
+        if case let .unsupported(message) = vm.responseState {
+            #expect(message.contains("binary body"))
+        } else {
+            Issue.record("Expected unsupported state for a captured binary request body")
         }
     }
 

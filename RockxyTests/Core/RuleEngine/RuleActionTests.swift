@@ -366,6 +366,19 @@ struct RuleActionTests {
         }
     }
 
+    @Test("MapLocal random-delay sentinel (-1) round-trips through Codable")
+    func mapLocalRandomDelayRoundtrip() throws {
+        let action = RuleAction.mapLocal(filePath: "/tmp/random.json", statusCode: 200, delayMs: -1)
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
+        if case let .mapLocal(path, _, _, delayMs) = decoded {
+            #expect(path == "/tmp/random.json")
+            #expect(delayMs == -1)
+        } else {
+            Issue.record("Expected .mapLocal")
+        }
+    }
+
     // MARK: - Header Modify: Multi-Operation + Phase Tests
 
     @Test("Multiple operations encode and decode correctly")

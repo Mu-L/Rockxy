@@ -63,29 +63,40 @@ final class AllowListWindowViewModel {
     /// "new quick-create while the editor is already open" without leaving
     /// stale fields on screen.
     var editorSession: AllowListEditorSession?
-    var isFilterBarVisible = false
-    var filterColumn: AllowListFilterColumn = .name
-    var filterText = ""
+    var searchText = ""
 
     /// Derived from manager.rules — never cached locally.
     var filteredRules: [AllowListRule] {
-        guard !filterText.isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
             return manager.rules
         }
         return manager.rules.filter { rule in
-            switch filterColumn {
-            case .name:
-                rule.name.localizedCaseInsensitiveContains(filterText)
-            case .method:
-                (rule.method ?? "ANY").localizedCaseInsensitiveContains(filterText)
-            case .matchingRule:
-                rule.rawPattern.localizedCaseInsensitiveContains(filterText)
-            }
+            rule.name.localizedCaseInsensitiveContains(query)
+                || (rule.method ?? "ANY").localizedCaseInsensitiveContains(query)
+                || rule.rawPattern.localizedCaseInsensitiveContains(query)
         }
     }
 
     var ruleCount: Int {
         manager.rules.count
+    }
+
+    var activeRuleCount: Int {
+        manager.rules.count(where: \.isEnabled)
+    }
+
+    var effectiveRuleCount: Int {
+        manager.rules.count { rule in
+            guard rule.isEnabled else {
+                return false
+            }
+            return AllowListRulePatternValidation.isValid(
+                rawPattern: rule.rawPattern,
+                matchType: rule.matchType,
+                includeSubpaths: rule.includeSubpaths
+            )
+        }
     }
 
     var isAllowListActive: Bool {
@@ -224,26 +235,25 @@ struct AllowListWindowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            infoBanner
+            Divider()
             AllowListTableView(
                 rules: viewModel.filteredRules,
+                isSearching: !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 selectedRuleID: $viewModel.selectedRuleID,
                 onToggle: { viewModel.toggleRule(id: $0) },
                 onEdit: openEditorForRule,
                 contextMenuItems: contextMenuItems
             )
-            if viewModel.isFilterBarVisible {
-                AllowListFilterBar(
-                    filterColumn: $viewModel.filterColumn,
-                    filterText: $viewModel.filterText,
-                    onDismiss: hideFilterBar
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            shortcutHelp
+            Divider()
             footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_200, height: 672)
+        .frame(
+            minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
         .onAppear { consumePendingContext() }
         .onReceive(NotificationCenter.default.publisher(for: .openAllowListWindow)) { _ in
             consumePendingContext()
@@ -282,7 +292,7 @@ struct AllowListWindowView: View {
             isPresented: $showExporter,
             document: exportDocument,
             contentType: .json,
-            defaultFilename: "allow-list"
+            defaultFilename: "allow-list-settings.json"
         ) { _ in
             exportDocument = nil
         }
@@ -294,7 +304,7 @@ struct AllowListWindowView: View {
             handleImport(result)
         }
         .alert(
-            String(localized: "Import Failed"),
+            operationAlertTitle,
             isPresented: Binding(
                 get: { importError != nil },
                 set: { newValue in
@@ -310,7 +320,17 @@ struct AllowListWindowView: View {
                 Text(error)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isFilterBarVisible)
+        .alert(
+            String(localized: "Replace Allow List Rules?"),
+            isPresented: $showImportConfirmation
+        ) {
+            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Choose File…")) {
+                showImporter = true
+            }
+        } message: {
+            Text(importConfirmationMessage)
+        }
         .onDeleteCommand {
             viewModel.removeSelected()
         }
@@ -330,8 +350,10 @@ struct AllowListWindowView: View {
     @State private var viewModel = AllowListWindowViewModel()
     @State private var showExporter = false
     @State private var showImporter = false
+    @State private var showImportConfirmation = false
     @State private var exportDocument: AllowListJSONDocument?
     @State private var importError: String?
+    @State private var operationAlertTitle = String(localized: "Import Failed")
     @State private var importSource: AllowListImportSource = .rockxyJSON
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
@@ -347,61 +369,112 @@ struct AllowListWindowView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(
-                String(localized: "Enable Allow List Tool"),
-                isOn: Binding(
-                    get: { viewModel.isAllowListActive },
-                    set: { viewModel.setActive($0) }
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    String(localized: "Enable Allow List"),
+                    isOn: Binding(
+                        get: { viewModel.isAllowListActive },
+                        set: { viewModel.setActive($0) }
+                    )
                 )
-            )
-            .toggleStyle(.checkbox)
-            .font(toolMetrics.font(weight: .medium))
-            .padding(.top, toolMetrics.headerTopPadding)
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font(weight: .medium))
+                .help(
+                    String(
+                        localized:
+                        "When off, Rockxy captures all traffic. Individual Allow List rules keep their enabled state."
+                    )
+                )
 
-            Text(String(localized: "Define Rules for capturing only specific domains. Ignore others domains."))
+                Text(String(localized: "Capture and display only traffic that matches an enabled rule."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
-                .foregroundStyle(.primary)
-
-            Text(
-                String(
-                    localized:
-                    "Each request is checked against the rules from top to bottom, stopping when a match is found."
-                )
-            )
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Search Allow List rules"))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
     }
 
-    private var shortcutHelp: some View {
-        Text(String(localized: "New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: Space"))
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isCapturingNothing ? "exclamationmark.triangle.fill" : "info.circle")
+                .foregroundStyle(isCapturingNothing ? Color.orange : Color.secondary)
+            Text(infoBannerMessage)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(isCapturingNothing ? Color.primary : Color.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background {
+            if isCapturingNothing {
+                Color.orange.opacity(0.12)
+            } else {
+                Color(nsColor: .controlBackgroundColor).opacity(0.5)
+            }
+        }
+    }
+
+    private var isCapturingNothing: Bool {
+        viewModel.isAllowListActive && viewModel.effectiveRuleCount == 0
+    }
+
+    private var infoBannerMessage: String {
+        if isCapturingNothing {
+            return String(
+                localized:
+                "Allow List is on, but no valid enabled rule can match. Rockxy will not record traffic until a rule is enabled."
+            )
+        }
+        return String(
+            localized:
+            "Allow List controls what Rockxy records in the session. Non-matching traffic is still forwarded normally."
+        )
     }
 
     private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             addRemoveControl
 
-            Button {
-                // Help content is intentionally deferred; this mirrors the reference affordance.
-            } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.bordered)
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
             moreMenu
+
+            Text(
+                viewModel.isAllowListActive
+                    ? "\(viewModel.effectiveRuleCount) \(String(localized: "ACTIVE"))"
+                    : String(localized: "ALLOW LIST OFF")
+            )
+            .font(toolMetrics.metadataFont(weight: .semibold))
+            .foregroundStyle(viewModel.isAllowListActive ? Color.white : Color.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(viewModel.isAllowListActive ? Color.green : Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var footerHint: String {
+        let countText = viewModel.searchText.isEmpty
+            ? "\(viewModel.ruleCount) \(String(localized: "rules"))"
+            : String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
     }
 
     private var addRemoveControl: some View {
@@ -456,21 +529,13 @@ struct AllowListWindowView: View {
             Button(String(localized: "Edit…")) {
                 openEditorForSelection()
             }
-            .keyboardShortcut("e", modifiers: .command)
+            .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
 
             Button(String(localized: "Duplicate")) {
                 viewModel.duplicateSelected()
             }
             .keyboardShortcut("d", modifiers: .command)
-            .disabled(viewModel.selectedRuleID == nil)
-
-            Button(enableDisableLabel) {
-                if let id = viewModel.selectedRuleID {
-                    viewModel.toggleRule(id: id)
-                }
-            }
-            .keyboardShortcut(.return, modifiers: [])
             .disabled(viewModel.selectedRuleID == nil)
 
             Button(enableDisableLabel) {
@@ -488,20 +553,17 @@ struct AllowListWindowView: View {
             }
             .disabled(viewModel.manager.rules.isEmpty)
 
-            Menu(String(localized: "Import Settings")) {
-                Button(String(localized: "From Rockxy JSON…")) {
-                    importSource = .rockxyJSON
-                    showImporter = true
+            Button(String(localized: "Import Rockxy Settings…")) {
+                requestImport(from: .rockxyJSON)
+            }
+
+            Menu(String(localized: "Migrate from Another Proxy")) {
+                Button(String(localized: "Proxyman Settings…")) {
+                    requestImport(from: .proxyman)
                 }
 
-                Button(String(localized: "From Proxyman…")) {
-                    importSource = .proxyman
-                    showImporter = true
-                }
-
-                Button(String(localized: "From Charles Proxy…")) {
-                    importSource = .charlesProxy
-                    showImporter = true
+                Button(String(localized: "Charles Proxy Settings…")) {
+                    requestImport(from: .charlesProxy)
                 }
             }
 
@@ -533,18 +595,13 @@ struct AllowListWindowView: View {
         Button(String(localized: "Edit…")) {
             openEditorForRule(id)
         }
-        .keyboardShortcut("e", modifiers: .command)
+        .keyboardShortcut(.return, modifiers: .command)
 
         Button(String(localized: "Duplicate")) {
             viewModel.selectedRuleID = id
             viewModel.duplicateSelected()
         }
         .keyboardShortcut("d", modifiers: .command)
-
-        Button(enableDisableLabel(for: id)) {
-            viewModel.toggleRule(id: id)
-        }
-        .keyboardShortcut(.return, modifiers: [])
 
         Button(enableDisableLabel(for: id)) {
             viewModel.toggleRule(id: id)
@@ -584,11 +641,6 @@ struct AllowListWindowView: View {
         viewModel.presentEditorForEditing(rule)
     }
 
-    private func hideFilterBar() {
-        viewModel.isFilterBarVisible = false
-        viewModel.filterText = ""
-    }
-
     private func consumePendingContext() {
         guard let context = AllowListEditorContextStore.shared.consumePending() else {
             return
@@ -604,12 +656,34 @@ struct AllowListWindowView: View {
             exportDocument = try AllowListJSONDocument(data: viewModel.exportRulesJSON())
             showExporter = true
         } catch {
+            operationAlertTitle = String(localized: "Export Failed")
             importError = error.localizedDescription
             Self.logger.error("Allow list export failed: \(error.localizedDescription)")
         }
     }
 
+    private var importConfirmationMessage: String {
+        switch importSource {
+        case .rockxyJSON:
+            String(
+                localized:
+                "Importing replaces all current rules and applies the Allow List on/off state stored in the file."
+            )
+        case .proxyman, .charlesProxy:
+            String(
+                localized:
+                "Migrating replaces all current rules. Rockxy keeps the current Allow List on/off state."
+            )
+        }
+    }
+
+    private func requestImport(from source: AllowListImportSource) {
+        importSource = source
+        showImportConfirmation = true
+    }
+
     private func handleImport(_ result: Result<[URL], Error>) {
+        operationAlertTitle = String(localized: "Import Failed")
         switch result {
         case let .success(urls):
             guard let url = urls.first else {
@@ -650,10 +724,18 @@ struct AllowListWindowView: View {
 
 // MARK: - AllowListTableView
 
+private enum AllowListTableLayout {
+    static let enabledWidth: CGFloat = 66
+    static let nameWidth: CGFloat = 330
+    static let methodWidth: CGFloat = 90
+    static let contentInset: CGFloat = 10
+}
+
 private struct AllowListTableView<ContextMenuContent: View>: View {
     // MARK: Internal
 
     let rules: [AllowListRule]
+    let isSearching: Bool
     @Binding var selectedRuleID: UUID?
 
     let onToggle: (UUID) -> Void
@@ -667,10 +749,25 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
                 zebraRows
 
                 if rules.isEmpty {
-                    Text(String(localized: "Click \"+\" or ⌘N to add new entry"))
-                        .font(.system(size: toolMetrics.emptyStateFontSize))
+                    VStack(spacing: 7) {
+                        Image(systemName: isSearching ? "magnifyingglass" : "checklist")
+                            .font(.system(size: max(22, toolMetrics.emptyStateFontSize + 8)))
+                            .foregroundStyle(.secondary)
+                        Text(
+                            isSearching
+                                ? String(localized: "No matching rules")
+                                : String(localized: "No Allow List rules")
+                        )
+                        .font(toolMetrics.font(weight: .medium))
+                        Text(
+                            isSearching
+                                ? String(localized: "Try a different name, method, or URL pattern.")
+                                : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                        )
+                        .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
@@ -697,9 +794,11 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
         }
         .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
         .clipped()
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay {
-            Rectangle()
-                .stroke(.secondary.opacity(0.45), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
     }
@@ -708,16 +807,22 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
 
     private var columnHeader: some View {
         HStack(spacing: 0) {
-            Text(String(localized: "Enabled"))
-                .frame(width: 66, alignment: .leading)
-            tableDivider
-            Text(String(localized: "Name"))
-                .frame(width: 330, alignment: .leading)
-            tableDivider
-            Text(String(localized: "Method"))
-                .frame(width: 90, alignment: .leading)
-            tableDivider
+            columnHeaderCell(
+                String(localized: "Enabled"),
+                width: AllowListTableLayout.enabledWidth
+            )
+            columnHeaderCell(
+                String(localized: "Name"),
+                width: AllowListTableLayout.nameWidth,
+                alignment: .center
+            )
+            columnHeaderCell(
+                String(localized: "Method"),
+                width: AllowListTableLayout.methodWidth,
+                leadingInset: AllowListTableLayout.contentInset
+            )
             Text(String(localized: "Matching Rule"))
+                .padding(.leading, AllowListTableLayout.contentInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(toolMetrics.tableHeaderFont())
@@ -730,11 +835,24 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
         }
     }
 
+    private func columnHeaderCell(
+        _ title: String,
+        width: CGFloat,
+        alignment: Alignment = .leading,
+        leadingInset: CGFloat = 0
+    ) -> some View {
+        Text(title)
+            .padding(.leading, leadingInset)
+            .frame(width: width, alignment: alignment)
+            .overlay(alignment: .trailing) {
+                tableDivider
+            }
+    }
+
     private var tableDivider: some View {
         Rectangle()
             .fill(.secondary.opacity(0.22))
             .frame(width: 1, height: max(16, toolMetrics.tableRowHeight - 10))
-            .padding(.trailing, 10)
     }
 
     private var zebraRows: some View {
@@ -782,22 +900,26 @@ private struct AllowListTableRow: View {
             ))
             .toggleStyle(.checkbox)
             .labelsHidden()
-            .frame(width: 66)
+            .frame(width: AllowListTableLayout.enabledWidth)
 
             Text(rule.name)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(width: 330, alignment: .leading)
+                .padding(.leading, AllowListTableLayout.contentInset)
+                .frame(width: AllowListTableLayout.nameWidth, alignment: .leading)
 
             Text(rule.method ?? "ANY")
                 .lineLimit(1)
-                .frame(width: 90, alignment: .leading)
+                .padding(.leading, AllowListTableLayout.contentInset)
+                .frame(width: AllowListTableLayout.methodWidth, alignment: .leading)
 
             Text(rule.rawPattern)
                 .font(toolMetrics.font(monospaced: true))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .padding(.leading, AllowListTableLayout.contentInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .help(rule.rawPattern)
         }
         .font(toolMetrics.font())
         .padding(.horizontal, toolMetrics.tableCellHorizontalPadding)

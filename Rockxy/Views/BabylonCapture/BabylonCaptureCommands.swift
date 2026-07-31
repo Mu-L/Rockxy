@@ -9,7 +9,7 @@ struct BabylonCaptureCommands: Commands {
                 openWindow(id: "babylonPairing")
             }
 
-            Button(String(localized: "Runtime Timeline…")) {
+            Button(String(localized: "Runtime Events…")) {
                 openWindow(id: "babylonRuntime")
             }
         }

@@ -17,24 +17,33 @@ protocol ComposeRequestExecutor: Sendable {
 /// the app's own proxy and avoid recursion.
 struct DefaultComposeExecutor: ComposeRequestExecutor {
     func execute(_ request: URLRequest, followsRedirects: Bool) async throws -> (Data, HTTPURLResponse) {
-        let session = followsRedirects ? RequestReplay.proxyBypassSession : Self.noRedirectSession
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ReplayError.invalidResponse
+        let responses = BoundedComposeRequestOperation.responses(
+            for: request,
+            configuration: RequestReplay.proxyBypassSession.configuration,
+            followsRedirects: followsRedirects,
+            maximumBytes: ProxyLimits.maxResponseBodySize
+        )
+        for try await response in responses {
+            return response
         }
-        return (data, httpResponse)
+        throw ReplayError.invalidResponse
     }
+}
 
-    // MARK: Private
+// MARK: - ComposeResponseError
 
-    private static let noRedirectSession: URLSession = {
-        let config = URLSessionConfiguration.ephemeral
-        config.connectionProxyDictionary = [
-            kCFNetworkProxiesHTTPEnable as String: false,
-            kCFNetworkProxiesHTTPSEnable as String: false,
-        ]
-        return URLSession(configuration: config, delegate: NoRedirectSessionDelegate(), delegateQueue: nil)
-    }()
+enum ComposeResponseError: LocalizedError, Equatable {
+    case bodyTooLarge(limitBytes: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case let .bodyTooLarge(limitBytes):
+            let limitMB = Double(limitBytes) / (1_024 * 1_024)
+            return String(
+                localized: "The response body exceeded the \(String(format: "%.0f", limitMB)) MB Compose limit."
+            )
+        }
+    }
 }
 
 // MARK: - ComposeResponseState
@@ -128,6 +137,7 @@ enum ComposeImportError: LocalizedError, Equatable {
     case emptyCommand
     case unsupportedCommand
     case missingURL
+    case fileBackedBodyUnsupported
 
     // MARK: Internal
 
@@ -139,13 +149,30 @@ enum ComposeImportError: LocalizedError, Equatable {
             String(localized: "Only cURL commands can be imported.")
         case .missingURL:
             String(localized: "The cURL command does not contain a URL.")
+        case .fileBackedBodyUnsupported:
+            String(
+                localized: "File-backed cURL bodies are not imported automatically. Load the file from the Body tab instead."
+            )
+        }
+    }
+}
+
+// MARK: - ComposeBodyImportError
+
+enum ComposeBodyImportError: LocalizedError, Equatable {
+    case unsupportedTextEncoding
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedTextEncoding:
+            String(localized: "The selected file is not valid UTF-8 text.")
         }
     }
 }
 
 // MARK: - ComposeHistoryEntry
 
-struct ComposeHistoryEntry: Codable, Equatable, Identifiable {
+struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let method: String
     let url: String
@@ -229,6 +256,7 @@ struct ComposeResponse {
     let bodyData: Data
     let bodyText: String?
     let contentType: ContentType?
+    let bodyTruncated: Bool
 
     var bodyDisplayText: String {
         if let text = bodyText {
@@ -252,10 +280,12 @@ final class ComposeViewModel {
 
     init(
         executor: ComposeRequestExecutor = DefaultComposeExecutor(),
-        historyStore: ComposeHistoryStore = .live
+        historyStore: ComposeHistoryStore = .live,
+        bodyImportSizeLimit: UInt64 = UInt64(ProxyLimits.maxRequestBodySize)
     ) {
         self.executor = executor
         self.historyStore = historyStore
+        self.bodyImportSizeLimit = bodyImportSizeLimit
         history = historyStore.load()
     }
 
@@ -274,6 +304,7 @@ final class ComposeViewModel {
     private(set) var lastFormattingError: String?
     private(set) var restoreConfirmationID = UUID()
     private(set) var restoreConfirmationMessage: String?
+    private var historyClearGeneration = 0
 
     // MARK: - Response State
 
@@ -282,6 +313,12 @@ final class ComposeViewModel {
     /// Whether the original captured transaction was a WebSocket connection.
     /// Immutable per draft — editing the method does not change WebSocket origin.
     private(set) var sourceIsWebSocket = false
+    /// Prevents Edit & Repeat from silently dropping captured binary request bodies
+    /// that the text-only Compose editor cannot represent faithfully.
+    private(set) var sourceHasUnsupportedBinaryBody = false
+    /// Prevents a body capped for on-disk history from being sent as though it
+    /// were the original complete request.
+    private(set) var sourceHasTruncatedHistoryBody = false
 
     // MARK: - Query Sync
 
@@ -290,7 +327,27 @@ final class ComposeViewModel {
 
     /// Whether the current draft cannot be faithfully replayed via URLSession.
     var isUnsupportedForReplay: Bool {
-        sourceIsWebSocket || method == "CONNECT"
+        replayRestrictionMessage != nil
+    }
+
+    var replayRestrictionMessage: String? {
+        if sourceIsWebSocket {
+            return String(localized: "WebSocket requests cannot be replayed as HTTP requests.")
+        }
+        if method == "CONNECT" {
+            return String(localized: "CONNECT requests cannot be replayed from Compose.")
+        }
+        if sourceHasUnsupportedBinaryBody {
+            return String(
+                localized: "This captured request has a binary body that the text editor cannot replay safely. Replace it in the Body tab or use an empty body."
+            )
+        }
+        if sourceHasTruncatedHistoryBody {
+            return String(
+                localized: "This request body was shortened for local history storage. Replace it in the Body tab before sending."
+            )
+        }
+        return nil
     }
 
     /// Assembled raw HTTP request text for the Raw tab.
@@ -326,6 +383,7 @@ final class ComposeViewModel {
     /// Prefill the compose form from a captured transaction. Parses query items
     /// from the URL immediately so the Query tab is always in sync.
     func prefill(from transaction: HTTPTransaction) {
+        invalidateActiveRun()
         clearRestoreConfirmation()
         method = transaction.request.method
         url = transaction.request.url.absoluteString
@@ -333,12 +391,19 @@ final class ComposeViewModel {
             EditableReplayHeader(name: $0.name, value: $0.value)
         }
         if let bodyData = transaction.request.body {
-            body = String(data: bodyData, encoding: .utf8) ?? ""
+            if let bodyText = String(data: bodyData, encoding: .utf8) {
+                body = bodyText
+                sourceHasUnsupportedBinaryBody = false
+            } else {
+                body = ""
+                sourceHasUnsupportedBinaryBody = true
+            }
         } else {
             body = ""
+            sourceHasUnsupportedBinaryBody = false
         }
+        sourceHasTruncatedHistoryBody = false
         sourceIsWebSocket = transaction.webSocketConnection != nil
-        currentRunID = 0
         syncURLToQuery()
         responseState = .empty
         syncUnsupportedState()
@@ -347,6 +412,7 @@ final class ComposeViewModel {
     /// Reset only the active editor draft. History and request options remain intact,
     /// so opening a fresh Compose window feels native without erasing user preferences.
     func resetDraft() {
+        invalidateActiveRun()
         clearRestoreConfirmation()
         method = "GET"
         url = ""
@@ -355,7 +421,8 @@ final class ComposeViewModel {
         queryItems = []
         lastFormattingError = nil
         sourceIsWebSocket = false
-        currentRunID = 0
+        sourceHasUnsupportedBinaryBody = false
+        sourceHasTruncatedHistoryBody = false
         lastSyncedURL = ""
         responseState = .empty
     }
@@ -363,41 +430,49 @@ final class ComposeViewModel {
     /// Send the current request draft. Uses latest-run-wins: if a newer send
     /// starts before this one completes, the stale result is silently discarded.
     func send() async {
-        guard !isUnsupportedForReplay else {
-            clearRestoreConfirmation()
-            responseState = .unsupported(
-                String(localized: "Replay is not supported for this request type.")
-            )
+        guard !Task.isCancelled else {
+            return
+        }
+        let runID = UUID()
+        activeRunID = runID
+        clearRestoreConfirmation()
+
+        if let replayRestrictionMessage {
+            activeRunID = nil
+            responseState = .unsupported(replayRestrictionMessage)
             return
         }
 
         guard let requestURL = URL(string: url) else {
-            clearRestoreConfirmation()
+            activeRunID = nil
             responseState = .error(String(localized: "Invalid URL"))
             return
         }
 
-        clearRestoreConfirmation()
-        currentRunID &+= 1
-        let runID = currentRunID
-
+        let requestSnapshot = sentRequestSnapshot()
         responseState = .loading
 
         var request = URLRequest(url: requestURL)
-        request.httpMethod = method
-        for header in headers where header.isEnabled && !header.name.isEmpty {
+        request.httpMethod = requestSnapshot.method
+        for header in requestSnapshot.headers where header.isEnabled && !header.name.isEmpty {
             request.setValue(header.value, forHTTPHeaderField: header.name)
         }
-        if !body.isEmpty {
-            request.httpBody = Data(body.utf8)
+        if !requestSnapshot.body.isEmpty {
+            request.httpBody = Data(requestSnapshot.body.utf8)
         }
         request.timeoutInterval = requestTimeout.interval
 
         do {
             let (data, httpResponse) = try await executor.execute(request, followsRedirects: followsRedirects)
 
-            guard runID == currentRunID else {
-                Self.logger.debug("Discarding stale response for runID \(runID)")
+            guard runID == activeRunID else {
+                Self.logger.debug("Discarding stale Compose response")
+                return
+            }
+            let bodyText = try await Self.decodeUTF8Body(data)
+            try Task.checkCancellation()
+            guard runID == activeRunID else {
+                Self.logger.debug("Discarding stale Compose response")
                 return
             }
 
@@ -410,28 +485,52 @@ final class ComposeViewModel {
                 statusMessage: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
                 headers: responseHeaders,
                 bodyData: data,
-                bodyText: String(data: data, encoding: .utf8),
-                contentType: contentType
+                bodyText: bodyText,
+                contentType: contentType,
+                bodyTruncated: false
             )
+            activeRunID = nil
             responseState = .success(response)
-            recordHistory(response: response)
+            await recordHistory(request: requestSnapshot, response: response)
             Self.logger.info("Compose send succeeded: \(httpResponse.statusCode)")
         } catch {
-            guard runID == currentRunID else {
-                Self.logger.debug("Discarding stale error for runID \(runID)")
+            if Task.isCancelled ||
+                error is CancellationError ||
+                (error as? URLError)?.code == .cancelled
+            {
+                if runID == activeRunID {
+                    activeRunID = nil
+                    responseState = .empty
+                }
                 return
             }
+            guard runID == activeRunID else {
+                Self.logger.debug("Discarding stale Compose error")
+                return
+            }
+            activeRunID = nil
             responseState = .error(error.localizedDescription)
-            recordHistory(response: nil)
+            await recordHistory(request: requestSnapshot, response: nil)
             Self.logger.error("Compose send failed: \(error.localizedDescription)")
         }
+    }
+
+    func cancelActiveSend() {
+        guard activeRunID != nil else {
+            return
+        }
+        activeRunID = nil
+        responseState = .empty
     }
 
     // MARK: - Templates
 
     func applyTemplate(_ template: ComposeTemplate) {
+        invalidateActiveRun()
         clearRestoreConfirmation()
         sourceIsWebSocket = false
+        sourceHasUnsupportedBinaryBody = false
+        sourceHasTruncatedHistoryBody = false
         responseState = .empty
         lastFormattingError = nil
 
@@ -517,7 +616,7 @@ final class ComposeViewModel {
                 }
             case let value where value.hasPrefix("--header="):
                 appendHeader(String(value.dropFirst("--header=".count)), to: &importedHeaders)
-            case "-d", "--data", "--data-raw", "--data-binary", "--data-ascii":
+            case "--data-raw":
                 if let value = tokens[safe: index + 1] {
                     importedBody = value
                     if importedMethod == "GET" {
@@ -525,8 +624,45 @@ final class ComposeViewModel {
                     }
                     index += 1
                 }
+            case "-d", "--data", "--data-binary", "--data-ascii":
+                if let value = tokens[safe: index + 1] {
+                    try rejectFileBackedCurlBody(value)
+                    importedBody = value
+                    if importedMethod == "GET" {
+                        importedMethod = "POST"
+                    }
+                    index += 1
+                }
+            case let value where value.hasPrefix("-d") && value.count > 2:
+                let bodyValue = String(value.dropFirst(2))
+                try rejectFileBackedCurlBody(bodyValue)
+                importedBody = bodyValue
+                if importedMethod == "GET" {
+                    importedMethod = "POST"
+                }
+            case let value where value.hasPrefix("--data-raw="):
+                importedBody = String(value.dropFirst("--data-raw=".count))
+                if importedMethod == "GET" {
+                    importedMethod = "POST"
+                }
             case let value where value.hasPrefix("--data="):
-                importedBody = String(value.dropFirst("--data=".count))
+                let bodyValue = String(value.dropFirst("--data=".count))
+                try rejectFileBackedCurlBody(bodyValue)
+                importedBody = bodyValue
+                if importedMethod == "GET" {
+                    importedMethod = "POST"
+                }
+            case let value where value.hasPrefix("--data-binary="):
+                let bodyValue = String(value.dropFirst("--data-binary=".count))
+                try rejectFileBackedCurlBody(bodyValue)
+                importedBody = bodyValue
+                if importedMethod == "GET" {
+                    importedMethod = "POST"
+                }
+            case let value where value.hasPrefix("--data-ascii="):
+                let bodyValue = String(value.dropFirst("--data-ascii=".count))
+                try rejectFileBackedCurlBody(bodyValue)
+                importedBody = bodyValue
                 if importedMethod == "GET" {
                     importedMethod = "POST"
                 }
@@ -545,11 +681,14 @@ final class ComposeViewModel {
             throw ComposeImportError.missingURL
         }
 
+        invalidateActiveRun()
         method = importedMethod.uppercased()
         url = importedURL
         headers = importedHeaders
         body = importedBody ?? ""
         sourceIsWebSocket = false
+        sourceHasUnsupportedBinaryBody = false
+        sourceHasTruncatedHistoryBody = false
         responseState = .empty
         lastFormattingError = nil
         clearRestoreConfirmation()
@@ -558,20 +697,22 @@ final class ComposeViewModel {
 
     // MARK: - History
 
-    func removeHistoryEntry(id: UUID) {
+    func removeHistoryEntry(id: UUID) async {
         history.removeAll { $0.id == id }
-        persistHistory()
+        await persistHistory()
     }
 
-    func clearHistory() {
+    func clearHistory() async {
+        historyClearGeneration += 1
         history.removeAll()
-        persistHistory()
+        await persistHistory()
     }
 
     func restoreHistoryEntry(id: UUID) {
         guard let entry = history.first(where: { $0.id == id }) else {
             return
         }
+        invalidateActiveRun()
         method = entry.method
         url = entry.url
         headers = entry.headers
@@ -579,6 +720,8 @@ final class ComposeViewModel {
         body = entry.body
         lastFormattingError = nil
         sourceIsWebSocket = false
+        sourceHasUnsupportedBinaryBody = false
+        sourceHasTruncatedHistoryBody = entry.bodyTruncated
         lastSyncedURL = entry.url
         if let statusCode = entry.statusCode {
             let responseBody = entry.responseBody ?? ""
@@ -591,7 +734,8 @@ final class ComposeViewModel {
                 headers: (entry.responseHeaders ?? []).map { ($0.name, $0.value) },
                 bodyData: Data(responseBody.utf8),
                 bodyText: responseBody,
-                contentType: contentType
+                contentType: contentType,
+                bodyTruncated: entry.responseBodyTruncated
             )
             responseState = .success(response)
         } else {
@@ -607,11 +751,33 @@ final class ComposeViewModel {
 
     // MARK: - Body Import And Formatting
 
-    func loadBodyFromFile(url fileURL: URL) throws {
-        let data = try Data(contentsOf: fileURL)
-        body = String(data: data, encoding: .utf8) ?? ""
-        lastFormattingError = nil
-        clearRestoreConfirmation()
+    func loadBodyFromFile(url fileURL: URL) async throws {
+        let isSecurityScoped = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let importedBody = try await Self.readUTF8Body(
+                from: fileURL,
+                maximumBytes: bodyImportSizeLimit
+            )
+            replaceUnavailableBody(with: importedBody)
+            lastFormattingError = nil
+            clearRestoreConfirmation()
+        } catch {
+            lastFormattingError = error.localizedDescription
+            throw error
+        }
+    }
+
+    func replaceUnavailableBody(with replacement: String) {
+        body = replacement
+        sourceHasUnsupportedBinaryBody = false
+        sourceHasTruncatedHistoryBody = false
+        syncUnsupportedState()
     }
 
     func prettifyJSONBody() {
@@ -693,7 +859,7 @@ final class ComposeViewModel {
         switch responseState {
         case .empty where isUnsupportedForReplay:
             responseState = .unsupported(
-                String(localized: "WebSocket and CONNECT requests cannot be replayed.")
+                replayRestrictionMessage ?? String(localized: "Replay is not supported for this request type.")
             )
         case .unsupported where !isUnsupportedForReplay:
             responseState = .empty
@@ -708,19 +874,37 @@ final class ComposeViewModel {
 
     private let executor: ComposeRequestExecutor
     private let historyStore: ComposeHistoryStore
-    private var currentRunID: UInt64 = 0
+    private let bodyImportSizeLimit: UInt64
+    private var activeRunID: UUID?
 
-    private func recordHistory(response: ComposeResponse?) {
-        guard !sourceIsWebSocket else {
-            return
-        }
-        let entry = ComposeHistoryEntry(
+    private func invalidateActiveRun() {
+        activeRunID = nil
+    }
+
+    private func sentRequestSnapshot() -> SentRequestSnapshot {
+        SentRequestSnapshot(
             method: method,
             url: url,
             headers: headers,
             queryItems: queryItems,
             body: body,
             bodyContentType: headerValue(named: "Content-Type", in: headers),
+            sourceIsWebSocket: sourceIsWebSocket
+        )
+    }
+
+    private func recordHistory(request: SentRequestSnapshot, response: ComposeResponse?) async {
+        guard !request.sourceIsWebSocket else {
+            return
+        }
+        let clearGeneration = historyClearGeneration
+        let fullEntry = ComposeHistoryEntry(
+            method: request.method,
+            url: request.url,
+            headers: request.headers,
+            queryItems: request.queryItems,
+            body: request.body,
+            bodyContentType: request.bodyContentType,
             statusCode: response?.statusCode,
             responseHeaders: response?.headers.map {
                 EditableReplayHeader(name: $0.name, value: $0.value)
@@ -728,17 +912,22 @@ final class ComposeViewModel {
             responseBody: response?.bodyDisplayText,
             timestamp: Date()
         )
+        let entry = await historyStore.boundedEntry(fullEntry)
+        guard clearGeneration == historyClearGeneration else {
+            return
+        }
         history.removeAll { $0.requestFingerprint == entry.requestFingerprint }
-        history.insert(entry, at: 0)
+        history.append(entry)
+        history.sort { $0.timestamp > $1.timestamp }
         if history.count > historyStore.maxEntries {
             history.removeLast(history.count - historyStore.maxEntries)
         }
-        persistHistory()
+        await persistHistory()
     }
 
-    private func persistHistory() {
+    private func persistHistory() async {
         do {
-            try historyStore.save(history)
+            try await historyStore.save(history)
         } catch {
             Self.logger.error("Failed to persist compose history: \(error.localizedDescription)")
         }
@@ -758,6 +947,83 @@ final class ComposeViewModel {
             return
         }
         headers.append(EditableReplayHeader(name: name, value: value))
+    }
+
+    private func rejectFileBackedCurlBody(_ value: String) throws {
+        guard value.hasPrefix("@") else {
+            return
+        }
+        lastFormattingError = ComposeImportError.fileBackedBodyUnsupported.localizedDescription
+        throw ComposeImportError.fileBackedBodyUnsupported
+    }
+
+    nonisolated private static func readUTF8Body(
+        from fileURL: URL,
+        maximumBytes: UInt64
+    ) async throws -> String {
+        let readTask = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let fileHandle = try FileHandle(forReadingFrom: fileURL)
+            defer { try? fileHandle.close() }
+
+            var data = Data()
+            let chunkSize = 64 * 1_024
+            while let chunk = try fileHandle.read(upToCount: chunkSize), !chunk.isEmpty {
+                try Task.checkCancellation()
+                let nextSize = UInt64(data.count) + UInt64(chunk.count)
+                guard nextSize <= maximumBytes else {
+                    throw ImportSizeError.fileTooLarge(
+                        actualBytes: nextSize,
+                        limitBytes: maximumBytes
+                    )
+                }
+                data.append(chunk)
+            }
+            guard let importedBody = String(data: data, encoding: .utf8) else {
+                throw ComposeBodyImportError.unsupportedTextEncoding
+            }
+            return importedBody
+        }
+        return try await withTaskCancellationHandler {
+            try await readTask.value
+        } onCancel: {
+            readTask.cancel()
+        }
+    }
+
+    nonisolated private static func decodeUTF8Body(_ data: Data) async throws -> String? {
+        let decodeTask = Task.detached(priority: .userInitiated) { () throws -> String? in
+            var decoded = ""
+            decoded.reserveCapacity(data.count)
+            var start = data.startIndex
+            let chunkSize = 1_024 * 1_024
+
+            while start < data.endIndex {
+                try Task.checkCancellation()
+                let remaining = data.distance(from: start, to: data.endIndex)
+                let tentativeEnd = data.index(start, offsetBy: min(chunkSize, remaining))
+                var end = tentativeEnd
+                if end < data.endIndex {
+                    while end > start, data[end] & 0b1100_0000 == 0b1000_0000 {
+                        end = data.index(before: end)
+                    }
+                }
+                guard end > start,
+                      let chunk = String(data: Data(data[start ..< end]), encoding: .utf8) else
+                {
+                    return nil
+                }
+                decoded.append(chunk)
+                start = end
+            }
+            try Task.checkCancellation()
+            return decoded
+        }
+        return try await withTaskCancellationHandler {
+            try await decodeTask.value
+        } onCancel: {
+            decodeTask.cancel()
+        }
     }
 
     private static func shellTokens(from command: String) -> [String] {
@@ -806,12 +1072,22 @@ final class ComposeViewModel {
         }
         return tokens
     }
+
+    private struct SentRequestSnapshot {
+        let method: String
+        let url: String
+        let headers: [EditableReplayHeader]
+        let queryItems: [EditableQueryItem]
+        let body: String
+        let bodyContentType: String?
+        let sourceIsWebSocket: Bool
+    }
 }
 
 // MARK: - EditableReplayHeader
 
 /// Identifiable header pair for the compose window's editable header list.
-struct EditableReplayHeader: Codable, Equatable, Identifiable {
+struct EditableReplayHeader: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
     var value: String
@@ -825,17 +1101,215 @@ struct EditableReplayHeader: Codable, Equatable, Identifiable {
     }
 }
 
-// MARK: - NoRedirectSessionDelegate
+// MARK: - BoundedComposeRequestOperation
 
-private final class NoRedirectSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+final class BoundedComposeRequestOperation: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(
+        request: URLRequest,
+        configuration: URLSessionConfiguration,
+        followsRedirects: Bool,
+        maximumBytes: Int,
+        continuation: AsyncThrowingStream<(Data, HTTPURLResponse), Error>.Continuation
+    ) {
+        self.request = request
+        self.configuration = configuration
+        self.followsRedirects = followsRedirects
+        self.maximumBytes = maximumBytes
+        self.continuation = continuation
+    }
+
+    // MARK: Internal
+
+    static func responses(
+        for request: URLRequest,
+        configuration: URLSessionConfiguration,
+        followsRedirects: Bool,
+        maximumBytes: Int
+    ) -> AsyncThrowingStream<(Data, HTTPURLResponse), Error> {
+        AsyncThrowingStream { continuation in
+            let operation = BoundedComposeRequestOperation(
+                request: request,
+                configuration: configuration,
+                followsRedirects: followsRedirects,
+                maximumBytes: maximumBytes,
+                continuation: continuation
+            )
+            continuation.onTermination = { _ in
+                operation.cancel()
+            }
+            if Task.isCancelled {
+                continuation.finish(throwing: CancellationError())
+            } else {
+                operation.start()
+            }
+        }
+    }
+
+    static func redirectedRequest(_ request: URLRequest, followsRedirects: Bool) -> URLRequest? {
+        followsRedirects ? request : nil
+    }
+
+    func start() {
+        delegateQueue.addOperation { [weak self] in
+            self?.startOnDelegateQueue()
+        }
+    }
+
+    func cancel() {
+        cancellationLock.lock()
+        cancellationRequested = true
+        let task = dataTask
+        cancellationLock.unlock()
+        task?.cancel()
+        delegateQueue.addOperation { [weak self] in
+            self?.cancelOnDelegateQueue()
+        }
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse,
+        willPerformHTTPRedirection _: HTTPURLResponse,
         newRequest request: URLRequest,
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
-        completionHandler(nil)
+        completionHandler(Self.redirectedRequest(request, followsRedirects: followsRedirects))
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            completionHandler(.cancel)
+            finish(throwing: ReplayError.invalidResponse)
+            return
+        }
+        if response.expectedContentLength > Int64(maximumBytes) {
+            completionHandler(.cancel)
+            finish(throwing: ComposeResponseError.bodyTooLarge(limitBytes: maximumBytes))
+            return
+        }
+        self.response = httpResponse
+        if response.expectedContentLength > 0 {
+            let reserveLimit = 1_024 * 1_024
+            data.reserveCapacity(min(Int(response.expectedContentLength), maximumBytes, reserveLimit))
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive chunk: Data) {
+        guard !isFinished else {
+            return
+        }
+        guard chunk.count <= maximumBytes,
+              data.count <= maximumBytes - chunk.count else
+        {
+            dataTask.cancel()
+            finish(throwing: ComposeResponseError.bodyTooLarge(limitBytes: maximumBytes))
+            return
+        }
+        data.append(chunk)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: (any Error)?
+    ) {
+        guard !isFinished else {
+            return
+        }
+        if let error {
+            finish(throwing: error)
+            return
+        }
+        guard let response else {
+            finish(throwing: ReplayError.invalidResponse)
+            return
+        }
+        finish(returning: (data, response))
+    }
+
+    // MARK: Private
+
+    private let request: URLRequest
+    private let configuration: URLSessionConfiguration
+    private let followsRedirects: Bool
+    private let maximumBytes: Int
+    private let continuation: AsyncThrowingStream<(Data, HTTPURLResponse), Error>.Continuation
+    private let cancellationLock = NSLock()
+    private let delegateQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.amunx.rockxy.compose-response"
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
+    private var session: URLSession?
+    private var dataTask: URLSessionDataTask?
+    private var response: HTTPURLResponse?
+    private var data = Data()
+    private var isFinished = false
+    private var cancellationRequested = false
+
+    private func startOnDelegateQueue() {
+        guard !isFinished else {
+            return
+        }
+        cancellationLock.lock()
+        let wasCancelled = cancellationRequested
+        cancellationLock.unlock()
+        guard !wasCancelled else {
+            finish(throwing: CancellationError())
+            return
+        }
+        let session = URLSession(
+            configuration: configuration,
+            delegate: self,
+            delegateQueue: delegateQueue
+        )
+        self.session = session
+        let task = session.dataTask(with: request)
+        cancellationLock.lock()
+        dataTask = task
+        let wasCancelledAfterCreation = cancellationRequested
+        cancellationLock.unlock()
+        guard !wasCancelledAfterCreation else {
+            task.cancel()
+            finish(throwing: CancellationError())
+            return
+        }
+        task.resume()
+    }
+
+    private func cancelOnDelegateQueue() {
+        guard !isFinished else {
+            return
+        }
+        finish(throwing: CancellationError())
+    }
+
+    private func finish(returning result: (Data, HTTPURLResponse)) {
+        guard !isFinished else {
+            return
+        }
+        isFinished = true
+        continuation.yield(result)
+        continuation.finish()
+        session?.finishTasksAndInvalidate()
+    }
+
+    private func finish(throwing error: Error) {
+        guard !isFinished else {
+            return
+        }
+        isFinished = true
+        session?.invalidateAndCancel()
+        continuation.finish(throwing: error)
     }
 }
 

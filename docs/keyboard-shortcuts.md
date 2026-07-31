@@ -38,6 +38,7 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | Shortcut | Action |
 |---|---|
 | `⌘↩` | Send |
+| `⌘.` | Cancel the active request |
 | `⌘L` | Focus the URL field |
 | `⌘T` | Open Template menu |
 | `⌘Y` | Open History menu |
@@ -53,6 +54,14 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | `⌘.` | Abort the selected paused item |
 | `Esc` | Close the queue window; queued items remain paused |
 | `⌘[` / `⌘]` | Move to the previous or next queued item |
+
+## Basic Compare
+
+| Shortcut | Action |
+|---|---|
+| `⌥⌘Y` | Open Diff View |
+| `⌥⌘D` | Compare Selected |
+| `⌥⌘S` | Swap Sides |
 
 ## Rules Windows
 

@@ -2,6 +2,9 @@ import Foundation
 @testable import Rockxy
 import Testing
 
+// MARK: - BreakpointRulesViewModelTests
+
+@Suite(.serialized)
 @MainActor
 struct BreakpointRulesViewModelTests {
     @Test("addBreakpointRule with wildcard creates correct pattern with .* conversions")
@@ -440,7 +443,7 @@ struct BreakpointRulesViewModelTests {
     }
 
     @Test("table labels and phase helpers mirror displayed columns")
-    func tableLabelsAndPhaseHelpers() throws {
+    func tableLabelsAndPhaseHelpers() {
         let vm = BreakpointRulesViewModel()
         let wildcardRule = ProxyRule(
             name: "Request Rule",
@@ -457,12 +460,14 @@ struct BreakpointRulesViewModelTests {
         vm.handleRulesDidChange(Notification(name: .rulesDidChange, object: [wildcardRule, regexRule]))
 
         #expect(vm.methodLabel(for: wildcardRule) == "GET")
-        #expect(vm.matchingRuleLabel(for: wildcardRule) == "Wildcard: /v2/")
+        #expect(vm.matchTypeLabel(for: wildcardRule) == "Wildcard")
+        #expect(vm.matchingRuleLabel(for: wildcardRule) == "/v2/")
         #expect(vm.breaksOnRequest(wildcardRule))
         #expect(!vm.breaksOnResponse(wildcardRule))
 
         #expect(vm.methodLabel(for: regexRule) == "ANY")
-        #expect(vm.matchingRuleLabel(for: regexRule) == #"Regex: ^https://api\.example\.com/v1$"#)
+        #expect(vm.matchTypeLabel(for: regexRule) == "Regex")
+        #expect(vm.matchingRuleLabel(for: regexRule) == #"^https://api\.example\.com/v1$"#)
         #expect(!vm.breaksOnRequest(regexRule))
         #expect(vm.breaksOnResponse(regexRule))
     }
@@ -683,19 +688,107 @@ struct BreakpointRulesViewModelTests {
         #expect(vm.selectedRuleID != originalID)
     }
 
-    // MARK: - Filter visibility
+    // MARK: - Active rule count
 
-    @Test("isFilterBarVisible defaults to hidden")
-    func filterBarDefaultsHidden() {
+    @Test("activeRuleCount counts only enabled breakpoint rules")
+    func activeRuleCountCountsEnabledRules() throws {
         let vm = BreakpointRulesViewModel()
-        #expect(vm.isFilterBarVisible == false)
+        vm.addBreakpointRule(
+            ruleName: "One",
+            urlPattern: "*.one.com/*",
+            httpMethod: .any,
+            matchType: .wildcard,
+            phaseRequest: true,
+            phaseResponse: true,
+            includeSubpaths: true
+        )
+        vm.addBreakpointRule(
+            ruleName: "Two",
+            urlPattern: "*.two.com/*",
+            httpMethod: .any,
+            matchType: .wildcard,
+            phaseRequest: true,
+            phaseResponse: true,
+            includeSubpaths: true
+        )
+
+        #expect(vm.activeRuleCount == 2)
+
+        let firstID = try #require(vm.breakpointRules.first?.id)
+        vm.toggleRule(id: firstID)
+        #expect(vm.activeRuleCount == 1)
+        #expect(vm.ruleCount == 2)
     }
 
-    @Test("toggling isFilterBarVisible preserves filterText")
-    func toggleFilterBarPreservesFilterText() {
-        let vm = BreakpointRulesViewModel()
-        vm.filterText = "api"
-        vm.isFilterBarVisible = true
-        #expect(vm.filterText == "api")
+    // MARK: - saveRule (async + injectable gate)
+
+    @Test("saveRule persists an accepted new rule to local state and the engine")
+    func saveRuleAcceptedNewRulePersists() async {
+        await BreakpointRuleTestIsolation.withSharedRuleState {
+            await RuleSyncService.replaceAllRules([])
+            let vm = BreakpointRulesViewModel(syncsChanges: true)
+
+            let accepted = await vm.saveRule(
+                original: nil,
+                ruleName: "Accepted",
+                urlPattern: "*.accepted.com/*",
+                httpMethod: .any,
+                matchType: .wildcard,
+                phaseRequest: true,
+                phaseResponse: true,
+                includeSubpaths: true,
+                using: RulePolicyGate(policy: BreakpointQuotaPolicy(maxRules: 10))
+            )
+
+            #expect(accepted)
+            #expect(vm.breakpointRules.count == 1)
+            #expect(vm.breakpointRules.first?.name == "Accepted")
+            let engineRules = await RuleEngine.shared.allRules
+            #expect(engineRules.count == 1)
+        }
     }
+
+    @Test("saveRule keeps a rejected new rule out of both local state and the engine")
+    func saveRuleRejectedNewRuleStaysOut() async {
+        await BreakpointRuleTestIsolation.withSharedRuleState {
+            await RuleSyncService.replaceAllRules([])
+            let vm = BreakpointRulesViewModel(syncsChanges: true)
+
+            let accepted = await vm.saveRule(
+                original: nil,
+                ruleName: "Rejected",
+                urlPattern: "*.rejected.com/*",
+                httpMethod: .any,
+                matchType: .wildcard,
+                phaseRequest: true,
+                phaseResponse: true,
+                includeSubpaths: true,
+                using: RulePolicyGate(policy: BreakpointQuotaPolicy(maxRules: 0))
+            )
+
+            #expect(!accepted)
+            #expect(vm.breakpointRules.isEmpty)
+            #expect(vm.mutationError != nil)
+            let engineRules = await RuleEngine.shared.allRules
+            #expect(engineRules.isEmpty)
+        }
+    }
+}
+
+// MARK: - BreakpointQuotaPolicy
+
+private struct BreakpointQuotaPolicy: AppPolicy {
+    // MARK: Lifecycle
+
+    init(maxRules: Int) {
+        maxActiveRulesPerTool = maxRules
+    }
+
+    // MARK: Internal
+
+    let maxWorkspaceTabs = 8
+    let maxDomainFavorites = 5
+    let maxActiveRulesPerTool: Int
+    let maxEnabledScripts = 10
+    let maxLiveHistoryEntries = 1_000
 }

@@ -51,6 +51,7 @@ struct ToastView: View {
     private var iconName: String {
         switch message.style {
         case .success: "checkmark.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
         case .error: "xmark.circle.fill"
         }
     }
@@ -58,6 +59,7 @@ struct ToastView: View {
     private var iconColor: Color {
         switch message.style {
         case .success: .green
+        case .warning: .orange
         case .error: .red
         }
     }

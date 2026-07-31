@@ -110,6 +110,9 @@ struct BlockListViewModelTests {
         #expect(rule?.name == "Block Example API")
         #expect(rule?.matchCondition.method == nil)
         #expect(rule?.matchCondition.urlPattern?.contains(".*") == true)
+        #expect(rule?.matchCondition.sourceURLPattern == "*example-api.local/*")
+        #expect(rule?.matchCondition.matchType == .wildcard)
+        #expect(rule?.matchCondition.includeSubpaths == true)
     }
 
     @Test("addBlockRule with regex passes pattern through unchanged")
@@ -398,6 +401,9 @@ struct BlockListViewModelTests {
         #expect(updated.isEnabled == false)
         #expect(updated.matchCondition.method == "GET")
         #expect(updated.matchCondition.urlPattern == "^https://new.example/.*$")
+        #expect(updated.matchCondition.sourceURLPattern == "^https://new.example/.*$")
+        #expect(updated.matchCondition.matchType == .regex)
+        #expect(updated.matchCondition.includeSubpaths == false)
     }
 
     @Test("importBlockRules preserves non-block rules and selects first imported block")

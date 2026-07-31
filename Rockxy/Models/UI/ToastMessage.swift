@@ -7,6 +7,7 @@ import Foundation
 /// Visual style for transient toast notifications.
 enum ToastStyle {
     case success
+    case warning
     case error
 }
 

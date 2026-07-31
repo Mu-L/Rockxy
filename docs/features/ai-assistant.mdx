@@ -69,6 +69,10 @@ You can explicitly opt in to **Selected and Related Traffic** when nearby reques
 
 Related traffic is never added silently. Changing the scope resets the current investigation so the new evidence can be reviewed from the beginning.
 
+Explicitly selected requests always remain in the investigation, even when they are outside the active Focus Set or match Noise Control. Automatically discovered related traffic follows the active Focus Set and Noise Control so hidden telemetry does not silently return through Assistant context. Traffic Signal rows such as Errors or Slow only filter the table; they do not narrow related Assistant evidence.
+
+Review Data reports how many related requests were found, included, and normally excluded by Focus or Noise. When including excluded traffic would materially change the bounded review, choose **Include Excluded Traffic Once** to rebuild that review without changing the workspace's Focus or Noise settings. The override applies only to the current review; later investigations use the normal scope again.
+
 ## Privacy and Trust Boundary
 
 Rockxy applies the following protections before configured-model access:

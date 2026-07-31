@@ -14,8 +14,8 @@ struct AdvancedSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        SettingsPane {
+            SettingsSectionCard(String(localized: "System Proxy")) {
                 settingsRow(label: String(localized: "Proxy Helper Tool:")) {
                     VStack(alignment: .leading, spacing: 10) {
                         // Zone A: Summary
@@ -167,50 +167,36 @@ struct AdvancedSettingsTab: View {
                         }
                     }
                 }
-                .task {
-                    await helperManager.checkStatus()
-                }
-                .alert(
-                    String(localized: "Uninstall Helper Tool?"),
-                    isPresented: $showUninstallConfirmation
-                ) {
-                    Button(String(localized: "Cancel"), role: .cancel) {}
-                    Button(String(localized: "Uninstall"), role: .destructive) {
-                        uninstallHelper()
-                    }
-                } message: {
-                    Text(
-                        String(
-                            localized: "The proxy helper tool will be removed. You may be prompted for your password when changing proxy settings."
-                        )
-                    )
-                }
+            }
 
-                Divider()
-
-                Text(String(localized: "UPDATES"))
-                    .font(settingsMetrics.secondaryFont(weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, settingsMetrics.rowLeading)
-
+            SettingsSectionCard(String(localized: "Software Update")) {
                 updatesSection
+            }
 
-                Divider()
-
-                Text(String(localized: "MISCELLANEOUS"))
-                    .font(settingsMetrics.secondaryFont(weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, settingsMetrics.rowLeading)
-
+            SettingsSectionCard(String(localized: "Behavior")) {
                 checkboxRow(
                     title: String(localized: "Show alert when quitting Rockxy"),
                     isOn: $showAlertOnQuit
                 )
-
-                Spacer()
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 20)
+        }
+        .task {
+            await helperManager.checkStatus()
+        }
+        .alert(
+            String(localized: "Uninstall Helper Tool?"),
+            isPresented: $showUninstallConfirmation
+        ) {
+            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Uninstall"), role: .destructive) {
+                uninstallHelper()
+            }
+        } message: {
+            Text(
+                String(
+                    localized: "The proxy helper tool will be removed. You may be prompted for your password when changing proxy settings."
+                )
+            )
         }
         .font(settingsMetrics.font())
     }

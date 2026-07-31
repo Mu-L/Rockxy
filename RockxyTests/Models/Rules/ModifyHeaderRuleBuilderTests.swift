@@ -39,6 +39,32 @@ struct ModifyHeaderRuleBuilderTests {
         #expect(rule.matchCondition.urlPattern == #"https:\/\/example\.com\/api($|[?#])"#)
     }
 
+    @Test("Reordering editable operations changes the saved HeaderOperation order")
+    func operationReorderChangesSavedOrder() {
+        var operations = [
+            EditableHeaderOperation(type: .add, headerName: "X-First", headerValue: "1"),
+            EditableHeaderOperation(type: .add, headerName: "X-Second", headerValue: "2"),
+            EditableHeaderOperation(type: .add, headerName: "X-Third", headerValue: "3"),
+        ]
+        // Mirrors the editor's move-down control applied to the first row.
+        operations.swapAt(0, 1)
+
+        let rule = ModifyHeaderRuleBuilder.build(
+            ruleName: "Reorder",
+            rawPattern: ".*example\\.com.*",
+            httpMethod: .any,
+            matchType: .regex,
+            includeSubpaths: false,
+            operations: operations.toHeaderOperations()
+        )
+
+        guard case let .modifyHeader(saved) = rule.action else {
+            Issue.record("Expected modifyHeader action")
+            return
+        }
+        #expect(saved.map(\.headerName) == ["X-Second", "X-First", "X-Third"])
+    }
+
     @Test("Regex matching preserves source and edited rule identity")
     func regexPatternPreservesIdentity() {
         let existing = ProxyRule(

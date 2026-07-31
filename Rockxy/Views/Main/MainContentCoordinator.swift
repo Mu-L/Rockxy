@@ -27,6 +27,45 @@ enum ProxyDisplayState: Equatable {
     }
 }
 
+// MARK: - ProxyListenerSnapshot
+
+/// Immutable record of how the proxy listener was actually configured for the
+/// currently running server. Captured from the exact `AppSettings` snapshot used
+/// to start the proxy, so the UI can report truthful live state instead of
+/// re-deriving it from settings that may have changed since launch.
+struct ProxyListenerSnapshot: Equatable {
+    /// The preferred port requested at startup (`AppSettings.proxyPort`).
+    let requestedPort: Int
+    /// The port the server actually bound — equals `requestedPort` unless a
+    /// fallback was chosen because the preferred port was occupied.
+    let resolvedPort: Int
+    /// The address the server listens on (`127.0.0.1` or `0.0.0.0`).
+    let listenAddress: String
+    /// Whether auto-select-on-launch was enabled for this run.
+    let autoSelectPort: Bool
+
+    /// True when the server fell back to a different port than requested.
+    var isUsingFallbackPort: Bool {
+        resolvedPort != requestedPort
+    }
+
+    /// Whether the saved (preferred) listener configuration matches the
+    /// parameters this running server started with. A fallback resolved port is
+    /// intentionally excluded — only the *requested* startup parameters count, so
+    /// an occupied-port fallback never implies the saved settings changed.
+    func matchesRequestedListener(
+        preferredPort: Int?,
+        autoSelectPort: Bool,
+        listenAddress: String
+    )
+        -> Bool
+    {
+        preferredPort == requestedPort
+            && autoSelectPort == self.autoSelectPort
+            && listenAddress == self.listenAddress
+    }
+}
+
 // MARK: - MainContentCoordinator
 
 /// Central coordinator for all Rockxy UI state, bridging the proxy engine, log engine,
@@ -94,6 +133,11 @@ final class MainContentCoordinator {
         let task: Task<Void, Never>
     }
 
+    struct DebugAssistantRelatedCacheKey: Equatable {
+        let primaryTransactionID: UUID
+        let trafficIndexGeneration: UInt
+    }
+
     static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "MainContentCoordinator")
 
     let policy: any AppPolicy
@@ -134,9 +178,22 @@ final class MainContentCoordinator {
     var deferredSessionBatches: [DeferredBatch] = []
     var proxyError: String?
     var isSystemProxyConfigured = false
+
+    /// The listener configuration the running proxy actually started with.
+    /// Non-nil only while the proxy is running; captured from the same settings
+    /// snapshot used to configure the server and cleared on stop.
+    var runtimeListenerSnapshot: ProxyListenerSnapshot?
+
     let readiness = ReadinessCoordinator.shared
 
     @ObservationIgnored var debugAssistantTasks: [UUID: DebugAssistantTaskHandle] = [:]
+    @ObservationIgnored var debugAssistantTransactionsByHost: [String: [HTTPTransaction]] = [:]
+    @ObservationIgnored var debugAssistantIndexedTransactionIDs: Set<UUID> = []
+    @ObservationIgnored var debugAssistantIndexedLiveCount = 0
+    @ObservationIgnored var debugAssistantIndexedFavoriteCount = 0
+    @ObservationIgnored var debugAssistantTrafficIndexGeneration: UInt = 0
+    @ObservationIgnored var debugAssistantRelatedCache:
+        (key: DebugAssistantRelatedCacheKey, transactions: [HTTPTransaction])?
 
     // MARK: - UI State — Logs
 
@@ -179,7 +236,6 @@ final class MainContentCoordinator {
     // MARK: - UI State — Import/Export
 
     var importPreview: ImportPreview?
-    var showExportScope = false
     var exportScopeContext: ExportScopeContext?
     var gistPublishContext: GistPublishContext?
     var sessionProvenance: SessionProvenance?

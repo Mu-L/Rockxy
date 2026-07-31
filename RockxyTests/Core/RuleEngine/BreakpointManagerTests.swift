@@ -2,11 +2,15 @@ import Foundation
 @testable import Rockxy
 import Testing
 
+// MARK: - BreakpointManagerTests
+
 // Regression tests for `BreakpointManager` in the core rule engine layer.
 
 @Suite(.serialized)
 @MainActor
 struct BreakpointManagerTests {
+    // MARK: Internal
+
     @Test("enqueue adds item to pausedItems")
     func enqueueAddsItem() async {
         let manager = BreakpointManager()
@@ -16,7 +20,9 @@ struct BreakpointManagerTests {
 
         Task {
             try? await Task.sleep(nanoseconds: 100_000_000)
-            manager.resolve(id: manager.pausedItems.first!.id, decision: .cancel)
+            if let id = manager.pausedItems.first?.id {
+                manager.resolve(id: id, decision: .cancel)
+            }
         }
 
         _ = await manager.enqueueAndWait(data)
@@ -108,5 +114,221 @@ struct BreakpointManagerTests {
         #expect(item.queryName == "ExpiredToken")
 
         manager.resolve(id: item.id, decision: .cancel)
+    }
+
+    // MARK: - Selection stability
+
+    @Test("a newer hit does not steal selection from the edited item")
+    func newerHitKeepsExistingSelection() async throws {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://first.com")
+        let firstId = try #require(manager.pausedItems.first?.id)
+        // First hit self-selects because the queue was empty.
+        #expect(manager.selectedItemId == firstId)
+
+        // The user is editing `first`; a second, newer hit arrives.
+        await enqueueItem(on: manager, url: "https://second.com")
+        #expect(manager.pausedItems.count == 2)
+        // Selection must stay on the item under edit — the newcomer never steals it.
+        #expect(manager.selectedItemId == firstId)
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    @Test("selection re-arms only when the current selection is no longer valid")
+    func reselectsWhenSelectionInvalidated() async throws {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        let firstId = try #require(manager.pausedItems.first?.id)
+        #expect(manager.selectedItemId == firstId)
+
+        // Resolving the sole selected item empties the queue and clears selection.
+        manager.resolve(id: firstId, decision: .cancel)
+        #expect(manager.selectedItemId == nil)
+
+        // A fresh hit into an empty queue self-selects again.
+        await enqueueItem(on: manager, url: "https://b.com")
+        #expect(manager.selectedItemId == manager.pausedItems.first?.id)
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    // MARK: - Notification lifecycle
+
+    @Test("posts breakpointHit only on the empty to non-empty transition")
+    func notifiesOncePerNonEmptyLifetime() async {
+        let manager = BreakpointManager()
+        let counter = NotificationCounter()
+        let token = NotificationCenter.default.addObserver(
+            forName: .breakpointHit,
+            object: nil,
+            queue: nil
+        ) { _ in
+            counter.increment()
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        // A burst of three hits must auto-raise the window exactly once.
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        await enqueueItem(on: manager, url: "https://c.com")
+        #expect(manager.pausedItems.count == 3)
+        #expect(counter.count == 1)
+
+        // Drain the queue back to empty.
+        manager.resolveAll(decision: .cancel)
+        #expect(manager.pausedItems.isEmpty)
+
+        // A new hit after the queue emptied re-arms the notification.
+        await enqueueItem(on: manager, url: "https://d.com")
+        #expect(counter.count == 2)
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    // MARK: - Adjacent-fallback selection on resolve
+
+    @Test("resolving the selected first item selects the row now at that index")
+    func resolveFirstFallsToNewFirst() async {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        await enqueueItem(on: manager, url: "https://c.com")
+        let ids = manager.pausedItems.map(\.id)
+
+        manager.selectedItemId = ids[0]
+        manager.resolve(id: ids[0], decision: .cancel)
+        // The item that shifted into index 0 (former `b`) becomes selected.
+        #expect(manager.selectedItemId == ids[1])
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    @Test("resolving the selected middle item selects the row now at that index")
+    func resolveMiddleFallsToNext() async {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        await enqueueItem(on: manager, url: "https://c.com")
+        let ids = manager.pausedItems.map(\.id)
+
+        manager.selectedItemId = ids[1]
+        manager.resolve(id: ids[1], decision: .cancel)
+        // `c` shifts into index 1 and becomes selected.
+        #expect(manager.selectedItemId == ids[2])
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    @Test("resolving the selected last item falls back to the previous final row")
+    func resolveLastFallsToPreviousFinal() async {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        await enqueueItem(on: manager, url: "https://c.com")
+        let ids = manager.pausedItems.map(\.id)
+
+        manager.selectedItemId = ids[2]
+        manager.resolve(id: ids[2], decision: .cancel)
+        // Nothing occupies the old last index, so selection clamps to `b`.
+        #expect(manager.selectedItemId == ids[1])
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    @Test("resolving a non-selected item preserves the current selection")
+    func resolveNonSelectedPreservesSelection() async {
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        await enqueueItem(on: manager, url: "https://c.com")
+        let ids = manager.pausedItems.map(\.id)
+
+        manager.selectedItemId = ids[1]
+        // Resolve an unrelated item; the edited item stays selected.
+        manager.resolve(id: ids[0], decision: .cancel)
+        #expect(manager.selectedItemId == ids[1])
+        #expect(manager.pausedItems.count == 2)
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    // MARK: - Cross-singleton isolation
+
+    @Test("a local manager never mutates BreakpointManager.shared selection")
+    func localManagerDoesNotTouchSharedSelection() async throws {
+        let sharedSelectionBefore = BreakpointManager.shared.selectedItemId
+
+        let manager = BreakpointManager()
+        await enqueueItem(on: manager, url: "https://a.com")
+        await enqueueItem(on: manager, url: "https://b.com")
+        // Exercise every selection-mutating path on the local instance.
+        manager.selectNextItem()
+        manager.selectPreviousItem()
+        let firstId = try #require(manager.pausedItems.first?.id)
+        manager.resolve(id: firstId, decision: .cancel)
+
+        #expect(manager.selectedItemId != nil)
+        // None of the local operations may leak into the shared singleton.
+        #expect(BreakpointManager.shared.selectedItemId == sharedSelectionBefore)
+
+        manager.resolveAll(decision: .cancel)
+    }
+
+    @Test("execute cannot strip a protected binary payload")
+    func protectedPayloadExecuteFallsBackToOriginal() async throws {
+        let manager = BreakpointManager()
+        var data = BreakpointRequestData(
+            method: "POST",
+            url: "https://example.com/upload",
+            headers: [],
+            body: "",
+            statusCode: 200,
+            phase: .request
+        )
+        data.isBodyEditable = false
+
+        let task = Task { await manager.enqueueAndWait(data) }
+        for _ in 0 ..< 100 where manager.pausedItems.isEmpty {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        let item = try #require(manager.pausedItems.first)
+        manager.resolve(id: item.id, decision: .execute)
+
+        let result = await task.value
+        #expect(result.0 == .cancel)
+        #expect(result.1.isBodyEditable == false)
+    }
+
+    // MARK: Private
+
+    /// Enqueue one paused item and wait until it is appended, so the queue order
+    /// is deterministic across sequential `enqueueItem` calls. The spawned task's
+    /// continuation is resolved by the caller's later `resolve`/`resolveAll`.
+    private func enqueueItem(on manager: BreakpointManager, url: String) async {
+        let before = manager.pausedItems.count
+        Task {
+            _ = await manager.enqueueAndWait(
+                BreakpointRequestData(
+                    method: "GET", url: url, headers: [], body: "", statusCode: 200, phase: .request
+                )
+            )
+        }
+        for _ in 0 ..< 100 where manager.pausedItems.count == before {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+    }
+}
+
+// MARK: - NotificationCounter
+
+/// Thread-safe-enough counter for observing `.breakpointHit` posts in tests.
+/// `.breakpointHit` is posted on the `@MainActor`, and the synchronous observer
+/// (`queue: nil`) therefore runs on the same main thread the test reads from.
+private final class NotificationCounter: @unchecked Sendable {
+    private(set) var count = 0
+
+    func increment() {
+        count += 1
     }
 }

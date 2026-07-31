@@ -21,20 +21,35 @@ struct ModifyHeaderEditorSession: Identifiable {
 
 @MainActor @Observable
 final class ModifyHeaderWindowViewModel {
+    // MARK: Lifecycle
+
+    init(isToolEnabled: Bool? = nil) {
+        self.isToolEnabled = isToolEnabled ?? Self.defaultToolEnabled
+    }
+
     // MARK: Internal
 
     private(set) var allRules: [ProxyRule] = []
     var selectedRuleID: UUID?
     var editorSession: ModifyHeaderEditorSession?
-    var searchText = ""
+    var searchText = "" {
+        didSet {
+            reconcileSelection()
+        }
+    }
+    var isToolEnabled: Bool
 
-    var modifyHeaderRules: [ProxyRule] {
-        let headerRules = allRules.filter { rule in
+    /// Unfiltered Modify Header rules in their global evaluation order.
+    var headerRules: [ProxyRule] {
+        allRules.filter { rule in
             if case .modifyHeader = rule.action {
                 return true
             }
             return false
         }
+    }
+
+    var modifyHeaderRules: [ProxyRule] {
         guard !searchText.isEmpty else {
             return headerRules
         }
@@ -49,13 +64,85 @@ final class ModifyHeaderWindowViewModel {
         modifyHeaderRules.count
     }
 
+    var activeRuleCount: Int {
+        headerRules.filter(\.isEnabled).count
+    }
+
+    /// Row reordering is only coherent against the full, unfiltered list, so it is
+    /// disabled while a search filter narrows the visible rows.
+    var isReorderable: Bool {
+        searchText.isEmpty
+    }
+
+    /// Reorders the global rule array so the Modify Header rules follow `orderedSubset`,
+    /// while every non-Modify-Header rule keeps its exact original index. `orderedSubset`
+    /// must be a permutation of the array's existing Modify Header rules.
+    static func applyingModifyHeaderOrder(
+        _ orderedSubset: [ProxyRule],
+        to allRules: [ProxyRule]
+    )
+        -> [ProxyRule]
+    {
+        let currentIDs = allRules.compactMap { rule -> UUID? in
+            if case .modifyHeader = rule.action {
+                return rule.id
+            }
+            return nil
+        }
+        guard orderedSubset.count == currentIDs.count,
+              Set(orderedSubset.map(\.id)) == Set(currentIDs)
+        else {
+            return allRules
+        }
+
+        var iterator = orderedSubset.makeIterator()
+        return allRules.map { rule in
+            if case .modifyHeader = rule.action {
+                return iterator.next() ?? rule
+            }
+            return rule
+        }
+    }
+
     func refreshFromEngine() async {
         allRules = await RuleEngine.shared.allRules
+        reconcileSelection()
+    }
+
+    func setToolEnabled(_ enabled: Bool) {
+        isToolEnabled = enabled
+        enqueueMutation {
+            await RulePolicyGate.shared.setModifyHeaderToolEnabled(enabled)
+        }
+    }
+
+    func moveRules(fromOffsets source: IndexSet, toOffset destination: Int) {
+        guard isReorderable else {
+            return
+        }
+        var subset = headerRules
+        subset.move(fromOffsets: source, toOffset: destination)
+        let updated = Self.applyingModifyHeaderOrder(subset, to: allRules)
+        guard updated.map(\.id) != allRules.map(\.id) else {
+            return
+        }
+        allRules = updated
+        let orderedIDs = subset.map(\.id)
+        enqueueMutation { [self] in
+            await RulePolicyGate.shared.reorderModifyHeaderRules(orderedIDs: orderedIDs)
+            self.allRules = await RuleEngine.shared.allRules
+            self.reconcileSelection()
+        }
+    }
+
+    func waitForPendingRuleSync() async {
+        await pendingRuleSyncTask?.value
     }
 
     func handleRulesDidChange(_ notification: Notification) {
         if let rules = notification.object as? [ProxyRule] {
             allRules = rules
+            reconcileSelection()
         }
     }
 
@@ -64,11 +151,11 @@ final class ModifyHeaderWindowViewModel {
             return
         }
         allRules[index].isEnabled.toggle()
-        Task {
+        enqueueMutation { [self] in
             let accepted = await RulePolicyGate.shared.toggleRule(id: id)
-            if !accepted {
-                allRules = await RuleEngine.shared.allRules
-            }
+            self.allRules = await RuleEngine.shared.allRules
+            self.reconcileSelection()
+            return accepted
         }
     }
 
@@ -91,12 +178,15 @@ final class ModifyHeaderWindowViewModel {
 
     @discardableResult
     func addRule(_ rule: ProxyRule) async -> Bool {
-        let accepted = await RulePolicyGate.shared.addRule(rule)
-        allRules = await RuleEngine.shared.allRules
-        if accepted {
-            selectedRuleID = rule.id
+        let task = enqueueMutation { [self] in
+            let accepted = await RulePolicyGate.shared.addRule(rule)
+            self.allRules = await RuleEngine.shared.allRules
+            if accepted {
+                self.selectedRuleID = rule.id
+            }
+            return accepted
         }
-        return accepted
+        return await task.value
     }
 
     @discardableResult
@@ -104,10 +194,13 @@ final class ModifyHeaderWindowViewModel {
         guard allRules.contains(where: { $0.id == rule.id }) else {
             return false
         }
-        await RulePolicyGate.shared.updateRule(rule)
-        allRules = await RuleEngine.shared.allRules
-        selectedRuleID = rule.id
-        return true
+        let task = enqueueMutation { [self] in
+            await RulePolicyGate.shared.updateRule(rule)
+            self.allRules = await RuleEngine.shared.allRules
+            self.selectedRuleID = rule.id
+            return true
+        }
+        return await task.value
     }
 
     func removeRule(id: UUID) {
@@ -115,7 +208,11 @@ final class ModifyHeaderWindowViewModel {
         if selectedRuleID == id {
             selectedRuleID = nil
         }
-        Task { await RulePolicyGate.shared.removeRule(id: id) }
+        enqueueMutation { [self] in
+            await RulePolicyGate.shared.removeRule(id: id)
+            self.allRules = await RuleEngine.shared.allRules
+            self.reconcileSelection()
+        }
     }
 
     @discardableResult
@@ -160,16 +257,60 @@ final class ModifyHeaderWindowViewModel {
         operations(for: rule).phaseSummaryLabel
     }
 
+    func scopeSummary(for rule: ProxyRule) -> String {
+        let phases = Set(operations(for: rule).map(\.phase))
+        if phases == [.request] {
+            return String(localized: "Request")
+        }
+        if phases == [.response] {
+            return String(localized: "Response")
+        }
+        return String(localized: "Both")
+    }
+
     func operationSummary(for rule: ProxyRule) -> String {
         operations(for: rule).operationSummary
     }
 
     // MARK: Private
 
+    private static let toolEnabledKey = "modifyHeaderToolEnabled"
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "ModifyHeaderWindowViewModel"
     )
+
+    private static var defaultToolEnabled: Bool {
+        UserDefaults.standard.object(forKey: toolEnabledKey) as? Bool ?? true
+    }
+
+    private var pendingRuleSyncTask: Task<Void, Never>?
+
+    @discardableResult
+    private func enqueueMutation<Result: Sendable>(
+        _ operation: @escaping @MainActor @Sendable () async -> Result
+    )
+        -> Task<Result, Never>
+    {
+        let previousTask = pendingRuleSyncTask
+        let task = Task { @MainActor in
+            await previousTask?.value
+            return await operation()
+        }
+        pendingRuleSyncTask = Task { @MainActor in
+            _ = await task.value
+        }
+        return task
+    }
+
+    private func reconcileSelection() {
+        guard let selectedRuleID else {
+            return
+        }
+        if !modifyHeaderRules.contains(where: { $0.id == selectedRuleID }) {
+            self.selectedRuleID = nil
+        }
+    }
 }
 
 // MARK: - ModifyHeaderWindowView
@@ -225,14 +366,41 @@ struct ModifyHeaderWindowView: View {
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var toolbar: some View {
-        HStack {
-            Text(String(localized: "Modify Headers"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .semibold))
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(isOn: Binding(
+                    get: { viewModel.isToolEnabled },
+                    set: { viewModel.setToolEnabled($0) }
+                )) {
+                    Text(String(localized: "Enable Modify Headers"))
+                        .font(toolMetrics.font(weight: .medium))
+                }
+                .toggleStyle(.checkbox)
+                .help(
+                    String(
+                        localized: "When off, Modify Header rules are skipped during evaluation. Other rule types are unaffected."
+                    )
+                )
+                .accessibilityLabel(String(localized: "Enable Modify Headers"))
+
+                Text(String(localized: "Apply ordered header operations to matching requests and responses."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
+
             Spacer()
-            TextField(String(localized: "Search"), text: $viewModel.searchText)
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Search Modify Header rules"))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -260,16 +428,17 @@ struct ModifyHeaderWindowView: View {
                 columnHeader
                 Divider()
                 List(selection: $viewModel.selectedRuleID) {
-                    ForEach(viewModel.modifyHeaderRules) { rule in
-                        ModifyHeaderRuleRow(
-                            rule: rule,
-                            operationCount: viewModel.operationCount(for: rule),
-                            phaseSummary: viewModel.phaseSummary(for: rule),
-                            operationSummary: viewModel.operationSummary(for: rule)
-                        ) {
-                            viewModel.toggleRule(id: rule.id)
+                    if viewModel.isReorderable {
+                        ForEach(viewModel.modifyHeaderRules) { rule in
+                            ruleRow(rule)
                         }
-                        .tag(rule.id)
+                        .onMove { source, destination in
+                            viewModel.moveRules(fromOffsets: source, toOffset: destination)
+                        }
+                    } else {
+                        ForEach(viewModel.modifyHeaderRules) { rule in
+                            ruleRow(rule)
+                        }
                     }
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -285,30 +454,26 @@ struct ModifyHeaderWindowView: View {
     private var columnHeader: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             Spacer().frame(width: 24)
+            Text(verbatim: "#")
+                .font(toolMetrics.tableHeaderFont())
+                .foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .trailing)
             Text(String(localized: "Name"))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
-                .frame(width: 190, alignment: .leading)
-            Text(String(localized: "Method"))
+                .frame(width: 220, alignment: .leading)
+            Text(String(localized: "Scope"))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
-            Text(String(localized: "Matching Rule"))
+                .frame(width: 82, alignment: .leading)
+            Text(String(localized: "Match"))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(String(localized: "Ops"))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
-                .frame(width: 42, alignment: .trailing)
-            Text(String(localized: "Phase"))
-                .font(toolMetrics.tableHeaderFont())
-                .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .leading)
-            Text(String(localized: "Summary"))
-                .font(toolMetrics.tableHeaderFont())
-                .foregroundStyle(.secondary)
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 54, alignment: .trailing)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.controlSpacing)
@@ -344,6 +509,7 @@ struct ModifyHeaderWindowView: View {
             .buttonStyle(.borderless)
             .keyboardShortcut("n", modifiers: .command)
             .help(String(localized: "New Rule"))
+            .accessibilityLabel(String(localized: "New Modify Header rule"))
 
             Button {
                 guard let id = viewModel.selectedRuleID else {
@@ -357,19 +523,35 @@ struct ModifyHeaderWindowView: View {
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
             .help(String(localized: "Delete Rule"))
+            .accessibilityLabel(String(localized: "Delete selected Modify Header rule"))
+
+            presetsMenu
 
             Divider()
                 .frame(height: max(16, toolMetrics.footerControlHeight - 10))
 
-            Text(
-                "\(viewModel.ruleCount) \(viewModel.ruleCount == 1 ? String(localized: "rule") : String(localized: "rules"))"
-            )
+            Text(footerHint)
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
 
             Spacer()
 
-            presetsMenu
+            Text(
+                viewModel.isToolEnabled
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
+                    : String(localized: "MODIFY HEADERS OFF")
+            )
+            .font(toolMetrics.metadataFont(weight: .semibold))
+            .foregroundStyle(viewModel.isToolEnabled ? Color.white : Color.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(viewModel.isToolEnabled ? Color.green : Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
+            .accessibilityLabel(
+                viewModel.isToolEnabled
+                    ? String(localized: "\(viewModel.activeRuleCount) active Modify Header rules")
+                    : String(localized: "Modify Headers is off")
+            )
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
@@ -403,25 +585,56 @@ struct ModifyHeaderWindowView: View {
                 Task { await viewModel.addRule(HeaderModifyPresets.stripServerHeader()) }
             }
         } label: {
-            Text(String(localized: "Presets"))
-            Image(systemName: "chevron.down")
-                .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            Label {
+                Text(String(localized: "Presets"))
+            } icon: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            }
         }
+        .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private var footerHint: String {
+        let countText: String
+        if viewModel.searchText.isEmpty {
+            countText = "\(viewModel.headerRules.count) \(String(localized: "rules"))"
+        } else {
+            countText = String(
+                localized: "\(viewModel.modifyHeaderRules.count) of \(viewModel.headerRules.count) rules"
+            )
+        }
+        let reorderHint = viewModel.isReorderable
+            ? String(localized: "Drag rows to reorder")
+            : String(localized: "Clear search to reorder")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · \(reorderHint)"
+    }
+
+    @ViewBuilder
+    private func ruleRow(_ rule: ProxyRule) -> some View {
+        let order = (viewModel.modifyHeaderRules.firstIndex { $0.id == rule.id } ?? 0) + 1
+        ModifyHeaderRuleRow(
+            order: order,
+            rule: rule,
+            operationCount: viewModel.operationCount(for: rule),
+            scopeSummary: viewModel.scopeSummary(for: rule)
+        ) {
+            viewModel.toggleRule(id: rule.id)
+        }
+        .tag(rule.id)
     }
 }
 
 // MARK: - ModifyHeaderRuleRow
 
 private struct ModifyHeaderRuleRow: View {
+    // MARK: Internal
+
+    let order: Int
     let rule: ProxyRule
     let operationCount: Int
-    let phaseSummary: String
-    let operationSummary: String
+    let scopeSummary: String
     let onToggle: () -> Void
 
     var body: some View {
@@ -430,55 +643,54 @@ private struct ModifyHeaderRuleRow: View {
                 get: { rule.isEnabled },
                 set: { _ in onToggle() }
             ))
-            .toggleStyle(.switch)
+            .toggleStyle(.checkbox)
             .labelsHidden()
             .controlSize(.small)
+            .help(rule.isEnabled ? String(localized: "Disable this rule") : String(localized: "Enable this rule"))
+            .accessibilityLabel(String(localized: "Enable \(rule.name)"))
+
+            Text("\(order)")
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, alignment: .trailing)
+                .accessibilityLabel(String(localized: "Order \(order)"))
 
             Text(rule.name)
                 .font(toolMetrics.font(weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(width: 190, alignment: .leading)
+                .frame(width: 220, alignment: .leading)
 
-            Text(rule.matchCondition.method ?? "ANY")
+            Text(scopeSummary)
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
-                .frame(width: 70, alignment: .leading)
+                .frame(width: 82, alignment: .leading)
 
-            Text(rule.matchCondition.urlPattern ?? ".*")
+            HStack(spacing: 6) {
+                Text(rule.matchCondition.method ?? "ANY")
+                    .font(toolMetrics.metadataFont(weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 34, alignment: .leading)
+                Text(rule.matchCondition.urlPattern ?? ".*")
+                    .font(toolMetrics.secondaryFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rule.matchCondition.urlPattern ?? ".*")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("\(operationCount) \(operationCount == 1 ? String(localized: "op") : String(localized: "ops"))")
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(rule.matchCondition.urlPattern ?? ".*")
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("\(operationCount)")
-                .font(toolMetrics.secondaryFont(monospaced: true))
-                .foregroundStyle(.secondary)
-                .frame(width: 42, alignment: .trailing)
-
-            Text(phaseSummary)
-                .font(toolMetrics.metadataFont(weight: .medium))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1)
-                .background(Color.green.opacity(0.12))
-                .foregroundStyle(.green)
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-                .frame(width: 72, alignment: .leading)
-
-            Text(operationSummary)
-                .font(toolMetrics.secondaryFont(monospaced: true))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(operationSummary)
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 54, alignment: .trailing)
         }
         .frame(minHeight: toolMetrics.tableRowHeight)
         .padding(.vertical, 2)
         .opacity(rule.isEnabled ? 1.0 : 0.5)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
@@ -494,7 +706,8 @@ private struct ModifyHeaderEditSheet: View {
 
     init(
         session: ModifyHeaderEditorSession,
-        onSave: @escaping (String, String, HTTPMethodFilter, RuleMatchType, Bool, [EditableHeaderOperation]) async -> Void
+        onSave: @escaping (String, String, HTTPMethodFilter, RuleMatchType, Bool, [EditableHeaderOperation]) async
+            -> Void
     ) {
         self.session = session
         self.onSave = onSave
@@ -534,33 +747,28 @@ private struct ModifyHeaderEditSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                formRow(String(localized: "Name:")) {
-                    TextField("", text: $name, prompt: Text(String(localized: "Untitled")))
-                        .textFieldStyle(.roundedBorder)
-                }
+                Text(isEditing ? String(localized: "Edit Header Rule") : String(localized: "New Header Rule"))
+                    .font(
+                        .system(
+                            size: max(15, toolMetrics.bodyFontSize + 2),
+                            weight: .semibold
+                        )
+                    )
 
-                formRow(String(localized: "Matching Rule:")) {
-                    TextField("", text: $urlPattern, prompt: Text("https://example.com/api/*"))
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                }
-
-                methodAndMatchRow
-
-                conditionalFields
+                ModifyHeaderRuleDetailsSection(
+                    name: $name,
+                    urlPattern: $urlPattern,
+                    httpMethod: $httpMethod,
+                    matchType: $matchType,
+                    includeSubpaths: $includeSubpaths,
+                    toolMetrics: toolMetrics
+                )
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Header Operations"))
-                        .font(toolMetrics.font(weight: .medium))
+                    Text(String(localized: "Ordered Operations"))
+                        .font(toolMetrics.font(weight: .semibold))
                     ScrollView {
                         ModifyHeaderEditorView(operations: $operations)
-                            .padding(10)
-                    }
-                    .background(Color(nsColor: .windowBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                     }
                     .frame(minHeight: max(300, toolMetrics.bodyFontSize * 12 + 144))
                 }
@@ -572,12 +780,14 @@ private struct ModifyHeaderEditSheet: View {
             Divider()
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button {
                     dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(isEditing ? String(localized: "Save") : String(localized: "Add")) {
+                Button {
                     Task {
                         isSaving = true
                         await onSave(
@@ -590,6 +800,10 @@ private struct ModifyHeaderEditSheet: View {
                         )
                         isSaving = false
                     }
+                } label: {
+                    footerButtonLabel(
+                        isEditing ? String(localized: "Save") : String(localized: "Add")
+                    )
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!isValid || isSaving)
@@ -636,33 +850,109 @@ private struct ModifyHeaderEditSheet: View {
             && operations.allSatisfy(\.isValid)
     }
 
-    private var labelWidth: CGFloat {
-        max(122, toolMetrics.formLabelWidth)
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
+    }
+}
+
+private struct ModifyHeaderRuleDetailsSection: View {
+    // MARK: Internal
+
+    @Binding var name: String
+    @Binding var urlPattern: String
+    @Binding var httpMethod: HTTPMethodFilter
+    @Binding var matchType: RuleMatchType
+    @Binding var includeSubpaths: Bool
+
+    let toolMetrics: ToolWindowDisplayMetrics
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                identityFields
+                methodAndMatchRow
+                conditionalFields
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    // MARK: Private
+
+    private var identityFields: some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            fieldGroup(String(localized: "Name")) {
+                TextField(String(localized: "Untitled"), text: $name)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(String(localized: "Rule name"))
+            }
+            .frame(width: max(250, toolMetrics.fieldWidth(250)))
+
+            fieldGroup(String(localized: "URL pattern")) {
+                TextField("https://example.com/api/*", text: $urlPattern)
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font(monospaced: true))
+                    .accessibilityLabel(String(localized: "URL pattern"))
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     private var methodAndMatchRow: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Spacer()
-                .frame(width: labelWidth + toolMetrics.controlSpacing)
-            Picker("", selection: $httpMethod) {
-                ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
-                    Text(method.rawValue).tag(method)
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+            inlineField(String(localized: "Method")) {
+                Menu {
+                    ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
+                        Button {
+                            httpMethod = method
+                        } label: {
+                            menuCheckmarkLabel(method.rawValue, isSelected: httpMethod == method)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(httpMethod.rawValue, width: toolMetrics.menuWidth(90))
                 }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "HTTP Method"))
+                .frame(width: toolMetrics.menuWidth(90))
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "HTTP Method"))
-            .frame(width: toolMetrics.menuWidth(90))
 
-            Picker("", selection: $matchType) {
-                ForEach(RuleMatchType.allCases, id: \.self) { type in
-                    Text(type.rawValue).tag(type)
+            inlineField(String(localized: "Match type")) {
+                Menu {
+                    ForEach(RuleMatchType.allCases, id: \.self) { type in
+                        Button {
+                            matchType = type
+                        } label: {
+                            menuCheckmarkLabel(type.rawValue, isSelected: matchType == type)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(matchType.rawValue, width: toolMetrics.menuWidth(175))
                 }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Match Type"))
+                .frame(width: toolMetrics.menuWidth(175))
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "Match Type"))
-            .frame(width: toolMetrics.menuWidth(175))
 
             if matchType == .wildcard {
                 Text(String(localized: "Support wildcard * and ?."))
@@ -670,41 +960,81 @@ private struct ModifyHeaderEditSheet: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer()
         }
     }
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            HStack(spacing: toolMetrics.controlSpacing) {
-                Spacer()
-                    .frame(width: labelWidth + toolMetrics.controlSpacing)
-                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
-            }
+            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
         }
     }
 
-    private func formRow(
+    private func inlineField(
         _ label: String,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
-        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
             Text(label)
                 .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: labelWidth, alignment: .trailing)
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 4) {
-                content()
-            }
-            .frame(minHeight: toolMetrics.formControlHeight)
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
         }
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+            Text(title)
+        }
     }
 }

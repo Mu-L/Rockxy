@@ -7,6 +7,8 @@ enum AssistantTrafficScope: String, Equatable, Sendable {
     case selectedOnly
     case selectedAndRelated
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .selectedOnly:
@@ -14,6 +16,34 @@ enum AssistantTrafficScope: String, Equatable, Sendable {
         case .selectedAndRelated:
             String(localized: "Selected and Related Traffic")
         }
+    }
+}
+
+// MARK: - DebugAssistantReviewSummary
+
+/// Review-time accounting of automatically discovered related traffic for a single investigation.
+/// Distinguishes Focus/Noise scope exclusion from context-bound (size/capacity) omission, which
+/// stays in `InvestigationContextManifest.omittedTransactionCount`.
+struct DebugAssistantReviewSummary: Equatable {
+    /// Raw related requests discovered near the selection, before Focus/Noise scoping.
+    var rawRelatedFound = 0
+    /// Related requests actually included in the reviewed context pack.
+    var relatedIncluded = 0
+    /// Related requests withheld by the active Focus Set or muted Noise sources. Reported for
+    /// transparency even after an override is applied — it never zeroes just because the excluded
+    /// traffic was included once.
+    var focusNoiseExcluded = 0
+    /// True once the user applied the one-time include-excluded override for this review.
+    var overrideApplied = false
+    /// True only when recomputing related traffic while ignoring Focus/Noise would actually change
+    /// the bounded reviewed related transaction-ID set. Merely having excluded raw candidates that
+    /// fall outside the context bound is not enough to make the override material.
+    var overrideExpandsReviewedSet = false
+
+    /// An override is offered only when it has not already been applied and it would materially
+    /// expand the bounded reviewed related set.
+    var canOverrideFocusNoise: Bool {
+        !overrideApplied && overrideExpandsReviewedSet
     }
 }
 
@@ -27,7 +57,11 @@ enum AssistantUserHandoff: String, CaseIterable, Identifiable, Sendable {
     case export
     case share
 
-    var id: String { rawValue }
+    // MARK: Internal
+
+    var id: String {
+        rawValue
+    }
 
     var title: String {
         switch self {

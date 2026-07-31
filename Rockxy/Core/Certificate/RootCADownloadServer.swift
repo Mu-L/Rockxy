@@ -88,14 +88,24 @@ actor RootCADownloadServer {
             throw RootCADownloadError.noRootCA
         }
 
-        await stop()
+        lifecycleGeneration += 1
+        let generation = lifecycleGeneration
+        let previousChannel = serverChannel
+        let previousGroup = eventLoopGroup
+        serverChannel = nil
+        eventLoopGroup = nil
+        activeSession = nil
+        await close(channel: previousChannel, group: previousGroup)
+
+        guard lifecycleGeneration == generation else {
+            throw CancellationError()
+        }
 
         guard let host = Self.rankedLANIPv4AddressCandidates().first?.address else {
             throw RootCADownloadError.noReachableLANAddress
         }
 
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        eventLoopGroup = group
 
         let placeholderSession = try RootCADownloadSession.make(host: host, port: 0, ttl: ttl)
         let pem = certificatePEM
@@ -120,23 +130,41 @@ actor RootCADownloadServer {
 
             let session = try placeholderSession.withPort(port)
 
+            guard lifecycleGeneration == generation else {
+                try? await channel.close().get()
+                throw CancellationError()
+            }
+
+            eventLoopGroup = group
             serverChannel = channel
             activeSession = session
             rootCADownloadLogger.info("Root CA download server started on \(host):\(port)")
             return session
         } catch {
-            try? await group.shutdownGracefully()
-            eventLoopGroup = nil
-            activeSession = nil
+            await close(channel: nil, group: group)
+            if lifecycleGeneration == generation {
+                eventLoopGroup = nil
+                serverChannel = nil
+                activeSession = nil
+            }
             throw error
         }
     }
 
     func stop() async {
+        lifecycleGeneration += 1
         activeSession = nil
         let channel = serverChannel
+        let group = eventLoopGroup
         serverChannel = nil
+        eventLoopGroup = nil
+        await close(channel: channel, group: group)
+    }
 
+    private func close(
+        channel: Channel?,
+        group: MultiThreadedEventLoopGroup?
+    ) async {
         if let channel {
             do {
                 try await channel.close().get()
@@ -145,13 +173,12 @@ actor RootCADownloadServer {
             }
         }
 
-        if let group = eventLoopGroup {
+        if let group {
             do {
                 try await group.shutdownGracefully()
             } catch {
                 rootCADownloadLogger.error("Failed to shut down Root CA download event loop: \(error.localizedDescription)")
             }
-            eventLoopGroup = nil
         }
     }
 
@@ -239,6 +266,7 @@ actor RootCADownloadServer {
 
     // MARK: Private
 
+    private var lifecycleGeneration = 0
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var serverChannel: Channel?
 

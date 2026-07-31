@@ -194,8 +194,11 @@ struct OpenAIResponsesStreamDecoder {
         let callID = item["call_id"] as? String ?? itemID
         let name = item["name"] as? String ?? ""
         let arguments = item["arguments"] as? String ?? ""
-        guard toolsByItemID.count < AssistantExecutionLimits.maxToolCalls,
-              arguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes else
+        guard toolsByItemID[itemID] != nil
+            || toolsByItemID.count < AssistantExecutionLimits.maxToolCalls,
+            arguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes,
+            aggregateToolArgumentBytes(replacing: itemID, with: arguments)
+            <= AssistantExecutionLimits.maxAggregateToolArgumentBytes else
         {
             throw AssistantProviderError.malformedResponse("Tool-call data exceeded Rockxy's size limit")
         }
@@ -206,14 +209,22 @@ struct OpenAIResponsesStreamDecoder {
     private mutating func toolArgumentsDelta(in object: [String: Any]) throws -> [AssistantStreamEvent] {
         let itemID = object["item_id"] as? String ?? ""
         let delta = object["delta"] as? String ?? ""
+        guard !itemID.isEmpty,
+              toolsByItemID[itemID] != nil
+              || toolsByItemID.count < AssistantExecutionLimits.maxToolCalls else
+        {
+            throw AssistantProviderError.malformedResponse("Too many active tool calls")
+        }
         var accumulator = toolsByItemID[itemID]
             ?? ToolAccumulator(callID: itemID, name: "", arguments: "")
-        guard accumulator.arguments.utf8.count + delta.utf8.count
-            <= AssistantExecutionLimits.maxToolArgumentBytes else
+        let updatedArguments = accumulator.arguments + delta
+        guard updatedArguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes,
+              aggregateToolArgumentBytes(replacing: itemID, with: updatedArguments)
+              <= AssistantExecutionLimits.maxAggregateToolArgumentBytes else
         {
             throw AssistantProviderError.malformedResponse("Tool-call arguments exceeded Rockxy's size limit")
         }
-        accumulator.arguments += delta
+        accumulator.arguments = updatedArguments
         toolsByItemID[itemID] = accumulator
         return [
             .toolCallDelta(
@@ -237,7 +248,10 @@ struct OpenAIResponsesStreamDecoder {
         guard !accumulator.callID.isEmpty, !accumulator.name.isEmpty else {
             throw AssistantProviderError.malformedResponse("A completed tool call is missing its ID or name")
         }
-        guard accumulator.arguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes else {
+        guard accumulator.arguments.utf8.count <= AssistantExecutionLimits.maxToolArgumentBytes,
+              aggregateToolArgumentBytes(replacing: itemID, with: accumulator.arguments)
+              <= AssistantExecutionLimits.maxAggregateToolArgumentBytes else
+        {
             throw AssistantProviderError.malformedResponse("Tool-call arguments exceeded Rockxy's size limit")
         }
         toolsByItemID.removeValue(forKey: itemID)
@@ -248,6 +262,17 @@ struct OpenAIResponsesStreamDecoder {
                 arguments: accumulator.arguments
             )),
         ]
+    }
+
+    private func aggregateToolArgumentBytes(
+        replacing itemID: String,
+        with arguments: String
+    )
+        -> Int
+    {
+        toolsByItemID.reduce(arguments.utf8.count) { partial, entry in
+            entry.key == itemID ? partial : partial + entry.value.arguments.utf8.count
+        }
     }
 
     private func completionEvents(in object: [String: Any]) -> [AssistantStreamEvent] {

@@ -60,8 +60,9 @@ struct BreakpointPhaseFTests {
     }
 
     // BP_F4b
-    @Test("saveBlockedWhenInvalid")
-    func saveBlockedWhenInvalid() {
+    // Invalid raw templates remain persistable editable drafts; only the application payload is withheld.
+    @Test("invalidTemplateProducesNoApplicationPayload")
+    func invalidTemplateProducesNoApplicationPayload() {
         let template = BreakpointTemplate(kind: .response, name: "Bad", rawMessage: "not a response")
         #expect(template.validation.isValid == false)
         #expect(template.applicationPayload == nil)
@@ -141,6 +142,9 @@ struct BreakpointPhaseFTests {
 
     private func makeDefaults() -> (UserDefaults, String) {
         let suiteName = "com.amunx.rockxy.tests.breakpoint.phasef.\(UUID().uuidString)"
-        return (UserDefaults(suiteName: suiteName)!, "breakpoint.templates.phasef")
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            preconditionFailure("Could not create isolated Breakpoint Phase F test defaults.")
+        }
+        return (defaults, "breakpoint.templates.phasef")
     }
 }

@@ -9,28 +9,22 @@ struct AssistantSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                SettingsSectionCard(String(localized: "1. Local Model Setup")) {
-                    globalModelSection
-                }
-
-                SettingsSectionCard(String(localized: "2. Provider & Model")) {
-                    providerSection
-                }
-
-                SettingsSectionCard(String(localized: "3. Connection")) {
-                    connectionSection
-                }
-
-                SettingsSectionCard(String(localized: "Data Handling")) {
-                    privacySection
-                }
+        SettingsPane {
+            SettingsSectionCard(String(localized: "1. Local Model Setup")) {
+                globalModelSection
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 20)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            SettingsSectionCard(String(localized: "2. Provider & Model")) {
+                providerSection
+            }
+
+            SettingsSectionCard(String(localized: "3. Connection")) {
+                connectionSection
+            }
+
+            SettingsSectionCard(String(localized: "Data Handling")) {
+                privacySection
+            }
         }
         .font(settingsMetrics.font())
         .task {
@@ -755,6 +749,22 @@ enum OllamaRuntimeState: Equatable {
     case unavailable(message: String)
 }
 
+// MARK: - AssistantSettingsManaging
+
+@MainActor
+protocol AssistantSettingsManaging: AnyObject {
+    var settings: AppSettings { get }
+
+    func updateAssistantConfiguration(
+        _ configuration: AssistantProviderConfiguration?,
+        enabled: Bool?
+    )
+    func selectAssistantConfiguration(_ configurationID: UUID)
+    func removeAssistantConfiguration(_ configurationID: UUID)
+}
+
+extension AppSettingsManager: AssistantSettingsManaging {}
+
 // MARK: - AssistantSettingsViewModel
 
 @MainActor @Observable
@@ -762,7 +772,7 @@ final class AssistantSettingsViewModel {
     // MARK: Lifecycle
 
     init(
-        manager: AppSettingsManager? = nil,
+        manager: (any AssistantSettingsManaging)? = nil,
         credentialStorage: any AssistantCredentialStorage = KeychainAssistantCredentialStorage(),
         runtime: any AssistantProviderRuntimeProtocol = AssistantProviderRuntime.shared,
         modelInstaller: any AssistantModelInstallerProtocol = OllamaModelInstaller.shared,
@@ -770,7 +780,7 @@ final class AssistantSettingsViewModel {
         runtimeInstaller: any AssistantLocalRuntimeInstalling = OllamaRuntimeInstaller.shared,
         applicationOpener: any AssistantRuntimeApplicationOpening = NSWorkspaceAssistantRuntimeApplicationOpener()
     ) {
-        let manager = manager ?? .shared
+        let manager = manager ?? AppSettingsManager.shared
         self.manager = manager
         self.credentialStorage = credentialStorage
         self.runtime = runtime
@@ -894,6 +904,7 @@ final class AssistantSettingsViewModel {
         guard configuration.kind != kind else {
             return
         }
+        invalidateConnectionAction()
         configuration = AssistantProviderConfiguration(kind: kind)
         credentialInput = ""
         hasStoredCredential = false
@@ -911,6 +922,7 @@ final class AssistantSettingsViewModel {
         guard let selected = savedConfigurations.first(where: { $0.id == configurationID }) else {
             return
         }
+        invalidateConnectionAction()
         manager.selectAssistantConfiguration(configurationID)
         savedConfiguration = selected
         configuration = selected
@@ -956,11 +968,10 @@ final class AssistantSettingsViewModel {
             return
         }
         isRefreshingProviderModels = true
-        startConnectionAction(requiresModel: false) { configuration in
-            defer { self.isRefreshingProviderModels = false }
+        startConnectionAction(requiresModel: false) { configuration, token in
             let previousModelID = self.configuration.model
             let values = try await self.runtime.discoverModels(configuration: configuration)
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, self.isCurrentConnectionAction(token) else {
                 return
             }
             self.models = values
@@ -1316,9 +1327,9 @@ final class AssistantSettingsViewModel {
     }
 
     func testConnection() {
-        startConnectionAction { configuration in
+        startConnectionAction { configuration, token in
             let result = try await self.runtime.testConnection(configuration: configuration)
-            guard !Task.isCancelled else {
+            guard !Task.isCancelled, self.isCurrentConnectionAction(token) else {
                 return
             }
             self.setSuccess(
@@ -1328,10 +1339,7 @@ final class AssistantSettingsViewModel {
     }
 
     func cancelConnection() {
-        connectionTask?.cancel()
-        connectionTask = nil
-        isBusy = false
-        isRefreshingProviderModels = false
+        invalidateConnectionAction()
         hasError = false
         statusMessage = String(localized: "Connection check cancelled.")
     }
@@ -1356,6 +1364,7 @@ final class AssistantSettingsViewModel {
             guard let removed = savedConfiguration else {
                 return
             }
+            invalidateConnectionAction()
             try credentialStorage.delete(providerID: removed.id)
             manager.removeAssistantConfiguration(removed.id)
             refreshSavedConfigurations()
@@ -1373,7 +1382,7 @@ final class AssistantSettingsViewModel {
 
     // MARK: Private
 
-    private let manager: AppSettingsManager
+    private let manager: any AssistantSettingsManaging
     private let credentialStorage: any AssistantCredentialStorage
     private let runtime: any AssistantProviderRuntimeProtocol
     private let modelInstaller: any AssistantModelInstallerProtocol
@@ -1384,6 +1393,7 @@ final class AssistantSettingsViewModel {
     @ObservationIgnored private var modelInstallTask: Task<Void, Never>?
     @ObservationIgnored private var runtimeInstallTask: Task<Void, Never>?
     private var lastInstalledRuntimeURL: URL?
+    private var connectionGeneration = UUID()
 
     private static var defaultRuntimeInstallDestination: URL {
         let fileManager = FileManager.default
@@ -1556,38 +1566,68 @@ final class AssistantSettingsViewModel {
 
     private func startConnectionAction(
         requiresModel: Bool = true,
-        _ operation: @escaping (AssistantProviderConfiguration) async throws -> Void
+        _ operation: @escaping (
+            AssistantProviderConfiguration,
+            AssistantProviderConnectionToken
+        ) async throws -> Void
     ) {
         guard !isBusy else {
             return
         }
         isBusy = true
         statusMessage = nil
+        connectionGeneration = UUID()
+        let generation = connectionGeneration
         connectionTask = Task { [weak self] in
             guard let self else {
                 return
             }
+            var operationToken: AssistantProviderConnectionToken?
             defer {
-                if !Task.isCancelled {
+                if self.connectionGeneration == generation {
                     self.isBusy = false
+                    self.isRefreshingProviderModels = false
                     self.connectionTask = nil
                 }
             }
             do {
                 try self.prepareDraft(requiresModel: requiresModel)
-                try await operation(self.configuration)
+                let configuration = self.configuration
+                let token = AssistantProviderConnectionToken(
+                    generation: generation,
+                    configuration: configuration
+                )
+                operationToken = token
+                try await operation(configuration, token)
             } catch is CancellationError {
                 return
             } catch AssistantProviderError.cancelled {
                 return
             } catch {
-                guard !Task.isCancelled else {
+                guard !Task.isCancelled,
+                      operationToken.map(self.isCurrentConnectionAction) ?? true else
+                {
                     return
                 }
                 self.setError(error)
                 self.isRefreshingProviderModels = false
             }
         }
+    }
+
+    private func invalidateConnectionAction() {
+        connectionGeneration = UUID()
+        connectionTask?.cancel()
+        connectionTask = nil
+        isBusy = false
+        isRefreshingProviderModels = false
+    }
+
+    private func isCurrentConnectionAction(_ token: AssistantProviderConnectionToken) -> Bool {
+        token.generation == connectionGeneration
+            && token.configurationID == configuration.id
+            && token.providerKind == configuration.kind
+            && token.baseURL == configuration.baseURL
     }
 
     private func setSuccess(_ message: String) {
@@ -1599,4 +1639,20 @@ final class AssistantSettingsViewModel {
         hasError = true
         statusMessage = error.localizedDescription
     }
+}
+
+// MARK: - AssistantProviderConnectionToken
+
+private struct AssistantProviderConnectionToken {
+    init(generation: UUID, configuration: AssistantProviderConfiguration) {
+        self.generation = generation
+        configurationID = configuration.id
+        providerKind = configuration.kind
+        baseURL = configuration.baseURL
+    }
+
+    let generation: UUID
+    let configurationID: UUID
+    let providerKind: AssistantProviderKind
+    let baseURL: String
 }

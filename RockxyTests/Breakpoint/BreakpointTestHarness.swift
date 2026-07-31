@@ -125,7 +125,11 @@ actor BreakpointTestHarness {
                     "Timed out waiting \(seconds)s for the next breakpoint pause."
                 )
             }
-            let item = try await group.next()!
+            guard let item = try await group.next() else {
+                throw BreakpointHarnessError.timeout(
+                    "Breakpoint queue wait ended before either task completed."
+                )
+            }
             group.cancelAll()
             return item
         }
@@ -171,15 +175,27 @@ actor BreakpointTestHarness {
         from url: URL,
         session: URLSession = .shared
     ) async throws -> (Data, URLResponse) {
+        try await dataWithRetry(
+            from: url,
+            request: { requestURL in
+                try await session.data(from: requestURL)
+            }
+        )
+    }
+
+    static func dataWithRetry(
+        from url: URL,
+        request: @escaping @Sendable (URL) async throws -> (Data, URLResponse)
+    ) async throws -> (Data, URLResponse) {
         do {
-            return try await session.data(from: url)
+            return try await request(url)
         } catch {
             if (error as NSError).domain == NSURLErrorDomain,
                (error as NSError).code == NSURLErrorCannotFindHost
                     || (error as NSError).code == NSURLErrorDNSLookupFailed
             {
                 try await Task.sleep(nanoseconds: 300_000_000)
-                return try await session.data(from: url)
+                return try await request(url)
             }
             throw BreakpointHarnessError.noNetwork(url, underlying: error)
         }

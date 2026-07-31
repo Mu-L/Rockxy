@@ -15,7 +15,6 @@ struct DeveloperSetupFeatureNeutralityTests {
             root.appendingPathComponent("Rockxy/Models/UI/DeveloperSetupMobileSnippetCatalog.swift"),
             root.appendingPathComponent("Rockxy/Models/UI/DeveloperSetupGuideCatalog.swift"),
             root.appendingPathComponent("Rockxy/ViewModels/DeveloperSetupViewModel.swift"),
-            root.appendingPathComponent("Rockxy/Views/DeveloperSetup/DeveloperSetupAutomationSheet.swift"),
             root.appendingPathComponent("Rockxy/Views/DeveloperSetup/DeveloperSetupWindowView.swift"),
             root.appendingPathComponent("Rockxy/Views/DeveloperSetup/DeveloperSetupSourceList.swift"),
             root.appendingPathComponent("Rockxy/Views/DeveloperSetup/DeveloperSetupInspector.swift"),

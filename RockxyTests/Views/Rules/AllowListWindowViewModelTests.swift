@@ -22,25 +22,16 @@ struct AllowListWindowViewModelTests {
         #expect(viewModel.filteredRules.isEmpty)
         #expect(viewModel.selectedRuleID == nil)
         #expect(viewModel.editorSession == nil)
-        #expect(!viewModel.isFilterBarVisible)
-        #expect(viewModel.filterText.isEmpty)
+        #expect(viewModel.searchText.isEmpty)
         #expect(!viewModel.isAllowListActive)
+        #expect(viewModel.activeRuleCount == 0)
+        #expect(viewModel.effectiveRuleCount == 0)
     }
 
-    // MARK: - Filter Bar
+    // MARK: - Search
 
     @Test
-    func filterBarVisibilityToggles() {
-        let (viewModel, url) = makeSetup()
-        defer { cleanup(url) }
-
-        #expect(!viewModel.isFilterBarVisible)
-        viewModel.isFilterBarVisible = true
-        #expect(viewModel.isFilterBarVisible)
-    }
-
-    @Test
-    func filterByNameColumn() {
+    func searchMatchesNameAcrossAllRuleFields() {
         let (viewModel, url) = makeSetup()
         defer { cleanup(url) }
 
@@ -66,15 +57,14 @@ struct AllowListWindowViewModelTests {
             includeSubpaths: true
         )
 
-        viewModel.filterColumn = .name
-        viewModel.filterText = "git"
+        viewModel.searchText = "git"
         let filtered = viewModel.filteredRules
         #expect(filtered.count == 2)
         #expect(filtered.map(\.name).sorted() == ["GitHub API", "GitLab"])
     }
 
     @Test
-    func filterByMethodColumn() {
+    func searchMatchesMethodAcrossAllRuleFields() {
         let (viewModel, url) = makeSetup()
         defer { cleanup(url) }
 
@@ -100,15 +90,14 @@ struct AllowListWindowViewModelTests {
             includeSubpaths: true
         )
 
-        viewModel.filterColumn = .method
-        viewModel.filterText = "POST"
+        viewModel.searchText = "POST"
         let filtered = viewModel.filteredRules
         #expect(filtered.count == 1)
         #expect(filtered[0].name == "r2")
     }
 
     @Test
-    func filterByMethodColumnMatchesAnyFallback() {
+    func searchMatchesAnyMethodFallback() {
         let (viewModel, url) = makeSetup()
         defer { cleanup(url) }
 
@@ -127,8 +116,7 @@ struct AllowListWindowViewModelTests {
             includeSubpaths: true
         )
 
-        viewModel.filterColumn = .method
-        viewModel.filterText = "any"
+        viewModel.searchText = "any"
 
         let filtered = viewModel.filteredRules
         #expect(filtered.count == 1)
@@ -136,7 +124,7 @@ struct AllowListWindowViewModelTests {
     }
 
     @Test
-    func filterByMatchingRuleColumn() {
+    func searchMatchesURLPatternAcrossAllRuleFields() {
         let (viewModel, url) = makeSetup()
         defer { cleanup(url) }
 
@@ -155,11 +143,47 @@ struct AllowListWindowViewModelTests {
             includeSubpaths: true
         )
 
-        viewModel.filterColumn = .matchingRule
-        viewModel.filterText = "stripe"
+        viewModel.searchText = "stripe"
         let filtered = viewModel.filteredRules
         #expect(filtered.count == 1)
         #expect(filtered[0].name == "r2")
+    }
+
+    @Test
+    func searchTrimsWhitespaceAndMatchesCaseInsensitively() {
+        let (viewModel, url) = makeSetup()
+        defer { cleanup(url) }
+
+        viewModel.addRule(
+            ruleName: "Payments API",
+            urlPattern: "*stripe.example/*",
+            httpMethod: .post,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+
+        viewModel.searchText = "  PAYMENTS  "
+        #expect(viewModel.filteredRules.map(\.name) == ["Payments API"])
+    }
+
+    @Test
+    func activeAndEffectiveCountsExcludeDisabledOrInvalidRules() {
+        let (viewModel, url) = makeSetup()
+        defer { cleanup(url) }
+
+        viewModel.manager.replaceAll([
+            AllowListRule(name: "valid", rawPattern: "*valid.example/*"),
+            AllowListRule(name: "disabled", isEnabled: false, rawPattern: "*disabled.example/*"),
+            AllowListRule(
+                name: "invalid regex",
+                rawPattern: "(",
+                matchType: .regex,
+                includeSubpaths: false
+            ),
+        ])
+
+        #expect(viewModel.activeRuleCount == 2)
+        #expect(viewModel.effectiveRuleCount == 1)
     }
 
     // MARK: - Add Flow

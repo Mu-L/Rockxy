@@ -2,43 +2,87 @@ import SwiftUI
 
 // MARK: - AddSSLDomainSheet
 
-/// Small centered popup for adding or editing a domain in the SSL Proxying list.
+/// Centered popup for adding or editing a single HTTPS decryption rule.
+/// Captures both a host pattern and an explicit behavior (Decrypt / Tunnel).
 struct AddSSLDomainSheet: View {
     // MARK: Lifecycle
 
-    init(editingRule: SSLProxyingRule? = nil, onSave: @escaping (String) -> Void) {
+    init(
+        editingRule: SSLProxyingRule? = nil,
+        existingRules: [SSLProxyingRule],
+        onSave: @escaping (String, SSLProxyingListType) -> Bool
+    ) {
         self.editingRule = editingRule
+        self.existingRules = existingRules
         self.onSave = onSave
         _domain = State(initialValue: editingRule?.domain ?? "")
+        _listType = State(initialValue: editingRule?.listType ?? .include)
     }
 
     // MARK: Internal
 
     let editingRule: SSLProxyingRule?
-    let onSave: (String) -> Void
+    let existingRules: [SSLProxyingRule]
+    let onSave: (String, SSLProxyingListType) -> Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: Theme.Layout.sectionSpacing) {
-                Text(editingRule != nil
-                    ? String(localized: "Edit Domain")
-                    : String(localized: "Add Domain"))
-                    .font(toolMetrics.font(weight: .bold))
-
-                VStack(spacing: 2) {
-                    Text(String(localized: "Only Host: without Port, Path and Query"))
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 2) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(toolMetrics.font(weight: .semibold))
+                    Text(explanation)
                         .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.secondary)
-                    Text(String(localized: "Use * to match all, or *.domain.com for subdomains"))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+
+                fieldRow(String(localized: "Host Pattern")) {
+                    TextField("", text: $domain, prompt: Text("api.example.com"))
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font(monospaced: true))
+                        .frame(height: toolMetrics.formControlHeight)
+                        .focused($isHostFocused)
+                        .accessibilityLabel(String(localized: "Host pattern"))
+                }
+
+                fieldRow(String(localized: "Behavior")) {
+                    Picker("", selection: $listType) {
+                        Text(SSLProxyingListViewModel.behaviorLabel(for: .include))
+                            .tag(SSLProxyingListType.include)
+                        Text(SSLProxyingListViewModel.behaviorLabel(for: .exclude))
+                            .tag(SSLProxyingListType.exclude)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(height: toolMetrics.formControlHeight)
+                    .accessibilityLabel(String(localized: "Rule behavior"))
+                }
+
+                Text(
+                    String(localized: "Enter a host: * for all, an exact host or IPv4, or *.domain.com for subdomains.")
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
 
-                TextField("", text: $domain, prompt: Text("api.example.com"))
-                    .textFieldStyle(.roundedBorder)
-                    .font(toolMetrics.font(monospaced: true))
-                    .frame(minHeight: toolMetrics.formControlHeight)
+                if let validationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if hasOppositeBehaviorOverlap {
+                    Label(
+                        String(
+                            localized:
+                            "This host also has the opposite behavior. Tunnel Without Decryption takes priority; row order does not affect matching."
+                        ),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 20)
@@ -46,30 +90,35 @@ struct AddSSLDomainSheet: View {
 
             Divider()
 
-            HStack {
+            HStack(spacing: toolMetrics.controlSpacing) {
                 Spacer()
 
-                Button(String(localized: "Cancel")) {
+                Button {
                     dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(editingRule != nil
-                    ? String(localized: "Done")
-                    : String(localized: "Add"))
-                {
+                Button {
                     let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
-                    onSave(trimmed)
-                    dismiss()
+                    if onSave(trimmed, listType) {
+                        dismiss()
+                    }
+                } label: {
+                    footerButtonLabel(
+                        editingRule != nil ? String(localized: "Save") : String(localized: "Add")
+                    )
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(domain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!isValid)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 10)
         }
-        .frame(width: max(350, toolMetrics.fieldWidth(350)))
+        .frame(width: max(420, toolMetrics.fieldWidth(420)))
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear { isHostFocused = true }
     }
 
     // MARK: Private
@@ -77,8 +126,82 @@ struct AddSSLDomainSheet: View {
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.dismiss) private var dismiss
     @State private var domain: String
+    @State private var listType: SSLProxyingListType
+    @FocusState private var isHostFocused: Bool
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var title: String {
+        editingRule != nil
+            ? String(localized: "Edit HTTPS Rule")
+            : String(localized: "Add HTTPS Rule")
+    }
+
+    private var explanation: String {
+        switch listType {
+        case .include:
+            String(localized: "Rockxy decrypts HTTPS for hosts matching this pattern.")
+        case .exclude:
+            String(localized: "Rockxy tunnels matching HTTPS without decrypting, overriding any Decrypt rule.")
+        }
+    }
+
+    private var trimmedDomain: String {
+        domain.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isValid: Bool {
+        !trimmedDomain.isEmpty && validationMessage == nil
+    }
+
+    /// Validates the raw host pattern against the `SSLProxyingRule` matcher contract:
+    /// `*`, an exact host / IPv4, or a leading `*.domain` suffix. Schemes, paths,
+    /// queries, fragments, ports, IPv6 literals, and whitespace are rejected because
+    /// the matcher compares a bare lowercased host.
+    private var validationMessage: String? {
+        let raw = trimmedDomain
+        guard !raw.isEmpty else {
+            return nil
+        }
+        if let message = SSLHostPatternValidation.message(for: raw) {
+            return message
+        }
+        return hasSameBehaviorDuplicate
+            ? String(localized: "A rule with this host pattern and behavior already exists.")
+            : nil
+    }
+
+    private var hasSameBehaviorDuplicate: Bool {
+        existingRules.contains { rule in
+            rule.id != editingRule?.id
+                && rule.listType == listType
+                && rule.domain.caseInsensitiveCompare(trimmedDomain) == .orderedSame
+        }
+    }
+
+    private var hasOppositeBehaviorOverlap: Bool {
+        existingRules.contains { rule in
+            rule.id != editingRule?.id
+                && rule.listType != listType
+                && rule.domain.caseInsensitiveCompare(trimmedDomain) == .orderedSame
+        }
+    }
+
+    private func fieldRow(_ label: String, @ViewBuilder content: () -> some View) -> some View {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .frame(width: toolMetrics.formCompactLabelWidth, alignment: .leading)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(width: max(80, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 2))
     }
 }

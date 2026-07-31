@@ -9,6 +9,8 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ScriptingViewModelTests {
+    // MARK: Internal
+
     @Test("ScriptTemplates.defaultSource contains the multi-arg onRequest signature")
     func defaultTemplateContainsMultiArgRequest() {
         #expect(ScriptTemplates.defaultSource.contains("function onRequest(context, url, request)"))
@@ -102,7 +104,11 @@ struct ScriptingViewModelTests {
     @Test("Script code highlighting uses supplied editor font size")
     func scriptCodeHighlightingUsesEditorFontSize() throws {
         let settings = InspectorTextEditorSettings(fontSize: 20, tabWidth: 4, useMonospacedFont: true)
-        let highlighted = ScriptCodeHighlighting.highlightedString("const value = 1", spans: [], editorSettings: settings)
+        let highlighted = ScriptCodeHighlighting.highlightedString(
+            "const value = 1",
+            spans: [],
+            editorSettings: settings
+        )
         let font = try #require(highlighted.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
 
         #expect(font.pointSize == 20)
@@ -127,6 +133,15 @@ struct ScriptingViewModelTests {
         #expect(decoded == index)
     }
 
+    @Test("Runtime status mapping is typed for every plugin state")
+    func runtimeStatusMappingCoversEveryPluginState() {
+        #expect(ScriptListRuntimeStatus(.active) == .active)
+        #expect(ScriptListRuntimeStatus(.disabled) == .disabled)
+        #expect(ScriptListRuntimeStatus(.loading) == .loading)
+        #expect(ScriptListRuntimeStatus(.error("boom")) == .error)
+        #expect(ScriptListRuntimeStatus(.error("boom")).title == "Error")
+    }
+
     @Test("Method filter treats missing persisted method as ANY")
     func methodFilterMatchesAnyFallback() {
         let (defaults, suiteName) = TestFixtures.makeNamedIsolatedDefaults()
@@ -144,7 +159,7 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: nil,
                 urlPattern: nil,
-                statusText: "Active"
+                runtimeStatus: .active
             ),
             PluginInfoSnapshot(
                 id: "script-post",
@@ -152,10 +167,9 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: "POST",
                 urlPattern: nil,
-                statusText: "Active"
+                runtimeStatus: .active
             ),
         ]
-        vm.isFilterVisible = true
         vm.filterColumn = .method
         vm.filterText = "any"
 
@@ -194,10 +208,9 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: "GET",
                 urlPattern: "/token",
-                statusText: "Active"
+                runtimeStatus: .active
             )
         ]
-        vm.isFilterVisible = true
         vm.filterText = "token"
         vm.filterColumn = .name
 
@@ -205,6 +218,70 @@ struct ScriptingViewModelTests {
         #expect(rows.count == 2)
         #expect(rows.first?.id == .folder(folderID))
         #expect(rows.last?.id == .script("script-1"))
+    }
+
+    @Test("Whitespace-only search preserves the unfiltered rows")
+    func whitespaceSearchPreservesRows() {
+        let (defaults, suiteName) = TestFixtures.makeNamedIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folderStore = ScriptFolderStore(defaults: defaults)
+        folderStore.reconcile(with: ["script-1"])
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(pluginManager: env.manager, folderStore: folderStore)
+        vm.plugins = [
+            PluginInfoSnapshot(
+                id: "script-1",
+                name: "Auth Script",
+                isEnabled: true,
+                method: "GET",
+                urlPattern: "/auth",
+                runtimeStatus: .active
+            ),
+        ]
+
+        vm.filterText = "   \n"
+
+        #expect(vm.filteredDisplayRows.map(\.id) == [.script("script-1")])
+    }
+
+    @Test("Creating a folder clears search so inline rename stays visible")
+    func createFolderClearsSearch() {
+        let (defaults, suiteName) = TestFixtures.makeNamedIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folderStore = ScriptFolderStore(defaults: defaults)
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(pluginManager: env.manager, folderStore: folderStore)
+        vm.filterText = "does-not-match"
+        vm.filterColumn = .method
+
+        vm.createNewFolder()
+
+        #expect(vm.filterText.isEmpty)
+        #expect(vm.filterColumn == .name)
+        #expect(vm.filteredDisplayRows.contains { $0.id == vm.selectedRowID })
+    }
+
+    @Test("Renaming a folder reconciles selection against the active name filter")
+    func renameFolderClearsHiddenSelection() {
+        let (defaults, suiteName) = TestFixtures.makeNamedIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folderStore = ScriptFolderStore(defaults: defaults)
+        let folderID = folderStore.createFolder(name: "Auth")
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(pluginManager: env.manager, folderStore: folderStore)
+        vm.filterColumn = .name
+        vm.filterText = "Auth"
+        vm.selectedRowID = .folder(folderID)
+        vm.beginRenameSelectedFolder()
+        vm.renamingFolderText = "Other"
+
+        vm.commitFolderRename()
+
+        #expect(vm.filteredDisplayRows.isEmpty)
+        #expect(vm.selectedRowID == nil)
     }
 
     @Test("Display rows preserve root order and hide collapsed folder children")
@@ -226,7 +303,7 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: nil,
                 urlPattern: nil,
-                statusText: "Active"
+                runtimeStatus: .active
             ),
             PluginInfoSnapshot(
                 id: "script-child",
@@ -234,7 +311,7 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: "GET",
                 urlPattern: "/auth",
-                statusText: "Active"
+                runtimeStatus: .active
             ),
         ]
 
@@ -290,7 +367,7 @@ struct ScriptingViewModelTests {
                 isEnabled: true,
                 method: "GET",
                 urlPattern: "/token",
-                statusText: "Active"
+                runtimeStatus: .active
             ),
         ]
         vm.selectedRowID = .folder(folderID)
@@ -301,6 +378,89 @@ struct ScriptingViewModelTests {
         #expect(folderStore.index.folders.isEmpty)
         #expect(folderStore.index.rootOrder == [.script("script-1")])
         #expect(vm.plugins.count == 1)
+    }
+
+    @Test("refresh clears a script selection removed by another surface")
+    func refreshClearsMissingSelection() async {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: ScriptFolderStore(defaults: env.defaults)
+        )
+        vm.plugins = [
+            PluginInfoSnapshot(
+                id: "removed-script",
+                name: "Removed Script",
+                isEnabled: true,
+                method: nil,
+                urlPattern: nil,
+                runtimeStatus: .active
+            ),
+        ]
+        vm.selectedRowID = .script("removed-script")
+
+        await vm.refresh()
+
+        #expect(vm.plugins.isEmpty)
+        #expect(vm.selectedRowID == nil)
+    }
+
+    @Test("refresh clears a selected script hidden by the active filter")
+    func refreshClearsFilteredSelection() async throws {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let pluginID = "script.filtered.\(UUID().uuidString)"
+        try makeScriptPlugin(
+            id: pluginID,
+            name: "Visible Script",
+            in: env.pluginsDir,
+            defaults: env.defaults,
+            enabled: false
+        )
+        await env.manager.loadAllPlugins()
+
+        let vm = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: ScriptFolderStore(defaults: env.defaults)
+        )
+        await vm.refresh()
+        vm.selectedRowID = .script(pluginID)
+        vm.filterText = "does-not-match"
+
+        await vm.refresh()
+
+        #expect(vm.plugins.map(\.id) == [pluginID])
+        #expect(vm.filteredDisplayRows.isEmpty)
+        #expect(vm.selectedRowID == nil)
+    }
+
+    @Test("collapsing a folder clears its hidden child selection")
+    func collapsingFolderClearsChildSelection() {
+        let (defaults, suiteName) = TestFixtures.makeNamedIsolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folderStore = ScriptFolderStore(defaults: defaults)
+        let folderID = folderStore.createFolder(name: "Auth")
+        folderStore.addScript("script-child", toFolder: folderID)
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(pluginManager: env.manager, folderStore: folderStore)
+        vm.plugins = [
+            PluginInfoSnapshot(
+                id: "script-child",
+                name: "Child",
+                isEnabled: false,
+                method: nil,
+                urlPattern: nil,
+                runtimeStatus: .disabled
+            ),
+        ]
+        vm.selectedRowID = .script("script-child")
+
+        vm.toggleFolder(id: folderID)
+
+        #expect(folderStore.index.folders.first(where: { $0.id == folderID })?.expanded == false)
+        #expect(vm.selectedRowID == nil)
     }
 
     @Test("open editor actions publish edit intent only for script selections")
@@ -362,6 +522,46 @@ struct ScriptingViewModelTests {
         #expect(source == ScriptTemplates.defaultSource)
     }
 
+    @Test("createNewScript clears search so its selected row stays visible")
+    func createNewScriptClearsActiveSearch() async throws {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: ScriptFolderStore(defaults: env.defaults),
+            pluginsDirectory: env.pluginsDir
+        )
+        vm.filterText = "does-not-match"
+        vm.filterColumn = .urlPattern
+
+        let createdID = try #require(await vm.createNewScript())
+
+        #expect(vm.filterText.isEmpty)
+        #expect(vm.filterColumn == .name)
+        #expect(vm.selectedRowID == .script(createdID))
+        #expect(vm.filteredDisplayRows.contains { $0.id == .script(createdID) })
+    }
+
+    @Test("Concurrent create requests are gated to one coherent discovery result")
+    func concurrentCreateRequestsAreGated() async throws {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let vm = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: ScriptFolderStore(defaults: env.defaults),
+            pluginsDirectory: env.pluginsDir
+        )
+
+        async let first = vm.createNewScript()
+        async let second = vm.createNewScript()
+        let (firstResult, secondResult) = await (first, second)
+        let results = [firstResult, secondResult].compactMap(\.self)
+
+        #expect(results.count == 1)
+        #expect(vm.plugins.map(\.id) == results)
+        #expect(await env.manager.plugins.map(\.id) == results)
+    }
+
     @Test("duplicateSelection copies source script manifest and selects the copy")
     func duplicateSelectionCopiesManifestAndSource() async throws {
         let env = TestFixtures.makeIsolatedPluginEnv()
@@ -414,6 +614,39 @@ struct ScriptingViewModelTests {
         #expect(manifest.scriptBehavior?.runOnResponse == false)
         #expect(manifest.scriptBehavior?.runAsMock == true)
         #expect(copiedSource == source)
+    }
+
+    @Test("duplicateSelection surfaces an operation error when the source bundle is missing")
+    func duplicateSelectionSurfacesOperationError() async {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let folderStore = ScriptFolderStore(defaults: env.defaults)
+        let vm = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: folderStore,
+            pluginsDirectory: env.pluginsDir
+        )
+        let missingID = "script.missing.\(UUID().uuidString)"
+        vm.plugins = [
+            PluginInfoSnapshot(
+                id: missingID,
+                name: "Ghost",
+                isEnabled: false,
+                method: nil,
+                urlPattern: nil,
+                runtimeStatus: .disabled
+            ),
+        ]
+        vm.selectedRowID = .script(missingID)
+        #expect(vm.operationError == nil)
+
+        await vm.duplicateSelection()
+
+        // Copying a bundle that does not exist on disk fails and is surfaced to
+        // the user via `operationError`; selection and plugin list are untouched.
+        #expect(vm.operationError != nil)
+        #expect(vm.selectedRowID == .script(missingID))
+        #expect(vm.plugins.map(\.id) == [missingID])
     }
 
     @Test("folder actions create rename cancel toggle and begin rename selected folder")
@@ -498,6 +731,37 @@ struct ScriptingViewModelTests {
         await vm.toggleScript(id: pluginID)
         snapshots = await env.manager.plugins
         #expect(snapshots.first(where: { $0.id == pluginID })?.isEnabled == false)
+    }
+
+    @Test("Reload marks a missing script bundle as errored instead of leaving a false active state")
+    func reloadMissingBundleMarksRuntimeError() async throws {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let pluginID = "script.reload.missing.\(UUID().uuidString)"
+        let bundle = try makeScriptPlugin(
+            id: pluginID,
+            name: "Missing During Reload",
+            in: env.pluginsDir,
+            defaults: env.defaults,
+            enabled: true
+        )
+        await env.manager.loadAllPlugins()
+        #expect(await env.manager.plugins.first(where: { $0.id == pluginID })?.status == .active)
+        try FileManager.default.removeItem(at: bundle)
+
+        do {
+            try await env.manager.reloadPlugin(id: pluginID)
+            Issue.record("Expected reload to fail when the bundle disappeared")
+        } catch {
+            #expect(error is ScriptPluginError)
+        }
+
+        let snapshot = await env.manager.plugins.first(where: { $0.id == pluginID })
+        guard case .error = snapshot?.status else {
+            Issue.record("Expected the missing bundle to leave an explicit runtime error")
+            return
+        }
+        #expect(snapshot?.lastError != nil)
     }
 
     @Test("Scripting advanced toggles persist through AppSettingsStorage")
@@ -587,6 +851,46 @@ struct ScriptingViewModelTests {
         #expect(vm.runOnResponse == true)
         #expect(vm.runAsMock == true)
         #expect(vm.code == source)
+    }
+
+    @Test("List duplicate and editor handoff honor an imported bundle path")
+    func importedBundlePathSupportsDuplicateAndEditorLoad() async throws {
+        let env = TestFixtures.makeIsolatedPluginEnv()
+        defer { env.cleanup() }
+        let pluginID = "script.imported.\(UUID().uuidString)"
+        let source = "async function onRequest(context, url, request) { return request; }"
+        let originalDirectory = try makeScriptPlugin(
+            id: pluginID,
+            name: "Imported Script",
+            in: env.pluginsDir,
+            defaults: env.defaults,
+            enabled: false,
+            source: source
+        )
+        let importedDirectory = env.pluginsDir.appendingPathComponent("user-folder-name", isDirectory: true)
+        try FileManager.default.moveItem(at: originalDirectory, to: importedDirectory)
+        await env.manager.loadAllPlugins()
+
+        let editor = ScriptEditorViewModel(
+            pluginManager: env.manager,
+            policyGate: ScriptPolicyGate(policy: DefaultAppPolicy()),
+            pluginsDirectory: env.pluginsDir
+        )
+        await editor.load(intent: .edit(pluginID: pluginID))
+        #expect(editor.name == "Imported Script")
+        #expect(editor.code == source)
+
+        let list = ScriptingListViewModel(
+            pluginManager: env.manager,
+            folderStore: ScriptFolderStore(defaults: env.defaults),
+            pluginsDirectory: env.pluginsDir
+        )
+        await list.refresh()
+        list.selectedRowID = .script(pluginID)
+        await list.duplicateSelection()
+
+        #expect(list.operationError == nil)
+        #expect(list.plugins.count == 2)
     }
 
     @Test("testRule handles matches misses and invalid regex")
@@ -685,18 +989,21 @@ struct ScriptingViewModelTests {
             pluginsDirectory: env.pluginsDir
         )
         await vm.load(intent: .edit(pluginID: pluginID))
-        let updatedSource = "async function onResponse(context, url, request, response) { return response; }"
+        // A valid Mock configuration: mock scripts must run on Request (and not
+        // Response), and the source must define the onRequest hook.
+        let updatedSource = "async function onRequest(context, url, request) { return request; }"
         vm.name = "Persisted Script"
         vm.urlPattern = "https://api.example.com/v1/*"
         vm.includeSubpaths = true
         vm.patternMode = .wildcard
         vm.method = .post
-        vm.runOnRequest = false
-        vm.runOnResponse = true
+        vm.runOnRequest = true
+        vm.runOnResponse = false
         vm.runAsMock = true
         vm.code = updatedSource
 
-        await vm.saveAndActivate()
+        let saved = await vm.saveAndActivate()
+        #expect(saved)
 
         let pluginDir = env.pluginsDir.appendingPathComponent(pluginID, isDirectory: true)
         let manifest = try JSONDecoder().decode(
@@ -709,8 +1016,8 @@ struct ScriptingViewModelTests {
         #expect(manifest.scriptBehavior?.matchCondition?.urlPattern == "https://api.example.com/v1/*")
         #expect(manifest.scriptBehavior?.matchCondition?.matchType == .wildcard)
         #expect(manifest.scriptBehavior?.matchCondition?.includeSubpaths == true)
-        #expect(manifest.scriptBehavior?.runOnRequest == false)
-        #expect(manifest.scriptBehavior?.runOnResponse == true)
+        #expect(manifest.scriptBehavior?.runOnRequest == true)
+        #expect(manifest.scriptBehavior?.runOnResponse == false)
         #expect(manifest.scriptBehavior?.runAsMock == true)
         #expect(source == updatedSource)
 
@@ -874,6 +1181,8 @@ struct ScriptingViewModelTests {
             "VM must report savedAndActive=true when actually active (msg: \(vm.statusMessage))"
         )
     }
+
+    // MARK: Private
 
     // MARK: - Helpers
 

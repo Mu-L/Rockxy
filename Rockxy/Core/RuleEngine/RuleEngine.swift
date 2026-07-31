@@ -38,7 +38,7 @@ actor RuleEngine {
             }
             let compiled = compiledPatterns[rule.id]
             if rule.matchCondition.matches(method: method, url: url, headers: headers, compiledPattern: compiled) {
-                Self.logger.debug("Breakpoint rule matched: \(rule.name)")
+                Self.logger.debug("Breakpoint rule matched: \(rule.name, privacy: .private)")
                 return rule
             }
         }
@@ -64,9 +64,12 @@ actor RuleEngine {
             if !networkConditionsToolEnabled, case .networkCondition = rule.action {
                 continue
             }
+            if !modifyHeaderToolEnabled, case .modifyHeader = rule.action {
+                continue
+            }
             let compiled = compiledPatterns[rule.id]
             if rule.matchCondition.matches(method: method, url: url, headers: headers, compiledPattern: compiled) {
-                Self.logger.debug("Rule matched: \(rule.name)")
+                Self.logger.debug("Rule matched: \(rule.name, privacy: .private)")
                 return rule
             }
         }
@@ -109,6 +112,33 @@ actor RuleEngine {
     func replaceAll(_ newRules: [ProxyRule]) {
         rules = newRules
         compilePatterns()
+    }
+
+    /// Reorders only Modify Header rules within their existing global slots.
+    /// Missing IDs are ignored and newly-added Modify Header rules retain their
+    /// current relative order after the explicitly ordered rules.
+    func reorderModifyHeaderRules(orderedIDs: [UUID]) {
+        let headerRules = rules.filter { rule in
+            if case .modifyHeader = rule.action {
+                return true
+            }
+            return false
+        }
+        let byID = Dictionary(uniqueKeysWithValues: headerRules.map { ($0.id, $0) })
+        let orderedIDSet = Set(orderedIDs)
+        let reordered = orderedIDs.compactMap { byID[$0] }
+            + headerRules.filter { !orderedIDSet.contains($0.id) }
+        guard reordered.count == headerRules.count else {
+            return
+        }
+
+        var iterator = reordered.makeIterator()
+        rules = rules.map { rule in
+            if case .modifyHeader = rule.action {
+                return iterator.next() ?? rule
+            }
+            return rule
+        }
     }
 
     func setEnabled(id: UUID, enabled: Bool) {
@@ -188,6 +218,10 @@ actor RuleEngine {
         networkConditionsToolEnabled = enabled
     }
 
+    func setModifyHeaderToolEnabled(_ enabled: Bool) {
+        modifyHeaderToolEnabled = enabled
+    }
+
     // MARK: - Atomic Quota-Checked Operations
 
     func addRuleIfAllowed(_ rule: ProxyRule, maxPerCategory: Int) -> Bool {
@@ -262,6 +296,7 @@ actor RuleEngine {
     private var mapLocalToolEnabled: Bool = true
     private var mapRemoteToolEnabled: Bool = true
     private var networkConditionsToolEnabled: Bool = true
+    private var modifyHeaderToolEnabled: Bool = true
     private var compiledPatterns: [UUID: NSRegularExpression] = [:]
 
     private func compilePatterns() {

@@ -8,7 +8,7 @@ import os
 final class DiffTransactionStore {
     // MARK: Lifecycle
 
-    private init() {}
+    init() {}
 
     // MARK: Internal
 

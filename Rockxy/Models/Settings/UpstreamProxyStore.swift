@@ -99,6 +99,14 @@ final class UpstreamProxyStore {
         policy.maxUpstreamProxyBypassEntries
     }
 
+    func storedCredentialUsername() -> String? {
+        do {
+            return try credentialStorage.load()?.username
+        } catch {
+            return nil
+        }
+    }
+
     func saveConfiguration(
         _ newConfiguration: UpstreamProxyConfiguration,
         credentials suppliedCredentials: UpstreamProxyCredentials? = nil
@@ -107,6 +115,9 @@ final class UpstreamProxyStore {
     {
         let resolvedCredentials = try suppliedCredentials ??
             (newConfiguration.hasCredentials ? credentialStorage.load() : nil)
+        if newConfiguration.hasCredentials, resolvedCredentials == nil {
+            throw UpstreamProxyStoreError.credentialsUnavailable
+        }
         try enforcePolicy(for: newConfiguration, credentials: resolvedCredentials)
         try newConfiguration.validate(
             credentials: resolvedCredentials,
@@ -123,11 +134,7 @@ final class UpstreamProxyStore {
             persisted.username = nil
         }
 
-        let data = try JSONEncoder().encode(persisted)
-        userDefaults.set(data, forKey: Self.userDefaultsKey)
-        configuration = persisted
-        rebuildCache()
-        NotificationCenter.default.post(name: .upstreamProxyConfigurationDidChange, object: nil)
+        try persist(persisted)
         Self.logger.info("Upstream Proxy configuration updated")
     }
 
@@ -138,7 +145,12 @@ final class UpstreamProxyStore {
     func setEnabled(_ isEnabled: Bool) throws {
         var updated = configuration
         updated.isEnabled = isEnabled
-        try saveConfiguration(updated)
+        if isEnabled {
+            try saveConfiguration(updated)
+        } else {
+            try persist(updated)
+            Self.logger.info("Upstream Proxy disabled")
+        }
     }
 
     nonisolated func resolvedSnapshot() -> UpstreamProxyResolvedConfiguration? {
@@ -149,12 +161,50 @@ final class UpstreamProxyStore {
     }
 
     func testConnection() async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
-        let snapshot = resolvedSnapshot()
-        let start = ContinuousClock.now
-        guard snapshot?.isEnabled == true else {
+        guard configuration.isEnabled else {
             return .failure(.invalidConfiguration(String(localized: "Upstream Proxy is disabled.")))
         }
+        return await testConnection(configuration: configuration)
+    }
 
+    func testConnection(
+        configuration draftConfiguration: UpstreamProxyConfiguration,
+        credentials suppliedCredentials: UpstreamProxyCredentials? = nil
+    ) async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
+        do {
+            var testConfiguration = draftConfiguration
+            testConfiguration.isEnabled = true
+            let resolvedCredentials = try suppliedCredentials ??
+                (testConfiguration.hasCredentials ? credentialStorage.load() : nil)
+            if testConfiguration.hasCredentials, resolvedCredentials == nil {
+                throw UpstreamProxyStoreError.credentialsUnavailable
+            }
+            try enforcePolicy(for: testConfiguration, credentials: resolvedCredentials)
+            try testConfiguration.validate(
+                credentials: resolvedCredentials,
+                bypassEntryLimit: policy.maxUpstreamProxyBypassEntries
+            )
+            let normalizedConfiguration = normalized(
+                testConfiguration,
+                credentials: resolvedCredentials
+            )
+            let snapshot = reachabilitySnapshot(from: UpstreamProxyResolvedConfiguration(
+                configuration: normalizedConfiguration,
+                credentials: normalizedConfiguration.hasCredentials ? resolvedCredentials : nil,
+                allowsSOCKS5: policy.upstreamProxyAllowsSOCKS5
+            ))
+            return await testConnection(using: snapshot)
+        } catch {
+            return .failure(.invalidConfiguration(error.localizedDescription))
+        }
+    }
+
+    // MARK: Private
+
+    private func testConnection(
+        using snapshot: UpstreamProxyResolvedConfiguration?
+    ) async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
+        let start = ContinuousClock.now
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer {
             Task {
@@ -201,8 +251,6 @@ final class UpstreamProxyStore {
             return .failure(.invalidConfiguration(error.localizedDescription))
         }
     }
-
-    // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "UpstreamProxy")
     private static let userDefaultsKey = "upstreamProxy.config.v1"
@@ -259,6 +307,27 @@ final class UpstreamProxyStore {
         return result
     }
 
+    private func reachabilitySnapshot(
+        from snapshot: UpstreamProxyResolvedConfiguration
+    ) -> UpstreamProxyResolvedConfiguration {
+        var configuration = snapshot.configuration
+        configuration.bypassHostPatterns = []
+        configuration.bypassLocalhost = false
+        return UpstreamProxyResolvedConfiguration(
+            configuration: configuration,
+            credentials: snapshot.credentials,
+            allowsSOCKS5: snapshot.allowsSOCKS5
+        )
+    }
+
+    private func persist(_ persisted: UpstreamProxyConfiguration) throws {
+        let data = try JSONEncoder().encode(persisted)
+        userDefaults.set(data, forKey: Self.userDefaultsKey)
+        configuration = persisted
+        rebuildCache()
+        NotificationCenter.default.post(name: .upstreamProxyConfigurationDidChange, object: self)
+    }
+
     private func rebuildCache() {
         let credentials = try? credentialStorage.load()
         let resolved = UpstreamProxyResolvedConfiguration(
@@ -269,6 +338,19 @@ final class UpstreamProxyStore {
         lock.lock()
         cachedResolvedConfiguration = resolved
         lock.unlock()
+    }
+}
+
+// MARK: - UpstreamProxyStoreError
+
+enum UpstreamProxyStoreError: LocalizedError {
+    case credentialsUnavailable
+
+    var errorDescription: String? {
+        String(
+            localized:
+            "Saved upstream proxy credentials are unavailable. Enter the username and password again."
+        )
     }
 }
 

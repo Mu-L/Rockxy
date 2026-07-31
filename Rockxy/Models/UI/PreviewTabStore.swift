@@ -7,7 +7,8 @@ import os
 final class PreviewTabStore {
     // MARK: Lifecycle
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -32,11 +33,13 @@ final class PreviewTabStore {
                 return existingTab
             }
             requestTabs.append(tab)
+            requestTabs.sort { $0.renderMode.displayOrder < $1.renderMode.displayOrder }
         case .response:
             if let existingTab = responseTabs.first(where: { $0.renderMode == renderMode && $0.isBuiltIn }) {
                 return existingTab
             }
             responseTabs.append(tab)
+            responseTabs.sort { $0.renderMode.displayOrder < $1.renderMode.displayOrder }
         }
         save()
         Self.logger.info("Enabled preview tab: \(renderMode.displayName) in \(panel.rawValue) panel")
@@ -77,13 +80,15 @@ final class PreviewTabStore {
     private static let storageKey = RockxyIdentity.current.defaultsKey("previewTabs")
     private static let beautifyKey = RockxyIdentity.current.defaultsKey("previewAutoBeautify")
 
+    private let defaults: UserDefaults
+
     // MARK: - Persistence
 
     private func save() {
         do {
             let allTabs = requestTabs + responseTabs
             let data = try JSONEncoder().encode(allTabs)
-            UserDefaults.standard.set(data, forKey: Self.storageKey)
+            defaults.set(data, forKey: Self.storageKey)
             saveBeautifyPreference()
         } catch {
             Self.logger.error("Failed to save preview tabs: \(error.localizedDescription)")
@@ -91,22 +96,37 @@ final class PreviewTabStore {
     }
 
     private func saveBeautifyPreference() {
-        UserDefaults.standard.set(autoBeautify, forKey: Self.beautifyKey)
+        defaults.set(autoBeautify, forKey: Self.beautifyKey)
     }
 
     private func load() {
-        autoBeautify = UserDefaults.standard.object(forKey: Self.beautifyKey) as? Bool ?? true
+        autoBeautify = defaults.object(forKey: Self.beautifyKey) as? Bool ?? true
 
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey) else {
+        guard let data = defaults.data(forKey: Self.storageKey) else {
             return
         }
         do {
             let allTabs = try JSONDecoder().decode([PreviewTab].self, from: data)
-            requestTabs = allTabs.filter { $0.panel == .request && $0.isBuiltIn }
-            responseTabs = allTabs.filter { $0.panel == .response && $0.isBuiltIn }
+            requestTabs = allTabs
+                .filter { $0.panel == .request && $0.isBuiltIn }
+                .map(Self.normalizedBuiltInTab)
+            responseTabs = allTabs
+                .filter { $0.panel == .response && $0.isBuiltIn }
+                .map(Self.normalizedBuiltInTab)
+            requestTabs.sort { $0.renderMode.displayOrder < $1.renderMode.displayOrder }
+            responseTabs.sort { $0.renderMode.displayOrder < $1.renderMode.displayOrder }
             Self.logger.info("Loaded \(allTabs.count) preview tabs")
         } catch {
             Self.logger.error("Failed to load preview tabs: \(error.localizedDescription)")
         }
+    }
+
+    private static func normalizedBuiltInTab(_ tab: PreviewTab) -> PreviewTab {
+        PreviewTab(
+            id: tab.id,
+            renderMode: tab.renderMode,
+            panel: tab.panel,
+            isBuiltIn: true
+        )
     }
 }

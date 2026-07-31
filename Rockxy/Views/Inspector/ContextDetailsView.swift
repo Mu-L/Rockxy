@@ -317,17 +317,22 @@ struct ContextDetailsView: View {
             WorkspaceFooterBar(horizontalPadding: 10) {
                 HStack(spacing: 8) {
                     Button {
-                        NotificationCenter.default.post(name: .openDiffWindow, object: nil)
+                        let transactions = selectedTransactions
+                        guard transactions.count == 2 else {
+                            return
+                        }
+                        coordinator.compareTransactions(transactions[0], transactions[1])
                     } label: {
                         Label(String(localized: "Compare"), systemImage: "arrow.left.arrow.right")
                     }
                     .disabled(selectedTransactions.count != 2)
                     Spacer()
                     Button {
-                        coordinator.presentExport(format: .har)
+                        coordinator.presentSelectedExport(format: .har)
                     } label: {
                         Label(String(localized: "Export Selection"), systemImage: "square.and.arrow.up")
                     }
+                    .disabled(selectedTransactions.isEmpty)
                 }
                 .controlSize(.small)
             }

@@ -34,7 +34,9 @@ struct MapLocalModelTests {
         let rule = ProxyRule(
             name: "Untitled",
             matchCondition: RuleMatchCondition(urlPattern: pattern),
-            action: .mapLocal(filePath: "/Users/stephen/Library/Application Support/Rockxy/map-local/default_message.json")
+            action: .mapLocal(
+                filePath: "/tmp/rockxy-map-local/default_message.json"
+            )
         )
 
         #expect(vm.methodLabel(for: rule) == "ANY")
@@ -96,6 +98,8 @@ struct MapLocalModelTests {
             .appendingPathComponent("RockxyTests-MapLocalEditor-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         let fileURL = tempDir.appendingPathComponent("response.json")
+        // A file outside Rockxy's Map Local directory is a user-owned reference.
+        try Data(#"{"original":true}"#.utf8).write(to: fileURL, options: .atomic)
 
         let existing = ProxyRule(
             name: "Existing",
@@ -144,8 +148,9 @@ struct MapLocalModelTests {
             Issue.record("Expected .mapLocal")
         }
 
+        // The referenced external file is left byte-for-byte untouched on save.
         let saved = try String(contentsOf: fileURL, encoding: .utf8)
-        #expect(saved == #"{"ok":true}"#)
+        #expect(saved == #"{"original":true}"#)
     }
 
     @Test("editor menu selections persist method match type and delay")
@@ -211,7 +216,8 @@ struct MapLocalModelTests {
         #expect(vm.filePath == fileURL.path)
         #expect(vm.delayPreset == .threeSeconds)
         #expect(vm.httpMessageText.contains("HTTP/1.1 201 CREATED"))
-        #expect(vm.httpMessageText.contains(#"{"status":"ok"}"#))
+        #expect(vm.responseBodyText.isEmpty)
+        #expect(vm.isExternalReference)
         #expect(vm.isSaveEnabled)
     }
 
@@ -237,6 +243,21 @@ struct MapLocalModelTests {
         #expect(!vm.isSaveEnabled)
     }
 
+    @Test("editor explains invalid regex patterns inline")
+    func editorExplainsInvalidRegex() {
+        let vm = MapLocalEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Invalid"
+        vm.matchType = .regex
+        vm.urlText = "["
+
+        #expect(!vm.isSaveEnabled)
+        #expect(vm.urlValidationMessage?.contains("Invalid regex pattern") == true)
+
+        vm.urlText = #"https:\/\/api\.example\.com\/v1\/.*"#
+        #expect(vm.urlValidationMessage == nil)
+    }
+
     @Test("tool enable setter updates view model immediately")
     func toolEnableSetter() async {
         await RuleTestLock.shared.acquire()
@@ -245,5 +266,179 @@ struct MapLocalModelTests {
         #expect(vm.isToolEnabled == false)
         await RuleSyncService.setMapLocalToolEnabled(true)
         await RuleTestLock.shared.release()
+    }
+
+    @Test("saving a rule that references an external file leaves its bytes unchanged")
+    func externalReferencedFilesAreNotRewritten() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RockxyTests-MapLocalExternal-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let textURL = tempDir.appendingPathComponent("payload.json")
+        let textBytes = Data(#"{"external":true}"#.utf8)
+        try textBytes.write(to: textURL, options: .atomic)
+
+        let binaryURL = tempDir.appendingPathComponent("payload.bin")
+        let binaryBytes = Data([0x00, 0x01, 0x02, 0xFF, 0xFE, 0x10, 0x7F])
+        try binaryBytes.write(to: binaryURL, options: .atomic)
+
+        for fileURL in [textURL, binaryURL] {
+            let existing = ProxyRule(
+                name: "Reference",
+                matchCondition: RuleMatchCondition(
+                    urlPattern: MapLocalPatternFormatter.wildcardToRegex("https://api.example.com/*")
+                ),
+                action: .mapLocal(filePath: fileURL.path, statusCode: 200)
+            )
+            let vm = MapLocalEditorViewModel()
+            vm.load(context: MapLocalEditorContext(existingRule: existing))
+            #expect(vm.isExternalReference)
+            // Mutating the editable buffer must not rewrite a user-owned file.
+            vm.httpMessageText = "HTTP/1.1 500 Internal Server Error\n\nrewritten"
+            _ = try #require(vm.makeRule())
+        }
+
+        let savedText = try Data(contentsOf: textURL)
+        let savedBinary = try Data(contentsOf: binaryURL)
+        #expect(savedText == textBytes)
+        #expect(savedBinary == binaryBytes)
+    }
+
+    @Test("captured binary draft writes exact bytes to the generated app-owned file")
+    func capturedBinaryDraftWritesExactBytes() throws {
+        let binaryBytes = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0xFF, 0x10, 0x7F])
+        let draft = MapLocalDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Binary",
+            sourceURL: URL(string: "https://cdn.example.com/logo.png"),
+            sourceHost: "cdn.example.com",
+            sourcePath: "/logo.png",
+            sourceMethod: "GET",
+            responseBody: binaryBytes,
+            responseContentType: "image/png",
+            inferredExtension: "png",
+            responseStatusCode: 206
+        )
+
+        let vm = MapLocalEditorViewModel()
+        vm.load(context: MapLocalEditorContext(draft: draft))
+
+        let rule = try #require(vm.makeRule())
+        guard case let .mapLocal(path, statusCode, _, _) = rule.action else {
+            Issue.record("Expected .mapLocal")
+            return
+        }
+        #expect(path.hasSuffix(".png"))
+        #expect(statusCode == 206)
+
+        let written = try Data(contentsOf: URL(fileURLWithPath: path))
+        #expect(written == binaryBytes)
+
+        let reopened = MapLocalEditorViewModel()
+        reopened.load(context: MapLocalEditorContext(existingRule: rule))
+        #expect(reopened.isCapturedBinary)
+        reopened.setResponseStatusCode(304)
+        let resaved = try #require(reopened.makeRule())
+        let resavedBytes = try Data(contentsOf: URL(fileURLWithPath: path))
+        #expect(resavedBytes == binaryBytes)
+        if case let .mapLocal(_, reopenedStatusCode, _, _) = resaved.action {
+            #expect(reopenedStatusCode == 304)
+        } else {
+            Issue.record("Expected .mapLocal")
+        }
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: path))
+    }
+
+    @Test("captured text draft writes the authored body and status to an app-owned file")
+    func capturedTextDraftWritesEditableBody() throws {
+        let body = Data(#"{"created":true}"#.utf8)
+        let draft = MapLocalDraft(
+            origin: .selectedTransaction,
+            suggestedName: "Created",
+            sourceURL: URL(string: "https://api.example.com/items"),
+            sourceHost: "api.example.com",
+            sourcePath: "/items",
+            sourceMethod: "POST",
+            responseBody: body,
+            responseContentType: "application/json",
+            inferredExtension: "json",
+            responseStatusCode: 201
+        )
+
+        let vm = MapLocalEditorViewModel()
+        vm.load(context: MapLocalEditorContext(draft: draft))
+        #expect(vm.isInlineResponseEditable)
+        #expect(vm.responseBodyText == #"{"created":true}"#)
+
+        vm.responseBodyText = #"{"created":"updated"}"#
+        let rule = try #require(vm.makeRule())
+        guard case let .mapLocal(path, statusCode, _, _) = rule.action else {
+            Issue.record("Expected .mapLocal")
+            return
+        }
+        #expect(statusCode == 201)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: path)) == Data(#"{"created":"updated"}"#.utf8))
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: path))
+    }
+
+    @Test("new wildcard rule retains authored source and match metadata")
+    func wildcardRuleRetainsAuthoredMetadata() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RockxyTests-MapLocalWildcard-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let fileURL = tempDir.appendingPathComponent("response.json")
+        try Data(#"{"ok":true}"#.utf8).write(to: fileURL, options: .atomic)
+
+        let vm = MapLocalEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Wildcard"
+        vm.matchType = .wildcard
+        vm.includeSubpaths = true
+        vm.urlText = "https://api.example.com/v1/*"
+        vm.filePath = fileURL.path
+
+        let rule = try #require(vm.makeRule())
+        #expect(rule.matchCondition.matchType == .wildcard)
+        #expect(rule.matchCondition.sourceURLPattern == "https://api.example.com/v1/*")
+        #expect(rule.matchCondition.includeSubpaths == true)
+        #expect(rule.matchCondition.urlPattern == MapLocalPatternFormatter
+            .wildcardToRegex("https://api.example.com/v1/*"))
+
+        let reopened = MapLocalEditorViewModel()
+        reopened.load(context: MapLocalEditorContext(existingRule: rule))
+        #expect(reopened.matchType == .wildcard)
+        #expect(reopened.urlText == "https://api.example.com/v1/*")
+        #expect(reopened.includeSubpaths == true)
+    }
+
+    @Test("advanced regex rule reopens from metadata without semantic rewriting")
+    func regexRuleReopensWithoutRewriting() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RockxyTests-MapLocalRegex-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let fileURL = tempDir.appendingPathComponent("response.json")
+        try Data(#"{"ok":true}"#.utf8).write(to: fileURL, options: .atomic)
+
+        let advancedRegex = #"https:\/\/api\.example\.com\/v(1|2)\/users\/\d+.*"#
+        let vm = MapLocalEditorViewModel()
+        vm.load(context: .blank)
+        vm.name = "Regex"
+        vm.matchType = .regex
+        vm.urlText = advancedRegex
+        vm.filePath = fileURL.path
+
+        let rule = try #require(vm.makeRule())
+        #expect(rule.matchCondition.matchType == .regex)
+        #expect(rule.matchCondition.sourceURLPattern == advancedRegex)
+        #expect(rule.matchCondition.urlPattern == advancedRegex)
+
+        let reopened = MapLocalEditorViewModel()
+        reopened.load(context: MapLocalEditorContext(existingRule: rule))
+        #expect(reopened.matchType == .regex)
+        #expect(reopened.urlText == advancedRegex)
+
+        let resaved = try #require(reopened.makeRule())
+        #expect(resaved.matchCondition.urlPattern == advancedRegex)
+        #expect(resaved.matchCondition.sourceURLPattern == advancedRegex)
     }
 }

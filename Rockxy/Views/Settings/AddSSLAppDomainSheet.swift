@@ -4,30 +4,36 @@ import UniformTypeIdentifiers
 
 // MARK: - AddSSLAppDomainSheet
 
-/// Panel for browsing observed apps and domains from captured traffic,
-/// then adding selected items as SSL proxying rules.
+/// Panel for browsing apps and domains observed in captured traffic, then adding
+/// selected hosts as HTTPS decryption rules with an explicit behavior.
 ///
 /// - Apps section shows each app with its observed domains as expandable children.
-///   Selecting an app and tapping Add adds all of that app's observed domains.
-/// - Domains section shows all observed domains flat.
-///   Selecting a domain and tapping Add adds that single domain.
+///   Choosing an app adds all of that app's currently observed hosts.
+/// - Domains section shows all observed domains flat. Choosing a domain adds it.
 ///
-/// Data comes from `TrafficDomainSnapshot`, populated by `MainContentCoordinator`
-/// on each traffic batch. No fake/guessed domains are generated.
+/// Rules match by host, so an added rule applies to those hosts for every client,
+/// not only the app they were observed from. Data comes from `TrafficDomainSnapshot`;
+/// no guessed hosts are generated.
 struct AddSSLAppDomainSheet: View {
     // MARK: Lifecycle
 
-    init(onAdd: @escaping ([String]) -> Void) {
+    init(
+        existingRules: [SSLProxyingRule],
+        onAdd: @escaping ([String], SSLProxyingListType) -> Void
+    ) {
+        self.existingRules = existingRules
         self.onAdd = onAdd
     }
 
     // MARK: Internal
 
-    let onAdd: ([String]) -> Void
+    let existingRules: [SSLProxyingRule]
+    let onAdd: ([String], SSLProxyingListType) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             headerSection
+            behaviorSection
             searchSection
             Divider()
             listSection
@@ -36,7 +42,16 @@ struct AddSSLAppDomainSheet: View {
             buttonBar
         }
         .font(toolMetrics.font())
-        .frame(width: max(500, toolMetrics.fieldWidth(500)), height: max(520, toolMetrics.bodyFontSize * 28 + 156))
+        .frame(width: max(520, toolMetrics.fieldWidth(520)), height: max(540, toolMetrics.bodyFontSize * 28 + 176))
+        .background {
+            Button("") { isSearchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+        .onChange(of: searchText) { _, _ in
+            reconcileSelection()
+        }
     }
 
     // MARK: Private
@@ -51,6 +66,7 @@ struct AddSSLAppDomainSheet: View {
 
     @State private var searchText = ""
     @State private var selectedItem: PickerItem?
+    @State private var listType: SSLProxyingListType = .include
     @FocusState private var isSearchFocused: Bool
 
     private var toolMetrics: ToolWindowDisplayMetrics {
@@ -81,26 +97,92 @@ struct AddSSLAppDomainSheet: View {
     }
 
     private var addButtonDisabled: Bool {
-        guard let selected = selectedItem else {
-            return true
+        newDomainsForSelection.isEmpty
+    }
+
+    private var selectedDomains: [String] {
+        guard let selectedItem else {
+            return []
         }
-        if case let .app(name) = selected {
-            return snapshot.domains(forApp: name).isEmpty
+        switch selectedItem {
+        case let .app(name):
+            return snapshot.domains(forApp: name)
+        case let .domain(domain):
+            return [domain]
         }
-        return false
+    }
+
+    private var newDomainsForSelection: [String] {
+        var seen = Set(
+            existingRules
+                .filter { $0.listType == listType }
+                .map { $0.domain.lowercased() }
+        )
+        return selectedDomains.filter { seen.insert($0.lowercased()).inserted }
+    }
+
+    private var duplicateCount: Int {
+        selectedDomains.count - newDomainsForSelection.count
+    }
+
+    private var overlapCount: Int {
+        let oppositeDomains = Set(
+            existingRules
+                .filter { $0.listType != listType }
+                .map { $0.domain.lowercased() }
+        )
+        return newDomainsForSelection.count { oppositeDomains.contains($0.lowercased()) }
+    }
+
+    private var hasObservedTraffic: Bool {
+        !snapshot.appEntries.isEmpty || !snapshot.domains.isEmpty
+    }
+
+    private var hasFilteredResults: Bool {
+        !filteredApps.isEmpty || !filteredDomains.isEmpty
     }
 
     // MARK: - Sections
 
     private var headerSection: some View {
-        HStack {
-            Text(String(localized: "Add favorite app or domain"))
-                .font(toolMetrics.font(weight: .medium))
+        VStack(alignment: .leading, spacing: 3) {
+            Text(String(localized: "Add Observed Domains"))
+                .font(toolMetrics.font(weight: .semibold))
+            Text(
+                String(
+                    localized:
+                    "Choosing an app adds the hosts it has contacted so far. Rules apply to those hosts for every client."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+    }
+
+    private var behaviorSection: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Behavior"))
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+            Picker("", selection: $listType) {
+                Text(SSLProxyingListViewModel.behaviorLabel(for: .include))
+                    .tag(SSLProxyingListType.include)
+                Text(SSLProxyingListViewModel.behaviorLabel(for: .exclude))
+                    .tag(SSLProxyingListType.exclude)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .accessibilityLabel(String(localized: "Rule behavior"))
             Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.bottom, 8)
     }
 
     private var searchSection: some View {
@@ -108,7 +190,7 @@ struct AddSSLAppDomainSheet: View {
             TextField(
                 String(localized: "Search app or domain"),
                 text: $searchText,
-                prompt: Text(String(localized: "Search app or domain (⌘⇧F)"))
+                prompt: Text(String(localized: "Search app or domain (⌘F)"))
             )
             .textFieldStyle(.roundedBorder)
             .font(toolMetrics.font())
@@ -126,6 +208,21 @@ struct AddSSLAppDomainSheet: View {
             domainsSection
         }
         .listStyle(.sidebar)
+        .overlay {
+            if !hasFilteredResults {
+                ContentUnavailableView(
+                    hasObservedTraffic
+                        ? String(localized: "No Matching Observed Hosts")
+                        : String(localized: "No Observed Hosts Yet"),
+                    systemImage: hasObservedTraffic ? "magnifyingglass" : "network.slash",
+                    description: Text(
+                        hasObservedTraffic
+                            ? String(localized: "Try a different app or host search.")
+                            : String(localized: "Capture traffic from an app or website, then return here.")
+                    )
+                )
+            }
+        }
     }
 
     private var appsSection: some View {
@@ -133,15 +230,7 @@ struct AddSSLAppDomainSheet: View {
             ForEach(filteredApps) { app in
                 DisclosureGroup {
                     ForEach(app.domains, id: \.self) { domain in
-                        HStack(spacing: 8) {
-                            Image(systemName: "circle.slash")
-                                .font(toolMetrics.secondaryFont())
-                                .foregroundStyle(.tertiary)
-                            Text(domain)
-                                .font(toolMetrics.secondaryFont())
-                                .lineLimit(1)
-                        }
-                        .tag(PickerItem.domain(domain))
+                        domainRow(domain)
                     }
                 } label: {
                     HStack(spacing: 8) {
@@ -157,60 +246,26 @@ struct AddSSLAppDomainSheet: View {
                 }
             }
         } header: {
-            HStack {
-                Image(systemName: "folder.fill")
-                    .font(toolMetrics.secondaryFont())
-                Text(String(localized: "Apps"))
-                    .font(toolMetrics.secondaryFont(weight: .semibold))
-                Spacer()
-                Text("\(filteredApps.count)")
-                    .font(toolMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(.quaternary)
-                    .clipShape(Capsule())
-            }
+            sectionHeader(String(localized: "Apps"), systemImage: "square.grid.2x2", count: filteredApps.count)
         }
     }
 
     private var domainsSection: some View {
         Section {
             ForEach(filteredDomains, id: \.self) { domain in
-                HStack(spacing: 8) {
-                    Image(systemName: "circle.slash")
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.tertiary)
-                    Text(domain)
-                        .font(toolMetrics.secondaryFont())
-                        .lineLimit(1)
-                }
-                .tag(PickerItem.domain(domain))
+                domainRow(domain)
             }
         } header: {
-            HStack {
-                Image(systemName: "globe")
-                    .font(toolMetrics.secondaryFont())
-                Text(String(localized: "Domains"))
-                    .font(toolMetrics.secondaryFont(weight: .semibold))
-                Spacer()
-                Text("\(filteredDomains.count)")
-                    .font(toolMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(.quaternary)
-                    .clipShape(Capsule())
-            }
+            sectionHeader(String(localized: "Domains"), systemImage: "globe", count: filteredDomains.count)
         }
     }
 
     private var footerHint: some View {
         HStack {
             Spacer()
-            Text(String(localized: "Launch your app/domain to see it in the list"))
+            Text(selectionSummary)
                 .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(overlapCount > 0 ? Color.orange : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
@@ -218,67 +273,112 @@ struct AddSSLAppDomainSheet: View {
     }
 
     private var buttonBar: some View {
-        HStack(spacing: 8) {
-            Button(String(localized: "Cancel")) {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Button {
                 dismiss()
+            } label: {
+                footerButtonLabel(String(localized: "Cancel"))
             }
             .keyboardShortcut(.cancelAction)
 
             Spacer()
 
-            Menu {
-                Button(String(localized: "App…")) {
-                    selectAllDomainsForFirstApp()
-                }
-                Button(String(localized: "Domain…")) {
-                    selectFirstDomain()
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(String(localized: "Select"))
-                    Image(systemName: "chevron.down")
-                        .font(toolMetrics.metadataFont())
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-
-            Button(String(localized: "Add")) {
+            Button {
                 addSelectedItem()
+            } label: {
+                footerButtonLabel(addButtonTitle)
             }
+            .keyboardShortcut(.defaultAction)
             .disabled(addButtonDisabled)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
 
-    private func selectAllDomainsForFirstApp() {
-        if let first = filteredApps.first {
-            selectedItem = .app(first.name)
+    private func domainRow(_ domain: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "network")
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.tertiary)
+            Text(domain)
+                .font(toolMetrics.secondaryFont())
+                .lineLimit(1)
+        }
+        .tag(PickerItem.domain(domain))
+    }
+
+    private func sectionHeader(_ title: String, systemImage: String, count: Int) -> some View {
+        HStack {
+            Image(systemName: systemImage)
+                .font(toolMetrics.secondaryFont())
+            Text(title)
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+            Spacer()
+            Text("\(count)")
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(.quaternary)
+                .clipShape(Capsule())
         }
     }
 
-    private func selectFirstDomain() {
-        if let first = filteredDomains.first {
-            selectedItem = .domain(first)
-        }
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(width: max(80, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 2))
     }
 
     private func addSelectedItem() {
-        guard let selected = selectedItem else {
+        add(newDomainsForSelection)
+    }
+
+    private func add(_ domains: [String]) {
+        guard !domains.isEmpty else {
             return
         }
-        switch selected {
+        onAdd(domains, listType)
+        dismiss()
+    }
+
+    private var addButtonTitle: String {
+        let count = newDomainsForSelection.count
+        return count > 1
+            ? String(localized: "Add \(count)")
+            : String(localized: "Add")
+    }
+
+    private var selectionSummary: String {
+        guard selectedItem != nil else {
+            return String(localized: "Choose an app or host to preview what will be added.")
+        }
+        let newCount = newDomainsForSelection.count
+        var parts = [String(localized: "\(newCount) new")]
+        if duplicateCount > 0 {
+            parts.append(String(localized: "\(duplicateCount) already exists"))
+        }
+        if overlapCount > 0 {
+            parts.append(
+                String(localized: "\(overlapCount) overlaps; Tunnel Without Decryption takes priority")
+            )
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func reconcileSelection() {
+        guard let selectedItem else {
+            return
+        }
+        let isVisible: Bool
+        switch selectedItem {
         case let .app(name):
-            let appDomains = snapshot.domains(forApp: name)
-            guard !appDomains.isEmpty else {
-                return
-            }
-            onAdd(appDomains)
-            dismiss()
+            isVisible = filteredApps.contains { $0.name == name }
         case let .domain(domain):
-            onAdd([domain])
-            dismiss()
+            isVisible = filteredDomains.contains(domain)
+                || filteredApps.contains { $0.domains.contains(domain) }
+        }
+        if !isVisible {
+            self.selectedItem = nil
         }
     }
 }

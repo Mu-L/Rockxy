@@ -81,6 +81,17 @@ extension MainContentCoordinator {
         transactions.count { source.matches($0) }
     }
 
+    /// Single Focus/Noise inclusion predicate shared by request-list workspace visibility and
+    /// Assistant related-traffic selection. Traffic Signals are intentionally excluded here so the
+    /// request list can layer its own signal lens on top without leaking that filter into the
+    /// Assistant's automatically discovered related context.
+    func isWithinFocusNoiseScope(_ transaction: HTTPTransaction, workspace: WorkspaceState) -> Bool {
+        if workspace.mutedTrafficSources.contains(where: { $0.matches(transaction) }) {
+            return false
+        }
+        return workspace.activeFocusSet?.matches(transaction) ?? true
+    }
+
     private func persistFocusSetsAcrossWorkspaces(_ focusSets: [FocusSet]) {
         FocusSetPersistence.save(focusSets)
         for workspace in workspaceStore.workspaces where workspace.id != activeWorkspace.id {

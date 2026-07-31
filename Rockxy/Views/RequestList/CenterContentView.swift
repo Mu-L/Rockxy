@@ -200,17 +200,26 @@ struct CenterContentView: View {
             refreshToken: coordinator.refreshToken,
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
             selectedIDs: $selectedIDs,
-            onSelectionChanged: { ids in
+            onSelectionChanged: { ids, primaryID in
                 coordinator.selectedTransactionIDs = ids
-                if let firstID = ids.first,
-                   let transaction = coordinator.transaction(for: firstID)
+                if let primaryID,
+                   ids.contains(primaryID),
+                   let transaction = coordinator.transaction(for: primaryID)
+                {
+                    coordinator.selectTransaction(transaction)
+                } else if let firstVisibleID = coordinator.filteredRows
+                    .lazy
+                    .map(\.id)
+                    .first(where: ids.contains),
+                    let transaction = coordinator.transaction(for: firstVisibleID)
                 {
                     coordinator.selectTransaction(transaction)
                 } else {
                     coordinator.selectTransaction(nil)
                 }
             },
-            mainCoordinator: coordinator
+            mainCoordinator: coordinator,
+            headerColumns: coordinator.headerColumnStore.columns
         )
     }
 }

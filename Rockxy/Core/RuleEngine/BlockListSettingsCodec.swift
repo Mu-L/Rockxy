@@ -209,7 +209,13 @@ enum BlockListSettingsCodec {
             rules.append(ProxyRule(
                 name: trimmedName?.isEmpty == false ? trimmedName ?? entry.pattern : entry.pattern,
                 isEnabled: entry.isEnabled,
-                matchCondition: RuleMatchCondition(urlPattern: regex, method: method),
+                matchCondition: RuleMatchCondition(
+                    urlPattern: regex,
+                    sourceURLPattern: entry.pattern,
+                    method: method,
+                    matchType: entry.matchType,
+                    includeSubpaths: entry.matchType == .wildcard ? entry.includeSubpaths : false
+                ),
                 action: .block(statusCode: entry.statusCode)
             ))
         }

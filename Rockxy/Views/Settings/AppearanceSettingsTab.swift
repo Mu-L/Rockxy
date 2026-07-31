@@ -5,30 +5,16 @@ struct AppearanceSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(String(localized: "App UI"))
-                        .font(settingsMetrics.font(weight: .medium))
-
-                    appUISection
-
-                    Text(String(localized: "App Theme"))
-                        .font(settingsMetrics.font(weight: .medium))
-
-                    themeSection
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 18)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+        SettingsPane {
+            SettingsSectionCard(String(localized: "App UI")) {
+                appUISection
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            SettingsSectionCard(String(localized: "App Theme")) {
+                themeSection
+            }
 
             restoreDefaultsButton
-                .padding(.horizontal, 18)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
         }
         .appUIDisplayMetrics(AppUIDisplayMetrics(settings: settingsManager.appUI))
         .font(settingsMetrics.font())
@@ -51,114 +37,89 @@ struct AppearanceSettingsTab: View {
     }
 
     private var appUISection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            appearanceControlGroup {
-                HStack(alignment: .top, spacing: 28) {
-                    HStack(spacing: 8) {
-                        Text(String(localized: "Font Size:"))
-                            .frame(width: settingsMetrics.fieldWidth(84), alignment: .trailing)
-                        Picker("", selection: fontSizeBinding) {
-                            ForEach(AppUISettings.allowedFontSizes, id: \.self) { size in
-                                Text("\(size)").tag(size)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: settingsMetrics.menuWidth(72))
-                    }
-
-                    HStack(spacing: 8) {
-                        Text(String(localized: "Tab Width:"))
-                        Picker("", selection: tabWidthBinding) {
-                            ForEach(AppUISettings.allowedTabWidths, id: \.self) { width in
-                                Text(String(localized: "\(width) Spaces")).tag(width)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: settingsMetrics.menuWidth(112))
+        VStack(alignment: .leading, spacing: settingsMetrics.sectionContentSpacing) {
+            SettingsFieldRow(String(localized: "Font Size:")) {
+                Picker("", selection: fontSizeBinding) {
+                    ForEach(AppUISettings.allowedFontSizes, id: \.self) { size in
+                        Text("\(size)").tag(size)
                     }
                 }
-
-                optionRow(label: "") {
-                    Toggle(String(localized: "Use Monospaced Font"), isOn: appUIToggle(\.useMonospacedFont))
-                        .toggleStyle(.checkbox)
-                }
-
-                Text(String(localized: "Applies throughout the app, including navigation, controls, tables, and inspectors."))
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, settingsMetrics.fieldWidth(192))
-                    .fixedSize(horizontal: false, vertical: true)
+                .labelsHidden()
+                .frame(width: settingsMetrics.menuWidth(84))
             }
 
-            appearanceControlGroup {
-                optionRow(label: String(localized: "Body Tab:")) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Toggle(String(localized: "Word Wrap"), isOn: appUIToggle(\.bodyWordWrap))
-                        Toggle(String(localized: "Show Invisibles"), isOn: appUIToggle(\.bodyShowInvisibles))
-                        Toggle(String(localized: "Show Minimap"), isOn: appUIToggle(\.bodyShowMinimap))
-                        Toggle(String(localized: "Scroll Beyond The Last Line"), isOn: appUIToggle(\.bodyScrollBeyondLastLine))
+            SettingsFieldRow(String(localized: "Tab Width:")) {
+                Picker("", selection: tabWidthBinding) {
+                    ForEach(AppUISettings.allowedTabWidths, id: \.self) { width in
+                        Text(String(localized: "\(width) Spaces")).tag(width)
                     }
-                    .toggleStyle(.checkbox)
                 }
+                .labelsHidden()
+                .frame(width: settingsMetrics.menuWidth(128))
             }
 
-            appearanceControlGroup {
-                optionRow(label: String(localized: "Other:")) {
+            SettingsIndentedContent {
+                VStack(alignment: .leading, spacing: 5) {
                     Toggle(
-                        String(localized: "Alternative Rows Background Colors"),
-                        isOn: appUIToggle(\.useAlternatingRowBackgroundColors)
+                        String(localized: "Use Monospaced Font"),
+                        isOn: appUIToggle(\.useMonospacedFont)
                     )
                     .toggleStyle(.checkbox)
+
+                    Text(
+                        String(
+                            localized: "Applies throughout the app, including navigation, controls, tables, and inspectors."
+                        )
+                    )
+                    .font(settingsMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            SettingsFieldRow(String(localized: "Body Tab:")) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Toggle(String(localized: "Word Wrap"), isOn: appUIToggle(\.bodyWordWrap))
+                    Toggle(String(localized: "Show Invisibles"), isOn: appUIToggle(\.bodyShowInvisibles))
+                    Toggle(String(localized: "Show Minimap"), isOn: appUIToggle(\.bodyShowMinimap))
+                    Toggle(
+                        String(localized: "Scroll Beyond The Last Line"),
+                        isOn: appUIToggle(\.bodyScrollBeyondLastLine)
+                    )
+                }
+                .toggleStyle(.checkbox)
+            }
+
+            SettingsFieldRow(String(localized: "Other:")) {
+                Toggle(
+                    String(localized: "Alternative Rows Background Colors"),
+                    isOn: appUIToggle(\.useAlternatingRowBackgroundColors)
+                )
+                .toggleStyle(.checkbox)
             }
         }
         .font(settingsMetrics.font())
-        .padding(.horizontal, settingsMetrics.fieldWidth(112))
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(nsColor: .controlBackgroundColor).opacity(0.82),
-            in: RoundedRectangle(cornerRadius: 8)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.22), lineWidth: 0.5)
-        }
     }
 
     private var themeSection: some View {
-        HStack(spacing: 56) {
+        HStack(spacing: max(28, settingsMetrics.sectionSpacing * 2)) {
             ForEach(AppTheme.allCases) { theme in
                 themeOption(theme)
             }
         }
-        .padding(.vertical, 18)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .overlay {
-            Rectangle()
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        }
     }
 
     private var restoreDefaultsButton: some View {
-        HStack(spacing: 8) {
-            Button(String(localized: "Restore Defaults")) {
-                settingsManager.restoreAppearanceDefaults()
-            }
-            .controlSize(.regular)
-
+        HStack {
+            Spacer()
             Button {
                 settingsManager.restoreAppearanceDefaults()
             } label: {
-                        Image(systemName: "arrow.clockwise")
-                    .font(settingsMetrics.secondaryFont(weight: .medium))
-                    .foregroundStyle(.secondary)
+                Label(String(localized: "Restore Defaults"), systemImage: "arrow.clockwise")
             }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-            .help(String(localized: "Restore Defaults"))
-
-            Spacer()
+            .controlSize(.regular)
         }
         .font(settingsMetrics.font())
     }
@@ -188,25 +149,6 @@ struct AppearanceSettingsTab: View {
                 settingsManager.updateAppUI { $0[keyPath: keyPath] = newValue }
             }
         )
-    }
-
-    private func optionRow<Content: View>(
-        label: String,
-        @ViewBuilder content: () -> Content
-    )
-        -> some View
-    {
-        HStack(alignment: .top, spacing: 8) {
-            Text(label)
-                .frame(width: settingsMetrics.fieldWidth(84), alignment: .trailing)
-            content()
-        }
-    }
-
-    private func appearanceControlGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(.vertical, 2)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func themeOption(_ theme: AppTheme) -> some View {

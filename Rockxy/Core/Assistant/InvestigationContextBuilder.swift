@@ -7,6 +7,7 @@ struct InvestigationContextBuilder {
 
     func build(
         snapshots: [InvestigationTransactionSnapshot],
+        requestedTransactionCount: Int? = nil,
         limits: InvestigationContextLimits = .default
     )
         throws -> InvestigationContextPack
@@ -41,12 +42,14 @@ struct InvestigationContextBuilder {
         guard let preview = String(bytes: payload, encoding: .utf8) else {
             throw InvestigationContextBuilderError.invalidEncoding
         }
-        let omitted = snapshots.count - included.count
+        let requestedCount = max(snapshots.count, requestedTransactionCount ?? snapshots.count)
+        let omitted = requestedCount - included.count
         let manifest = InvestigationContextManifest(
             requestCount: included.count,
             outboundBytes: payload.count,
             redactedHeaderCount: totals.redactedHeaderCount,
             redactedQueryCount: totals.redactedQueryCount,
+            redactedURLCredentialCount: totals.redactedURLCredentialCount,
             redactedBodyFieldCount: totals.redactedBodyFieldCount,
             truncatedBodyCount: totals.truncatedBodyCount,
             omittedBinaryBodyCount: totals.omittedBinaryBodyCount,
@@ -83,6 +86,7 @@ struct InvestigationContextBuilder {
             limits: limits
         )
         let originalQueryCount = sensitiveQueryCount(in: snapshot.request.url)
+        let originalURLCredentialCount = sensitiveURLCredentialCount(in: snapshot.request.url)
         let redactedURL = bounded(
             redactor.redactURL(snapshot.request.url).absoluteString,
             characters: limits.maxURLCharacters
@@ -115,6 +119,7 @@ struct InvestigationContextBuilder {
             manifest: ManifestAccumulator(
                 redactedHeaderCount: requestHeaders.redactedCount + responseHeaders.redactedCount,
                 redactedQueryCount: originalQueryCount,
+                redactedURLCredentialCount: originalURLCredentialCount,
                 redactedBodyFieldCount: requestBody.redactedCount + responseBody.redactedCount,
                 truncatedBodyCount: requestBody.wasTruncatedCount + responseBody.wasTruncatedCount,
                 omittedBinaryBodyCount: requestBody.wasBinaryCount + responseBody.wasBinaryCount
@@ -175,6 +180,13 @@ struct InvestigationContextBuilder {
             return 0
         }
         return items.count { SensitiveDataRedactor.sensitiveQueryParams.contains($0.name.lowercased()) }
+    }
+
+    private func sensitiveURLCredentialCount(in url: URL) -> Int {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return 0
+        }
+        return (components.user == nil ? 0 : 1) + (components.password == nil ? 0 : 1)
     }
 
     private func encode(transactions: [PayloadTransaction]) throws -> Data {
@@ -325,6 +337,7 @@ private struct PayloadRecord {
 private struct ManifestAccumulator {
     var redactedHeaderCount = 0
     var redactedQueryCount = 0
+    var redactedURLCredentialCount = 0
     var redactedBodyFieldCount = 0
     var truncatedBodyCount = 0
     var omittedBinaryBodyCount = 0
@@ -332,6 +345,7 @@ private struct ManifestAccumulator {
     mutating func add(_ other: ManifestAccumulator) {
         redactedHeaderCount += other.redactedHeaderCount
         redactedQueryCount += other.redactedQueryCount
+        redactedURLCredentialCount += other.redactedURLCredentialCount
         redactedBodyFieldCount += other.redactedBodyFieldCount
         truncatedBodyCount += other.truncatedBodyCount
         omittedBinaryBodyCount += other.omittedBinaryBodyCount

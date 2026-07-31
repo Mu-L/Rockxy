@@ -102,7 +102,7 @@ struct BreakpointEditorContextBuilderTests {
 
         let context = BreakpointEditorContextBuilder.fromTransaction(transaction)
 
-        #expect(context.defaultPattern == "*api.example.com/v1/users")
+        #expect(context.defaultPattern == "*://api.example.com/v1/users")
     }
 
     @Test("Context from transaction normalizes empty path to slash")
@@ -117,10 +117,10 @@ struct BreakpointEditorContextBuilderTests {
         let context = BreakpointEditorContextBuilder.fromTransaction(transaction)
 
         #expect(context.sourcePath == "/")
-        #expect(context.defaultPattern == "*api.example.com/")
+        #expect(context.defaultPattern == "*://api.example.com/")
     }
 
-    @Test("Context from transaction sets includeSubpaths true")
+    @Test("Context from transaction defaults to the exact captured path")
     @MainActor
     func transactionIncludeSubpaths() {
         let transaction = TestFixtures.makeTransaction(
@@ -131,7 +131,7 @@ struct BreakpointEditorContextBuilderTests {
 
         let context = BreakpointEditorContextBuilder.fromTransaction(transaction)
 
-        #expect(context.includeSubpaths == true)
+        #expect(context.includeSubpaths == false)
     }
 
     @Test("Context from transaction provides suggested name with method and host")
@@ -175,7 +175,7 @@ struct BreakpointEditorContextBuilderTests {
     func domainSetsPattern() {
         let context = BreakpointEditorContextBuilder.fromDomain("cdn.example.com")
 
-        #expect(context.defaultPattern == "*cdn.example.com/")
+        #expect(context.defaultPattern == "*://cdn.example.com/*")
     }
 
     @Test("Context from domain sets ANY method")

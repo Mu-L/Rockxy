@@ -30,6 +30,8 @@ final class BlockListViewModel {
     var selectedRuleID: UUID?
     var editorSession: BlockListEditorSession?
     var isBlockListActive: Bool
+    var searchText = ""
+    var mutationError: String?
     private(set) var allRules: [ProxyRule] = []
 
     init() {
@@ -42,6 +44,24 @@ final class BlockListViewModel {
 
     var ruleCount: Int {
         blockRules.count
+    }
+
+    var filteredBlockRules: [ProxyRule] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return blockRules
+        }
+        return blockRules.filter { rule in
+            rule.name.localizedCaseInsensitiveContains(query)
+                || rule.blockActionType.rawValue.localizedCaseInsensitiveContains(query)
+                || (rule.matchCondition.method ?? "ANY").localizedCaseInsensitiveContains(query)
+                || (rule.matchCondition.sourceURLPattern ?? rule.matchCondition.urlPattern ?? "")
+                .localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var activeRuleCount: Int {
+        blockRules.count(where: \.isEnabled)
     }
 
     func refreshFromEngine() async {
@@ -100,6 +120,9 @@ final class BlockListViewModel {
             if !accepted {
                 allRules = await RuleEngine.shared.allRules
                 reconcileSelectionAfterRulesChange()
+                mutationError = String(
+                    localized: "The active Block List rule limit was reached. Disable another rule and try again."
+                )
             }
         }
     }
@@ -182,6 +205,9 @@ final class BlockListViewModel {
             if !accepted {
                 allRules = await RuleEngine.shared.allRules
                 reconcileSelectionAfterRulesChange()
+                mutationError = String(
+                    localized: "The active Block List rule limit was reached. Disable another rule and try again."
+                )
             }
         }
     }
@@ -228,6 +254,7 @@ final class BlockListViewModel {
             name: displayName,
             matchCondition: RuleMatchCondition(
                 urlPattern: escapedPattern,
+                sourceURLPattern: urlPattern,
                 method: httpMethod.methodValue,
                 matchType: matchType,
                 includeSubpaths: includeSubpaths
@@ -252,19 +279,25 @@ struct BlockListWindowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            infoBanner
+            Divider()
             BlockListTableView(
-                rules: viewModel.blockRules,
+                rules: viewModel.filteredBlockRules,
                 selectedRuleID: $viewModel.selectedRuleID,
                 onToggle: { viewModel.toggleRule(id: $0) },
                 onEdit: openEditorForRule,
                 onDelete: { viewModel.removeRule(id: $0) },
                 contextMenuItems: contextMenuItems
             )
-            shortcutHelp
+            Divider()
             footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_200, height: 672)
+        .frame(
+            minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
         .task { await viewModel.refreshFromEngine() }
         .onAppear { consumePendingContext() }
         .onReceive(NotificationCenter.default.publisher(for: .openBlockListWindow)) { _ in
@@ -315,16 +348,24 @@ struct BlockListWindowView: View {
             handleImport(result)
         }
         .alert(
-            String(localized: "Import Failed"),
+            String(localized: "Block List"),
             isPresented: Binding(
-                get: { importError != nil },
-                set: { if !$0 { importError = nil } }
+                get: { displayedErrorMessage != nil },
+                set: {
+                    if !$0 {
+                        importError = nil
+                        viewModel.mutationError = nil
+                    }
+                }
             )
         ) {
-            Button(String(localized: "OK")) { importError = nil }
+            Button(String(localized: "OK")) {
+                importError = nil
+                viewModel.mutationError = nil
+            }
         } message: {
-            if let importError {
-                Text(importError)
+            if let displayedErrorMessage {
+                Text(displayedErrorMessage)
             }
         }
         .onDeleteCommand {
@@ -345,43 +386,63 @@ struct BlockListWindowView: View {
     @State private var importSource: BlockListImportSource = .proxyman
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
+    private var displayedErrorMessage: String? {
+        importError ?? viewModel.mutationError
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
-            Toggle(
-                String(localized: "Enable Block List Tool"),
-                isOn: Binding(
-                    get: { viewModel.isBlockListActive },
-                    set: { viewModel.setBlockListActive($0) }
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    String(localized: "Enable Block List"),
+                    isOn: Binding(
+                        get: { viewModel.isBlockListActive },
+                        set: { viewModel.setBlockListActive($0) }
+                    )
                 )
-            )
-            .toggleStyle(.checkbox)
-            .font(toolMetrics.font(weight: .medium))
-            .padding(.top, toolMetrics.headerTopPadding)
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font(weight: .medium))
+                .help(
+                    String(
+                        localized: "When off, Block List rules are skipped. Other intervention rules remain active."
+                    )
+                )
 
-            Text(String(localized: "Block or Hide any Requests. Useful to block/hide unnecessary requests."))
+                Text(String(localized: "Return 403 Forbidden or drop matching client connections."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
-                .foregroundStyle(.primary)
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Search Block List rules"))
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
+    }
 
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
             Text(
                 String(
                     localized:
-                    "Each request is checked against the rules from top to bottom, stopping when a match is found."
+                    "Block List is a network intervention. Enabled rules participate in Rockxy's global first-match runtime order."
                 )
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
+            Spacer()
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
-    }
-
-    private var shortcutHelp: some View {
-        Text(String(localized: "New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ␣"))
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(.quaternary.opacity(0.5))
     }
 
     private var footer: some View {
@@ -393,14 +454,37 @@ struct BlockListWindowView: View {
             } label: {
                 Image(systemName: "questionmark.circle")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderless)
+
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
             moreMenu
+
+            Text(
+                viewModel.isBlockListActive
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
+                    : String(localized: "BLOCK LIST OFF")
+            )
+            .font(toolMetrics.metadataFont(weight: .semibold))
+            .foregroundStyle(viewModel.isBlockListActive ? Color.white : Color.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(viewModel.isBlockListActive ? Color.red : Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var footerHint: String {
+        let countText = viewModel.searchText.isEmpty
+            ? "\(viewModel.ruleCount) \(String(localized: "rules"))"
+            : String(localized: "\(viewModel.filteredBlockRules.count) of \(viewModel.ruleCount) rules")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
     }
 
     private var addRemoveControl: some View {
@@ -683,9 +767,11 @@ private struct BlockListTableView<ContextMenuContent: View>: View {
         }
         .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
         .clipped()
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay {
-            Rectangle()
-                .stroke(.secondary.opacity(0.45), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
     }
@@ -782,7 +868,7 @@ private struct BlockRuleTableRow: View {
                 .lineLimit(1)
                 .frame(width: 90, alignment: .leading)
 
-            Text(rule.matchCondition.urlPattern ?? "")
+            Text(rule.matchCondition.sourceURLPattern ?? rule.matchCondition.urlPattern ?? "")
                 .font(toolMetrics.font(monospaced: true))
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -837,11 +923,26 @@ private struct AddBlockRuleSheet: View {
             _includeSubpaths = State(initialValue: context?.includeSubpaths ?? true)
         case let .edit(rule):
             _ruleName = State(initialValue: rule.name)
-            _urlPattern = State(initialValue: rule.matchCondition.urlPattern ?? "")
-            _httpMethod = State(initialValue: HTTPMethodFilter(rawValue: rule.matchCondition.method ?? "ANY") ?? .any)
-            _matchType = State(initialValue: .regex)
+            let normalizedMethod = rule.matchCondition.method?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased()
+            _httpMethod = State(
+                initialValue: normalizedMethod.flatMap(HTTPMethodFilter.init(rawValue:)) ?? .any
+            )
+            if let sourcePattern = rule.matchCondition.sourceURLPattern {
+                _urlPattern = State(initialValue: sourcePattern)
+                _matchType = State(initialValue: rule.matchCondition.matchType ?? .regex)
+                _includeSubpaths = State(
+                    initialValue: rule.matchCondition.matchType == .wildcard
+                        ? rule.matchCondition.includeSubpaths ?? false
+                        : false
+                )
+            } else {
+                _urlPattern = State(initialValue: rule.matchCondition.urlPattern ?? "")
+                _matchType = State(initialValue: .regex)
+                _includeSubpaths = State(initialValue: false)
+            }
             _blockAction = State(initialValue: rule.blockActionType)
-            _includeSubpaths = State(initialValue: false)
         }
     }
 
@@ -851,34 +952,18 @@ private struct AddBlockRuleSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                Text(isEditing ? String(localized: "Edit Block Rule") : String(localized: "New Block Rule"))
+                    .font(
+                        .system(
+                            size: max(15, toolMetrics.bodyFontSize + 2),
+                            weight: .semibold
+                        )
+                    )
+
                 provenanceBanner
 
-                formRow(String(localized: "Name:")) {
-                    TextField("", text: $ruleName, prompt: Text(String(localized: "Untitled")))
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                formRow(String(localized: "Matching Rule:")) {
-                    TextField("", text: $urlPattern, prompt: Text("https://example.com"))
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                }
-
-                methodAndMatchRow
-
-                conditionalFields
-
-                formRow(String(localized: "Action:")) {
-                    Picker("", selection: $blockAction) {
-                        ForEach(BlockActionType.allCases, id: \.self) { action in
-                            Text(action.rawValue).tag(action)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .labelsHidden()
-                    .accessibilityLabel(String(localized: "Action"))
-                    .frame(width: toolMetrics.menuWidth(220))
-                }
+                ruleDetailsSection
+                decisionSection
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)
             .padding(.top, toolMetrics.formVerticalPadding)
@@ -888,30 +973,34 @@ private struct AddBlockRuleSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button {
                     dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(primaryButtonTitle) {
+                Button {
                     onSave(
-                        ruleName,
-                        urlPattern,
+                        trimmedName,
+                        trimmedPattern,
                         httpMethod,
                         matchType,
                         blockAction,
-                        includeSubpaths
+                        matchType == .wildcard ? includeSubpaths : false
                     )
                     dismiss()
+                } label: {
+                    footerButtonLabel(primaryButtonTitle)
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(urlPattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(trimmedPattern.isEmpty)
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)
             .padding(.vertical, toolMetrics.controlSpacing)
         }
         .font(toolMetrics.font())
-        .frame(minWidth: max(640, toolMetrics.bodyFontSize * 20 + 380))
+        .frame(minWidth: max(720, toolMetrics.bodyFontSize * 24 + 408))
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -924,15 +1013,23 @@ private struct AddBlockRuleSheet: View {
     @State private var blockAction: BlockActionType
     @State private var includeSubpaths: Bool
 
-    private var primaryButtonTitle: String {
+    private var isEditing: Bool {
         if case .edit = session.mode {
-            return String(localized: "Save")
+            return true
         }
-        return String(localized: "Done")
+        return false
     }
 
-    private var labelWidth: CGFloat {
-        max(122, toolMetrics.formLabelWidth)
+    private var primaryButtonTitle: String {
+        isEditing ? String(localized: "Save") : String(localized: "Add")
+    }
+
+    private var trimmedName: String {
+        ruleName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedPattern: String {
+        urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     @ViewBuilder private var provenanceBanner: some View {
@@ -964,29 +1061,83 @@ private struct AddBlockRuleSheet: View {
         }
     }
 
-    private var methodAndMatchRow: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Spacer()
-                .frame(width: labelWidth + toolMetrics.controlSpacing)
-            Picker("", selection: $httpMethod) {
-                ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
-                    Text(method.rawValue).tag(method)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "HTTP Method"))
-            .frame(width: toolMetrics.menuWidth(90))
+    private var ruleDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            Picker("", selection: $matchType) {
-                ForEach(BlockMatchType.allCases, id: \.self) { type in
-                    Text(type.rawValue).tag(type)
-                }
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                identityFields
+                methodAndMatchRow
+                conditionalFields
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "Match Type"))
-            .frame(width: toolMetrics.menuWidth(175))
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    private var identityFields: some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            fieldGroup(String(localized: "Name")) {
+                TextField(String(localized: "Untitled"), text: $ruleName)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(String(localized: "Rule name"))
+            }
+            .frame(width: max(250, toolMetrics.fieldWidth(250)))
+
+            fieldGroup(String(localized: "URL pattern")) {
+                TextField("https://example.com/api/*", text: $urlPattern)
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font(monospaced: true))
+                    .accessibilityLabel(String(localized: "URL pattern"))
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var methodAndMatchRow: some View {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+            inlineField(String(localized: "Method")) {
+                Menu {
+                    ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
+                        Button {
+                            httpMethod = method
+                        } label: {
+                            menuCheckmarkLabel(method.rawValue, isSelected: httpMethod == method)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(httpMethod.rawValue, width: toolMetrics.menuWidth(90))
+                }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "HTTP Method"))
+                .frame(width: toolMetrics.menuWidth(90))
+            }
+
+            inlineField(String(localized: "Match type")) {
+                Menu {
+                    ForEach(BlockMatchType.allCases, id: \.self) { type in
+                        Button {
+                            matchType = type
+                        } label: {
+                            menuCheckmarkLabel(type.rawValue, isSelected: matchType == type)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(matchType.rawValue, width: toolMetrics.menuWidth(175))
+                }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Match Type"))
+                .frame(width: toolMetrics.menuWidth(175))
+            }
 
             if matchType == .wildcard {
                 Text(String(localized: "Support wildcard * and ?."))
@@ -994,42 +1145,144 @@ private struct AddBlockRuleSheet: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer()
         }
     }
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            HStack(spacing: 8) {
+            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
+        }
+    }
+
+    private var decisionSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Decision"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                inlineField(String(localized: "When matched")) {
+                    Menu {
+                        ForEach(BlockActionType.allCases, id: \.self) { action in
+                            Button {
+                                blockAction = action
+                            } label: {
+                                menuCheckmarkLabel(action.rawValue, isSelected: blockAction == action)
+                            }
+                        }
+                    } label: {
+                        dataEntryMenuLabel(blockAction.rawValue, width: toolMetrics.menuWidth(220))
+                    }
+                    .menuIndicator(.hidden)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "Block action"))
+                    .frame(width: toolMetrics.menuWidth(220))
+                }
+
+                Text(actionDescription)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+
                 Spacer()
-                    .frame(width: labelWidth + toolMetrics.controlSpacing)
-                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
         }
     }
 
-    private func formRow(
+    private var actionDescription: String {
+        switch blockAction {
+        case .returnForbidden:
+            String(localized: "Send an HTTP 403 response to the client.")
+        case .dropConnection:
+            String(localized: "Close the matching client connection without a response.")
+        }
+    }
+
+    private func inlineField(
         _ label: String,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
-        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
             Text(label)
                 .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: labelWidth, alignment: .trailing)
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 4) {
-                content()
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
             }
-            .frame(minHeight: toolMetrics.formControlHeight)
+            Text(title)
         }
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
     }
 }
 

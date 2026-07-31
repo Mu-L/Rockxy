@@ -48,6 +48,35 @@ struct InvestigationContextBuilderTests {
         #expect(!pack.preview.contains("body-secret"))
     }
 
+    @Test("URL credentials and provider API key headers never enter reviewed context")
+    func redactsURLCredentialsAndProviderHeaders() throws {
+        let request = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "https://client:password@api.example.com/data?safe=1")),
+            httpVersion: "HTTP/2",
+            headers: [
+                HTTPHeader(name: "api-key", value: "azure-secret"),
+                HTTPHeader(name: "x-goog-api-key", value: "gemini-secret"),
+                HTTPHeader(name: "ocp-apim-subscription-key", value: "subscription-secret"),
+            ]
+        )
+        let transaction = HTTPTransaction(request: request, state: .completed)
+
+        let pack = try InvestigationContextBuilder().build(
+            snapshots: [InvestigationTransactionSnapshot(transaction: transaction)]
+        )
+
+        #expect(pack.manifest.redactedHeaderCount == 3)
+        #expect(pack.manifest.redactedURLCredentialCount == 2)
+        #expect(pack.manifest.redactedFieldCount == 5)
+        #expect(!pack.preview.contains("client:password"))
+        #expect(!pack.preview.contains("password@"))
+        #expect(!pack.preview.contains("azure-secret"))
+        #expect(!pack.preview.contains("gemini-secret"))
+        #expect(!pack.preview.contains("subscription-secret"))
+        #expect(pack.preview.contains("https://api.example.com/data?"))
+    }
+
     @Test("Context pack enforces request count, body, and binary bounds")
     func boundedContext() throws {
         let transactions = try (0 ..< 4).map { index -> HTTPTransaction in
@@ -76,6 +105,27 @@ struct InvestigationContextBuilderTests {
         #expect(pack.manifest.omittedBinaryBodyCount == 1)
         #expect(pack.manifest.truncatedBodyCount == 1)
         #expect(pack.payload.count <= limits.maxOutboundBytes)
+    }
+
+    @Test("Manifest preserves the user-requested count after early snapshot bounding")
+    func requestedCountSurvivesEarlyBounding() throws {
+        let transactions = try (0 ..< 2).map { index -> HTTPTransaction in
+            let request = HTTPRequestData(
+                method: "GET",
+                url: try #require(URL(string: "https://api.example.com/\(index)")),
+                httpVersion: "HTTP/2",
+                headers: []
+            )
+            return HTTPTransaction(request: request, state: .completed)
+        }
+
+        let pack = try InvestigationContextBuilder().build(
+            snapshots: transactions.map(InvestigationTransactionSnapshot.init(transaction:)),
+            requestedTransactionCount: 10
+        )
+
+        #expect(pack.manifest.requestCount == 2)
+        #expect(pack.manifest.omittedTransactionCount == 8)
     }
 
     @Test("Adversarial payloads remain inert while local context bounds stay enforceable")

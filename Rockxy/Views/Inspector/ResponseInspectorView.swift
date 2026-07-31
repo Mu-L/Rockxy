@@ -36,6 +36,19 @@ struct ResponseInspectorView: View {
         .task(id: transaction.id) {
             syncInspectorStateForTransaction()
         }
+        .onChange(of: previewTabStore.responseTabs.map(\.id)) { _, availableTabIDs in
+            guard let selectedPreviewTab,
+                  InspectorPreviewSelectionReconciler.retainedSelection(
+                      selectedPreviewTab,
+                      availableTabIDs: availableTabIDs
+                  ) == nil else
+            {
+                return
+            }
+            self.selectedPreviewTab = nil
+            protocolTab = nil
+            selectionIntent = .native
+        }
     }
 
     // MARK: Private
