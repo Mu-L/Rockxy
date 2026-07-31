@@ -28,6 +28,15 @@ struct BuildForwardHeadTests {
         #expect(forward.uri == "/v2/users?id=42")
     }
 
+    @Test("Percent-encoded path bytes remain encoded in the forwarded URI")
+    func encodedPathRemainsEncoded() {
+        let req = makeRequest(url: "https://example.com/files/a%2Fb%20c?token=hello%20world")
+        let originalHead = makeOriginalHead(uri: "/files")
+        let forward = ProxyHandlerShared.buildForwardHead(from: req, originalHead: originalHead)
+
+        #expect(forward.uri == "/files/a%2Fb%20c?token=hello%20world")
+    }
+
     @Test("Path-only mutation produces uri without query suffix")
     func pathOnly() {
         let req = makeRequest(url: "https://example.com/v2/users")

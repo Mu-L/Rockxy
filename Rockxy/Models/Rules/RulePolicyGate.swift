@@ -169,6 +169,10 @@ final class RulePolicyGate: @unchecked Sendable {
         await RuleSyncService.replaceAllRules(capped)
     }
 
+    func reorderModifyHeaderRules(orderedIDs: [UUID]) async {
+        await RuleSyncService.reorderModifyHeaderRules(orderedIDs: orderedIDs)
+    }
+
     func setBreakpointToolEnabled(_ enabled: Bool) async {
         await RuleSyncService.setBreakpointToolEnabled(enabled)
     }
@@ -187,6 +191,10 @@ final class RulePolicyGate: @unchecked Sendable {
 
     func setNetworkConditionsToolEnabled(_ enabled: Bool) async {
         await RuleSyncService.setNetworkConditionsToolEnabled(enabled)
+    }
+
+    func setModifyHeaderToolEnabled(_ enabled: Bool) async {
+        await RuleSyncService.setModifyHeaderToolEnabled(enabled)
     }
 
     // MARK: Private

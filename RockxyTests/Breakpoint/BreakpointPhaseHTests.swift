@@ -22,9 +22,18 @@ struct BreakpointPhaseHTests {
     // BP_H2
     @Test("networkRetryOnceOnDnsFailure")
     func networkRetryOnceOnDnsFailure() async throws {
-        let (data, response) = try await BreakpointTestHarness.dataWithRetry(from: TestEndpoints.httpbinHTTPS("get"))
+        let url = try #require(URL(string: "https://retry.rockxy.test/get"))
+        let loader = DNSFailureOnceLoader()
+        let (data, response) = try await BreakpointTestHarness.dataWithRetry(
+            from: url,
+            request: { requestURL in
+                try await loader.load(from: requestURL)
+            }
+        )
+
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
-        #expect(!data.isEmpty)
+        #expect(data == Data("retry-ok".utf8))
+        #expect(await loader.requestCount == 2)
     }
 
     // BP_H3
@@ -48,9 +57,9 @@ struct BreakpointPhaseHTests {
 
     // BP_H5
     @Test("noTestLeaksUserDefaults")
-    func noTestLeaksUserDefaults() {
+    func noTestLeaksUserDefaults() throws {
         let suiteName = "com.amunx.rockxy.tests.bp.h5.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.set(true, forKey: "breakpointToolEnabled")
         defaults.removePersistentDomain(forName: suiteName)
         #expect(defaults.object(forKey: "breakpointToolEnabled") == nil)
@@ -59,7 +68,9 @@ struct BreakpointPhaseHTests {
     // BP_H6
     @Test("parallelTestRunStable")
     func parallelTestRunStable() {
-        #expect(RuleTestLock.shared is RuleTestLock)
+        let firstReference = RuleTestLock.shared
+        let secondReference = RuleTestLock.shared
+        #expect(firstReference === secondReference)
     }
 
     // BP_H7
@@ -116,5 +127,26 @@ struct BreakpointPhaseHTests {
                 Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) == 0
             }
         }
+    }
+}
+
+private actor DNSFailureOnceLoader {
+    private(set) var requestCount = 0
+
+    func load(from url: URL) throws -> (Data, URLResponse) {
+        requestCount += 1
+        if requestCount == 1 {
+            throw URLError(.cannotFindHost)
+        }
+
+        guard let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "text/plain"]
+        ) else {
+            throw URLError(.badServerResponse)
+        }
+        return (Data("retry-ok".utf8), response)
     }
 }

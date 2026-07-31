@@ -9,180 +9,211 @@ struct ProtobufSchemaListWindowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            ProtobufLocalOnlyNotice(message: Self.capabilityNotice)
+            if !schemaStore.schemas.isEmpty, schemaStore.importAvailability != .available {
+                Divider()
+                availabilityNotice
+            }
+            Divider()
             schemaTable
-            consoleSection
+            Divider()
             footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_000, height: 860)
+        .frame(
+            minWidth: max(760, toolMetrics.bodyFontSize * 24 + 432),
+            minHeight: max(520, toolMetrics.bodyFontSize * 15 + 325)
+        )
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.data],
+            allowedContentTypes: Self.allowedContentTypes,
             allowsMultipleSelection: false
         ) { result in
             importSchema(result)
         }
-        .onDeleteCommand {
-            removeSelectedSchema()
+        .confirmationDialog(
+            String(localized: "Delete Schema?"),
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: {
+                    if !$0 {
+                        pendingDeletion = nil
+                    }
+                }
+            ),
+            presenting: pendingDeletion
+        ) { schema in
+            Button(String(localized: "Delete"), role: .destructive) {
+                performDelete(schema)
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {
+                pendingDeletion = nil
+            }
+        } message: { schema in
+            Text(deletionMessage(for: schema))
         }
     }
 
     // MARK: Private
 
+    private enum ImportStatus: Equatable {
+        case success(String)
+        case failure(String)
+    }
+
+    private static let capabilityNotice = String(
+        localized:
+        """
+        Imported .proto files are stored locally on this Mac. Schema-aware decoding is unavailable \
+        in this build — captured Protobuf traffic is decoded with heuristics only.
+        """
+    )
+
+    private static var allowedContentTypes: [UTType] {
+        if let proto = UTType(filenameExtension: "proto") {
+            return [proto]
+        }
+        return [.plainText]
+    }
+
     @State private var schemaStore = ProtobufSchemaStore.shared
+    @State private var mappingStore = ProtobufMappingRuleStore.shared
     @State private var selectedSchemaID: UUID?
     @State private var showImporter = false
-    @State private var consoleLines: [String] = []
+    @State private var pendingDeletion: ProtobufSchemaDescriptor?
+    @State private var importStatus: ImportStatus?
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Protobuf File Descriptor List"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .medium))
+    private var canImport: Bool {
+        schemaStore.importAvailability.allowsImport
+    }
 
-            Text(String(localized: "List of *.proto files used to define the structure of protocol buffer data."))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2)))
-                .foregroundStyle(.secondary)
-
-            Text(
-                String(
-                    localized: "Schema files are required for named, human-readable fields. Heuristic decoding does not require schema files."
-                )
-            )
-            .font(.system(size: max(15, toolMetrics.bodyFontSize + 2)))
-            .foregroundStyle(.secondary)
-
-            if !schemaStore.canUploadSchema {
-                PolicyLockNotice(
-                    title: String(localized: "Schema upload unavailable"),
-                    message: String(
-                        localized: "The current app policy rejects schema uploads. Existing schema list controls remain visible for the future implementation path."
-                    )
-                )
-            }
+    private var footerHint: String {
+        let used = schemaStore.schemasUsed
+        let count = used == 1
+            ? String(localized: "1 schema")
+            : String(localized: "\(used) schemas")
+        if schemaStore.schemasLimit > 0 {
+            return String(localized: "\(count) of \(schemaStore.schemasLimit) stored")
         }
-        .padding(.horizontal, 26)
-        .padding(.top, 26)
-        .padding(.bottom, 18)
+        return count
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Local Protobuf Schemas"))
+                    .font(toolMetrics.font(weight: .medium))
+                Text(String(localized: "Store .proto source files on this Mac."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
     }
 
     private var schemaTable: some View {
-        ZStack {
-            Table(schemaStore.schemas, selection: $selectedSchemaID) {
-                TableColumn(String(localized: "Schema File Name")) { schema in
-                    Text(schema.fileName)
-                        .lineLimit(1)
-                }
-                TableColumn(String(localized: "Message Types")) { schema in
-                    Text(schema.parsedMessageNames.isEmpty
-                        ? String(localized: "Not parsed")
-                        : schema.parsedMessageNames.joined(separator: ", "))
-                        .foregroundStyle(schema.parsedMessageNames.isEmpty ? .secondary : .primary)
-                        .lineLimit(1)
-                }
-                TableColumn(String(localized: "Default Mapping")) { schema in
-                    Text(schema.defaultMessageType ?? schema.hostPattern)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+        Table(schemaStore.schemas, selection: $selectedSchemaID) {
+            TableColumn(String(localized: "Schema File Name")) { schema in
+                Text(schema.fileName)
+                    .font(toolMetrics.font(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(schema.fileName)
             }
-            .contextMenu(forSelectionType: UUID.self) { ids in
-                schemaContextMenu(ids: ids)
-            }
+            .width(min: 200, ideal: 300)
 
-            if schemaStore.schemas.isEmpty {
-                Text(String(localized: "Click \"+\" or ⌘N to import Protobuf Schema (*.proto)"))
-                    .font(.system(size: toolMetrics.emptyStateFontSize))
+            TableColumn(String(localized: "Referenced By")) { schema in
+                let count = mappingStore.referenceCount(forSchema: schema.id)
+                Text(count == 1
+                    ? String(localized: "1 definition")
+                    : String(localized: "\(count) definitions"))
+                    .foregroundStyle(count == 0 ? .secondary : .primary)
+            }
+            .width(min: 130, ideal: 160)
+
+            TableColumn(String(localized: "Runtime")) { _ in
+                Text(String(localized: "Not applied"))
                     .foregroundStyle(.secondary)
             }
+            .width(min: 100, ideal: 120)
         }
-        .frame(height: 350)
-        .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-        .padding(.horizontal, 26)
-    }
-
-    private var consoleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(String(localized: "Protobuf Console Log"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .medium))
-
-            ZStack(alignment: .bottomTrailing) {
-                ScrollView {
-                    if consoleLines.isEmpty {
-                        Text(String(localized: "Empty Console Log"))
-                            .font(.system(size: toolMetrics.emptyStateFontSize))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 154)
-                    } else {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(consoleLines, id: \.self) { line in
-                                Text(line)
-                                    .font(toolMetrics.font(monospaced: true))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        .padding(10)
-                    }
-                }
-                .frame(height: 180)
-                .background(Color(nsColor: .textBackgroundColor))
-                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-
-                Button {
-                    consoleLines.removeAll()
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .padding(8)
-                .disabled(consoleLines.isEmpty)
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            schemaContextMenu(ids: ids)
+        }
+        .overlay {
+            if schemaStore.schemas.isEmpty {
+                emptyState
             }
         }
-        .padding(.horizontal, 26)
-        .padding(.top, 24)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    @ViewBuilder private var emptyState: some View {
+        switch schemaStore.importAvailability {
+        case .available:
+            ContentUnavailableView(
+                String(localized: "No Local Schemas"),
+                systemImage: "doc.badge.plus",
+                description: Text(String(localized: "Click \"+\" or press ⌘N to import a .proto file."))
+            )
+        case .policyUnavailable:
+            ContentUnavailableView(
+                String(localized: "Schema Import Unavailable"),
+                systemImage: "lock",
+                description: Text(String(localized: "Local schema import is unavailable in this version of Rockxy."))
+            )
+        case let .limitReached(limit):
+            ContentUnavailableView(
+                String(localized: "Schema Limit Reached"),
+                systemImage: "tray.full",
+                description: Text(String(localized: "This build stores up to \(limit) local schemas."))
+            )
+        case .storageUnavailable:
+            ContentUnavailableView {
+                Label(String(localized: "Schema Storage Unavailable"), systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(String(localized: "The stored schema list could not be read. Retry before changing local files."))
+            } actions: {
+                Button(String(localized: "Retry")) {
+                    schemaStore.reload()
+                }
+            }
+        }
     }
 
     private var footer: some View {
-        HStack(spacing: 10) {
-            addRemoveControl
-
-            Spacer()
-
-            Button(String(localized: "How to get *.proto file?")) {
-                appendConsole(
-                    String(
-                        localized: "Generate .proto files from your service definition or export descriptors from your build pipeline."
-                    )
-                )
+        VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+            HStack(spacing: toolMetrics.controlSpacing) {
+                addRemoveControl
+                Text(footerHint)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                Spacer()
+                moreMenu
             }
-
-            Menu {
-                Button(String(localized: "New…")) {
-                    showImporter = true
-                }
-                .keyboardShortcut("n", modifiers: .command)
-                .disabled(!schemaStore.canUploadSchema)
-
-                Divider()
-
-                Button(String(localized: "Delete"), role: .destructive) {
-                    removeSelectedSchema()
-                }
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(selectedSchemaID == nil)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle")
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
-                }
+            if let importStatus {
+                statusLabel(importStatus)
             }
-            .menuIndicator(.hidden)
         }
-        .padding(.horizontal, 26)
-        .padding(.top, 16)
-        .padding(.bottom, 22)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
     private var addRemoveControl: some View {
@@ -192,52 +223,166 @@ struct ProtobufSchemaListWindowView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: toolMetrics.compactIconFontSize))
-                    .frame(width: toolMetrics.compactButtonSize, height: toolMetrics.compactButtonSize)
+                    .foregroundStyle(canImport ? .primary : .tertiary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .disabled(!schemaStore.canUploadSchema)
+            .disabled(!canImport)
             .help(String(localized: "Import Protobuf Schema"))
+            .accessibilityLabel(String(localized: "Import local Protobuf schema"))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
-                .frame(width: 1, height: 21)
+                .frame(width: 1, height: 18)
 
             Button {
-                removeSelectedSchema()
+                requestDeleteSelected()
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: toolMetrics.compactIconFontSize))
                     .foregroundStyle(selectedSchemaID == nil ? .tertiary : .primary)
-                    .frame(width: toolMetrics.compactButtonSize, height: toolMetrics.compactButtonSize)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: .command)
             .disabled(selectedSchemaID == nil)
             .help(String(localized: "Delete Protobuf Schema"))
+            .accessibilityLabel(String(localized: "Delete selected local Protobuf schema"))
         }
-        .frame(height: toolMetrics.footerControlHeight)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private var moreMenu: some View {
+        Menu {
+            Button(String(localized: "Import…")) {
+                showImporter = true
+            }
+            .disabled(!canImport)
+
+            Divider()
+
+            Button(String(localized: "Delete"), role: .destructive) {
+                requestDeleteSelected()
+            }
+            .disabled(selectedSchemaID == nil)
+        } label: {
+            HStack(spacing: 6) {
+                Text(String(localized: "More"))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            }
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .fixedSize()
+    }
+
+    private var availabilityNotice: some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            Image(systemName: availabilityIcon)
+                .foregroundStyle(availabilityColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(availabilityTitle)
+                    .font(toolMetrics.font(weight: .medium))
+                Text(availabilityMessage)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            if schemaStore.importAvailability == .storageUnavailable {
+                Button(String(localized: "Retry")) {
+                    schemaStore.reload()
+                }
+            }
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    private var availabilityIcon: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            "checkmark.circle"
+        case .policyUnavailable:
+            "lock"
+        case .limitReached:
+            "tray.full"
+        case .storageUnavailable:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var availabilityColor: Color {
+        schemaStore.importAvailability == .storageUnavailable ? .orange : .secondary
+    }
+
+    private var availabilityTitle: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            String(localized: "Local Import Available")
+        case .policyUnavailable:
+            String(localized: "Local Import Unavailable")
+        case .limitReached:
+            String(localized: "Schema Limit Reached")
+        case .storageUnavailable:
+            String(localized: "Schema Storage Unavailable")
+        }
+    }
+
+    private var availabilityMessage: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            String(localized: "Import a local .proto source file.")
+        case .policyUnavailable:
+            String(localized: "This version of Rockxy does not allow new local schema imports. Existing files can still be removed.")
+        case let .limitReached(limit):
+            String(localized: "This build stores up to \(limit) local schemas. Remove one before importing another.")
+        case .storageUnavailable:
+            String(localized: "The stored schema list could not be read. Retry before changing local schema files.")
+        }
+    }
+
+    private func statusLabel(_ status: ImportStatus) -> some View {
+        let isSuccess: Bool
+        let message: String
+        switch status {
+        case let .success(text):
+            isSuccess = true
+            message = text
+        case let .failure(text):
+            isSuccess = false
+            message = text
+        }
+        return Label(message, systemImage: isSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(isSuccess ? Color.green : Color.red)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .help(message)
     }
 
     @ViewBuilder
     private func schemaContextMenu(ids: Set<UUID>) -> some View {
-        Button(String(localized: "New…")) {
+        Button(String(localized: "Import…")) {
             showImporter = true
         }
-        .disabled(!schemaStore.canUploadSchema)
+        .disabled(!canImport)
 
         Divider()
 
         Button(String(localized: "Delete"), role: .destructive) {
             if let id = ids.first {
-                removeSchema(id: id)
+                requestDelete(id: id)
             }
         }
         .disabled(ids.isEmpty)
@@ -256,41 +401,88 @@ struct ProtobufSchemaListWindowView: View {
                 }
             }
             do {
-                let data = try Data(contentsOf: url)
-                _ = try schemaStore.uploadSchema(
+                let data = try ProtobufSchemaSourceValidator.loadValidatedSource(
+                    at: url,
+                    fileName: url.lastPathComponent
+                )
+                let descriptor = try schemaStore.uploadSchema(
                     data: data,
                     fileName: url.lastPathComponent,
                     hostPattern: "*"
                 )
-                appendConsole(String(localized: "Imported \(url.lastPathComponent)."))
+                importStatus = .success(String(localized: "Imported \(descriptor.fileName)."))
             } catch {
-                appendConsole(error.localizedDescription)
+                importStatus = .failure(error.localizedDescription)
             }
         case let .failure(error):
-            appendConsole(error.localizedDescription)
+            importStatus = .failure(error.localizedDescription)
         }
     }
 
-    private func removeSelectedSchema() {
-        guard let selectedSchemaID else {
+    private func requestDeleteSelected() {
+        guard let selectedSchemaID,
+              let schema = schemaStore.schemas.first(where: { $0.id == selectedSchemaID }) else
+        {
             return
         }
-        removeSchema(id: selectedSchemaID)
+        pendingDeletion = schema
     }
 
-    private func removeSchema(id: UUID) {
+    private func requestDelete(id: UUID) {
+        guard let schema = schemaStore.schemas.first(where: { $0.id == id }) else {
+            return
+        }
+        selectedSchemaID = id
+        pendingDeletion = schema
+    }
+
+    private func deletionMessage(for schema: ProtobufSchemaDescriptor) -> String {
+        let references = mappingStore.referenceCount(forSchema: schema.id)
+        guard references > 0 else {
+            return String(localized: "This removes the stored \(schema.fileName) file from this Mac.")
+        }
+        let mappingCount = references == 1
+            ? String(localized: "1 mapping definition")
+            : String(localized: "\(references) mapping definitions")
+        return String(
+            localized: "\(mappingCount) reference this schema. Deleting it clears their schema selection."
+        )
+    }
+
+    private func performDelete(_ schema: ProtobufSchemaDescriptor) {
+        defer { pendingDeletion = nil }
+        let rulesSnapshot = mappingStore.rules
         do {
-            try schemaStore.removeSchema(id: id)
-            if selectedSchemaID == id {
+            let detached = try mappingStore.detachSchema(id: schema.id)
+            do {
+                try schemaStore.removeSchema(id: schema.id)
+            } catch {
+                do {
+                    try mappingStore.restoreRules(rulesSnapshot)
+                } catch let restoreError {
+                    importStatus = .failure(
+                        String(
+                            localized:
+                            """
+                            The schema was not deleted, but its mapping references could not be restored: \
+                            \(restoreError.localizedDescription)
+                            """
+                        )
+                    )
+                    return
+                }
+                throw error
+            }
+            if selectedSchemaID == schema.id {
                 selectedSchemaID = nil
             }
-            appendConsole(String(localized: "Removed Protobuf schema."))
+            importStatus = .success(
+                detached > 0
+                    ? String(localized: "Deleted schema and cleared \(detached) references.")
+                    : String(localized: "Deleted schema.")
+            )
         } catch {
-            appendConsole(error.localizedDescription)
+            importStatus = .failure(error.localizedDescription)
         }
-    }
-
-    private func appendConsole(_ line: String) {
-        consoleLines.append(line)
     }
 }

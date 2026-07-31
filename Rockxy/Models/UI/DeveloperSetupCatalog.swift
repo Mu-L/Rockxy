@@ -455,7 +455,6 @@ extension SetupTarget {
             SetupTargetSection(category: .device, targets: deviceTargets),
             SetupTargetSection(category: .framework, targets: frameworkTargets),
             SetupTargetSection(category: .environment, targets: environmentTargets),
-            SetupTargetSection(category: .savedProfile, targets: []),
         ]
     }
 
@@ -475,10 +474,6 @@ extension SetupTarget {
 
         return sections.compactMap { section in
             let categoryMatches = section.category.title.localizedLowercase.contains(normalizedQuery)
-
-            if section.category == .savedProfile {
-                return categoryMatches ? section : nil
-            }
 
             let filteredTargets = categoryMatches
                 ? section.targets
@@ -501,71 +496,6 @@ extension SetupTarget {
             automationSupport.title,
         ].contains { value in
             value.localizedLowercase.contains(query)
-        }
-    }
-
-    static func automationPreview(for target: SetupTarget) -> SetupAutomationPreview? {
-        guard target.automationSupport.isAvailable else {
-            return nil
-        }
-
-        switch target.automationSupport {
-        case .none:
-            return nil
-        case .runtimeTerminal:
-            return SetupAutomationPreview(
-                title: String(localized: "Automatic Setup"),
-                summary: String(
-                    localized: """
-                    Automatic Setup prepares a scoped terminal session for supported runtimes.
-                    It uses the same proxy and certificate model as Manual Setup, then opens a prepared shell before you run your app or script.
-                    """
-                ),
-                primaryActionTitle: target.automationSupport.sheetPrimaryActionTitle,
-                supplementaryNote: String(
-                    localized: "Manual setup remains the baseline path. This preview does not replace the step-by-step workflow."
-                ),
-                steps: [
-                    SetupAutomationStep(
-                        id: "runtime",
-                        title: String(localized: "Confirm the runtime target"),
-                        description: String(
-                            localized: "Use the current target to choose the shell and runtime behavior that Automatic Setup would prepare."
-                        )
-                    ),
-                    SetupAutomationStep(
-                        id: "access",
-                        title: String(localized: "Prepare a terminal session"),
-                        description: String(
-                            localized: "Rockxy prepares the proxy settings, trust hints, and runtime-specific shell behavior for this target."
-                        )
-                    ),
-                    SetupAutomationStep(
-                        id: "launch",
-                        title: String(localized: "Launch the prepared shell"),
-                        description: String(
-                            localized: "The terminal would open with the runtime session already pointed at Rockxy."
-                        )
-                    ),
-                    SetupAutomationStep(
-                        id: "validate",
-                        title: String(localized: "Return to Validate"),
-                        description: String(
-                            localized: "After the app or script starts in that shell, come back here and confirm the first matching request appears."
-                        )
-                    ),
-                ]
-            )
-        case .deviceAutomation:
-            return SetupAutomationPreview(
-                title: String(localized: "Automatic Device Setup"),
-                summary: String(
-                    localized: "This preview describes a device-specific setup route from the same target detail."
-                ),
-                primaryActionTitle: target.automationSupport.sheetPrimaryActionTitle,
-                supplementaryNote: String(localized: "Manual setup remains the source of truth."),
-                steps: []
-            )
         }
     }
 }

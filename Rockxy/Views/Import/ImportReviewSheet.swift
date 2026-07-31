@@ -1,12 +1,152 @@
 import SwiftUI
 
-// Renders the import review sheet interface for session import review.
+// MARK: - ImportReviewSummary
+
+/// Pure, testable description of an import review. Owns the file labels, the
+/// incoming counts, the empty-vs-replace impact copy, and the primary action
+/// title so the confirmation surface stays honest without reaching into the
+/// import coordinator. Mirrors the shape of `GistPublishReviewSummary`.
+struct ImportReviewSummary: Equatable {
+    // MARK: Lifecycle
+
+    init(preview: ImportPreview, currentTransactionCount: Int, currentLogCount: Int) {
+        fileType = preview.fileType
+        fileName = preview.fileName
+        fileSize = preview.fileSize
+        incomingTransactionCount = preview.transactionCount
+        incomingLogEntryCount = preview.logEntryCount
+        self.currentTransactionCount = currentTransactionCount
+        self.currentLogCount = currentLogCount
+        rockxyVersion = preview.rockxyVersion.flatMap {
+            let normalized = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalized.isEmpty ? nil : normalized
+        }
+    }
+
+    // MARK: Internal
+
+    let fileType: ImportFileType
+    let fileName: String
+    let fileSize: Int64
+    let incomingTransactionCount: Int
+    let incomingLogEntryCount: Int
+    let currentTransactionCount: Int
+    let currentLogCount: Int
+    let rockxyVersion: String?
+
+    var isRockxySession: Bool {
+        fileType == .rockxysession
+    }
+
+    /// An empty workspace has nothing to lose — the import is non-destructive.
+    var isSessionEmpty: Bool {
+        currentTransactionCount == 0 && currentLogCount == 0
+    }
+
+    var isDestructive: Bool {
+        !isSessionEmpty
+    }
+
+    var title: String {
+        ImportReviewCopy.headerTitle(fileType)
+    }
+
+    var subtitle: String {
+        ImportReviewCopy.subtitle
+    }
+
+    var fileTypeLabel: String {
+        ImportReviewCopy.fileTypeLabel(fileType)
+    }
+
+    var fileSizeLabel: String {
+        ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+    }
+
+    var incomingRequestsLabel: String {
+        ImportReviewCopy.requests(incomingTransactionCount)
+    }
+
+    var incomingLogsLabel: String {
+        ImportReviewCopy.logEntries(incomingLogEntryCount)
+    }
+
+    var versionLabel: String? {
+        rockxyVersion.map { String(localized: "Rockxy v\($0)") }
+    }
+
+    var actionTitle: String {
+        isDestructive ? ImportReviewCopy.replaceActionTitle : ImportReviewCopy.primaryActionTitle(fileType)
+    }
+
+    /// Neutral consequence copy for an empty workspace, explicit replacement copy
+    /// (naming both current counts) for a populated one.
+    var impactSummary: String {
+        if isSessionEmpty {
+            if isRockxySession {
+                return String(
+                    localized: "The current session is empty. Opening loads \(incomingRequestsLabel) and \(incomingLogsLabel)."
+                )
+            }
+            return String(localized: "The current session is empty. Importing loads \(incomingRequestsLabel).")
+        }
+        let currentRequests = ImportReviewCopy.requests(currentTransactionCount)
+        let currentLogs = ImportReviewCopy.logEntries(currentLogCount)
+        return String(
+            localized: "Importing replaces the entire current session — \(currentRequests) and \(currentLogs) — with this capture."
+        )
+    }
+}
+
+// MARK: - ImportReviewCopy
+
+/// Truthful, testable copy for the import review surface.
+enum ImportReviewCopy {
+    static let subtitle = String(localized: "Review this capture before it loads into the current session.")
+
+    static let replaceActionTitle = String(localized: "Replace Session")
+
+    static func fileTypeLabel(_ type: ImportFileType) -> String {
+        switch type {
+        case .har:
+            String(localized: "HAR Archive (HTTP Archive 1.2)")
+        case .rockxysession:
+            String(localized: "Rockxy Session")
+        }
+    }
+
+    static func headerTitle(_ type: ImportFileType) -> String {
+        switch type {
+        case .har:
+            String(localized: "Import HAR Archive")
+        case .rockxysession:
+            String(localized: "Open Rockxy Session")
+        }
+    }
+
+    static func primaryActionTitle(_ type: ImportFileType) -> String {
+        switch type {
+        case .har:
+            String(localized: "Import")
+        case .rockxysession:
+            String(localized: "Open Session")
+        }
+    }
+
+    static func requests(_ count: Int) -> String {
+        String(localized: "\(count) request\(count == 1 ? "" : "s")")
+    }
+
+    static func logEntries(_ count: Int) -> String {
+        String(localized: "\(count) log entr\(count == 1 ? "y" : "ies")")
+    }
+}
 
 // MARK: - ImportReviewSheet
 
-/// Confirmation sheet shown after file selection but before any destructive session
-/// replacement. Displays file metadata and a warning about data loss when the current
-/// session is non-empty. Matches the Figma design at file BmxrbvKOU3Q2wZUe2NT87Y node 8:3.
+/// Confirmation sheet shown after file selection but before any destructive
+/// session replacement. Displays the capture metadata and, when the current
+/// session is non-empty, an explicit warning that importing replaces it.
 struct ImportReviewSheet: View {
     // MARK: Internal
 
@@ -18,111 +158,166 @@ struct ImportReviewSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            title
-
-            sectionLabel(String(localized: "FILE INFO"))
-
-            fileInfoSection
-
-            sectionLabel(String(localized: "WARNING"))
-
-            warningRow
-
-            bottomBar
+            header
+            summaryCard
+            impactRow
+            footer
         }
-        .padding(.top, 16)
+        .padding(.top, 18)
         .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.bottom, 18)
         .font(toolMetrics.font())
-        .frame(width: max(420, toolMetrics.fieldWidth(420)))
+        .frame(width: max(440, toolMetrics.fieldWidth(440)))
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: Private
 
-    private var fileTypeDisplayName: String {
-        switch preview.fileType {
-        case .har:
-            String(localized: "HAR Archive (HTTP Archive 1.2)")
-        case .rockxysession:
-            String(localized: "Rockxy Session")
-        }
-    }
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
-    private var warningText: String {
-        if currentTransactionCount == 0, currentLogCount == 0 {
-            return String(
-                localized: "Your session is empty. This will load \(preview.transactionCount) transactions."
-            )
-        }
-        return String(
-            localized: "This will replace \(currentTransactionCount) transactions and \(currentLogCount) log entries."
+    private var summary: ImportReviewSummary {
+        ImportReviewSummary(
+            preview: preview,
+            currentTransactionCount: currentTransactionCount,
+            currentLogCount: currentLogCount
         )
     }
 
-    private var title: some View {
-        Text(String(localized: "Import Review"))
-            .font(toolMetrics.font(weight: .semibold))
-            .frame(maxWidth: .infinity, alignment: .center)
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private var fileInfoSection: some View {
+    private var footerActionWidth: CGFloat {
+        max(140, toolMetrics.bodyFontSize * 8)
+    }
+
+    private var capturedLabel: String? {
+        guard let start = preview.captureStartDate else {
+            return nil
+        }
+        return dateRangeText(start, preview.captureEndDate)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(summary.title)
+                .font(toolMetrics.font(weight: .semibold))
+            Text(summary.subtitle)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("importReview.header")
+    }
+
+    private var summaryCard: some View {
         VStack(spacing: 0) {
-            infoRow(
-                label: String(localized: "File Name"),
-                value: preview.fileName
+            metadataRow(
+                String(localized: "File"),
+                summary.fileName,
+                identifier: "importReview.summary.file",
+                truncateMiddle: true
             )
-
             dividerLine
-
-            infoRow(
-                label: String(localized: "Type"),
-                value: fileTypeDisplayName
-            )
-
+            metadataRow(String(localized: "Type"), summary.fileTypeLabel, identifier: "importReview.summary.type")
             dividerLine
-
-            infoRow(
-                label: String(localized: "Requests"),
-                value: "\(preview.transactionCount)"
-            )
-
+            metadataRow(String(localized: "Size"), summary.fileSizeLabel, identifier: "importReview.summary.size")
             dividerLine
-
-            infoRow(
-                label: String(localized: "File Size"),
-                value: ByteCountFormatter.string(
-                    fromByteCount: preview.fileSize,
-                    countStyle: .file
-                )
+            metadataRow(
+                String(localized: "Requests"),
+                summary.incomingRequestsLabel,
+                identifier: "importReview.summary.requests"
             )
 
-            if preview.fileType == .rockxysession {
+            if summary.isRockxySession {
                 dividerLine
-
-                infoRow(
-                    label: String(localized: "Log Entries"),
-                    value: "\(preview.logEntryCount)"
+                metadataRow(
+                    String(localized: "Logs"),
+                    summary.incomingLogsLabel,
+                    identifier: "importReview.summary.logs"
                 )
 
-                if let startDate = preview.captureStartDate {
+                if let capturedLabel {
                     dividerLine
-
-                    infoRow(
-                        label: String(localized: "Captured"),
-                        value: dateRangeText(startDate, preview.captureEndDate)
+                    metadataRow(
+                        String(localized: "Captured"),
+                        capturedLabel,
+                        identifier: "importReview.summary.captured"
                     )
                 }
 
-                if let version = preview.rockxyVersion, !version.isEmpty {
+                if let version = summary.versionLabel {
                     dividerLine
-
-                    infoRow(
-                        label: String(localized: "Saved with"),
-                        value: "Rockxy v\(version)"
+                    metadataRow(
+                        String(localized: "Saved with"),
+                        version,
+                        identifier: "importReview.summary.version"
                     )
                 }
             }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        )
+    }
+
+    private var impactRow: some View {
+        Label {
+            Text(summary.impactSummary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: summary.isDestructive ? "exclamationmark.triangle.fill" : "info.circle")
+        }
+        .font(toolMetrics.secondaryFont())
+        .foregroundStyle(summary.isDestructive ? Color.orange : Color(nsColor: .secondaryLabelColor))
+        .accessibilityIdentifier("importReview.impact")
+    }
+
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Spacer()
+
+            Button {
+                onCancel()
+            } label: {
+                Text(String(localized: "Cancel"))
+                    .frame(width: footerActionWidth)
+                    .frame(minHeight: toolMetrics.formControlHeight)
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.cancelAction)
+            .accessibilityIdentifier("importReview.cancelButton")
+
+            actionButton
+        }
+    }
+
+    @ViewBuilder private var actionButton: some View {
+        if summary.isDestructive {
+            Button(role: .destructive) {
+                onReplace()
+            } label: {
+                Text(summary.actionTitle)
+                    .frame(width: footerActionWidth)
+                    .frame(minHeight: toolMetrics.formControlHeight)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("importReview.actionButton")
+        } else {
+            Button {
+                onReplace()
+            } label: {
+                Text(summary.actionTitle)
+                    .frame(width: footerActionWidth)
+                    .frame(minHeight: toolMetrics.formControlHeight)
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+            .accessibilityIdentifier("importReview.actionButton")
         }
     }
 
@@ -132,95 +327,32 @@ struct ImportReviewSheet: View {
             .frame(height: 1)
     }
 
-    private var warningRow: some View {
-        HStack(spacing: 0) {
-            Text("\u{26A0}")
-                .font(toolMetrics.font(weight: .semibold))
-                .foregroundStyle(Color(red: 0.93, green: 0.60, blue: 0.0))
-
-            Spacer()
-                .frame(width: 6)
-
-            Text(warningText)
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(Color(red: 0.55, green: 0.38, blue: 0.0))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: toolMetrics.formControlHeight)
-                .background(Color(red: 1.0, green: 0.969, blue: 0.922))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5)
-                        .strokeBorder(
-                            Color(red: 0.93, green: 0.851, blue: 0.722),
-                            lineWidth: 0.5
-                        )
-                }
-        }
-        .padding(.leading, 12)
-        .frame(minHeight: toolMetrics.formControlHeight + 16)
-    }
-
-    private var bottomBar: some View {
-        VStack(spacing: 8) {
-            dividerLine
-
-            HStack(spacing: 8) {
-                Spacer()
-
-                Button(String(localized: "Cancel")) {
-                    onCancel()
-                }
-                .keyboardShortcut(.cancelAction)
-                .frame(width: toolMetrics.footerButtonWidth)
-                .frame(minHeight: toolMetrics.formControlHeight)
-
-                Button(role: .destructive) {
-                    onReplace()
-                } label: {
-                    Text(String(localized: "Replace Current"))
-                        .font(toolMetrics.font(weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: toolMetrics.menuWidth(130))
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                        .background(Color(red: 1.0, green: 0.231, blue: 0.188))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(toolMetrics.metadataFont(weight: .medium))
-            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-            .tracking(0.3)
-            .textCase(.uppercase)
-    }
-
-    private func infoRow(label: String, value: String) -> some View {
-        HStack(spacing: 0) {
+    private func metadataRow(
+        _ label: String,
+        _ value: String,
+        identifier: String,
+        truncateMiddle: Bool = false
+    )
+        -> some View
+    {
+        HStack(spacing: 12) {
             Text(label)
                 .font(toolMetrics.font())
-                .frame(width: toolMetrics.menuWidth(90), alignment: .leading)
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(width: toolMetrics.menuWidth(92), alignment: .leading)
 
             Text(value)
                 .font(toolMetrics.font())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: toolMetrics.formControlHeight)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5)
-                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                }
+                .foregroundStyle(Color(nsColor: .labelColor))
+                .lineLimit(1)
+                .truncationMode(truncateMiddle ? .middle : .tail)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.leading, 12)
-        .frame(minHeight: toolMetrics.formControlHeight + 16)
+        .padding(.horizontal, 12)
+        .frame(minHeight: toolMetrics.tableRowHeight)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
     private func dateRangeText(_ start: Date, _ end: Date?) -> String {
@@ -232,11 +364,5 @@ struct ImportReviewSheet: View {
             return startStr
         }
         return "\(startStr) — \(formatter.string(from: end))"
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }

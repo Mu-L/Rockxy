@@ -7,6 +7,7 @@ struct RuleMatchCondition: Codable, Equatable {
 
     init(
         urlPattern: String? = nil,
+        sourceURLPattern: String? = nil,
         method: String? = nil,
         headerName: String? = nil,
         headerValue: String? = nil,
@@ -14,6 +15,7 @@ struct RuleMatchCondition: Codable, Equatable {
         includeSubpaths: Bool? = nil
     ) {
         self.urlPattern = urlPattern
+        self.sourceURLPattern = sourceURLPattern
         self.method = method
         self.headerName = headerName
         self.headerValue = headerValue
@@ -24,6 +26,9 @@ struct RuleMatchCondition: Codable, Equatable {
     // MARK: Internal
 
     var urlPattern: String?
+    /// Optional user-authored pattern retained for editors when `urlPattern`
+    /// contains the compiled regex used by the runtime.
+    var sourceURLPattern: String?
     var method: String?
     var headerName: String?
     var headerValue: String?
@@ -70,8 +75,9 @@ struct RuleMatchCondition: Codable, Equatable {
         guard let matchType else {
             return urlPattern
         }
+        let authoredPattern = sourceURLPattern ?? urlPattern
         return RulePatternBuilder.regexSource(
-            rawPattern: urlPattern,
+            rawPattern: authoredPattern,
             matchType: matchType,
             includeSubpaths: matchType == .wildcard ? includeSubpaths ?? false : false
         )

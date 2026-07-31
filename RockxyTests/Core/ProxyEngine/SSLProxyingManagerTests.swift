@@ -302,6 +302,21 @@ struct SSLProxyingManagerTests {
         #expect(manager2.excludeRules[0].domain == "b.com")
     }
 
+    @Test("export preserves master state and TLS exceptions when there are no rules")
+    func exportImportSettingsWithoutRules() throws {
+        let manager1 = makeManager()
+        manager1.setEnabled(false)
+        manager1.setBypassDomains("custom.example.com,::1")
+        let data = try #require(manager1.exportRules())
+
+        let manager2 = makeManager()
+        try manager2.importRules(from: data)
+
+        #expect(manager2.rules.isEmpty)
+        #expect(!manager2.isEnabled)
+        #expect(manager2.bypassDomains == "custom.example.com,::1")
+    }
+
     @Test("import legacy array format")
     func importLegacyArray() throws {
         let legacyRules = [SSLProxyingRule(domain: "old.com")]

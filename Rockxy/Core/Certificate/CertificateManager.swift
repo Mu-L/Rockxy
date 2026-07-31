@@ -496,9 +496,8 @@ actor CertificateManager {
     // MARK: - Host Certificates
 
     func certificateForHost(_ host: String) throws -> (certificate: Certificate, privateKey: P256.Signing.PrivateKey) {
-        if let customRoot = try CustomCertificateManager.shared.activeRootIssuer() {
-            let fingerprint = CustomCertificateManager.shared.metadata(kind: .root).last?.fingerprintSHA256 ?? "custom"
-            let cacheKey = "\(fingerprint):\(host)"
+        if let customRoot = try CustomCertificateManager.shared.activeRootIssuerSnapshot() {
+            let cacheKey = "\(customRoot.fingerprintSHA256):\(host)"
             if let cached = hostCertCache[cacheKey] {
                 touchCacheEntry(cacheKey)
                 return (cached.certificate, cached.privateKey)

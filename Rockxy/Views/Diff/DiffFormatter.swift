@@ -1,20 +1,52 @@
+import CryptoKit
 import Foundation
 
 // Renders the diff interface for the diff workflow.
 
 // MARK: - CompareTarget
 
-enum CompareTarget: String, CaseIterable {
+enum CompareTarget: String, CaseIterable, Sendable {
     case request = "Request"
     case response = "Response"
     case timing = "Timing"
+
+    var title: String {
+        switch self {
+        case .request: String(localized: "Request")
+        case .response: String(localized: "Response")
+        case .timing: String(localized: "Timing")
+        }
+    }
 }
 
 // MARK: - PresentationMode
 
-enum PresentationMode: String, CaseIterable {
+enum PresentationMode: String, CaseIterable, Sendable {
     case sideBySide = "Side by Side"
     case unified = "Unified"
+
+    var title: String {
+        switch self {
+        case .sideBySide: String(localized: "Side by Side")
+        case .unified: String(localized: "Unified")
+        }
+    }
+}
+
+// MARK: - DiffTransactionSnapshot
+
+struct DiffTransactionSnapshot: Sendable {
+    let request: HTTPRequestData
+    let response: HTTPResponseData?
+    let timingInfo: TimingInfo?
+    let measuredDuration: TimeInterval?
+
+    init(transaction: HTTPTransaction) {
+        request = transaction.request
+        response = transaction.response
+        timingInfo = transaction.timingInfo
+        measuredDuration = transaction.measuredDuration
+    }
 }
 
 // MARK: - DiffFormatter
@@ -24,6 +56,8 @@ enum PresentationMode: String, CaseIterable {
 enum DiffFormatter {
     // MARK: Internal
 
+    static let maximumBodyPreviewBytes = 512 * 1_024
+
     /// Formats a transaction into named sections based on the compare target.
     static func format(
         transaction: HTTPTransaction,
@@ -31,13 +65,22 @@ enum DiffFormatter {
     )
         -> [(title: String, content: String)]
     {
+        format(snapshot: DiffTransactionSnapshot(transaction: transaction), target: target)
+    }
+
+    static func format(
+        snapshot: DiffTransactionSnapshot,
+        target: CompareTarget
+    )
+        -> [(title: String, content: String)]
+    {
         switch target {
         case .request:
-            formatRequest(transaction)
+            formatRequest(snapshot)
         case .response:
-            formatResponse(transaction)
+            formatResponse(snapshot)
         case .timing:
-            formatTiming(transaction)
+            formatTiming(snapshot)
         }
     }
 
@@ -54,22 +97,34 @@ enum DiffFormatter {
         return DiffEngine.diffSections(leftSections: leftSections, rightSections: rightSections)
     }
 
+    static func diff(
+        left: DiffTransactionSnapshot,
+        right: DiffTransactionSnapshot,
+        target: CompareTarget
+    )
+        -> DiffResult
+    {
+        let leftSections = format(snapshot: left, target: target)
+        let rightSections = format(snapshot: right, target: target)
+        return DiffEngine.diffSections(leftSections: leftSections, rightSections: rightSections)
+    }
+
     // MARK: Private
 
     // MARK: - Request Formatting
 
-    private static func formatRequest(_ transaction: HTTPTransaction) -> [(String, String)] {
+    private static func formatRequest(_ transaction: DiffTransactionSnapshot) -> [(String, String)] {
         var sections: [(String, String)] = []
 
         // Request line
         sections.append((
-            "Request Line",
+            String(localized: "Request Line"),
             "\(transaction.request.method) \(transaction.request.url.path) \(normalizeHTTPVersion(transaction.request.httpVersion))"
         ))
 
         // Host
         sections.append((
-            "Host",
+            String(localized: "Host"),
             transaction.request.url.host ?? "—"
         ))
 
@@ -78,22 +133,34 @@ enum DiffFormatter {
             .queryItems ?? []
         if !queryItems.isEmpty {
             let queryText = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "\n")
-            sections.append(("Query", queryText))
+            sections.append((String(localized: "Query"), queryText))
         } else {
-            sections.append(("Query", "(no query parameters)"))
+            sections.append((
+                String(localized: "Query"),
+                String(localized: "(no query parameters)")
+            ))
         }
 
         // Request headers
         let headersText = transaction.request.headers
             .map { "\($0.name): \($0.value)" }
             .joined(separator: "\n")
-        sections.append(("Headers", headersText.isEmpty ? "(no headers)" : headersText))
+        sections.append((
+            String(localized: "Headers"),
+            headersText.isEmpty ? String(localized: "(no headers)") : headersText
+        ))
 
         // Request body
         if let body = transaction.request.body {
-            sections.append(("Body", formatBody(body, contentType: transaction.request.contentType?.rawValue)))
+            sections.append((
+                String(localized: "Body"),
+                formatBody(body, contentType: transaction.request.contentType?.rawValue)
+            ))
         } else {
-            sections.append(("Body", "No request body"))
+            sections.append((
+                String(localized: "Body"),
+                String(localized: "No request body")
+            ))
         }
 
         return sections
@@ -101,20 +168,20 @@ enum DiffFormatter {
 
     // MARK: - Response Formatting
 
-    private static func formatResponse(_ transaction: HTTPTransaction) -> [(String, String)] {
+    private static func formatResponse(_ transaction: DiffTransactionSnapshot) -> [(String, String)] {
         var sections: [(String, String)] = []
 
         guard let response = transaction.response else {
             return [
-                ("Status Line", "No response"),
-                ("Headers", "(no headers)"),
-                ("Body", "No response body"),
+                (String(localized: "Status Line"), String(localized: "No response")),
+                (String(localized: "Headers"), String(localized: "(no headers)")),
+                (String(localized: "Body"), String(localized: "No response body")),
             ]
         }
 
         // Status line
         sections.append((
-            "Status Line",
+            String(localized: "Status Line"),
             "HTTP/1.1 \(response.statusCode) \(response.statusMessage)"
         ))
 
@@ -122,14 +189,27 @@ enum DiffFormatter {
         let headersText = response.headers
             .map { "\($0.name): \($0.value)" }
             .joined(separator: "\n")
-        sections.append(("Headers", headersText.isEmpty ? "(no headers)" : headersText))
+        sections.append((
+            String(localized: "Headers"),
+            headersText.isEmpty ? String(localized: "(no headers)") : headersText
+        ))
 
         // Response body
         if let body = response.body {
             let contentType = response.headers.first { $0.name.lowercased() == "content-type" }?.value
-            sections.append(("Body", formatBody(body, contentType: contentType)))
+            sections.append((
+                String(localized: "Body"),
+                formatBody(
+                    body,
+                    contentType: contentType,
+                    captureWasTruncated: response.bodyTruncated
+                )
+            ))
         } else {
-            sections.append(("Body", "No response body"))
+            let bodyText = response.bodyTruncated
+                ? "\(String(localized: "No response body"))\n\(captureTruncationNotice)"
+                : String(localized: "No response body")
+            sections.append((String(localized: "Body"), bodyText))
         }
 
         return sections
@@ -137,44 +217,97 @@ enum DiffFormatter {
 
     // MARK: - Timing Formatting
 
-    private static func formatTiming(_ transaction: HTTPTransaction) -> [(String, String)] {
+    private static func formatTiming(_ transaction: DiffTransactionSnapshot) -> [(String, String)] {
         guard let timing = transaction.timingInfo else {
-            return [("Timing", "No timing data")]
+            if let measuredDuration = transaction.measuredDuration {
+                return [(
+                    String(localized: "Timing"),
+                    "\(String(localized: "Total measured duration")): \(formatMs(measuredDuration))\n"
+                        + String(localized: "Detailed phase timing unavailable")
+                )]
+            }
+            return [(
+                String(localized: "Timing"),
+                String(localized: "No timing data")
+            )]
         }
 
         let content = """
-        DNS Lookup:       \(formatMs(timing.dnsLookup))
-        TCP Connection:   \(formatMs(timing.tcpConnection))
-        TLS Handshake:    \(formatMs(timing.tlsHandshake))
-        Time to First Byte: \(formatMs(timing.timeToFirstByte))
-        Content Transfer:  \(formatMs(timing.contentTransfer))
-        Total:            \(formatMs(timing.totalDuration))
+        \(String(localized: "DNS Lookup")): \(formatMs(timing.dnsLookup))
+        \(String(localized: "TCP Connection")): \(formatMs(timing.tcpConnection))
+        \(String(localized: "TLS Handshake")): \(formatMs(timing.tlsHandshake))
+        \(String(localized: "Time to First Byte")): \(formatMs(timing.timeToFirstByte))
+        \(String(localized: "Content Transfer")): \(formatMs(timing.contentTransfer))
+        \(String(localized: "Total")): \(formatMs(timing.totalDuration))
         """
 
-        return [("Timing", content)]
+        return [(String(localized: "Timing"), content)]
     }
 
     // MARK: - Body Formatting
 
-    private static func formatBody(_ data: Data, contentType: String?) -> String {
-        // Check if binary
-        guard let text = String(data: data, encoding: .utf8) else {
-            let ct = contentType ?? "unknown"
-            return "Binary body (\(data.count) bytes, \(ct))"
+    private static let captureTruncationNotice = String(
+        localized: "Capture truncated — comparison covers captured bytes only."
+    )
+
+    private static func formatBody(
+        _ data: Data,
+        contentType: String?,
+        captureWasTruncated: Bool = false
+    ) -> String {
+        let bodyIsLimited = data.count > maximumBodyPreviewBytes
+        let previewData = validUTF8Prefix(of: data, limit: maximumBodyPreviewBytes)
+        let shouldTreatAsBinary = isBinaryContentType(contentType)
+            || containsBinaryControlBytes(previewData)
+            || String(data: previewData, encoding: .utf8) == nil
+
+        if shouldTreatAsBinary {
+            return binaryDescription(
+                data,
+                contentType: contentType,
+                captureWasTruncated: captureWasTruncated
+            )
+        }
+
+        guard let text = String(data: previewData, encoding: .utf8) else {
+            return binaryDescription(
+                data,
+                contentType: contentType,
+                captureWasTruncated: captureWasTruncated
+            )
         }
 
         // Try JSON pretty-print
-        if let jsonObject = try? JSONSerialization.jsonObject(with: data),
+        let renderedText: String
+        if !bodyIsLimited,
+           let jsonObject = try? JSONSerialization.jsonObject(with: previewData),
            let prettyData = try? JSONSerialization.data(
                withJSONObject: jsonObject,
                options: [.prettyPrinted, .sortedKeys]
            ),
            let prettyText = String(data: prettyData, encoding: .utf8)
         {
-            return prettyText
+            renderedText = prettyText
+        } else {
+            renderedText = text
         }
 
-        return text
+        var lines = [renderedText]
+        if bodyIsLimited {
+            lines.append(
+                String(
+                    localized:
+                    "Body preview limited to \(previewData.count) of \(data.count) captured bytes."
+                )
+            )
+            lines.append(
+                "\(String(localized: "SHA-256 (all captured bytes)")): \(sha256(data))"
+            )
+        }
+        if captureWasTruncated {
+            lines.append(captureTruncationNotice)
+        }
+        return lines.joined(separator: "\n")
     }
 
     private static func normalizeHTTPVersion(_ version: String) -> String {
@@ -183,5 +316,86 @@ enum DiffFormatter {
 
     private static func formatMs(_ seconds: TimeInterval) -> String {
         String(format: "%.1fms", seconds * 1_000)
+    }
+
+    private static func sha256(_ data: Data) -> String {
+        let chunkSize = 64 * 1_024
+        var hasher = SHA256()
+        var offset = data.startIndex
+
+        while offset < data.endIndex {
+            guard !Task.isCancelled else {
+                return ""
+            }
+            let end = min(offset + chunkSize, data.endIndex)
+            hasher.update(data: data[offset ..< end])
+            offset = end
+        }
+        return hasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private static func binaryDescription(
+        _ data: Data,
+        contentType: String?,
+        captureWasTruncated: Bool
+    ) -> String {
+        var lines = [
+            String(localized: "Binary body"),
+            "\(String(localized: "Size")): \(data.count) \(String(localized: "bytes"))",
+            "\(String(localized: "Content-Type")): \(contentType ?? String(localized: "unknown"))",
+            "\(String(localized: "SHA-256 (captured bytes)")): \(sha256(data))",
+        ]
+        if captureWasTruncated {
+            lines.append(captureTruncationNotice)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func validUTF8Prefix(of data: Data, limit: Int) -> Data {
+        var prefix = Data(data.prefix(limit))
+        guard data.count > limit else {
+            return prefix
+        }
+        for _ in 0 ..< 4 where String(data: prefix, encoding: .utf8) == nil && !prefix.isEmpty {
+            prefix.removeLast()
+        }
+        return prefix
+    }
+
+    private static func isBinaryContentType(_ contentType: String?) -> Bool {
+        guard let contentType = contentType?.lowercased() else {
+            return false
+        }
+        if contentType.hasPrefix("text/")
+            || contentType.contains("json")
+            || contentType.contains("xml")
+            || contentType.contains("javascript")
+            || contentType.contains("x-www-form-urlencoded")
+        {
+            return false
+        }
+        return contentType.hasPrefix("image/")
+            || contentType.hasPrefix("audio/")
+            || contentType.hasPrefix("video/")
+            || contentType.hasPrefix("font/")
+            || contentType.contains("octet-stream")
+            || contentType.contains("pdf")
+            || contentType.contains("zip")
+            || contentType.contains("gzip")
+            || contentType.contains("protobuf")
+    }
+
+    private static func containsBinaryControlBytes(_ data: Data) -> Bool {
+        for (index, byte) in data.enumerated() {
+            if index.isMultiple(of: 64 * 1_024), Task.isCancelled {
+                return false
+            }
+            if byte == 0 || byte < 0x09 || (byte > 0x0D && byte < 0x20) {
+                return true
+            }
+        }
+        return false
     }
 }

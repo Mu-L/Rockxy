@@ -589,6 +589,6 @@ extension MainContentCoordinator {
         let draft = NetworkConditionsDraftBuilder.fromDomain(domain)
         NetworkConditionsDraftStore.shared.setPending(draft)
         NotificationCenter.default.post(name: .openNetworkConditionsWindow, object: nil)
-        Self.logger.info("Created Network Conditions draft for domain: \(domain)")
+        Self.logger.info("Created Network Conditions draft for domain: \(domain, privacy: .private)")
     }
 }

@@ -6,6 +6,23 @@ import Testing
 
 @Suite("HTTPConnectTunnelHandler")
 struct HTTPConnectTunnelHandlerTests {
+    @Test("IPv6 target uses bracketed CONNECT and Host authorities")
+    func ipv6TargetAuthority() throws {
+        let channel = EmbeddedChannel()
+        let promise = channel.eventLoop.makePromise(of: Void.self)
+        try channel.pipeline.syncOperations.addHandler(HTTPConnectTunnelHandler(
+            targetHost: "2001:db8::1",
+            targetPort: 443,
+            credentials: nil,
+            completionPromise: promise
+        ))
+
+        var request = try #require(try channel.readOutbound(as: ByteBuffer.self))
+        let text = request.readString(length: request.readableBytes)
+        #expect(text?.contains("CONNECT [2001:db8::1]:443 HTTP/1.1\r\n") == true)
+        #expect(text?.contains("Host: [2001:db8::1]:443\r\n") == true)
+    }
+
     @Test("writes CONNECT request and succeeds on 200")
     func connectSuccess() throws {
         let channel = EmbeddedChannel()

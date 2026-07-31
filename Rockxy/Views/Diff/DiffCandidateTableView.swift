@@ -1,129 +1,166 @@
 import SwiftUI
 
-/// Pool table showing candidate transactions for comparison.
-/// Users assign Left/Right by clicking the L/R columns.
+/// Pool table showing candidate transactions for comparison, wrapped in a
+/// native card. Users assign Left/Right by clicking the L/R columns.
 struct DiffCandidateTableView: View {
     // MARK: Internal
 
     @Bindable var viewModel: DiffViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            cardHeader
+            Divider()
+            Group {
+                if viewModel.candidates.isEmpty {
+                    emptyState
+                } else {
+                    candidateTable
+                }
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            if viewModel.candidates.isEmpty {
-                emptyState
-            } else {
-                Table(viewModel.candidates) {
-                    TableColumn("L") { transaction in
-                        Button {
-                            viewModel.assignLeft(transaction)
-                        } label: {
-                            Image(systemName: viewModel.isLeft(transaction) ? "circle.fill" : "circle")
-                                .font(.system(size: toolMetrics.compactIconFontSize))
-                                .foregroundStyle(viewModel.isLeft(transaction) ? Color.accentColor : Color.secondary
-                                    .opacity(0.4))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .width(24)
+    private var candidateTable: some View {
+        Table(viewModel.candidates) {
+            TableColumn("L") { transaction in
+                assignmentControl(
+                    isAssigned: viewModel.isLeft(transaction),
+                    label: String(localized: "Assign as Left transaction"),
+                    action: { viewModel.assignLeft(transaction) }
+                )
+            }
+            .width(max(32, toolMetrics.compactButtonSize + 4))
 
-                    TableColumn("R") { transaction in
-                        Button {
-                            viewModel.assignRight(transaction)
-                        } label: {
-                            Image(systemName: viewModel.isRight(transaction) ? "circle.fill" : "circle")
-                                .font(.system(size: toolMetrics.compactIconFontSize))
-                                .foregroundStyle(viewModel.isRight(transaction) ? Color.accentColor : Color.secondary
-                                    .opacity(0.4))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .width(24)
+            TableColumn("R") { transaction in
+                assignmentControl(
+                    isAssigned: viewModel.isRight(transaction),
+                    label: String(localized: "Assign as Right transaction"),
+                    action: { viewModel.assignRight(transaction) }
+                )
+            }
+            .width(max(32, toolMetrics.compactButtonSize + 4))
 
-                    TableColumn(String(localized: "Method")) { transaction in
-                        StatusBadge(method: transaction.request.method)
-                    }
-                    .width(50)
+            TableColumn(String(localized: "Method")) { transaction in
+                DiffMethodBadge(method: transaction.request.method)
+            }
+            .width(methodColumnWidth)
 
-                    TableColumn(String(localized: "URL")) { transaction in
-                        Text(transaction.request.url.absoluteString)
-                            .font(toolMetrics.secondaryFont(monospaced: true))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .help(transaction.request.url.absoluteString)
-                    }
+            TableColumn(String(localized: "URL")) { transaction in
+                Text(transaction.request.url.absoluteString)
+                    .font(toolMetrics.secondaryFont(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(transaction.request.url.absoluteString)
+            }
 
-                    TableColumn(String(localized: "Client")) { transaction in
-                        Text(transaction.clientApp ?? "—")
-                            .font(toolMetrics.secondaryFont())
-                            .foregroundStyle(.secondary)
-                    }
-                    .width(60)
+            TableColumn(String(localized: "Client")) { transaction in
+                Text(transaction.clientApp ?? "—")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(transaction.clientApp ?? String(localized: "Unknown client"))
+            }
+            .width(clientColumnWidth)
 
-                    TableColumn(String(localized: "Code")) { transaction in
-                        Text(transaction.response.map { "\($0.statusCode)" } ?? "—")
-                            .font(toolMetrics.secondaryFont(monospaced: true))
-                            .foregroundStyle(statusColor(transaction.response?.statusCode))
-                    }
-                    .width(40)
-
-                    TableColumn(String(localized: "Time")) { transaction in
-                        Text(formatTime(transaction.timestamp))
-                            .font(toolMetrics.secondaryFont(monospaced: true))
-                            .foregroundStyle(.secondary)
-                    }
-                    .width(70)
-
-                    TableColumn(String(localized: "Duration")) { transaction in
-                        Text(formatDuration(transaction.timingInfo?.totalDuration))
-                            .font(toolMetrics.secondaryFont(monospaced: true))
-                            .foregroundStyle(.secondary)
-                    }
-                    .width(70)
+            TableColumn(String(localized: "Code")) { transaction in
+                if let statusCode = transaction.response?.statusCode {
+                    DiffStatusCodeBadge(statusCode: statusCode)
+                } else {
+                    Text("—")
+                        .font(toolMetrics.secondaryFont(monospaced: true))
+                        .foregroundStyle(.secondary)
                 }
             }
+            .width(statusColumnWidth)
+
+            TableColumn(String(localized: "Time")) { transaction in
+                let formattedTime = formatTime(transaction.timestamp)
+                Text(formattedTime)
+                    .font(toolMetrics.secondaryFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .help(formattedTime)
+            }
+            .width(timeColumnWidth)
+
+            TableColumn(String(localized: "Duration")) { transaction in
+                Text(formatDuration(transaction.timingInfo?.totalDuration ?? transaction.measuredDuration))
+                    .font(toolMetrics.secondaryFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+            }
+            .width(durationColumnWidth)
         }
+        .scrollContentBackground(.hidden)
     }
 
-    // MARK: Private
+    private var cardHeader: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Comparison Set"))
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+            Text(String(localized: "\(viewModel.candidates.count) captured"))
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button(String(localized: "Clear")) {
+                viewModel.clearCandidates()
+            }
+            .buttonStyle(.plain)
+            .font(toolMetrics.secondaryFont())
+            .disabled(viewModel.candidates.isEmpty)
+            .help(String(localized: "Clear local comparison candidates"))
+        }
+        .padding(.horizontal, toolMetrics.tableCellHorizontalPadding)
+        .frame(minHeight: toolMetrics.footerControlHeight)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+    }
 
     private var emptyState: some View {
-        VStack(spacing: 4) {
-            Text(String(localized: "No compare candidates yet"))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.tertiary)
+        ContentUnavailableView {
+            Label(String(localized: "No compare candidates yet"), systemImage: "rectangle.split.2x1")
+                .font(toolMetrics.font(weight: .medium))
+        } description: {
             Text(
                 String(localized: "Select two requests and choose \"Compare Selected\" to start a basic local compare.")
             )
-            .font(toolMetrics.metadataFont())
-            .foregroundStyle(.quaternary)
-            .fixedSize(horizontal: false, vertical: true)
+            .font(toolMetrics.secondaryFont())
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func statusColor(_ code: Int?) -> Color {
-        guard let code else {
-            return .secondary
+    private func assignmentControl(isAssigned: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: isAssigned ? "circle.fill" : "circle")
+                .font(.system(size: toolMetrics.compactIconFontSize))
+                .foregroundStyle(isAssigned ? Color.accentColor : Color.secondary.opacity(0.4))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .contentShape(Rectangle())
         }
-        switch code {
-        case 200 ..< 300: return .green
-        case 300 ..< 400: return .blue
-        case 400 ..< 500: return .orange
-        case 500...: return .red
-        default: return .secondary
-        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isAssigned ? [.isSelected] : [])
     }
 
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
+        date.formatted(.dateTime.hour().minute().second())
     }
 
     private func formatDuration(_ seconds: TimeInterval?) -> String {
@@ -131,5 +168,94 @@ struct DiffCandidateTableView: View {
             return "—"
         }
         return String(format: "%.0fms", seconds * 1_000)
+    }
+
+    private var methodColumnWidth: CGFloat {
+        max(60, toolMetrics.metadataFontSize * 4 + 18)
+    }
+
+    private var clientColumnWidth: CGFloat {
+        max(90, toolMetrics.secondaryFontSize * 5 + 24)
+    }
+
+    private var statusColumnWidth: CGFloat {
+        max(56, toolMetrics.metadataFontSize * 2.4 + 16)
+    }
+
+    private var timeColumnWidth: CGFloat {
+        max(100, toolMetrics.secondaryFontSize * 7 + 34)
+    }
+
+    private var durationColumnWidth: CGFloat {
+        max(82, toolMetrics.secondaryFontSize * 4.5 + 20)
+    }
+}
+
+// MARK: - DiffMethodBadge
+
+struct DiffMethodBadge: View {
+    let method: String
+
+    var body: some View {
+        Text(method)
+            .font(toolMetrics.metadataFont(weight: .semibold, monospaced: true))
+            .lineLimit(1)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .foregroundStyle(foregroundColor)
+            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 3))
+    }
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var color: Color {
+        switch method.uppercased() {
+        case "GET": Theme.Highlight.blue
+        case "POST": Theme.Highlight.green
+        case "PUT": Theme.Highlight.orange
+        case "PATCH": Theme.Highlight.yellow
+        case "DELETE": Theme.Highlight.red
+        case "HEAD": Theme.Highlight.purple
+        default: .secondary
+        }
+    }
+
+    private var foregroundColor: Color {
+        method.uppercased() == "PATCH" ? .primary : color
+    }
+}
+
+// MARK: - DiffStatusCodeBadge
+
+private struct DiffStatusCodeBadge: View {
+    let statusCode: Int
+
+    var body: some View {
+        Text("\(statusCode)")
+            .font(toolMetrics.metadataFont(weight: .medium, monospaced: true))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .foregroundStyle(color)
+            .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 3))
+    }
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var color: Color {
+        switch statusCode {
+        case 200 ..< 300: Theme.Highlight.green
+        case 300 ..< 400: Theme.Highlight.blue
+        case 400 ..< 500: Theme.Highlight.orange
+        case 500 ..< 600: Theme.Highlight.red
+        default: .secondary
+        }
     }
 }

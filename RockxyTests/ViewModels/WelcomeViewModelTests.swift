@@ -2,229 +2,63 @@ import Foundation
 @testable import Rockxy
 import Testing
 
-// Regression tests for `WelcomeViewModel` in the view models layer.
+// Regression tests for the original four-step Welcome flow and helper recovery policy.
 
 // MARK: - WelcomeViewModelTests
 
 @MainActor
 struct WelcomeViewModelTests {
-    // MARK: - completedSteps Tests
+    // MARK: - Four-step progress
 
-    @Test("completedSteps returns 0 when nothing is complete")
-    func completedStepsAllFalse() {
+    @Test("completed steps preserve the original four setup milestones")
+    func completedStepsPreserveFourStepFlow() {
         let viewModel = WelcomeViewModel()
-
         #expect(viewModel.completedSteps == 0)
-    }
 
-    @Test("completedSteps returns 1 when only certInstalled is true")
-    func completedStepsCertInstalledOnly() {
-        let viewModel = WelcomeViewModel()
         viewModel.certInstalled = true
-
         #expect(viewModel.completedSteps == 1)
-    }
 
-    @Test("completedSteps returns 2 when certInstalled and certTrusted are true")
-    func completedStepsCertInstalledAndTrusted() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
         viewModel.certTrusted = true
-
         #expect(viewModel.completedSteps == 2)
-    }
 
-    @Test("completedSteps returns 3 when cert and helper are complete")
-    func completedStepsThreeComplete() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
-        viewModel.certTrusted = true
         viewModel.helperStatus = .installedCompatible
-
         #expect(viewModel.completedSteps == 3)
+
+        viewModel.systemProxyEnabled = true
+        #expect(viewModel.completedSteps == 4)
+        #expect(viewModel.totalSteps == 4)
     }
 
-    @Test("completedSteps returns 4 when all steps are complete")
-    func completedStepsAllComplete() {
+    @Test("Get Started still requires all four original steps")
+    func canGetStartedRequiresAllFourSteps() {
         let viewModel = WelcomeViewModel()
         viewModel.certInstalled = true
         viewModel.certTrusted = true
-        viewModel.helperStatus = .installedCompatible
         viewModel.systemProxyEnabled = true
 
-        #expect(viewModel.completedSteps == 4)
+        viewModel.helperStatus = .notInstalled
+        #expect(viewModel.canGetStarted == false)
+
+        viewModel.helperStatus = .installedCompatible
+        #expect(viewModel.canGetStarted == true)
+
+        viewModel.certTrusted = false
+        #expect(viewModel.canGetStarted == false)
     }
 
-    @Test("completedSteps counts only helper installed, not other statuses")
-    func completedStepsHelperNotInstalled() {
-        let viewModel = WelcomeViewModel()
-        viewModel.helperStatus = .requiresApproval
-
-        #expect(viewModel.completedSteps == 0)
-    }
-
-    @Test("completedSteps counts systemProxyEnabled independently")
-    func completedStepsProxyOnly() {
+    @Test("system proxy progress remains independent from certificate and helper state")
+    func systemProxyProgressIsIndependent() {
         let viewModel = WelcomeViewModel()
         viewModel.systemProxyEnabled = true
 
         #expect(viewModel.completedSteps == 1)
-    }
-
-    // MARK: - totalSteps Tests
-
-    @Test("totalSteps is always 4")
-    func totalStepsIsFour() {
-        let viewModel = WelcomeViewModel()
-
-        #expect(viewModel.totalSteps == 4)
-    }
-
-    // MARK: - canGetStarted Tests
-
-    @Test("canGetStarted is false when cert is not installed")
-    func canGetStartedFalseNoCert() {
-        let viewModel = WelcomeViewModel()
-
         #expect(viewModel.canGetStarted == false)
     }
 
-    @Test("canGetStarted is false when cert installed but not trusted")
-    func canGetStartedFalseNotTrusted() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
+    // MARK: - Helper action and recovery
 
-        #expect(viewModel.canGetStarted == false)
-    }
-
-    @Test("canGetStarted is false when cert trusted but not installed")
-    func canGetStartedFalseTrustedNotInstalled() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certTrusted = true
-
-        #expect(viewModel.canGetStarted == false)
-    }
-
-    @Test("canGetStarted is true when all four steps are complete")
-    func canGetStartedTrue() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
-        viewModel.certTrusted = true
-        viewModel.helperStatus = .installedCompatible
-        viewModel.systemProxyEnabled = true
-
-        #expect(viewModel.canGetStarted == true)
-    }
-
-    @Test("canGetStarted is false when only cert steps are done")
-    func canGetStartedFalseWithoutHelperAndProxy() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
-        viewModel.certTrusted = true
-        viewModel.helperStatus = .notInstalled
-        viewModel.systemProxyEnabled = false
-
-        #expect(viewModel.canGetStarted == false)
-    }
-
-    // MARK: - installCert Guard Tests
-
-    @Test("installCert skips when certTrusted is already true")
-    func installCertSkipsWhenAlreadyTrusted() async {
-        let viewModel = WelcomeViewModel()
-        viewModel.certTrusted = true
-
-        await viewModel.installCert()
-
-        #expect(viewModel.isPerformingAction == false)
-        #expect(viewModel.errorMessage == nil)
-    }
-
-    // MARK: - Initial State Tests
-
-    @Test("initial state has all properties at defaults")
-    func initialState() {
-        let viewModel = WelcomeViewModel()
-
-        #expect(viewModel.certInstalled == false)
-        #expect(viewModel.certTrusted == false)
-        #expect(viewModel.helperStatus == .notInstalled)
-        #expect(viewModel.systemProxyEnabled == false)
-        #expect(viewModel.isPerformingAction == false)
-        #expect(viewModel.errorMessage == nil)
-        #expect(viewModel.completedSteps == 0)
-        #expect(viewModel.totalSteps == 4)
-        #expect(viewModel.canGetStarted == false)
-    }
-
-    // MARK: - Signing Mismatch Tests
-
-    @Test("completedSteps does not count signingMismatch as complete")
-    func completedStepsSigningMismatch() {
-        let viewModel = WelcomeViewModel()
-        viewModel.helperStatus = .signingMismatch
-
-        #expect(viewModel.completedSteps == 0)
-    }
-
-    @Test("canGetStarted is false when helper has signing mismatch")
-    func canGetStartedFalseSigningMismatch() {
-        let viewModel = WelcomeViewModel()
-        viewModel.certInstalled = true
-        viewModel.certTrusted = true
-        viewModel.helperStatus = .signingMismatch
-        viewModel.systemProxyEnabled = true
-
-        #expect(viewModel.canGetStarted == false)
-    }
-
-    @Test("subtype-only change through applyHelperState diverges action label")
-    func subtypeChangeThroughApplyPath() {
-        let viewModel = WelcomeViewModel()
-
-        viewModel.applyHelperState(
-            status: .signingMismatch,
-            signingIssue: .appSignatureInvalid(detail: "stale")
-        )
-        #expect(viewModel.helperStatus == .signingMismatch)
-        #expect(viewModel.helperSigningIssue == .appSignatureInvalid(detail: "stale"))
-        let label1 = HelperManager.helperActionLabel(
-            status: viewModel.helperStatus,
-            signingIssue: viewModel.helperSigningIssue
-        )
-        #expect(label1 == nil)
-
-        viewModel.applyHelperState(
-            status: .signingMismatch,
-            signingIssue: .identityMismatch(appSigner: "Dev", helperSigner: "Prod")
-        )
-        #expect(viewModel.helperStatus == .signingMismatch)
-        #expect(
-            viewModel.helperSigningIssue == .identityMismatch(
-                appSigner: "Dev",
-                helperSigner: "Prod"
-            )
-        )
-        let label2 = HelperManager.helperActionLabel(
-            status: viewModel.helperStatus,
-            signingIssue: viewModel.helperSigningIssue
-        )
-        #expect(label2 == String(localized: "Reinstall"))
-    }
-
-    // MARK: - Helper Action Label Alignment
-
-    @Test("unreachable label is Retry, not Install")
-    func unreachableLabelIsRetry() {
-        let label = HelperManager.helperActionLabel(
-            status: .unreachable,
-            signingIssue: nil
-        )
-        #expect(label == String(localized: "Retry"))
-    }
-
-    @Test("action labels cover all statuses consistently")
-    func actionLabelsAllStatuses() {
+    @Test("helper action labels remain aligned with HelperManager states")
+    func helperActionLabelsMatchManager() {
         let cases: [(HelperManager.HelperStatus, HelperManager.SigningIssue?, String?)] = [
             (.notInstalled, nil, String(localized: "Install")),
             (.requiresApproval, nil, String(localized: "Open Settings")),
@@ -238,8 +72,95 @@ struct WelcomeViewModelTests {
         ]
 
         for (status, issue, expected) in cases {
-            let label = HelperManager.helperActionLabel(status: status, signingIssue: issue)
-            #expect(label == expected, "status=\(status) issue=\(String(describing: issue))")
+            let viewModel = WelcomeViewModel()
+            viewModel.applyHelperState(status: status, signingIssue: issue)
+            #expect(viewModel.helperActionLabel == expected)
         }
+    }
+
+    @Test("helper remains incomplete for approval, unreachable, and signing failures")
+    func helperIncompleteStatesDoNotAdvanceFlow() {
+        for status in [
+            HelperManager.HelperStatus.requiresApproval,
+            .unreachable,
+            .signingMismatch,
+        ] {
+            let viewModel = WelcomeViewModel()
+            viewModel.helperStatus = status
+            #expect(viewModel.completedSteps == 0)
+            #expect(viewModel.canGetStarted == false)
+        }
+    }
+
+    @Test("unreachable and approval states expose the repair route")
+    func recoverableHelperStatesOfferRepair() {
+        let viewModel = WelcomeViewModel()
+
+        viewModel.helperStatus = .unreachable
+        #expect(viewModel.shouldOfferHelperRepair)
+
+        viewModel.helperStatus = .requiresApproval
+        #expect(viewModel.shouldOfferHelperRepair)
+
+        viewModel.helperStatus = .notInstalled
+        #expect(viewModel.shouldOfferHelperRepair == false)
+    }
+
+    @Test("incomplete app package routes to rebuild instead of destructive repair")
+    func incompletePackageDoesNotOfferDestructiveRepair() {
+        let error = HelperManager.HelperInstallPreflightError.missingBundledHelperBinary(
+            path: "/Applications/Rockxy.app/Contents/Library/LaunchServices/RockxyHelperTool"
+        )
+
+        #expect(WelcomeViewModel.resolveHelperFailureRecovery(for: error) == .rebuildApp)
+    }
+
+    @Test("normal helper registration errors can use repair and reinstall")
+    func registrationErrorOffersRepairAndReinstall() {
+        let error = NSError(domain: NSOSStatusErrorDomain, code: -1)
+
+        #expect(WelcomeViewModel.resolveHelperFailureRecovery(for: error) == .repairAndReinstall)
+    }
+
+    // MARK: - Action guard and defaults
+
+    @Test("only one Welcome action may run at a time")
+    func actionSerializationPolicy() {
+        #expect(WelcomeViewModel.canBeginAction(current: nil))
+        #expect(WelcomeViewModel.canBeginAction(current: .certificate) == false)
+        #expect(WelcomeViewModel.canBeginAction(current: .helper) == false)
+        #expect(WelcomeViewModel.canBeginAction(current: .systemProxy) == false)
+        #expect(WelcomeViewModel.canBeginAction(current: nil, isCheckingSystem: true) == false)
+    }
+
+    @Test("certificate install skips when trust is already complete")
+    func installCertificateSkipsWhenTrusted() async {
+        let viewModel = WelcomeViewModel()
+        viewModel.certTrusted = true
+
+        await viewModel.installCert()
+
+        #expect(viewModel.isPerformingAction == false)
+        #expect(viewModel.errorMessage == nil)
+    }
+
+    @Test("initial state matches the original incomplete onboarding flow")
+    func initialState() {
+        let viewModel = WelcomeViewModel()
+
+        #expect(viewModel.certInstalled == false)
+        #expect(viewModel.certTrusted == false)
+        #expect(viewModel.helperStatus == .notInstalled)
+        #expect(viewModel.systemProxyEnabled == false)
+        #expect(viewModel.isCheckingSystem == false)
+        #expect(viewModel.isPerformingAction == false)
+        #expect(viewModel.isBusy == false)
+        #expect(viewModel.activeAction == nil)
+        #expect(viewModel.errorArea == nil)
+        #expect(viewModel.helperFailureRecovery == nil)
+        #expect(viewModel.errorMessage == nil)
+        #expect(viewModel.completedSteps == 0)
+        #expect(viewModel.totalSteps == 4)
+        #expect(viewModel.canGetStarted == false)
     }
 }

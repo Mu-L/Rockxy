@@ -86,6 +86,52 @@ struct RootCADownloadServerAddressTests {
     }
 }
 
+// MARK: - RootCADownloadServerLifecycleTests
+
+struct RootCADownloadServerLifecycleTests {
+    @Test("Concurrent starts publish only the newest share session")
+    func concurrentStartsPublishNewestSession() async throws {
+        guard !RootCADownloadServer.lanIPv4Addresses().isEmpty else {
+            return
+        }
+
+        let server = RootCADownloadServer()
+        let firstStart = Task {
+            try await server.start(certificatePEM: "first")
+        }
+        await Task.yield()
+        let secondStart = Task {
+            try await server.start(certificatePEM: "second")
+        }
+
+        _ = try? await firstStart.value
+        let newestSession = try await secondStart.value
+
+        #expect(await server.activeSession?.id == newestSession.id)
+        await server.stop()
+    }
+
+    @Test("Stop prevents an in-flight share start from publishing afterward")
+    func stopIsPublicationBarrier() async {
+        guard !RootCADownloadServer.lanIPv4Addresses().isEmpty else {
+            return
+        }
+
+        let server = RootCADownloadServer()
+        let startTask = Task {
+            try await server.start(certificatePEM: "certificate")
+        }
+        await Task.yield()
+
+        await server.stop()
+        _ = try? await startTask.value
+        await Task.yield()
+
+        #expect(await server.activeSession == nil)
+        #expect(await server.isRunning == false)
+    }
+}
+
 // MARK: - RootCADownloadResponderTests
 
 struct RootCADownloadResponderTests {
@@ -112,8 +158,8 @@ struct RootCADownloadResponderTests {
         #expect(header("Content-Disposition", in: response) == "attachment; filename=\"RockxyRootCA.pem\"")
         #expect(header("Cache-Control", in: response) == "no-store")
         #expect(header("X-Content-Type-Options", in: response) == "nosniff")
-        #expect(String(decoding: response.body, as: UTF8.self) == pem)
-        #expect(String(decoding: response.body, as: UTF8.self).contains("PRIVATE KEY") == false)
+        #expect(String(bytes: response.body, encoding: .utf8) == pem)
+        #expect(String(bytes: response.body, encoding: .utf8)?.contains("PRIVATE KEY") == false)
     }
 
     @Test("invalid token is rejected as not found")
@@ -147,7 +193,7 @@ struct RootCADownloadResponderTests {
         )
 
         #expect(response.status == .gone)
-        #expect(String(decoding: response.body, as: UTF8.self).contains("expired"))
+        #expect(String(bytes: response.body, encoding: .utf8)?.contains("expired") == true)
     }
 
     @Test("wrong method or path does not expose certificate")
@@ -173,8 +219,8 @@ struct RootCADownloadResponderTests {
 
         #expect(postResponse.status == .methodNotAllowed)
         #expect(pathResponse.status == .notFound)
-        #expect(String(decoding: postResponse.body, as: UTF8.self).contains("BEGIN CERTIFICATE") == false)
-        #expect(String(decoding: pathResponse.body, as: UTF8.self).contains("BEGIN CERTIFICATE") == false)
+        #expect(String(bytes: postResponse.body, encoding: .utf8)?.contains("BEGIN CERTIFICATE") == false)
+        #expect(String(bytes: pathResponse.body, encoding: .utf8)?.contains("BEGIN CERTIFICATE") == false)
     }
 
     private func header(_ name: String, in response: RootCADownloadResponse) -> String? {

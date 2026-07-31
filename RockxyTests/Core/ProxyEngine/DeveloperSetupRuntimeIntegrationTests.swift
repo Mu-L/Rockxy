@@ -452,8 +452,7 @@ struct DeveloperSetupRuntimeIntegrationTests {
             requestPath: "/developer-setup/nextjs",
             upstreamListenAddress: "0.0.0.0",
             expectedCapturedHost: nextHostAddress,
-            expectedCapturedMethod: "CONNECT",
-            allowAnyCapturedPath: true,
+            expectedCapturedMethod: "GET",
             captureTimeout: .seconds(30),
             buildInvocation: { proxyPort, upstreamPort, workingDirectory in
                 let appPort = try findFreePort()

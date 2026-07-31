@@ -4,16 +4,21 @@ import SwiftUI
 
 @MainActor @Observable
 final class BreakpointRuleEditorStore {
-    // MARK: Internal
-
-    typealias SaveHandler = (String, String, HTTPMethodFilter, RuleMatchType, Bool, Bool, Bool) -> Void
+    typealias SaveHandler = (
+        String,
+        String,
+        HTTPMethodFilter,
+        RuleMatchType,
+        Bool,
+        Bool,
+        Bool
+    ) async -> Bool
 
     static let shared = BreakpointRuleEditorStore()
 
     private(set) var editorContext: BreakpointEditorContext?
     private(set) var editingRule: ProxyRule?
     private(set) var draftVersion: UInt64 = 0
-
     var onSave: SaveHandler?
 
     func openNew(context: BreakpointEditorContext? = nil, onSave: @escaping SaveHandler) {
@@ -30,7 +35,11 @@ final class BreakpointRuleEditorStore {
         draftVersion &+= 1
     }
 
-    // MARK: Private
+    func reset() {
+        editorContext = nil
+        editingRule = nil
+        onSave = nil
+    }
 
     private init() {}
 }
@@ -38,24 +47,72 @@ final class BreakpointRuleEditorStore {
 // MARK: - BreakpointRuleEditorWindowView
 
 struct BreakpointRuleEditorWindowView: View {
-    // MARK: Internal
-
     var body: some View {
-        VStack(spacing: toolMetrics.headerSpacing) {
-            formRows
-            Spacer(minLength: 8)
-            actionRow
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 3) {
+                    Text(editorTitle)
+                        .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
+
+                    if let quickCreateProvenance {
+                        provenanceBanner(quickCreateProvenance)
+                    }
+
+                    ruleDetailsSection
+                    breakpointPhasesSection
+                }
+                .padding(.horizontal, toolMetrics.formHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
+            .id(store.draftVersion)
+
+            Divider()
+
+            VStack(alignment: .trailing, spacing: toolMetrics.controlSpacing) {
+                if let saveError {
+                    validationLabel(saveError)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        cancel()
+                    } label: {
+                        footerButtonLabel(String(localized: "Cancel"))
+                    }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(isSaving)
+
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        footerButtonLabel(
+                            isSaving
+                                ? String(localized: "Saving…")
+                                : isEditing ? String(localized: "Save") : String(localized: "Add")
+                        )
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!isValid || isSaving)
+                }
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding)
+            .padding(.vertical, toolMetrics.controlSpacing)
         }
         .font(toolMetrics.font())
-        .padding(.horizontal, toolMetrics.formHorizontalPadding)
-        .padding(.top, toolMetrics.formVerticalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
-        .frame(minWidth: max(815, toolMetrics.bodyFontSize * 24 + 504), minHeight: max(270, toolMetrics.bodyFontSize * 10 + 150))
+        .frame(
+            minWidth: max(760, toolMetrics.bodyFontSize * 24 + 472),
+            minHeight: max(430, toolMetrics.bodyFontSize * 13 + 261)
+        )
         .onAppear { loadFromStore() }
-        .onChange(of: store.draftVersion) { _, _ in loadFromStore() }
+        .onChange(of: store.draftVersion) { _, _ in
+            loadFromStore()
+        }
+        .onDisappear {
+            store.reset()
+        }
     }
-
-    // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -68,133 +125,204 @@ struct BreakpointRuleEditorWindowView: View {
     @State private var includeSubpaths = true
     @State private var breakpointRequest = true
     @State private var breakpointResponse = true
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     private var isEditing: Bool {
         store.editingRule != nil
     }
 
-    private var canSave: Bool {
-        !urlPattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (breakpointRequest || breakpointResponse)
+    private var editorTitle: String {
+        isEditing
+            ? String(localized: "Edit Breakpoint Rule")
+            : String(localized: "New Breakpoint Rule")
     }
 
-    private var labelWidth: CGFloat {
-        max(122, toolMetrics.formLabelWidth)
+    private var patternValidationMessage: String? {
+        BreakpointRuleForm.patternValidationMessage(
+            rawPattern: urlPattern,
+            matchType: matchType,
+            includeSubpaths: includeSubpaths
+        )
     }
 
-    private var formRows: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-            formRow(String(localized: "Name:")) {
-                TextField(String(localized: "Untitled"), text: $ruleName)
-                    .textFieldStyle(.roundedBorder)
-            }
+    private var phaseValidationMessage: String? {
+        BreakpointRuleForm.phaseValidationMessage(
+            request: breakpointRequest,
+            response: breakpointResponse
+        )
+    }
 
-            formRow(String(localized: "Matching Rule:")) {
-                TextField("/v1/*", text: $urlPattern)
-                    .textFieldStyle(.roundedBorder)
-                    .font(toolMetrics.font(monospaced: true))
-            }
+    private var isValid: Bool {
+        patternValidationMessage == nil && phaseValidationMessage == nil
+    }
 
-            HStack(spacing: toolMetrics.controlSpacing) {
-                Spacer()
-                    .frame(width: labelWidth)
-                Picker("", selection: $httpMethod) {
-                    ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
-                        Text(method.rawValue).tag(method)
+    private var quickCreateProvenance: String? {
+        guard let context = store.editorContext else {
+            return nil
+        }
+        switch context.origin {
+        case .selectedTransaction:
+            let method = context.sourceMethod ?? "ANY"
+            return String(localized: "Created from \(method) \(context.sourceHost)\(context.sourcePath ?? "/")")
+        case .domainQuickCreate:
+            return String(localized: "Created from domain \(context.sourceHost)")
+        }
+    }
+
+    private var ruleDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Name")) {
+                        TextField(String(localized: "Untitled"), text: $ruleName)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Breakpoint rule name"))
                     }
-                }
-                .labelsHidden()
-                .frame(width: toolMetrics.menuWidth(100))
+                    .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-                Picker("", selection: $matchType) {
-                    ForEach(RuleMatchType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+                    fieldGroup(String(localized: "URL Pattern")) {
+                        TextField("https://api.example.com/v1/*", text: $urlPattern)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Breakpoint URL pattern"))
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .labelsHidden()
-                .frame(width: toolMetrics.menuWidth(132))
 
-                Text(String(localized: "Support wildcard * and ?."))
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Method")) {
+                        methodMenu
+                    }
+                    .frame(width: toolMetrics.menuWidth(90))
+
+                    fieldGroup(String(localized: "Match Type")) {
+                        matchTypeMenu
+                    }
+                    .frame(width: toolMetrics.menuWidth(175))
+
+                    if matchType == .wildcard {
+                        fieldGroup(String(localized: "Path Scope")) {
+                            Toggle(String(localized: "Include subpaths"), isOn: $includeSubpaths)
+                                .toggleStyle(.checkbox)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                if let patternValidationMessage {
+                    validationLabel(patternValidationMessage)
+                }
+
+                Text(patternHelpText)
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Button(String(localized: "Test your Rule")) {
-                    NSSound.beep()
-                }
-                .buttonStyle(.link)
-                .foregroundStyle(.secondary)
             }
-
-            HStack(spacing: toolMetrics.controlSpacing) {
-                Spacer()
-                    .frame(width: labelWidth)
-                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
-                    .disabled(matchType != .wildcard)
-            }
-
-            formRow(String(localized: "Breakpoint:")) {
-                Toggle(String(localized: "Request"), isOn: $breakpointRequest)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
-                Toggle(String(localized: "Response"), isOn: $breakpointResponse)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
-            }
-
-            HStack {
-                Spacer()
-                    .frame(width: labelWidth)
-                Text(String(localized: "Start the breakpoint for out-going request or in-coming response."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
         }
     }
 
-    private var actionRow: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Spacer()
-            Button(String(localized: "Cancel")) {
-                dismiss()
-            }
-            .keyboardShortcut(.cancelAction)
-            .frame(width: toolMetrics.footerButtonWidth)
+    private var breakpointPhasesSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Pause Phases"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            Button(isEditing ? String(localized: "Save (⌘↵)") : String(localized: "Add (⌘↵)")) {
-                store.onSave?(
-                    ruleName,
-                    urlPattern,
-                    httpMethod,
-                    matchType,
-                    breakpointRequest,
-                    breakpointResponse,
-                    includeSubpaths
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    phaseOption(
+                        title: String(localized: "Request"),
+                        detail: String(localized: "Pause before the outgoing request is forwarded."),
+                        systemImage: "arrow.up.right",
+                        isOn: $breakpointRequest
+                    )
+                    phaseOption(
+                        title: String(localized: "Response"),
+                        detail: String(localized: "Pause after the incoming response is received."),
+                        systemImage: "arrow.down.left",
+                        isOn: $breakpointResponse
+                    )
+                }
+
+                if let phaseValidationMessage {
+                    validationLabel(phaseValidationMessage)
+                }
+
+                Text(
+                    String(
+                        localized:
+                        "The Breakpoint Queue lets you inspect, edit, continue, or abort traffic after this rule pauses it."
+                    )
                 )
-                dismiss()
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .keyboardShortcut(.defaultAction)
-            .disabled(!canSave)
-            .frame(width: toolMetrics.footerButtonWidth)
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
         }
     }
 
-    private func formRow(
-        _ label: String,
-        @ViewBuilder content: () -> some View
-    )
-        -> some View
-    {
-        HStack(alignment: .firstTextBaseline, spacing: toolMetrics.controlSpacing) {
-            Text(label)
-                .font(toolMetrics.font())
-                .lineLimit(1)
-                .frame(width: labelWidth, alignment: .trailing)
-            content()
-                .frame(minHeight: toolMetrics.formControlHeight)
+    private var methodMenu: some View {
+        Menu {
+            ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
+                Button {
+                    httpMethod = method
+                } label: {
+                    menuCheckmarkLabel(method.rawValue, isSelected: httpMethod == method)
+                }
+            }
+        } label: {
+            dataEntryMenuLabel(httpMethod.rawValue, width: toolMetrics.menuWidth(90))
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "HTTP method"))
+    }
+
+    private var matchTypeMenu: some View {
+        Menu {
+            ForEach(RuleMatchType.allCases, id: \.self) { type in
+                Button {
+                    matchType = type
+                } label: {
+                    menuCheckmarkLabel(type.rawValue, isSelected: matchType == type)
+                }
+            }
+        } label: {
+            dataEntryMenuLabel(matchType.rawValue, width: toolMetrics.menuWidth(175))
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "Match type"))
+    }
+
+    private var patternHelpText: String {
+        switch matchType {
+        case .wildcard:
+            return String(
+                localized:
+                "Wildcard patterns support * for any sequence and ? for one character. Turn on Include subpaths to extend the match beyond this URL."
+            )
+        case .regex:
+            return String(localized: "Regular expressions are validated before the rule is saved.")
         }
     }
 
@@ -202,9 +330,130 @@ struct BreakpointRuleEditorWindowView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func phaseOption(
+        title: String,
+        detail: String,
+        systemImage: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Toggle("", isOn: isOn)
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .accessibilityLabel(title)
+                .padding(.top, 2)
+            Image(systemName: systemImage)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(toolMetrics.font(weight: .medium))
+                Text(detail)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+            Text(title)
+        }
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(toolMetrics.font())
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func provenanceBanner(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "arrow.turn.down.right")
+                .foregroundStyle(.secondary)
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(message)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
+    }
+
+    private func validationLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func loadFromStore() {
+        saveError = nil
+        isSaving = false
         if let editingRule = store.editingRule {
-            let decoded = AddBreakpointRuleSheet.decode(rule: editingRule)
+            let decoded = BreakpointRuleForm.decode(rule: editingRule)
             ruleName = editingRule.name
             urlPattern = decoded.displayPattern
             httpMethod = decoded.httpMethod
@@ -229,5 +478,37 @@ struct BreakpointRuleEditorWindowView: View {
             breakpointRequest = true
             breakpointResponse = true
         }
+    }
+
+    @MainActor
+    private func save() async {
+        guard !isSaving, isValid, let onSave = store.onSave else {
+            return
+        }
+        isSaving = true
+        saveError = nil
+        let accepted = await onSave(
+            ruleName,
+            urlPattern,
+            httpMethod,
+            matchType,
+            breakpointRequest,
+            breakpointResponse,
+            includeSubpaths
+        )
+        isSaving = false
+        guard accepted else {
+            saveError = String(
+                localized: "This rule could not be saved. Disable another Breakpoint rule and try again."
+            )
+            return
+        }
+        store.reset()
+        dismiss()
+    }
+
+    private func cancel() {
+        store.reset()
+        dismiss()
     }
 }

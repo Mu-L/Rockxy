@@ -6,6 +6,8 @@ enum GitHubGistVisibility: String, CaseIterable, Codable {
     case secret
     case `public`
 
+    // MARK: Internal
+
     var isPublic: Bool {
         self == .public
     }
@@ -13,9 +15,18 @@ enum GitHubGistVisibility: String, CaseIterable, Codable {
     var title: String {
         switch self {
         case .secret:
-            String(localized: "Private Gist")
+            String(localized: "Secret Gist")
         case .public:
             String(localized: "Public Gist")
+        }
+    }
+
+    var sharingDescription: String {
+        switch self {
+        case .secret:
+            String(localized: "Unlisted and not searchable on GitHub, but anyone with the link can open it.")
+        case .public:
+            String(localized: "Discoverable and searchable on GitHub by anyone.")
         }
     }
 }

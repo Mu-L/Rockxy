@@ -6,6 +6,7 @@ enum BreakpointEditorContextBuilder {
 
     static func fromTransaction(_ transaction: HTTPTransaction) -> BreakpointEditorContext {
         let host = transaction.request.host
+        let patternHost = wildcardHost(host)
         let normalizedPath = normalizePath(transaction.request.path)
         let method = transaction.request.method.uppercased()
 
@@ -20,27 +21,28 @@ enum BreakpointEditorContextBuilder {
             sourceHost: host,
             sourcePath: normalizedPath,
             sourceMethod: method,
-            defaultPattern: "*\(host)\(normalizedPath)",
+            defaultPattern: "*://\(patternHost)\(normalizedPath)",
             defaultMatchType: .wildcard,
             httpMethod: httpMethod,
-            includeSubpaths: true,
+            includeSubpaths: false,
             breakpointRequest: true,
             breakpointResponse: true
         )
     }
 
     static func fromDomain(_ domain: String) -> BreakpointEditorContext {
-        BreakpointEditorContext(
+        let patternHost = wildcardHost(domain)
+        return BreakpointEditorContext(
             origin: .domainQuickCreate,
             suggestedName: "Breakpoint — \(domain)",
             sourceURL: nil,
             sourceHost: domain,
             sourcePath: nil,
             sourceMethod: nil,
-            defaultPattern: "*\(domain)/",
+            defaultPattern: "*://\(patternHost)/*",
             defaultMatchType: .wildcard,
             httpMethod: .any,
-            includeSubpaths: true,
+            includeSubpaths: false,
             breakpointRequest: true,
             breakpointResponse: true
         )
@@ -50,5 +52,13 @@ enum BreakpointEditorContextBuilder {
 
     private static func normalizePath(_ path: String) -> String {
         path.isEmpty ? "/" : path
+    }
+
+    private static func wildcardHost(_ host: String) -> String {
+        let colonCount = host.count(where: { $0 == ":" })
+        guard colonCount > 1, !host.hasPrefix("[") else {
+            return host
+        }
+        return "[\(host)]"
     }
 }

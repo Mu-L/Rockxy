@@ -9,28 +9,22 @@ struct AssistantSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                SettingsSectionCard(String(localized: "1. Local Model Setup")) {
-                    globalModelSection
-                }
-
-                SettingsSectionCard(String(localized: "2. Provider & Model")) {
-                    providerSection
-                }
-
-                SettingsSectionCard(String(localized: "3. Connection")) {
-                    connectionSection
-                }
-
-                SettingsSectionCard(String(localized: "Data Handling")) {
-                    privacySection
-                }
+        SettingsPane {
+            SettingsSectionCard(String(localized: "1. Local Model Setup")) {
+                globalModelSection
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 20)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            SettingsSectionCard(String(localized: "2. Provider & Model")) {
+                providerSection
+            }
+
+            SettingsSectionCard(String(localized: "3. Connection")) {
+                connectionSection
+            }
+
+            SettingsSectionCard(String(localized: "Data Handling")) {
+                privacySection
+            }
         }
         .font(settingsMetrics.font())
         .task {

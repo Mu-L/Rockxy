@@ -2,179 +2,25 @@ import AppKit
 import os
 import SwiftUI
 
-// Presents the Proxyman-style Map Local management and editor windows.
-
-// MARK: - MapLocalHTTPMethod
-
-enum MapLocalHTTPMethod: String, CaseIterable, Identifiable {
-    case any = "ANY"
-    case get = "GET"
-    case post = "POST"
-    case put = "PUT"
-    case delete = "DELETE"
-    case patch = "PATCH"
-    case head = "HEAD"
-    case options = "OPTIONS"
-    case trace = "TRACE"
-
-    var id: String { rawValue }
-
-    init(ruleMethod: String?) {
-        guard let ruleMethod,
-              let method = Self(rawValue: ruleMethod.uppercased()) else
-        {
-            self = .any
-            return
-        }
-        self = method
-    }
-
-    var ruleValue: String? {
-        self == .any ? nil : rawValue
-    }
-}
-
-// MARK: - MapLocalMatchType
-
-enum MapLocalMatchType: String, CaseIterable, Identifiable {
-    case wildcard
-    case regex
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .wildcard: "Use Wildcard"
-        case .regex: "Use Regex"
-        }
-    }
-}
-
-// MARK: - MapLocalTargetMode
-
-enum MapLocalTargetMode: String, CaseIterable, Identifiable {
-    case localFile
-    case localDirectory
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .localFile: "Local File"
-        case .localDirectory: "Local Directory"
-        }
-    }
-}
-
-// MARK: - MapLocalDelayPreset
-
-enum MapLocalDelayPreset: String, CaseIterable, Identifiable {
-    case none
-    case oneSecond
-    case twoSeconds
-    case threeSeconds
-    case fiveSeconds
-    case tenSeconds
-    case thirtySeconds
-    case sixtySeconds
-    case random
-    case custom
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .none: "No Delay"
-        case .oneSecond: "1 second"
-        case .twoSeconds: "2 seconds"
-        case .threeSeconds: "3 seconds"
-        case .fiveSeconds: "5 seconds"
-        case .tenSeconds: "10 seconds"
-        case .thirtySeconds: "30 seconds"
-        case .sixtySeconds: "60 seconds"
-        case .random: "Random (1-15s)"
-        case .custom: "Custom"
-        }
-    }
-
-    var delayMs: Int {
-        switch self {
-        case .none: 0
-        case .oneSecond: 1_000
-        case .twoSeconds: 2_000
-        case .threeSeconds: 3_000
-        case .fiveSeconds: 5_000
-        case .tenSeconds: 10_000
-        case .thirtySeconds: 30_000
-        case .sixtySeconds: 60_000
-        case .random: -1
-        case .custom: 0
-        }
-    }
-
-    static func from(delayMs: Int) -> Self {
-        switch delayMs {
-        case 0: .none
-        case 1_000: .oneSecond
-        case 2_000: .twoSeconds
-        case 3_000: .threeSeconds
-        case 5_000: .fiveSeconds
-        case 10_000: .tenSeconds
-        case 30_000: .thirtySeconds
-        case 60_000: .sixtySeconds
-        case -1: .random
-        default: .custom
-        }
-    }
-}
-
-// MARK: - MapLocalEditorContext
-
-struct MapLocalEditorContext {
-    var existingRule: ProxyRule?
-    var draft: MapLocalDraft?
-
-    static let blank = MapLocalEditorContext()
-}
-
-// MARK: - MapLocalEditorStore
-
-@MainActor @Observable
-final class MapLocalEditorStore {
-    private init() {}
-
-    static let shared = MapLocalEditorStore()
-
-    private(set) var context = MapLocalEditorContext.blank
-    var draftVersion: UInt64 = 0
-
-    func openNew(draft: MapLocalDraft? = nil) {
-        context = MapLocalEditorContext(existingRule: nil, draft: draft)
-        draftVersion &+= 1
-    }
-
-    func openExisting(_ rule: ProxyRule) {
-        context = MapLocalEditorContext(existingRule: rule, draft: nil)
-        draftVersion &+= 1
-    }
-}
+// Presents the native Map Local management and editor windows.
 
 // MARK: - MapLocalViewModel
 
 @MainActor @Observable
 final class MapLocalViewModel {
+    // MARK: Lifecycle
+
+    init(isToolEnabled: Bool? = nil) {
+        self.isToolEnabled = isToolEnabled ?? Self.defaultToolEnabled
+    }
+
     // MARK: Internal
 
     var allRules: [ProxyRule] = []
     var searchText = ""
     var selectedRuleIDs: Set<UUID> = []
-    var isFilterVisible = false
     var isToolEnabled: Bool
     var errorMessage: String?
-
-    init(isToolEnabled: Bool? = nil) {
-        self.isToolEnabled = isToolEnabled ?? Self.defaultToolEnabled
-    }
 
     var mapLocalRules: [ProxyRule] {
         allRules.filter {
@@ -186,16 +32,25 @@ final class MapLocalViewModel {
     }
 
     var filteredRules: [ProxyRule] {
-        guard !searchText.isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else {
             return mapLocalRules
         }
-        let query = searchText.lowercased()
         return mapLocalRules.filter { rule in
             rule.name.lowercased().contains(query)
+                || (rule.matchCondition.sourceURLPattern?.lowercased().contains(query) ?? false)
                 || (rule.matchCondition.urlPattern?.lowercased().contains(query) ?? false)
                 || methodLabel(for: rule).lowercased().contains(query)
                 || filePath(for: rule).lowercased().contains(query)
         }
+    }
+
+    var ruleCount: Int {
+        mapLocalRules.count
+    }
+
+    var activeRuleCount: Int {
+        mapLocalRules.filter(\.isEnabled).count
     }
 
     var selectedRule: ProxyRule? {
@@ -306,16 +161,6 @@ final class MapLocalViewModel {
         addRule(rule)
     }
 
-    func createNewFolderPlaceholder() {
-        let rule = ProxyRule(
-            name: "New Folder",
-            isEnabled: false,
-            matchCondition: RuleMatchCondition(urlPattern: nil),
-            action: .mapLocal(filePath: "", isDirectory: true)
-        )
-        addRule(rule)
-    }
-
     func filePath(for rule: ProxyRule) -> String {
         if case let .mapLocal(path, _, _, _) = rule.action {
             return path
@@ -328,6 +173,12 @@ final class MapLocalViewModel {
     }
 
     func matchingRuleLabel(for rule: ProxyRule) -> String {
+        if let sourcePattern = rule.matchCondition.sourceURLPattern,
+           !sourcePattern.isEmpty
+        {
+            let prefix = rule.matchCondition.matchType == .regex ? "Regex: " : "Wildcard: "
+            return prefix + sourcePattern
+        }
         guard let pattern = rule.matchCondition.urlPattern, !pattern.isEmpty else {
             return "<Missing URL>"
         }
@@ -361,6 +212,7 @@ final class MapLocalViewModel {
 
     private static let toolEnabledKey = "mapLocalToolEnabled"
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "MapLocalViewModel")
+
     private static var defaultToolEnabled: Bool {
         UserDefaults.standard.object(forKey: toolEnabledKey) as? Bool ?? true
     }
@@ -381,19 +233,25 @@ final class MapLocalViewModel {
 // MARK: - MapLocalWindowView
 
 struct MapLocalWindowView: View {
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @Environment(\.openWindow) private var openWindow
+    // MARK: Internal
+
     @State var viewModel = MapLocalViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            infoBanner
+            Divider()
             tableContent
-            shortcutStrip
-            bottomBar
+            Divider()
+            footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_024, height: 570)
+        .frame(
+            minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
         .task { await viewModel.refreshFromEngine() }
         .onAppear { consumePendingDraftIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: .openMapLocalWindow)) { _ in
@@ -406,7 +264,11 @@ struct MapLocalWindowView: View {
             String(localized: "Map Local"),
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
+                set: {
+                    if !$0 {
+                        viewModel.errorMessage = nil
+                    }
+                }
             )
         ) {
             Button(String(localized: "OK")) { viewModel.errorMessage = nil }
@@ -417,78 +279,116 @@ struct MapLocalWindowView: View {
         }
     }
 
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.openWindow) private var openWindow
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var footerHint: String {
+        let countText = isSearching
+            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
+            : String(localized: "\(viewModel.ruleCount) rules")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
-            Toggle(isOn: Binding(
-                get: { viewModel.isToolEnabled },
-                set: { viewModel.setToolEnabled($0) }
-            )) {
-                Text(String(localized: "Enable Map Local Tool"))
-                    .font(toolMetrics.font())
-            }
-            .toggleStyle(.checkbox)
-            .padding(.top, toolMetrics.headerTopPadding)
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    String(localized: "Enable Map Local"),
+                    isOn: Binding(
+                        get: { viewModel.isToolEnabled },
+                        set: { viewModel.setToolEnabled($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font(weight: .medium))
 
-            Text(String(localized: "Map a Response with a Local File or Directory. Support Status Code, Headers and Body."))
-                .font(toolMetrics.font())
-            Text(String(localized: "Each request is checked against the rules from top to bottom, stopping when a match is found."))
-                .font(toolMetrics.font())
-                .foregroundStyle(.secondary)
-
-            if viewModel.isFilterVisible {
-                HStack(spacing: toolMetrics.controlSpacing) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(String(localized: "Filter Map Local rules"), text: $viewModel.searchText)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        viewModel.searchText = ""
-                        viewModel.isFilterVisible = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
+                Text(String(localized: "Serve a local file or directory for matching requests."))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
-                }
             }
+
+            Spacer()
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Search Map Local rules"))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
+    }
+
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text(
+                String(
+                    localized:
+                    "Map Local participates in Rockxy's global first-match rule order. A match returns the selected local response without contacting the remote server."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
     }
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleIDs) {
-            TableColumn(String(localized: "Name")) { rule in
-                HStack(spacing: 7) {
-                    Toggle("", isOn: Binding(
-                        get: { rule.isEnabled },
-                        set: { _ in viewModel.toggleRule(id: rule.id) }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
-                    Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
-                        .lineLimit(1)
-                }
+            TableColumn(String(localized: "Enabled")) { rule in
+                Toggle("", isOn: Binding(
+                    get: { rule.isEnabled },
+                    set: { _ in viewModel.toggleRule(id: rule.id) }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
             }
-            .width(min: 190, ideal: 220)
+            .width(62)
+
+            TableColumn(String(localized: "Name")) { rule in
+                Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rule.name)
+            }
+            .width(min: 150, ideal: 190)
 
             TableColumn(String(localized: "Method")) { rule in
                 Text(viewModel.methodLabel(for: rule))
                     .lineLimit(1)
             }
-            .width(86)
+            .width(76)
 
             TableColumn(String(localized: "Matching Rule")) { rule in
                 Text(viewModel.matchingRuleLabel(for: rule))
+                    .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
-                    .help(rule.matchCondition.urlPattern ?? "<Missing URL>")
+                    .truncationMode(.middle)
+                    .help(viewModel.matchingRuleLabel(for: rule))
             }
-            .width(min: 260, ideal: 320)
+            .width(min: 220, ideal: 300)
 
-            TableColumn(String(localized: "Map from")) { rule in
+            TableColumn(String(localized: "Local Response")) { rule in
                 HStack(spacing: 6) {
                     Text(viewModel.mapFromLabel(for: rule))
                         .lineLimit(1)
+                        .truncationMode(.middle)
                         .help(viewModel.filePath(for: rule))
                     if !viewModel.delayLabel(for: rule).isEmpty {
                         Text(viewModel.delayLabel(for: rule))
@@ -497,7 +397,7 @@ struct MapLocalWindowView: View {
                     }
                 }
             }
-            .width(min: 360, ideal: 500)
+            .width(min: 280, ideal: 420)
         }
         .contextMenu(forSelectionType: UUID.self) { ids in
             tableContextMenu(ids: ids)
@@ -512,135 +412,138 @@ struct MapLocalWindowView: View {
         .overlay {
             if viewModel.filteredRules.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "No Map Local Rules"),
-                    systemImage: "folder.badge.gearshape",
-                    description: Text(String(localized: "Click + or create a rule from a captured request."))
+                    isSearching
+                        ? String(localized: "No matching rules")
+                        : String(localized: "No Map Local rules"),
+                    systemImage: isSearching ? "magnifyingglass" : "folder.badge.gearshape",
+                    description: Text(
+                        isSearching
+                            ? String(localized: "Try a different name, method, URL, or local path.")
+                            : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                    )
                 )
             }
         }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
     }
 
-    private var shortcutStrip: some View {
-        Text("New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ↵")
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
-    }
-
-    private var bottomBar: some View {
+    private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            HStack(spacing: 0) {
-                Button {
-                    openNewEditor()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                        .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut("n", modifiers: .command)
+            addRemoveControl
 
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1, height: 18)
-
-                Button {
-                    viewModel.removeSelectedRules()
-                } label: {
-                    Image(systemName: "minus")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                        .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(viewModel.selectedRuleIDs.isEmpty)
-            }
-            .foregroundStyle(.primary)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .overlay(
-                Rectangle()
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
-            .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
-
-            Button(String(localized: "New Folder")) {
-                viewModel.createNewFolderPlaceholder()
-            }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-
-            Button {
-                viewModel.errorMessage = String(localized: "Map Local checks rules from top to bottom and returns the first matching local response.")
-            } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.bordered)
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
-            Button {
-                withAnimation {
-                    viewModel.isFilterVisible.toggle()
-                }
-            } label: {
-                Label(String(localized: "Filter"), systemImage: "magnifyingglass")
-            }
-            .keyboardShortcut("f", modifiers: .command)
+            moreMenu
 
-            Menu {
-                Button(String(localized: "New")) { openNewEditor() }
-                    .keyboardShortcut("n", modifiers: .command)
-                Button(String(localized: "Edit")) {
-                    if let rule = viewModel.selectedRule {
-                        openEditor(for: rule)
-                    }
-                }
-                .keyboardShortcut("e", modifiers: .command)
-                .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
-                    .keyboardShortcut("d", modifiers: .command)
-                    .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Toggle")) {
-                    if let id = viewModel.selectedRuleIDs.first {
-                        viewModel.toggleRule(id: id)
-                    }
-                }
-                .keyboardShortcut(.return, modifiers: [])
-                .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Toggle")) {
-                    if let id = viewModel.selectedRuleIDs.first {
-                        viewModel.toggleRule(id: id)
-                    }
-                }
-                .keyboardShortcut(.space, modifiers: [])
-                .disabled(viewModel.selectedRule == nil)
-                Divider()
-                Button(String(localized: "Delete"), role: .destructive) {
-                    viewModel.removeSelectedRules()
-                }
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(viewModel.selectedRuleIDs.isEmpty)
-            } label: {
-                HStack(spacing: 6) {
-                    Text(String(localized: "More"))
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
-                }
-            }
-            .menuIndicator(.hidden)
-            .buttonStyle(.bordered)
-            .fixedSize()
+            Text(
+                viewModel.isToolEnabled
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
+                    : String(localized: "MAP LOCAL OFF")
+            )
+            .font(toolMetrics.metadataFont(weight: .semibold))
+            .foregroundStyle(viewModel.isToolEnabled ? Color.white : Color.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(viewModel.isToolEnabled ? Color.green : Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private var addRemoveControl: some View {
+        HStack(spacing: 0) {
+            Button {
+                openNewEditor()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
+            .help(String(localized: "New Rule"))
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.7))
+                .frame(width: 1, height: 18)
+
+            Button {
+                viewModel.removeSelectedRules()
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRuleIDs.isEmpty)
+            .help(String(localized: "Remove Selected Rules"))
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(
+            width: max(43, toolMetrics.compactButtonSize * 2 + 1),
+            height: toolMetrics.footerControlHeight
+        )
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button(String(localized: "New Rule")) { openNewEditor() }
+                .keyboardShortcut("n", modifiers: .command)
+            Button(String(localized: "Edit Rule")) {
+                if let rule = viewModel.selectedRule {
+                    openEditor(for: rule)
+                }
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
+                .keyboardShortcut("d", modifiers: .command)
+                .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Toggle Enabled")) {
+                if let id = viewModel.selectedRuleIDs.first {
+                    viewModel.toggleRule(id: id)
+                }
+            }
+            .keyboardShortcut(.space, modifiers: [])
+            .disabled(viewModel.selectedRule == nil)
+            Divider()
+            Button(String(localized: "Delete"), role: .destructive) {
+                viewModel.removeSelectedRules()
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRuleIDs.isEmpty)
+        } label: {
+            HStack(spacing: 6) {
+                Text(String(localized: "More"))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            }
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .fixedSize()
     }
 
     @ViewBuilder
@@ -680,287 +583,37 @@ struct MapLocalWindowView: View {
     }
 }
 
-// MARK: - MapLocalEditorViewModel
-
-@MainActor @Observable
-final class MapLocalEditorViewModel {
-    // MARK: Internal
-
-    var name = "Untitled"
-    var urlText = ""
-    var method: MapLocalHTTPMethod = .any
-    var matchType: MapLocalMatchType = .wildcard
-    var includeSubpaths = false
-    var delayPreset: MapLocalDelayPreset = .none
-    var customDelaySeconds = 15
-    var targetMode: MapLocalTargetMode = .localFile
-    var localFileEnabled = true
-    var localDirectoryEnabled = false
-    var filePath = ""
-    var directoryPath = ""
-    var httpMessageText = MapLocalHTTPMessage.defaultMessage(statusCode: 200)
-    var autoSave = true
-    var errorMessage: String?
-
-    private(set) var existingID: UUID?
-    private(set) var originalRule: ProxyRule?
-    private(set) var draft: MapLocalDraft?
-    private(set) var isLoaded = false
-
-    var windowTitle: String {
-        "Map Local Editor: \(name.isEmpty ? "Untitled" : name)"
-    }
-
-    var selectedPath: String {
-        targetMode == .localDirectory ? directoryPath : filePath
-    }
-
-    var isDirectoryValid: Bool {
-        guard !directoryPath.isEmpty else {
-            return false
-        }
-        var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: directoryPath, isDirectory: &isDirectory) && isDirectory.boolValue
-    }
-
-    var isSaveEnabled: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && isTargetValid
-            && RegexValidator.compile(urlPatternForSaving()).isSuccess
-    }
-
-    var delayMs: Int {
-        if delayPreset == .custom {
-            return max(0, customDelaySeconds) * 1_000
-        }
-        return delayPreset.delayMs
-    }
-
-    func load(context: MapLocalEditorContext) {
-        existingID = context.existingRule?.id
-        originalRule = context.existingRule
-        draft = context.draft
-
-        if let rule = context.existingRule {
-            load(existingRule: rule)
-        } else if let draft = context.draft {
-            load(draft: draft)
-        } else {
-            loadBlank()
-        }
-        isLoaded = true
-    }
-
-    func choosePath() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = targetMode == .localFile
-        panel.canChooseDirectories = targetMode == .localDirectory
-        panel.allowsMultipleSelection = false
-        panel.message = targetMode == .localDirectory
-            ? String(localized: "Select a local directory to serve files from")
-            : String(localized: "Select a local file to serve for matched requests")
-
-        if panel.runModal() == .OK, let url = panel.url {
-            if targetMode == .localDirectory {
-                directoryPath = url.path(percentEncoded: false)
-                localDirectoryEnabled = true
-            } else {
-                filePath = url.path(percentEncoded: false)
-                localFileEnabled = true
-                httpMessageText = MapLocalHTTPMessage.message(statusCode: statusCodeFromText(), filePath: filePath)
-            }
-        }
-    }
-
-    func showSelectedPathInFinder() {
-        let path = selectedPath
-        guard !path.isEmpty else {
-            return
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-    }
-
-    func openSelectedPath(with app: MapLocalExternalEditor) {
-        let path = selectedPath
-        guard !path.isEmpty else {
-            return
-        }
-        let url = URL(fileURLWithPath: path)
-        if let bundleID = app.bundleIdentifier,
-           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        {
-            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: .init()) { _, _ in }
-        } else {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    func makeRule() -> ProxyRule? {
-        guard isSaveEnabled else {
-            errorMessage = String(localized: "Complete the matching rule and local target before saving.")
-            return nil
-        }
-
-        do {
-            if targetMode == .localFile {
-                try saveLocalFileIfNeeded()
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
-        }
-
-        var condition = originalRule?.matchCondition ?? RuleMatchCondition()
-        condition.urlPattern = urlPatternForSaving()
-        condition.method = method.ruleValue
-
-        return ProxyRule(
-            id: existingID ?? UUID(),
-            name: name,
-            isEnabled: originalRule?.isEnabled ?? true,
-            matchCondition: condition,
-            action: .mapLocal(
-                filePath: targetMode == .localDirectory ? directoryPath : filePath,
-                statusCode: statusCodeFromText(),
-                isDirectory: targetMode == .localDirectory,
-                delayMs: delayMs
-            ),
-            priority: originalRule?.priority ?? 0
-        )
-    }
-
-    func urlPatternForSaving() -> String {
-        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard matchType == .wildcard else {
-            return trimmed
-        }
-        let pattern = includeSubpaths && !trimmed.hasSuffix("*") ? "\(trimmed)*" : trimmed
-        return MapLocalPatternFormatter.wildcardToRegex(pattern)
-    }
-
-    // MARK: Private
-
-    private var isTargetValid: Bool {
-        switch targetMode {
-        case .localFile:
-            return localFileEnabled && !filePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .localDirectory:
-            return localDirectoryEnabled && isDirectoryValid
-        }
-    }
-
-    private func loadBlank() {
-        name = "Untitled"
-        urlText = ""
-        method = .any
-        matchType = .wildcard
-        includeSubpaths = false
-        delayPreset = .none
-        customDelaySeconds = 15
-        targetMode = .localFile
-        localFileEnabled = true
-        localDirectoryEnabled = false
-        filePath = Self.defaultMapLocalFilePath()
-        directoryPath = ""
-        httpMessageText = MapLocalHTTPMessage.defaultMessage(statusCode: 200)
-    }
-
-    private func load(draft: MapLocalDraft) {
-        loadBlank()
-        name = draft.suggestedName.isEmpty ? "Untitled" : draft.suggestedName
-        method = MapLocalHTTPMethod(ruleMethod: draft.sourceMethod)
-        includeSubpaths = draft.origin == .domainQuickCreate
-        if let sourceURL = draft.sourceURL {
-            urlText = sourceURL.absoluteString
-        } else {
-            urlText = "https://\(draft.sourceHost)/*"
-        }
-        if let body = draft.responseBody, !body.isEmpty {
-            let status = 200
-            let contentType = draft.responseContentType ?? "application/json; charset=utf-8"
-            let bodyText = String(data: body, encoding: .utf8) ?? ""
-            httpMessageText = MapLocalHTTPMessage.message(statusCode: status, contentType: contentType, body: bodyText)
-        }
-    }
-
-    private func load(existingRule rule: ProxyRule) {
-        name = rule.name.isEmpty ? "Untitled" : rule.name
-        let storedPattern = rule.matchCondition.urlPattern ?? ""
-        if MapLocalPatternFormatter.prefersWildcardPresentation(storedPattern) {
-            urlText = MapLocalPatternFormatter.readablePattern(storedPattern)
-            matchType = .wildcard
-        } else {
-            urlText = storedPattern
-            matchType = .regex
-        }
-        method = MapLocalHTTPMethod(ruleMethod: rule.matchCondition.method)
-        includeSubpaths = false
-        if case let .mapLocal(path, statusCode, isDirectory, delayMs) = rule.action {
-            targetMode = isDirectory ? .localDirectory : .localFile
-            filePath = isDirectory ? "" : path
-            directoryPath = isDirectory ? path : ""
-            localFileEnabled = !isDirectory
-            localDirectoryEnabled = isDirectory
-            delayPreset = MapLocalDelayPreset.from(delayMs: delayMs)
-            if delayPreset == .custom {
-                customDelaySeconds = max(0, delayMs / 1_000)
-            }
-            httpMessageText = MapLocalHTTPMessage.message(statusCode: statusCode, filePath: path)
-        }
-    }
-
-    private func statusCodeFromText() -> Int {
-        MapLocalHTTPMessage.parse(httpMessageText).statusCode
-    }
-
-    private func saveLocalFileIfNeeded() throws {
-        let parsed = MapLocalHTTPMessage.parse(httpMessageText)
-        let url = URL(fileURLWithPath: filePath)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try Data(parsed.body.utf8).write(to: url, options: .atomic)
-    }
-
-    private static func defaultMapLocalFilePath() -> String {
-        let directory = RockxyIdentity.current
-            .appSupportDirectory()
-            .appendingPathComponent("map-local", isDirectory: true)
-        return directory
-            .appendingPathComponent("default_message_\(UUID().uuidString.prefix(8)).json")
-            .path
-    }
-}
-
-private extension Result where Success == NSRegularExpression, Failure == RegexValidator.ValidationError {
-    var isSuccess: Bool {
-        if case .success = self {
-            return true
-        }
-        return false
-    }
-}
-
 // MARK: - MapLocalEditorWindowView
 
 struct MapLocalEditorWindowView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @State private var editorStore = MapLocalEditorStore.shared
+    // MARK: Internal
+
     @State var viewModel = MapLocalEditorViewModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.formVerticalPadding) {
-            matchingRuleSection
-            mapToSection
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 3) {
+                    Text(editorTitle)
+                        .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
+
+                    if let provenance = quickCreateProvenance {
+                        provenanceBanner(provenance)
+                    }
+
+                    ruleDetailsSection
+                    responseSourceSection
+                }
+                .padding(.horizontal, toolMetrics.formHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
+
+            Divider()
+            footer
         }
         .font(toolMetrics.font())
-        .padding(.horizontal, toolMetrics.formHorizontalPadding)
-        .padding(.top, toolMetrics.formVerticalPadding + 12)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
-        .frame(minWidth: 1_024, minHeight: max(720, toolMetrics.bodyFontSize * 22 + 440))
+        .frame(minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496))
+        .frame(height: max(680, toolMetrics.bodyFontSize * 20 + 420))
         .navigationTitle(viewModel.windowTitle)
         .onAppear { viewModel.load(context: editorStore.context) }
         .onChange(of: editorStore.draftVersion) { _, _ in
@@ -970,7 +623,11 @@ struct MapLocalEditorWindowView: View {
             String(localized: "Map Local"),
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
+                set: {
+                    if !$0 {
+                        viewModel.errorMessage = nil
+                    }
+                }
             )
         ) {
             Button(String(localized: "OK")) { viewModel.errorMessage = nil }
@@ -981,62 +638,115 @@ struct MapLocalEditorWindowView: View {
         }
     }
 
-    private var matchingRuleSection: some View {
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @State private var editorStore = MapLocalEditorStore.shared
+    @State private var isSaving = false
+
+    private var editorTitle: String {
+        viewModel.existingID == nil
+            ? String(localized: "New Map Local Rule")
+            : String(localized: "Edit Map Local Rule")
+    }
+
+    private var quickCreateProvenance: String? {
+        guard let draft = viewModel.draft else {
+            return nil
+        }
+        if let sourceURL = draft.sourceURL {
+            return String(localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)")
+        }
+        return String(localized: "Created from domain \(draft.sourceHost)")
+    }
+
+    private var fileStatusColor: Color {
+        if viewModel.isCapturedBinary {
+            return .blue
+        }
+        if viewModel.isExternalReference {
+            return viewModel.isSelectedFileAvailable ? .green : .orange
+        }
+        return viewModel.isSelectedFileAvailable ? .green : .secondary
+    }
+
+    private var fileStatusMessage: String {
+        if viewModel.isCapturedBinary {
+            return String(localized: "Captured binary response will be written when the rule is saved.")
+        }
+        if viewModel.isExternalReference {
+            return viewModel.isSelectedFileAvailable
+                ? String(localized: "External file available")
+                : String(localized: "External file is currently unavailable")
+        }
+        return viewModel.isSelectedFileAvailable
+            ? String(localized: "Rockxy-owned response file available")
+            : String(localized: "Rockxy will create this response file when the rule is saved.")
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Matching Rule"))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .medium))
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(String(localized: "Name:"))
-                        .lineLimit(1)
-                        .frame(width: compactLabelWidth, alignment: .trailing)
-                    TextField(String(localized: "Untitled"), text: $viewModel.name)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .frame(minHeight: toolMetrics.formControlHeight)
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Name")) {
+                        TextField(String(localized: "Untitled"), text: $viewModel.name)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Rule name"))
+                    }
+                    .frame(width: max(250, toolMetrics.fieldWidth(250)))
+
+                    fieldGroup(String(localized: "URL pattern")) {
+                        TextField("https://example.com/api/*", text: $viewModel.urlText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(toolMetrics.font(monospaced: true))
+                            .accessibilityLabel(String(localized: "URL pattern"))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
 
-                HStack {
-                    Text(String(localized: "URL:"))
-                        .lineLimit(1)
-                        .frame(width: compactLabelWidth, alignment: .trailing)
-                    TextField("api.proxyman.com/v1/*", text: $viewModel.urlText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                }
-
-                HStack(spacing: 10) {
-                    Spacer().frame(width: compactLabelWidth)
-                    methodMenu
-                    matchTypeMenu
-                    Text(String(localized: "Support wildcard * and ?."))
+                if let validationMessage = viewModel.urlValidationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
                         .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(String(localized: "Test your Rule")) {}
-                        .buttonStyle(.link)
+                        .foregroundStyle(.red)
                 }
 
-                HStack {
-                    Spacer().frame(width: compactLabelWidth)
-                    Toggle(String(localized: "Include all subpaths of this URL"), isOn: $viewModel.includeSubpaths)
-                        .toggleStyle(.checkbox)
+                HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                    inlineField(String(localized: "Method")) {
+                        methodMenu
+                    }
+                    inlineField(String(localized: "Match type")) {
+                        matchTypeMenu
+                    }
+
+                    if viewModel.matchType == .wildcard {
+                        Text(String(localized: "Supports * and ?."))
+                            .font(toolMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                if viewModel.matchType == .wildcard {
+                    Toggle(
+                        String(localized: "Include all subpaths of this URL"),
+                        isOn: $viewModel.includeSubpaths
+                    )
+                    .toggleStyle(.checkbox)
                 }
 
                 Divider()
-                    .padding(.leading, compactLabelWidth)
 
-                HStack(spacing: 12) {
-                    Spacer().frame(width: compactLabelWidth)
-                    Text(String(localized: "Advanced Settings:"))
-                        .font(toolMetrics.font(weight: .semibold))
-                }
-                HStack(spacing: 10) {
-                    Text(String(localized: "Delay Response:"))
-                        .lineLimit(1)
-                        .frame(width: advancedLabelWidth, alignment: .trailing)
+                HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+                    Text(String(localized: "Response delay"))
+                        .foregroundStyle(.secondary)
                     delayMenu
                     if viewModel.delayPreset == .custom {
                         Stepper(
@@ -1046,149 +756,211 @@ struct MapLocalEditorWindowView: View {
                         )
                         .frame(width: toolMetrics.fieldWidth(160))
                     }
+                    Spacer()
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
         }
     }
 
-    private var mapToSection: some View {
+    private var responseSourceSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Map To"))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .medium))
+            Text(String(localized: "Response Source"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            ZStack(alignment: .top) {
-                VStack(spacing: 0) {
-                    if viewModel.targetMode == .localFile {
-                        localFileSection
-                    } else {
-                        localDirectorySection
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 30)
-                .padding(.bottom, 14)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(nsColor: .separatorColor).opacity(0.35)))
-                .padding(.top, 10)
-
-                Picker("", selection: $viewModel.targetMode) {
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                Picker(String(localized: "Source type"), selection: $viewModel.targetMode) {
                     Text(MapLocalTargetMode.localFile.displayName).tag(MapLocalTargetMode.localFile)
                     Text(MapLocalTargetMode.localDirectory.displayName).tag(MapLocalTargetMode.localDirectory)
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(width: toolMetrics.menuWidth(240))
-                .background(
-                    Color(nsColor: .controlBackgroundColor)
-                        .padding(.horizontal, -8)
-                        .padding(.vertical, -3)
-                )
-                .zIndex(1)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                Divider()
+
+                responseStatusRow
+
+                if viewModel.targetMode == .localFile {
+                    localFileSection
+                } else {
+                    localDirectorySection
+                }
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
         }
     }
 
     private var localFileSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Toggle(String(localized: "Enable Local File"), isOn: $viewModel.localFileEnabled)
-                .toggleStyle(.checkbox)
-            Text("File: \(viewModel.filePath)")
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 10, height: 10)
-                Text(String(localized: "Map Response Body with a local file (Saved)"))
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            HStack(alignment: .bottom, spacing: toolMetrics.controlSpacing) {
+                fieldGroup(String(localized: "Local file")) {
+                    Text(viewModel.filePath)
+                        .font(toolMetrics.font(monospaced: true))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 5)
+                                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                        }
+                        .help(viewModel.filePath)
+                }
+                .frame(maxWidth: .infinity)
+
+                Button(String(localized: "Choose…")) { viewModel.choosePath() }
+                    .frame(height: toolMetrics.formControlHeight)
+
+                fileActionsMenu
             }
 
-            MapLocalHTTPMessageEditor(text: $viewModel.httpMessageText, editorSettings: toolMetrics.codeEditorSettings)
-                .frame(minHeight: 238)
-                .clipped()
-                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35)))
-
-            HStack(spacing: 10) {
-                Button(String(localized: "Select Local File")) { viewModel.choosePath() }
-                Text(String(localized: "Accept HTTP Message Format or Local File"))
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(fileStatusColor)
+                    .frame(width: 8, height: 8)
+                Text(fileStatusMessage)
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {
-                    viewModel.errorMessage = String(localized: """
-                    Paste an HTTP response message or plain body. Rockxy saves the body to the local file and uses the status line for the response code.
-                    """)
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.borderless)
                 Spacer()
-                gearMenu
-                Button(String(localized: "Save ⌘S")) { saveAndClose() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!viewModel.isSaveEnabled)
+                Text(viewModel.responseContentType)
+                    .font(toolMetrics.metadataFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .help(String(localized: "Content-Type is inferred from the file extension."))
+            }
+
+            if viewModel.isInlineResponseEditable {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(localized: "Response body"))
+                        .foregroundStyle(.secondary)
+                    MapLocalHTTPMessageEditor(
+                        text: Binding(
+                            get: { viewModel.responseBodyText },
+                            set: { viewModel.responseBodyText = $0 }
+                        ),
+                        editorSettings: toolMetrics.codeEditorSettings
+                    )
+                    .frame(minHeight: 230)
+                    .clipped()
+                    .overlay {
+                        Rectangle()
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    }
+                    Text(
+                        String(
+                            localized:
+                            "Rockxy saves the status code and body. Content-Type is inferred from the file extension."
+                        )
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: viewModel.isCapturedBinary ? "doc.zipper" : "link")
+                        .foregroundStyle(.secondary)
+                    Text(
+                        viewModel.isCapturedBinary
+                            ? String(
+                                localized:
+                                "Captured binary data is preserved byte-for-byte and cannot be edited inline."
+                            )
+                            : String(
+                                localized:
+                                "This rule references a user-owned file. Rockxy will never rewrite its contents."
+                            )
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(10)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
             }
         }
     }
 
+    private var responseStatusRow: some View {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+            Text(String(localized: "Status code"))
+                .foregroundStyle(.secondary)
+            TextField(
+                "",
+                value: Binding(
+                    get: { viewModel.responseStatusCode },
+                    set: { viewModel.setResponseStatusCode($0) }
+                ),
+                format: .number
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 84, height: toolMetrics.formControlHeight)
+            .accessibilityLabel(String(localized: "HTTP response status code"))
+            Text(String(localized: "Applied to every response from this rule · Valid range: 100–599"))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+    }
+
     private var localDirectorySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Toggle(String(localized: "Enable Local Directory"), isOn: $viewModel.localDirectoryEnabled)
-                .toggleStyle(.checkbox)
-
-            HStack {
-                Text(String(localized: "Directory Path:"))
-                    .lineLimit(1)
-                TextField("", text: $viewModel.directoryPath)
-                    .textFieldStyle(.roundedBorder)
-                    .font(toolMetrics.font())
-                    .frame(minHeight: toolMetrics.formControlHeight)
+        VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+            fieldGroup(String(localized: "Local directory")) {
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    TextField(String(localized: "Choose a directory"), text: $viewModel.directoryPath)
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font(monospaced: true))
+                    Button(String(localized: "Choose…")) { viewModel.choosePath() }
+                    Button(String(localized: "Show in Finder")) { viewModel.showSelectedPathInFinder() }
+                        .disabled(!viewModel.isDirectoryValid)
+                }
             }
-
             HStack(spacing: 8) {
                 Circle()
-                    .fill(viewModel.isDirectoryValid ? .green : .red)
-                    .frame(width: 10, height: 10)
+                    .fill(viewModel.isDirectoryValid ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
                 Text(viewModel.isDirectoryValid
-                    ? String(localized: "Directory Found")
-                    : String(localized: "Directory Not Found!"))
-                .foregroundStyle(.secondary)
-            }
-            .padding(.leading, directoryLeading)
-
-            HStack(spacing: 12) {
-                Spacer().frame(width: directoryLeading)
-                Button(String(localized: "Select Directory")) { viewModel.choosePath() }
-                Button(String(localized: "Show in Finder")) { viewModel.showSelectedPathInFinder() }
-                    .disabled(!viewModel.isDirectoryValid)
-            }
-
-            HStack(spacing: 12) {
-                Spacer().frame(width: directoryLeading)
-                Text(String(localized: "Support map from Root or Sub-Directories"))
+                    ? String(localized: "Directory available")
+                    : String(localized: "Choose an available directory to continue."))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {
-                    viewModel.errorMessage = String(localized: """
-                    Directory mode maps request subpaths into the selected local directory. Root requests fall back to index.html when present.
-                    """)
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                }
-                .buttonStyle(.borderless)
-                Spacer()
-                Button(String(localized: "Save ⌘S")) { saveAndClose() }
-                    .keyboardShortcut("s", modifiers: .command)
-                    .disabled(!viewModel.isSaveEnabled)
             }
-            Spacer(minLength: 80)
+
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                Text(
+                    String(
+                        localized:
+                        "Request subpaths resolve inside this directory. Root requests use index.html when it exists."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(10)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
         }
     }
 
@@ -1205,11 +977,11 @@ struct MapLocalEditorWindowView: View {
                 }
             }
         } label: {
-            menuLabel(viewModel.method.rawValue)
+            dataEntryMenuLabel(viewModel.method.rawValue, width: toolMetrics.menuWidth(90))
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(90))
     }
 
     private var matchTypeMenu: some View {
@@ -1224,17 +996,12 @@ struct MapLocalEditorWindowView: View {
                     Divider()
                 }
             }
-            Divider()
-            Menu(String(localized: "Advanced")) {
-                Button(String(localized: "Use Regex")) { viewModel.matchType = .regex }
-                Button(String(localized: "Use Wildcard")) { viewModel.matchType = .wildcard }
-            }
         } label: {
-            menuLabel(viewModel.matchType.displayName)
+            dataEntryMenuLabel(viewModel.matchType.displayName, width: toolMetrics.menuWidth(150))
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(150))
     }
 
     private var delayMenu: some View {
@@ -1250,33 +1017,81 @@ struct MapLocalEditorWindowView: View {
                 }
             }
         } label: {
-            menuLabel(viewModel.delayPreset.displayName, minWidth: 132)
+            dataEntryMenuLabel(viewModel.delayPreset.displayName, width: toolMetrics.menuWidth(160))
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(160))
     }
 
-    private var gearMenu: some View {
+    private var fileActionsMenu: some View {
         Menu {
-            Toggle(String(localized: "Auto-Save"), isOn: $viewModel.autoSave)
-            Divider()
-            Button(String(localized: "Show in Finder...")) { viewModel.showSelectedPathInFinder() }
+            Button(String(localized: "Show in Finder")) { viewModel.showSelectedPathInFinder() }
+                .disabled(!viewModel.isSelectedFileAvailable)
             Divider()
             ForEach(MapLocalExternalEditor.allCases) { editor in
-                Button(editor.displayName) { viewModel.openSelectedPath(with: editor) }
+                Button(String(localized: "Open with \(editor.displayName)")) {
+                    viewModel.openSelectedPath(with: editor)
+                }
+                .disabled(!viewModel.isSelectedFileAvailable)
             }
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "gearshape.fill")
-                Image(systemName: "chevron.down")
-                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
-            }
-            .frame(minWidth: 50)
+            Image(systemName: "ellipsis.circle")
+                .frame(width: toolMetrics.footerControlHeight, height: toolMetrics.formControlHeight)
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .help(String(localized: "File Actions"))
+    }
+
+    private var footer: some View {
+        HStack {
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                footerButtonLabel(String(localized: "Cancel"))
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Button {
+                saveAndClose()
+            } label: {
+                footerButtonLabel(
+                    isSaving
+                        ? String(localized: "Saving…")
+                        : viewModel.existingID == nil
+                        ? String(localized: "Add")
+                        : String(localized: "Save")
+                )
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(!viewModel.isSaveEnabled || isSaving)
+        }
+        .padding(.horizontal, toolMetrics.formHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    private func provenanceBanner(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "arrow.turn.down.right")
+                .foregroundStyle(.secondary)
+            Text(message)
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(message)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+        }
     }
 
     private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
@@ -1288,41 +1103,90 @@ struct MapLocalEditorWindowView: View {
         }
     }
 
-    private func menuLabel(_ title: String, minWidth: CGFloat = 90) -> some View {
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
         HStack(spacing: 6) {
             Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 6)
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
         }
-        .frame(minWidth: toolMetrics.menuWidth(minWidth))
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
     }
 
-    private var compactLabelWidth: CGFloat {
-        toolMetrics.formCompactLabelWidth
+    private func inlineField(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
     }
 
-    private var advancedLabelWidth: CGFloat {
-        toolMetrics.menuWidth(140)
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
     }
 
-    private var directoryLeading: CGFloat {
-        toolMetrics.menuWidth(200)
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
     }
 
     private func saveAndClose() {
         guard let rule = viewModel.makeRule() else {
             return
         }
-        if viewModel.existingID == nil {
-            Task { await RulePolicyGate.shared.addRule(rule) }
-        } else {
-            Task { await RulePolicyGate.shared.updateRule(rule) }
+        isSaving = true
+        Task {
+            if viewModel.existingID == nil {
+                let accepted = await RulePolicyGate.shared.addRule(rule)
+                guard accepted else {
+                    viewModel.errorMessage = String(
+                        localized:
+                        "The active Map Local rule limit was reached. Disable another rule and try again."
+                    )
+                    isSaving = false
+                    return
+                }
+            } else {
+                await RulePolicyGate.shared.updateRule(rule)
+            }
+            isSaving = false
+            dismiss()
         }
-        dismiss()
     }
 }
 
@@ -1334,7 +1198,11 @@ enum MapLocalExternalEditor: String, CaseIterable, Identifiable {
     case textEdit
     case xcode
 
-    var id: String { rawValue }
+    // MARK: Internal
+
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
@@ -1352,37 +1220,5 @@ enum MapLocalExternalEditor: String, CaseIterable, Identifiable {
         case .textEdit: "com.apple.TextEdit"
         case .xcode: "com.apple.dt.Xcode"
         }
-    }
-}
-
-// MARK: - MapLocalHTTPMessage
-
-enum MapLocalHTTPMessage {
-    static func defaultMessage(statusCode: Int) -> String {
-        message(statusCode: statusCode, contentType: "application/json; charset=utf-8", body: "{\n  \"status\": \"ok\"\n}")
-    }
-
-    static func message(statusCode: Int, filePath: String) -> String {
-        let body = (try? String(contentsOfFile: filePath, encoding: .utf8)) ?? "{\n  \"status\": \"ok\"\n}"
-        return message(statusCode: statusCode, contentType: MimeTypeResolver.mimeType(for: filePath), body: body)
-    }
-
-    static func message(statusCode: Int, contentType: String, body: String) -> String {
-        let status = HTTPURLResponse.localizedString(forStatusCode: statusCode).uppercased()
-        return "HTTP/1.1 \(statusCode) \(status)\nContent-Type: \(contentType)\n\n\(body)"
-    }
-
-    static func parse(_ text: String) -> (statusCode: Int, body: String) {
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-        let lines = normalized.components(separatedBy: "\n")
-        let statusCode = lines.first
-            .flatMap { line in
-                line.split(separator: " ").dropFirst().first.flatMap { Int($0) }
-            } ?? 200
-
-        if let range = normalized.range(of: "\n\n") {
-            return (statusCode, String(normalized[range.upperBound...]))
-        }
-        return (statusCode, normalized)
     }
 }

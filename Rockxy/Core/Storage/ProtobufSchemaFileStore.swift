@@ -1,9 +1,19 @@
 import Foundation
 import os
 
+// MARK: - ProtobufSchemaFileStoring
+
+protocol ProtobufSchemaFileStoring {
+    func loadDescriptors() throws -> [ProtobufSchemaDescriptor]
+    func saveDescriptors(_ descriptors: [ProtobufSchemaDescriptor]) throws
+    func saveSchemaData(_ data: Data, descriptorID: UUID) throws
+    func loadSchemaData(descriptorID: UUID) throws -> Data?
+    func removeSchemaData(descriptorID: UUID) throws
+}
+
 // MARK: - ProtobufSchemaFileStore
 
-struct ProtobufSchemaFileStore {
+struct ProtobufSchemaFileStore: ProtobufSchemaFileStoring {
     // MARK: Lifecycle
 
     init(directoryURL: URL = RockxyIdentity.current.appSupportPath("protobuf-schemas")) {

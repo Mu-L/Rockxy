@@ -1,22 +1,26 @@
-import os
+import AppKit
 import SwiftUI
 
-// Presents the Proxyman-style Map Remote management and editor windows.
+// Presents the native Map Remote management and editor windows.
 
 // MARK: - MapRemoteEditorContext
 
 struct MapRemoteEditorContext {
+    static let blank = MapRemoteEditorContext()
+
     var existingRule: ProxyRule?
     var draft: MapRemoteDraft?
-
-    static let blank = MapRemoteEditorContext()
 }
 
 // MARK: - MapRemoteEditorStore
 
 @MainActor @Observable
 final class MapRemoteEditorStore {
+    // MARK: Lifecycle
+
     private init() {}
+
+    // MARK: Internal
 
     static let shared = MapRemoteEditorStore()
 
@@ -49,10 +53,7 @@ final class MapRemoteWindowViewModel {
     var allRules: [ProxyRule] = []
     var searchText = ""
     var selectedRuleIDs: Set<UUID> = []
-    var isFilterVisible = false
     var isToolEnabled: Bool
-    var errorMessage: String?
-    private var pendingRuleSyncTask: Task<Void, Never>?
 
     var mapRemoteRules: [ProxyRule] {
         allRules.filter { rule in
@@ -64,16 +65,25 @@ final class MapRemoteWindowViewModel {
     }
 
     var filteredRules: [ProxyRule] {
-        guard !searchText.isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else {
             return mapRemoteRules
         }
-        let query = searchText.lowercased()
         return mapRemoteRules.filter { rule in
             rule.name.lowercased().contains(query)
+                || (rule.matchCondition.sourceURLPattern?.lowercased().contains(query) ?? false)
+                || (rule.matchCondition.urlPattern?.lowercased().contains(query) ?? false)
                 || methodLabel(for: rule).lowercased().contains(query)
-                || matchingRuleLabel(for: rule).lowercased().contains(query)
                 || destinationLabel(for: rule).lowercased().contains(query)
         }
+    }
+
+    var ruleCount: Int {
+        mapRemoteRules.count
+    }
+
+    var activeRuleCount: Int {
+        mapRemoteRules.filter(\.isEnabled).count
     }
 
     var selectedRule: ProxyRule? {
@@ -113,20 +123,6 @@ final class MapRemoteWindowViewModel {
             if !accepted {
                 allRules = await RuleEngine.shared.allRules
             }
-        }
-    }
-
-    func enableAll() {
-        var updated = allRules
-        for index in updated.indices {
-            if case .mapRemote = updated[index].action {
-                updated[index].isEnabled = true
-            }
-        }
-        allRules = updated
-        pendingRuleSyncTask = Task {
-            await RulePolicyGate.shared.replaceAllRules(updated)
-            allRules = await RuleEngine.shared.allRules
         }
     }
 
@@ -177,6 +173,10 @@ final class MapRemoteWindowViewModel {
     }
 
     func matchingRuleLabel(for rule: ProxyRule) -> String {
+        if let sourcePattern = rule.matchCondition.sourceURLPattern, !sourcePattern.isEmpty {
+            let prefix = rule.matchCondition.matchType == .regex ? "Regex: " : "Wildcard: "
+            return prefix + sourcePattern
+        }
         guard let pattern = rule.matchCondition.urlPattern, !pattern.isEmpty else {
             return "<Missing URL>"
         }
@@ -190,25 +190,47 @@ final class MapRemoteWindowViewModel {
         guard case let .mapRemote(config) = rule.action else {
             return ""
         }
+        guard let host = config.host, !host.isEmpty else {
+            var overrides: [String] = []
+            if let scheme = config.scheme {
+                overrides.append("Protocol \(scheme.uppercased())")
+            }
+            if let port = config.port {
+                overrides.append("Port \(port)")
+            }
+            if let path = config.path, !config.preserveOriginalURL {
+                overrides.append("Path \(path)")
+            }
+            if let query = config.query, !config.preserveOriginalURL {
+                overrides.append("Query \(query)")
+            }
+            if config.preserveOriginalURL {
+                overrides.append("Original target")
+            }
+            overrides.append("Original host")
+            return overrides.joined(separator: " · ")
+        }
         var result = ""
         if let scheme = config.scheme {
             result += "\(scheme)://"
         }
-        if let host = config.host {
-            result += host
-        }
+        let displayHost = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+        result += displayHost
         if let port = config.port {
             result += ":\(port)"
         }
-        if let path = config.path {
+        if let path = config.path, !config.preserveOriginalURL {
             if result.isEmpty {
                 result += path
             } else {
                 result += path.hasPrefix("/") ? path : "/\(path)"
             }
         }
-        if let query = config.query {
+        if let query = config.query, !config.preserveOriginalURL {
             result += "?\(query)"
+        }
+        if config.preserveOriginalURL {
+            result += " · Original target"
         }
         return result.isEmpty ? "—" : result
     }
@@ -223,32 +245,36 @@ final class MapRemoteWindowViewModel {
     // MARK: Private
 
     private static let toolEnabledKey = "mapRemoteToolEnabled"
-    private static let logger = Logger(
-        subsystem: RockxyIdentity.current.logSubsystem,
-        category: "MapRemoteWindowViewModel"
-    )
+
     private static var defaultToolEnabled: Bool {
         UserDefaults.standard.object(forKey: toolEnabledKey) as? Bool ?? true
     }
+
+    private var pendingRuleSyncTask: Task<Void, Never>?
 }
 
 // MARK: - MapRemoteWindowView
 
 struct MapRemoteWindowView: View {
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @Environment(\.openWindow) private var openWindow
+    // MARK: Internal
+
     @State var viewModel = MapRemoteWindowViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+            Divider()
+            infoBanner
+            Divider()
             tableContent
-            localhostHint
-            shortcutStrip
-            bottomBar
+            Divider()
+            footer
         }
         .font(toolMetrics.font())
-        .frame(width: 1_202, height: 640)
+        .frame(
+            minWidth: max(900, toolMetrics.bodyFontSize * 30 + 520),
+            minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
+        )
         .task { await viewModel.refreshFromEngine() }
         .onAppear { consumePendingDraftIfNeeded() }
         .onReceive(NotificationCenter.default.publisher(for: .openMapRemoteWindow)) { _ in
@@ -257,58 +283,79 @@ struct MapRemoteWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .rulesDidChange)) { notification in
             viewModel.handleRulesDidChange(notification)
         }
-        .alert(
-            String(localized: "Map Remote"),
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )
-        ) {
-            Button(String(localized: "OK")) { viewModel.errorMessage = nil }
-        } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
-            }
-        }
+    }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.openWindow) private var openWindow
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var footerHint: String {
+        let countText = isSearching
+            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
+            : String(localized: "\(viewModel.ruleCount) rules")
+        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.headerSpacing) {
-            Toggle(isOn: Binding(
-                get: { viewModel.isToolEnabled },
-                set: { viewModel.setToolEnabled($0) }
-            )) {
-                Text(String(localized: "Enable Map Remote Tool"))
-                    .font(toolMetrics.font())
-            }
-            .toggleStyle(.checkbox)
-            .padding(.top, toolMetrics.headerTopPadding)
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    String(localized: "Enable Map Remote"),
+                    isOn: Binding(
+                        get: { viewModel.isToolEnabled },
+                        set: { viewModel.setToolEnabled($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font(weight: .medium))
 
-            Text(String(localized: "Map Requests to different Host, Path, Post. Useful to map from Localhost ↔ Production."))
-                .font(toolMetrics.font())
-            Text(String(localized: "Each request is checked against the rules from top to bottom, stopping when a match is found."))
-                .font(toolMetrics.font())
-                .foregroundStyle(.secondary)
-
-            if viewModel.isFilterVisible {
-                HStack(spacing: toolMetrics.controlSpacing) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(String(localized: "Filter Map Remote rules"), text: $viewModel.searchText)
-                        .textFieldStyle(.roundedBorder)
-                    Button {
-                        viewModel.searchText = ""
-                        viewModel.isFilterVisible = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
+                Text(String(localized: "Rewrite matching requests to a different host, port, path, or query."))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
-                }
             }
+
+            Spacer()
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Search Map Remote rules"))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
+    }
+
+    private var infoBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text(
+                String(
+                    localized:
+                    """
+                    Map Remote participates in Rockxy's global first-match rule order. Blank fields keep matched request \
+                    components; changing Protocol with a blank Port uses the new protocol's default.
+                    """
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
     }
 
     private var tableContent: some View {
@@ -320,46 +367,52 @@ struct MapRemoteWindowView: View {
                 ))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
+                .accessibilityLabel(
+                    String(localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)")
+                )
             }
-            .width(58)
+            .width(62)
 
             TableColumn(String(localized: "Name")) { rule in
                 Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
                     .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rule.name)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 210, ideal: 260)
+            .width(min: 150, ideal: 190)
 
             TableColumn(String(localized: "Method")) { rule in
                 Text(viewModel.methodLabel(for: rule))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(86)
+            .width(76)
 
             TableColumn(String(localized: "Matching Rule")) { rule in
                 Text(viewModel.matchingRuleLabel(for: rule))
+                    .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
-                    .help(rule.matchCondition.urlPattern ?? "<Missing URL>")
+                    .truncationMode(.middle)
+                    .help(viewModel.matchingRuleLabel(for: rule))
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 300, ideal: 320)
+            .width(min: 220, ideal: 300)
 
-            TableColumn(String(localized: "To")) { rule in
+            TableColumn(String(localized: "Remote Destination")) { rule in
                 HStack(spacing: 6) {
                     Text(viewModel.destinationLabel(for: rule))
+                        .font(toolMetrics.font(monospaced: true))
                         .lineLimit(1)
+                        .truncationMode(.middle)
                         .help(viewModel.destinationLabel(for: rule))
                     if viewModel.preservesHost(for: rule) {
-                        Text("H")
-                            .font(toolMetrics.metadataFont(weight: .semibold))
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
+                        preserveHostBadge
                     }
                 }
                 .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 360, ideal: 440)
+            .width(min: 280, ideal: 420)
         }
         .contextMenu(forSelectionType: UUID.self) { ids in
             tableContextMenu(ids: ids)
@@ -373,136 +426,151 @@ struct MapRemoteWindowView: View {
         }
         .overlay {
             if viewModel.filteredRules.isEmpty {
-                Text(String(localized: "Click \"+\" or ⌘N to add new entry"))
-                    .font(.system(size: toolMetrics.emptyStateFontSize))
-                    .foregroundStyle(.secondary)
+                ContentUnavailableView(
+                    isSearching
+                        ? String(localized: "No matching rules")
+                        : String(localized: "No Map Remote rules"),
+                    systemImage: isSearching ? "magnifyingglass" : "arrow.triangle.branch",
+                    description: Text(
+                        isSearching
+                            ? String(localized: "Try a different name, method, URL, or destination.")
+                            : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                    )
+                )
             }
         }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
     }
 
-    private var localhostHint: some View {
-        Text(String(localized: "If your `localhost` requests don't show on Proxyman, please set domain aliases on /etc/hosts file"))
-            .font(toolMetrics.secondaryFont())
+    private var preserveHostBadge: some View {
+        Text(String(localized: "Host kept"))
+            .font(toolMetrics.metadataFont(weight: .semibold))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
+            .help(String(localized: "The Host header is preserved from the original request."))
+            .accessibilityLabel(String(localized: "Host header preserved"))
     }
 
-    private var shortcutStrip: some View {
-        Text("New: ⌘N    Edit: ⌘↩    Delete: ⌘⌫    Duplicate: ⌘D    Toggle: ↵")
-            .font(.system(size: toolMetrics.shortcutFontSize))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.top, toolMetrics.shortcutTopPadding)
-            .padding(.bottom, toolMetrics.shortcutBottomPadding)
-    }
-
-    private var bottomBar: some View {
+    private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            HStack(spacing: 0) {
-                Button {
-                    openNewEditor()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                        .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut("n", modifiers: .command)
+            addRemoveControl
 
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1, height: 18)
-
-                Button {
-                    viewModel.removeSelectedRules()
-                } label: {
-                    Image(systemName: "minus")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .regular))
-                        .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(viewModel.selectedRuleIDs.isEmpty)
-            }
-            .foregroundStyle(.primary)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 1))
-            .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
-
-            Button {
-                viewModel.errorMessage = String(localized: "Map Remote checks rules from top to bottom and rewrites the first matching request to the configured destination.")
-            } label: {
-                Image(systemName: "questionmark.circle")
-            }
-            .buttonStyle(.bordered)
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
-            Button {
-                withAnimation {
-                    viewModel.isFilterVisible.toggle()
-                }
-            } label: {
-                Label(String(localized: "Filter"), systemImage: "magnifyingglass")
-            }
-            .keyboardShortcut("f", modifiers: .command)
+            moreMenu
 
-            Menu {
-                Button(String(localized: "New")) { openNewEditor() }
-                    .keyboardShortcut("n", modifiers: .command)
-                Button(String(localized: "Edit")) {
-                    if let rule = viewModel.selectedRule {
-                        openEditor(for: rule)
-                    }
-                }
-                .keyboardShortcut("e", modifiers: .command)
-                .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
-                    .keyboardShortcut("d", modifiers: .command)
-                    .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Toggle")) {
-                    if let id = viewModel.selectedRuleIDs.first {
-                        viewModel.toggleRule(id: id)
-                    }
-                }
-                .keyboardShortcut(.return, modifiers: [])
-                .disabled(viewModel.selectedRule == nil)
-                Button(String(localized: "Toggle")) {
-                    if let id = viewModel.selectedRuleIDs.first {
-                        viewModel.toggleRule(id: id)
-                    }
-                }
-                .keyboardShortcut(.space, modifiers: [])
-                .disabled(viewModel.selectedRule == nil)
-                Divider()
-                Button(String(localized: "Enable All")) { viewModel.enableAll() }
-                Divider()
-                Button(String(localized: "Delete"), role: .destructive) {
-                    viewModel.removeSelectedRules()
-                }
-                .keyboardShortcut(.delete, modifiers: .command)
-                .disabled(viewModel.selectedRuleIDs.isEmpty)
-            } label: {
-                HStack(spacing: 6) {
-                    Text(String(localized: "More"))
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
-                }
-            }
-            .menuIndicator(.hidden)
-            .buttonStyle(.bordered)
-            .fixedSize()
+            Text(
+                viewModel.isToolEnabled
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
+                    : String(localized: "MAP REMOTE OFF")
+            )
+            .font(toolMetrics.metadataFont(weight: .semibold))
+            .foregroundStyle(viewModel.isToolEnabled ? Color.white : Color.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(viewModel.isToolEnabled ? Color.green : Color.secondary.opacity(0.14))
+            .clipShape(Capsule())
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private var addRemoveControl: some View {
+        HStack(spacing: 0) {
+            Button {
+                openNewEditor()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
+            .help(String(localized: "New Rule"))
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.7))
+                .frame(width: 1, height: 18)
+
+            Button {
+                viewModel.removeSelectedRules()
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRuleIDs.isEmpty)
+            .help(String(localized: "Remove Selected Rules"))
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(
+            width: max(43, toolMetrics.compactButtonSize * 2 + 1),
+            height: toolMetrics.footerControlHeight
+        )
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button(String(localized: "New Rule")) { openNewEditor() }
+                .keyboardShortcut("n", modifiers: .command)
+            Button(String(localized: "Edit Rule")) {
+                if let rule = viewModel.selectedRule {
+                    openEditor(for: rule)
+                }
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
+                .keyboardShortcut("d", modifiers: .command)
+                .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Toggle Enabled")) {
+                if let id = viewModel.selectedRuleIDs.first {
+                    viewModel.toggleRule(id: id)
+                }
+            }
+            .keyboardShortcut(.space, modifiers: [])
+            .disabled(viewModel.selectedRule == nil)
+            Divider()
+            Button(String(localized: "Delete"), role: .destructive) {
+                viewModel.removeSelectedRules()
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
+            .disabled(viewModel.selectedRuleIDs.isEmpty)
+        } label: {
+            HStack(spacing: 6) {
+                Text(String(localized: "More"))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
+            }
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .fixedSize()
     }
 
     @ViewBuilder
@@ -542,394 +610,309 @@ struct MapRemoteWindowView: View {
     }
 }
 
-// MARK: - MapRemoteEditorViewModel
+// MARK: - MapRemoteEditorWindowView
 
-@MainActor @Observable
-final class MapRemoteEditorViewModel {
+struct MapRemoteEditorWindowView: View {
     // MARK: Internal
 
-    var name = "Untitled"
-    var urlText = ""
-    var method: MapLocalHTTPMethod = .any
-    var matchType: MapLocalMatchType = .wildcard
-    var includeSubpaths = true
-    var destScheme = ""
-    var destHost = ""
-    var destPort = ""
-    var destPath = ""
-    var destQuery = ""
-    var preserveOriginalURL = false
-    var preserveHost = false
-    var errorMessage: String?
+    @State var viewModel = MapRemoteEditorViewModel()
 
-    private(set) var existingID: UUID?
-    private(set) var originalRule: ProxyRule?
-    private(set) var draft: MapRemoteDraft?
-    private(set) var isLoaded = false
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 3) {
+                    Text(editorTitle)
+                        .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
 
-    var windowTitle: String {
-        "Map Remote Editor: \(name.isEmpty ? "Untitled" : name)"
-    }
+                    if let provenance = quickCreateProvenance {
+                        provenanceBanner(provenance)
+                    }
 
-    var isSaveEnabled: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && hasAnyDestination
-            && isPortValid
-            && RegexValidator.compile(urlPatternForSaving()).isSuccess
-    }
+                    ruleDetailsSection
+                    remoteDestinationSection
+                }
+                .padding(.horizontal, toolMetrics.formHorizontalPadding)
+                .padding(.vertical, toolMetrics.formVerticalPadding)
+            }
 
-    var hasAnyDestination: Bool {
-        !destScheme.isEmpty
-            || !destHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !destPort.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !destPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !destQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var destinationPreviewString: String {
-        let scheme = destScheme.isEmpty ? "https" : destScheme
-        let host = destHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "example.com"
-            : destHost.trimmingCharacters(in: .whitespacesAndNewlines)
-        let path = normalizedPath().isEmpty ? "/" : normalizedPath()
-
-        var result = "\(scheme)://\(host)"
-        if let port = parsedPort {
-            result += ":\(port)"
+            Divider()
+            footer
         }
-        result += path
-        let query = destQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !query.isEmpty {
-            result += "?\(query)"
+        .font(toolMetrics.font())
+        .frame(minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496))
+        .frame(height: max(660, toolMetrics.bodyFontSize * 20 + 400))
+        .navigationTitle(viewModel.windowTitle)
+        .onAppear {
+            viewModel.load(context: editorStore.context)
+            focusDestinationHostIfNeeded()
         }
-        return result
-    }
-
-    func load(context: MapRemoteEditorContext) {
-        existingID = context.existingRule?.id
-        originalRule = context.existingRule
-        draft = context.draft
-
-        if let rule = context.existingRule {
-            load(existingRule: rule)
-        } else if let draft = context.draft {
-            load(draft: draft)
-        } else {
-            loadBlank()
+        .onChange(of: editorStore.draftVersion) { _, _ in
+            viewModel.load(context: editorStore.context)
+            focusDestinationHostIfNeeded()
         }
-        isLoaded = true
-    }
-
-    func tryParseDestinationURL(_ input: String) {
-        guard input.contains("://"),
-              let components = URLComponents(string: input),
-              let host = components.host, !host.isEmpty else
-        {
-            return
-        }
-
-        destScheme = components.scheme?.lowercased() ?? ""
-        destHost = host
-        if let port = components.port {
-            destPort = String(port)
-        }
-        if !components.path.isEmpty, components.path != "/" {
-            destPath = String(components.path.drop(while: { $0 == "/" }))
-        }
-        if let query = components.percentEncodedQuery {
-            destQuery = query
-        }
-    }
-
-    func makeRule() -> ProxyRule? {
-        guard isSaveEnabled else {
-            errorMessage = String(localized: "Complete the matching rule and destination before saving.")
-            return nil
-        }
-
-        var condition = originalRule?.matchCondition ?? RuleMatchCondition()
-        condition.urlPattern = urlPatternForSaving()
-        condition.method = method.ruleValue
-
-        let config = MapRemoteConfiguration(
-            scheme: destScheme.isEmpty ? nil : destScheme.lowercased(),
-            host: nilIfBlank(destHost),
-            port: parsedPort,
-            path: nilIfBlank(normalizedPath()),
-            query: nilIfBlank(destQuery),
-            preserveOriginalURL: preserveOriginalURL,
-            preserveHostHeader: preserveHost
-        )
-
-        return ProxyRule(
-            id: existingID ?? UUID(),
-            name: name,
-            isEnabled: originalRule?.isEnabled ?? true,
-            matchCondition: condition,
-            action: .mapRemote(configuration: config),
-            priority: originalRule?.priority ?? 0
-        )
-    }
-
-    func urlPatternForSaving() -> String {
-        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard matchType == .wildcard else {
-            return trimmed
-        }
-        return RulePatternBuilder.regexSource(
-            rawPattern: trimmed,
-            matchType: .wildcard,
-            includeSubpaths: includeSubpaths
-        )
     }
 
     // MARK: Private
 
-    private var parsedPort: Int? {
-        Int(destPort.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    private var isPortValid: Bool {
-        let trimmed = destPort.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return true
-        }
-        guard let port = Int(trimmed) else {
-            return false
-        }
-        return (1 ... 65_535).contains(port)
-    }
-
-    private func loadBlank() {
-        name = "Untitled"
-        urlText = ""
-        method = .any
-        matchType = .wildcard
-        includeSubpaths = true
-        destScheme = ""
-        destHost = ""
-        destPort = ""
-        destPath = ""
-        destQuery = ""
-        preserveOriginalURL = false
-        preserveHost = false
-    }
-
-    private func load(draft: MapRemoteDraft) {
-        loadBlank()
-        name = draft.suggestedName.isEmpty ? "Untitled" : draft.suggestedName
-        method = MapLocalHTTPMethod(ruleMethod: draft.sourceMethod)
-        includeSubpaths = draft.origin == .domainQuickCreate
-        if let sourceURL = draft.sourceURL {
-            urlText = sourceURL.absoluteString
-        } else {
-            urlText = "https://\(draft.sourceHost)/*"
-        }
-    }
-
-    private func load(existingRule rule: ProxyRule) {
-        name = rule.name.isEmpty ? "Untitled" : rule.name
-        let storedPattern = rule.matchCondition.urlPattern ?? ""
-        if MapLocalPatternFormatter.prefersWildcardPresentation(storedPattern) {
-            urlText = MapLocalPatternFormatter.readablePattern(storedPattern)
-            matchType = .wildcard
-        } else {
-            urlText = storedPattern
-            matchType = .regex
-        }
-        method = MapLocalHTTPMethod(ruleMethod: rule.matchCondition.method)
-        includeSubpaths = false
-        if case let .mapRemote(config) = rule.action {
-            destScheme = config.scheme ?? ""
-            destHost = config.host ?? ""
-            destPort = config.port.map(String.init) ?? ""
-            destPath = config.path.map { String($0.drop(while: { $0 == "/" })) } ?? ""
-            destQuery = config.query ?? ""
-            preserveOriginalURL = config.preserveOriginalURL
-            preserveHost = config.preserveHostHeader
-        }
-    }
-
-    private func normalizedPath() -> String {
-        let trimmed = destPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ""
-        }
-        return trimmed.hasPrefix("/") ? trimmed : "/\(trimmed)"
-    }
-
-    private func nilIfBlank(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-// MARK: - MapRemoteEditorWindowView
-
-struct MapRemoteEditorWindowView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @State private var editorStore = MapRemoteEditorStore.shared
-    @State var viewModel = MapRemoteEditorViewModel()
+    @FocusState private var isDestinationHostFocused: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: toolMetrics.formVerticalPadding + 2) {
-            matchingRuleSection
-            mapToSection
-            actionBar
-        }
-        .font(toolMetrics.font())
-        .padding(.horizontal, toolMetrics.formHorizontalPadding)
-        .padding(.top, toolMetrics.headerTopPadding)
-        .padding(.bottom, toolMetrics.footerBottomPadding)
-        .frame(minWidth: 834, minHeight: max(560, toolMetrics.bodyFontSize * 17 + 340))
-        .navigationTitle(viewModel.windowTitle)
-        .onAppear { viewModel.load(context: editorStore.context) }
-        .onChange(of: editorStore.draftVersion) { _, _ in
-            viewModel.load(context: editorStore.context)
-        }
-        .alert(
-            String(localized: "Map Remote"),
-            isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )
-        ) {
-            Button(String(localized: "OK")) { viewModel.errorMessage = nil }
-        } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
-            }
-        }
+    private var editorTitle: String {
+        viewModel.existingID == nil
+            ? String(localized: "New Map Remote Rule")
+            : String(localized: "Edit Map Remote Rule")
     }
 
-    private var matchingRuleSection: some View {
+    private var quickCreateProvenance: String? {
+        guard let draft = viewModel.draft else {
+            return nil
+        }
+        if let sourceURL = draft.sourceURL {
+            return String(localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)")
+        }
+        return String(localized: "Created from domain \(draft.sourceHost)")
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Matching Rule"))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .medium))
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-                labeledTextField(String(localized: "Name:"), placeholder: String(localized: "Untitled"), text: $viewModel.name)
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Name")) {
+                        TextField(String(localized: "Untitled"), text: $viewModel.name)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel(String(localized: "Rule name"))
+                    }
+                    .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-                labeledTextField(String(localized: "Rule:"), placeholder: "/v1/*", text: $viewModel.urlText)
-
-                HStack(spacing: toolMetrics.controlSpacing) {
-                    Spacer().frame(width: compactLabelWidth)
-                    methodMenu
-                    matchTypeMenu
-                    Text(String(localized: "Support wildcard * and ?."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(String(localized: "Test your Rule")) {}
-                        .buttonStyle(.link)
+                    fieldGroup(String(localized: "URL pattern")) {
+                        TextField("https://example.com/api/*", text: $viewModel.urlText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(toolMetrics.font())
+                            .accessibilityLabel(String(localized: "URL pattern"))
+                    }
+                    .frame(maxWidth: .infinity)
                 }
 
-                HStack {
-                    Spacer().frame(width: compactLabelWidth)
-                    Toggle(String(localized: "Include all subpaths of this URL"), isOn: $viewModel.includeSubpaths)
-                        .toggleStyle(.checkbox)
+                if let validationMessage = viewModel.urlValidationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.red)
+                }
+
+                HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                    inlineField(String(localized: "Method")) {
+                        methodMenu
+                    }
+                    inlineField(String(localized: "Match type")) {
+                        matchTypeMenu
+                    }
+                    if viewModel.matchType == .wildcard {
+                        Text(String(localized: "Supports * and ?."))
+                            .font(toolMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+
+                if viewModel.matchType == .wildcard {
+                    Toggle(
+                        String(localized: "Include all subpaths of this URL"),
+                        isOn: $viewModel.includeSubpaths
+                    )
+                    .toggleStyle(.checkbox)
+                    .font(toolMetrics.font())
                 }
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
             .padding(.vertical, toolMetrics.formVerticalPadding - 2)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
         }
     }
 
-    private var mapToSection: some View {
+    private var remoteDestinationSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Map To"))
-                .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .medium))
+            Text(String(localized: "Remote Destination"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-                HStack {
-                    Text(String(localized: "Protocol:"))
-                        .lineLimit(1)
-                        .frame(width: compactLabelWidth, alignment: .trailing)
-                    schemeMenu
-                }
-
-                labeledTextField(String(localized: "Host:"), placeholder: "", text: $viewModel.destHost)
-                    .onChange(of: viewModel.destHost) { _, newValue in
-                        viewModel.tryParseDestinationURL(newValue)
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+                    inlineField(String(localized: "Protocol")) {
+                        schemeMenu
                     }
-
-                HStack {
-                    Text(String(localized: "Port:"))
-                        .lineLimit(1)
-                        .frame(width: compactLabelWidth, alignment: .trailing)
-                    TextField("443", text: $viewModel.destPort)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                        .frame(width: toolMetrics.fieldWidth(60))
+                    Spacer()
                 }
 
-                labeledTextField(String(localized: "Path:"), placeholder: "v2/api", text: $viewModel.destPath)
-                labeledTextField(String(localized: "Query:"), placeholder: "id=123", text: $viewModel.destQuery)
+                HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+                    fieldGroup(String(localized: "Host")) {
+                        TextField(String(localized: "Keep original"), text: $viewModel.destHost)
+                            .textFieldStyle(.roundedBorder)
+                            .font(toolMetrics.font())
+                            .focused($isDestinationHostFocused)
+                            .accessibilityLabel(String(localized: "Destination host"))
+                    }
+                    .frame(maxWidth: .infinity)
 
-                Text(String(localized: "Leave textfields blank to keep it unchanged from matched requests. Wildcard/Regex is not allowed."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(String(localized: "Hint: Paste your URL to the Host textfield to auto-parse each components (Host, Port, Path, Query)."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .fixedSize(horizontal: false, vertical: true)
+                    fieldGroup(String(localized: "Port")) {
+                        TextField(String(localized: "Automatic"), text: $viewModel.destPort)
+                            .textFieldStyle(.roundedBorder)
+                            .font(toolMetrics.font())
+                            .accessibilityLabel(String(localized: "Destination port"))
+                    }
+                    .frame(width: toolMetrics.fieldWidth(90))
+                }
+
+                if let schemeError = viewModel.schemeValidationMessage {
+                    validationLabel(schemeError)
+                }
+                if let hostError = viewModel.hostValidationMessage {
+                    validationLabel(hostError)
+                }
+                if let portError = viewModel.portValidationMessage {
+                    validationLabel(portError)
+                }
+                if let destinationError = viewModel.destinationValidationMessage {
+                    validationLabel(destinationError)
+                }
+
+                fieldGroup(String(localized: "Path")) {
+                    TextField(String(localized: "Keep original"), text: $viewModel.destPath)
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .accessibilityLabel(String(localized: "Destination path"))
+                }
+
+                fieldGroup(String(localized: "Query")) {
+                    TextField(String(localized: "Keep original"), text: $viewModel.destQuery)
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .accessibilityLabel(String(localized: "Destination query"))
+                }
+
+                Text(
+                    String(
+                        localized: "Blank fields keep the matched request component. If Protocol changes while Port is blank, Rockxy uses the new protocol's default port."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
                 Divider()
-                    .padding(.leading, fieldLeading)
-                    .padding(.vertical, 4)
 
-                Text(String(localized: "Advanced Settings:"))
-                    .font(toolMetrics.font(weight: .semibold))
-                    .padding(.leading, fieldLeading)
+                fullURLRow
+                if viewModel.hasAnyDestination {
+                    destinationSummaryRow
+                }
 
-                Toggle(String(localized: "Preserve the Original URL after matching with Map Remote"), isOn: $viewModel.preserveOriginalURL)
+                Divider()
+
+                Toggle(
+                    String(localized: "Keep original request path and query"),
+                    isOn: $viewModel.preserveOriginalURL
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
+                .accessibilityHint(
+                    String(localized: "Forwards the original request target while connecting to the remote destination.")
+                )
+                Text(
+                    String(
+                        localized:
+                        "The destination protocol, host, and port still choose the remote server. Path and query overrides are ignored while this is enabled."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Toggle(String(localized: "Preserve Host header"), isOn: $viewModel.preserveHost)
                     .toggleStyle(.checkbox)
-                    .padding(.leading, fieldLeading)
-                Text(String(localized: "The Request URL will be replaced with a new Map Remote URL."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Toggle(String(localized: "Preserve Host Header"), isOn: $viewModel.preserveHost)
-                    .toggleStyle(.checkbox)
-                    .padding(.leading, fieldLeading)
-                    .padding(.top, 2)
-                Text(String(localized: "The `Host` header of Requests are not changed."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, fieldLeading)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(toolMetrics.font())
+                    .accessibilityHint(
+                        String(localized: "Keeps the request's Host header even when the destination host changes.")
+                    )
+                Text(
+                    String(
+                        localized:
+                        "The Host header stays as the original request sent it. The destination host, DNS lookup, and TLS server name still use the rewritten host above."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .font(toolMetrics.font())
             .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
             .padding(.vertical, toolMetrics.formVerticalPadding - 2)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
         }
     }
 
-    private var actionBar: some View {
-        HStack {
-            Spacer()
-            Button(String(localized: "Cancel")) { dismiss() }
-            .keyboardShortcut(.cancelAction)
-                .frame(width: toolMetrics.footerButtonWidth)
-            Button(viewModel.existingID == nil ? String(localized: "Add (⌘↩)") : String(localized: "Save (⌘↩)")) {
-                saveAndClose()
+    private var fullURLRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(localized: "Fill from full URL"))
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+            HStack(spacing: toolMetrics.controlSpacing) {
+                TextField("https://staging.example.com:8443/v2?debug=1", text: $viewModel.destinationURLPaste)
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .frame(height: toolMetrics.formControlHeight)
+                    .onSubmit { applyPastedURL() }
+                    .accessibilityLabel(String(localized: "Full destination URL"))
+                Button(String(localized: "Fill fields")) { applyPastedURL() }
+                    .frame(height: toolMetrics.formControlHeight)
+                    .disabled(viewModel.destinationURLPaste.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .keyboardShortcut(.defaultAction)
-            .frame(width: toolMetrics.footerButtonWidth)
-            .disabled(!viewModel.isSaveEnabled)
+            if let parseError = viewModel.urlParseError {
+                Label(parseError, systemImage: "exclamationmark.triangle.fill")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.red)
+            }
+            if let confirmation = viewModel.urlFillConfirmation {
+                Label(confirmation, systemImage: "checkmark.circle.fill")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.green)
+            }
         }
-        .padding(.top, 2)
+    }
+
+    private var destinationSummaryRow: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "arrow.right.circle")
+                .foregroundStyle(.secondary)
+            Text(viewModel.destinationSummary)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
     }
 
     private var methodMenu: some View {
@@ -945,11 +928,12 @@ struct MapRemoteEditorWindowView: View {
                 }
             }
         } label: {
-            menuLabel(viewModel.method.rawValue, minWidth: toolMetrics.menuWidth(86))
+            dataEntryMenuLabel(viewModel.method.rawValue, width: toolMetrics.menuWidth(90))
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(90))
+        .accessibilityLabel(String(localized: "Request method"))
     }
 
     private var matchTypeMenu: some View {
@@ -960,11 +944,12 @@ struct MapRemoteEditorWindowView: View {
                 }
             }
         } label: {
-            menuLabel(viewModel.matchType.displayName, minWidth: toolMetrics.menuWidth(128))
+            dataEntryMenuLabel(viewModel.matchType.displayName, width: toolMetrics.menuWidth(150))
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(150))
+        .accessibilityLabel(String(localized: "Match type"))
     }
 
     private var schemeMenu: some View {
@@ -980,22 +965,71 @@ struct MapRemoteEditorWindowView: View {
                 menuCheckmarkLabel("https", isSelected: viewModel.destScheme == "https")
             }
         } label: {
-            menuLabel(viewModel.destScheme.isEmpty ? "http/https" : viewModel.destScheme, minWidth: toolMetrics.menuWidth(80))
+            dataEntryMenuLabel(
+                viewModel.destScheme.isEmpty ? String(localized: "Keep Original") : viewModel.destScheme,
+                width: toolMetrics.menuWidth(150)
+            )
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .fixedSize()
+        .buttonStyle(.plain)
+        .frame(width: toolMetrics.menuWidth(150))
+        .accessibilityLabel(String(localized: "Destination protocol"))
     }
 
-    private func labeledTextField(_ label: String, placeholder: String, text: Binding<String>) -> some View {
-        HStack {
-            Text(label)
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let errorMessage = viewModel.errorMessage {
+                validationLabel(errorMessage)
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
+                }
+                .keyboardShortcut(.cancelAction)
+                .disabled(viewModel.isSaving)
+
+                Button {
+                    saveAndClose()
+                } label: {
+                    footerButtonLabel(
+                        viewModel.isSaving
+                            ? String(localized: "Saving…")
+                            : viewModel.existingID == nil
+                            ? String(localized: "Add")
+                            : String(localized: "Save")
+                    )
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!viewModel.isSaveEnabled || viewModel.isSaving)
+            }
+        }
+        .padding(.horizontal, toolMetrics.formHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    private func provenanceBanner(_ message: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "arrow.turn.down.right")
+                .foregroundStyle(.secondary)
+            Text(message)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: compactLabelWidth, alignment: .trailing)
-            TextField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder)
-                .font(toolMetrics.font())
-                .frame(minHeight: toolMetrics.formControlHeight)
+                .truncationMode(.middle)
+                .help(message)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
         }
     }
 
@@ -1008,45 +1042,99 @@ struct MapRemoteEditorWindowView: View {
         }
     }
 
-    private func menuLabel(_ title: String, minWidth: CGFloat) -> some View {
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
         HStack(spacing: 6) {
             Text(title)
+                .font(toolMetrics.font())
+                .lineLimit(1)
+            Spacer(minLength: 6)
             Image(systemName: "chevron.up.chevron.down")
                 .font(.system(size: 10, weight: .semibold))
         }
-        .frame(minWidth: minWidth)
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
     }
 
-    private var compactLabelWidth: CGFloat {
-        toolMetrics.formCompactLabelWidth
+    private func inlineField(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
     }
 
-    private var fieldLeading: CGFloat {
-        compactLabelWidth + toolMetrics.controlSpacing
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
+    }
+
+    private func validationLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func applyPastedURL() {
+        if viewModel.applyDestinationURL(viewModel.destinationURLPaste) {
+            viewModel.destinationURLPaste = ""
+        }
     }
 
     private func saveAndClose() {
-        guard let rule = viewModel.makeRule() else {
+        Task {
+            if await viewModel.save() {
+                dismiss()
+            }
+        }
+    }
+
+    private func focusDestinationHostIfNeeded() {
+        guard viewModel.existingID == nil, viewModel.draft != nil else {
             return
         }
-        if viewModel.existingID == nil {
-            Task { await RulePolicyGate.shared.addRule(rule) }
-        } else {
-            Task { await RulePolicyGate.shared.updateRule(rule) }
+        Task { @MainActor in
+            await Task.yield()
+            isDestinationHostFocused = true
         }
-        dismiss()
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-}
-
-private extension Result where Success == NSRegularExpression, Failure == RegexValidator.ValidationError {
-    var isSuccess: Bool {
-        if case .success = self {
-            return true
-        }
-        return false
     }
 }

@@ -9,6 +9,7 @@ struct ComposeRequestEditor: View {
     // MARK: Internal
 
     @Bindable var viewModel: ComposeViewModel
+
     let onLoadFromFile: () -> Void
 
     var body: some View {
@@ -42,37 +43,42 @@ struct ComposeRequestEditor: View {
     }
 
     private var headerBar: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: toolMetrics.headerSpacing) {
             Text(String(localized: "Request"))
                 .font(toolMetrics.font(weight: .semibold))
 
-            ForEach(ComposeRequestTab.primaryTabs) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    Text(tab.title)
-                        .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Divider()
-                .frame(height: max(18, toolMetrics.bodyFontSize + 5))
-
-            Button {
-                selectedTab = .raw
-            } label: {
-                Text(String(localized: "Raw"))
-                    .foregroundStyle(selectedTab == .raw ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
+            tabPicker
 
             Spacer()
 
             requestMenu
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .frame(minHeight: max(44, toolMetrics.formControlHeight + 16))
+    }
+
+    @ViewBuilder private var tabPicker: some View {
+        if toolMetrics.bodyFontSize >= 20 {
+            Picker(String(localized: "Request Section"), selection: $selectedTab) {
+                ForEach(ComposeRequestTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(minWidth: 130)
+            .accessibilityLabel(String(localized: "Request section"))
+        } else {
+            Picker(String(localized: "Request Section"), selection: $selectedTab) {
+                ForEach(ComposeRequestTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .accessibilityLabel(String(localized: "Request section"))
+        }
     }
 
     private var requestMenu: some View {
@@ -113,19 +119,19 @@ struct ComposeRequestEditor: View {
                             .frame(width: 24)
 
                         TextField(
-                            String(localized: "Header name"),
+                            String(localized: "e.g. Content-Type"),
                             text: headerNameBinding(for: header.id)
                         )
                         .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
+                        .font(toolMetrics.font())
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         TextField(
-                            String(localized: "Header value"),
+                            String(localized: "e.g. application/json"),
                             text: headerValueBinding(for: header.id)
                         )
                         .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
+                        .font(toolMetrics.font())
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         removeButton {
@@ -156,19 +162,19 @@ struct ComposeRequestEditor: View {
                         Color.clear.frame(width: 24)
 
                         TextField(
-                            String(localized: "Parameter name"),
+                            String(localized: "e.g. page"),
                             text: queryNameBinding(for: item.id)
                         )
                         .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
+                        .font(toolMetrics.font())
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         TextField(
-                            String(localized: "Parameter value"),
+                            String(localized: "e.g. 1"),
                             text: queryValueBinding(for: item.id)
                         )
                         .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
+                        .font(toolMetrics.font())
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         removeButton {
@@ -191,7 +197,7 @@ struct ComposeRequestEditor: View {
 
     private var bodyEditor: some View {
         VStack(spacing: 0) {
-            TextEditor(text: $viewModel.body)
+            TextEditor(text: bodyBinding)
                 .font(toolMetrics.font(monospaced: true))
                 .padding(8)
 
@@ -226,11 +232,11 @@ struct ComposeRequestEditor: View {
         HStack {
             Color.clear.frame(width: 24)
             Text(String(localized: String.LocalizationValue(name)))
-                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(String(localized: String.LocalizationValue(value)))
-                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: 24)
@@ -240,10 +246,12 @@ struct ComposeRequestEditor: View {
 
     private func removeButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: "minus.circle.fill")
-                .foregroundStyle(.red)
+            Image(systemName: "minus.circle")
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
         }
         .buttonStyle(.plain)
+        .help(String(localized: "Remove"))
     }
 
     private func addButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -259,6 +267,13 @@ struct ComposeRequestEditor: View {
     }
 
     // MARK: - Bindings
+
+    private var bodyBinding: Binding<String> {
+        Binding(
+            get: { viewModel.body },
+            set: { viewModel.replaceUnavailableBody(with: $0) }
+        )
+    }
 
     private func headerEnabledBinding(for id: UUID) -> Binding<Bool> {
         Binding(
@@ -327,8 +342,6 @@ private enum ComposeRequestTab: String, CaseIterable, Identifiable {
     case raw
 
     // MARK: Internal
-
-    static let primaryTabs: [ComposeRequestTab] = [.headers, .query, .body]
 
     var id: String {
         rawValue

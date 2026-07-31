@@ -185,14 +185,12 @@ struct ContentView: View {
                 onCancel: { coordinator.cancelImport() }
             )
         }
-        .sheet(isPresented: $coordinator.showExportScope) {
-            if let context = coordinator.exportScopeContext {
-                ExportScopeSheet(
-                    context: context,
-                    onExport: { scope in coordinator.executeExport(format: context.format, scope: scope) },
-                    onCancel: { coordinator.showExportScope = false }
-                )
-            }
+        .sheet(item: $coordinator.exportScopeContext) { context in
+            ExportScopeSheet(
+                context: context,
+                onExport: { scope in coordinator.executeExport(context: context, scope: scope) },
+                onCancel: { coordinator.exportScopeContext = nil }
+            )
         }
         .sheet(item: $coordinator.gistPublishContext) { context in
             GistPublishConfirmationSheet(

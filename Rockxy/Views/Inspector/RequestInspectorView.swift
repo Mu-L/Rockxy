@@ -24,6 +24,12 @@ struct RequestInspectorView: View {
             tabContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: previewTabStore.requestTabs.map(\.id)) { _, availableTabIDs in
+            selectedPreviewTab = InspectorPreviewSelectionReconciler.retainedSelection(
+                selectedPreviewTab,
+                availableTabIDs: availableTabIDs
+            )
+        }
     }
 
     // MARK: Private

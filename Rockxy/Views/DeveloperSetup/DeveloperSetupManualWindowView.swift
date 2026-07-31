@@ -13,27 +13,44 @@ struct DeveloperSetupManualWindowView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            Divider()
-            terminalCard
-            footerButtons
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                Divider()
+                if viewModel.isRuntimeTerminalTarget {
+                    terminalCard
+                } else {
+                    targetManualCard
+                }
+                footer
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .frame(width: 780, height: 540)
+        .frame(minWidth: 640, minHeight: 460)
         .background(Color(nsColor: .windowBackgroundColor))
+        .font(setupMetrics.font())
         .centerOverRockxyMainWindowOnAppear()
         .task {
+            viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
             viewModel.refresh()
-            viewModel.prepareScriptForDisplay()
+            if viewModel.isRuntimeTerminalTarget {
+                viewModel.prepareScriptForDisplay()
+            }
+        }
+        .onChange(of: routeStore.manualRoute) { _, _ in
+            viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
+            if viewModel.isRuntimeTerminalTarget {
+                viewModel.prepareScriptForDisplay()
+            }
         }
     }
 
     // MARK: Private
 
     @State private var viewModel: DeveloperSetupSessionSetupViewModel
+    @State private var routeStore = DeveloperSetupRouteStore.shared
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var setupMetrics: DeveloperSetupDisplayMetrics {
@@ -43,33 +60,33 @@ struct DeveloperSetupManualWindowView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: setupMetrics.prominentIconFontSize, weight: .regular))
+                Image(systemName: viewModel.target.iconName)
+                    .font(setupMetrics.font(size: setupMetrics.prominentIconFontSize))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
-                Text(String(localized: "Manual Setup"))
-                    .font(.system(size: setupMetrics.titleFontSize, weight: .semibold))
-                    .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Manual Setup"))
+                        .font(setupMetrics.font(size: setupMetrics.titleFontSize, weight: .semibold))
+                    Text(viewModel.target.title)
+                        .font(setupMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                benefitRow(
-                    systemImage: "checkmark.circle.fill",
-                    text: String(localized: "Capture traffic from Node.js, Python, Ruby, Go, cURL, and terminal-based tools.")
-                )
-                benefitRow(
-                    systemImage: "lock.shield.fill",
-                    text: String(localized: "Safe by default: source the command in your current shell session only.")
-                )
-            }
+            Text(viewModel.target.manualSummary)
+                .font(setupMetrics.font())
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
+    /// Terminal-runtime targets get the scoped-shell source-command flow.
     private var terminalCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Terminal app"))
-                .font(.system(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
+            Text(String(localized: "Terminal session"))
+                .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 16) {
                 instructionStep(
@@ -79,23 +96,20 @@ struct DeveloperSetupManualWindowView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(String(localized: "2. Copy and paste this command into that terminal"))
-                        .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .font(setupMetrics.font(weight: .semibold))
 
-                    commandBox
+                    commandBox(viewModel.manualSourceCommand)
 
-                    Button {
+                    Button(String(localized: "Copy Setup Command")) {
                         viewModel.copyManualCommand()
-                    } label: {
-                        Text(String(localized: "Copy to Clipboard"))
                     }
-                    .buttonStyle(.bordered)
                     .controlSize(.regular)
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
                 }
 
                 instructionStep(
-                    title: String(localized: "3. Done"),
-                    caption: String(localized: "Start your server or run scripts in that terminal session."),
+                    title: String(localized: "3. Run \(viewModel.target.title) in that terminal session"),
+                    caption: String(localized: "Start your server or scripts there so Rockxy can capture the traffic."),
                     trailingSystemImage: "checkmark"
                 )
             }
@@ -107,73 +121,109 @@ struct DeveloperSetupManualWindowView: View {
         }
     }
 
-    private var commandBox: some View {
-        HStack(spacing: 0) {
-            ScrollView(.horizontal) {
-                Text(viewModel.manualSourceCommand)
-                    .font(.system(size: setupMetrics.snippetFontSize, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    /// Device / browser / client / framework / environment targets show their own
+    /// manual workflow snippet and guide, never the generic localhost terminal flow.
+    private var targetManualCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: "\(viewModel.target.title) manual setup"))
+                .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(viewModel.target.currentSupportSummary)
+                    .font(setupMetrics.font())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let snippet = viewModel.targetSnippetText {
+                    commandBox(snippet, minHeight: 120)
+
+                    Button(String(localized: "Copy Setup Command")) {
+                        viewModel.copyTargetSnippet()
+                    }
+                    .controlSize(.regular)
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                }
+
+                if let guide = viewModel.guideContent, !guide.setupTips.isEmpty {
+                    ForEach(guide.setupTips) { tip in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(tip.title)
+                                .font(setupMetrics.font(weight: .semibold))
+                            Text(tip.message)
+                                .font(setupMetrics.secondaryFont())
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
         }
-        .frame(height: 64)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
-    private var footerButtons: some View {
-        HStack(spacing: 12) {
-            Button(String(localized: "How does it work?")) {
-                revealSetupScript()
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let status = viewModel.statusMessage {
+                Text(status)
+                    .font(setupMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.bordered)
 
-            Button(String(localized: "Troubleshooting")) {
-                revealSetupScript()
+            if viewModel.isRuntimeTerminalTarget {
+                Button(String(localized: "Show Setup Script in Finder")) {
+                    revealSetupScript()
+                }
+                .help(String(localized: "Reveal the generated setup script so you can inspect exactly what it exports"))
             }
-            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func benefitRow(systemImage: String, text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: setupMetrics.iconFontSize, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Color(nsColor: .systemGreen))
-                .frame(width: 18)
-
+    private func commandBox(_ text: String, minHeight: CGFloat = 64) -> some View {
+        ScrollView([.horizontal, .vertical]) {
             Text(text)
-                .font(.system(size: setupMetrics.bodyFontSize))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(setupMetrics.font(size: setupMetrics.snippetFontSize, monospaced: true))
+                .textSelection(.enabled)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(minHeight: minHeight)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityLabel(String(localized: "Generated setup command"))
+        .accessibilityValue(text)
     }
 
     private func instructionStep(
         title: String,
         caption: String,
         trailingSystemImage: String? = nil
-    ) -> some View {
+    )
+        -> some View
+    {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
-                    .font(.system(size: setupMetrics.bodyFontSize, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .font(setupMetrics.font(weight: .semibold))
 
                 if let trailingSystemImage {
                     Image(systemName: trailingSystemImage)
-                        .font(.system(size: setupMetrics.iconFontSize, weight: .bold))
+                        .font(setupMetrics.font(size: setupMetrics.iconFontSize, weight: .bold))
                         .foregroundStyle(Color(nsColor: .systemGreen))
+                        .accessibilityHidden(true)
                 }
             }
 
             Text(caption)
-                .font(.system(size: setupMetrics.bodyFontSize))
+                .font(setupMetrics.font())
                 .foregroundStyle(.secondary)
                 .padding(.leading, 24)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -182,7 +232,8 @@ struct DeveloperSetupManualWindowView: View {
             try viewModel.prepareScript()
             NSWorkspace.shared.activateFileViewerSelecting([viewModel.scriptURL])
         } catch {
-            viewModel.statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+            viewModel
+                .statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
         }
     }
 }

@@ -14,7 +14,8 @@ struct MapLocalDraft {
         sourceMethod: String? = nil,
         responseBody: Data? = nil,
         responseContentType: String? = nil,
-        inferredExtension: String? = nil
+        inferredExtension: String? = nil,
+        responseStatusCode: Int? = nil
     ) {
         self.origin = origin
         self.suggestedName = suggestedName
@@ -25,6 +26,7 @@ struct MapLocalDraft {
         self.responseBody = responseBody
         self.responseContentType = responseContentType
         self.inferredExtension = inferredExtension
+        self.responseStatusCode = responseStatusCode
     }
 
     // MARK: Internal
@@ -43,6 +45,7 @@ struct MapLocalDraft {
     let responseBody: Data?
     let responseContentType: String?
     let inferredExtension: String?
+    let responseStatusCode: Int?
 
     var hasResponseBody: Bool {
         guard let body = responseBody else {

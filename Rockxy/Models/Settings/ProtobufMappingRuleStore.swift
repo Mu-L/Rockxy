@@ -15,6 +15,8 @@ final class ProtobufMappingRuleStore {
 
     // MARK: Internal
 
+    static let shared = ProtobufMappingRuleStore()
+
     private(set) var rules: [ProtobufMappingRule]
 
     var selectedRuleID: UUID?
@@ -35,6 +37,14 @@ final class ProtobufMappingRuleStore {
         try validateMessageType(rule.responseMessageType ?? "")
     }
 
+    static func isMessageTypeValid(_ value: String) -> Bool {
+        guard !value.isEmpty else {
+            return true
+        }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_.$"))
+        return !value.unicodeScalars.contains(where: { !allowed.contains($0) })
+    }
+
     func addRule(_ rule: ProtobufMappingRule) throws {
         try Self.validate(rule)
         rules.append(rule)
@@ -45,7 +55,7 @@ final class ProtobufMappingRuleStore {
     func updateRule(_ rule: ProtobufMappingRule) throws {
         try Self.validate(rule)
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else {
-            return
+            throw ProtobufMappingRuleStoreError.ruleNoLongerExists
         }
         rules[index] = rule
         selectedRuleID = rule.id
@@ -69,6 +79,13 @@ final class ProtobufMappingRuleStore {
 
     func duplicateSelectedRule() {
         guard let selectedRule else {
+            return
+        }
+        duplicateRule(id: selectedRule.id)
+    }
+
+    func duplicateRule(id: UUID) {
+        guard let selectedRule = rules.first(where: { $0.id == id }) else {
             return
         }
         var copy = selectedRule
@@ -97,13 +114,57 @@ final class ProtobufMappingRuleStore {
         persist()
     }
 
-    func schemaName(for id: UUID?, schemas: [ProtobufSchemaDescriptor]) -> String {
-        guard let id,
-              let schema = schemas.first(where: { $0.id == id }) else
-        {
-            return String(localized: "Not selected")
+    /// Resolves how a definition's stored schema id maps onto the local schema list,
+    /// distinguishing "no schema chosen" from "chosen schema no longer exists".
+    func schemaReference(for id: UUID?, schemas: [ProtobufSchemaDescriptor]) -> ProtobufSchemaReference {
+        guard let id else {
+            return .notSelected
         }
-        return schema.fileName
+        guard let schema = schemas.first(where: { $0.id == id }) else {
+            return .missing
+        }
+        return .selected(schema.fileName)
+    }
+
+    func schemaLabel(for id: UUID?, schemas: [ProtobufSchemaDescriptor]) -> String {
+        schemaReference(for: id, schemas: schemas).displayLabel
+    }
+
+    func referenceCount(forSchema id: UUID) -> Int {
+        rules.filter { $0.schemaID == id }.count
+    }
+
+    /// Clears the stored schema id on every definition that referenced `id`, persisting the result.
+    /// Returns the number of definitions detached.
+    @discardableResult
+    func detachSchema(id: UUID) throws -> Int {
+        let original = rules
+        var detached = 0
+        for index in rules.indices where rules[index].schemaID == id {
+            rules[index].schemaID = nil
+            detached += 1
+        }
+        if detached > 0 {
+            do {
+                try persistThrowing()
+            } catch {
+                rules = original
+                throw error
+            }
+        }
+        return detached
+    }
+
+    /// Restores a previously captured rule snapshot after a coordinated operation fails.
+    func restoreRules(_ snapshot: [ProtobufMappingRule]) throws {
+        let original = rules
+        rules = snapshot
+        do {
+            try persistThrowing()
+        } catch {
+            rules = original
+            throw error
+        }
     }
 
     // MARK: Private
@@ -123,21 +184,34 @@ final class ProtobufMappingRuleStore {
     }
 
     private static func validateMessageType(_ value: String) throws {
-        guard !value.isEmpty else {
-            return
-        }
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_.$"))
-        if value.unicodeScalars.contains(where: { !allowed.contains($0) }) {
+        if !isMessageTypeValid(value) {
             throw ProtobufMappingRuleValidationError.invalidMessageType
         }
     }
 
     private func persist() {
         do {
-            let data = try JSONEncoder().encode(rules)
-            userDefaults.set(data, forKey: Self.userDefaultsKey)
+            try persistThrowing()
         } catch {
             Self.logger.error("Failed to persist Protobuf mapping rules: \(error.localizedDescription)")
+        }
+    }
+
+    private func persistThrowing() throws {
+        let data = try JSONEncoder().encode(rules)
+        userDefaults.set(data, forKey: Self.userDefaultsKey)
+    }
+}
+
+// MARK: - ProtobufMappingRuleStoreError
+
+enum ProtobufMappingRuleStoreError: LocalizedError, Equatable {
+    case ruleNoLongerExists
+
+    var errorDescription: String? {
+        switch self {
+        case .ruleNoLongerExists:
+            String(localized: "This mapping definition was deleted in another window.")
         }
     }
 }

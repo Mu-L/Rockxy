@@ -25,86 +25,94 @@ extension MainContentCoordinator {
     }
 
     func presentExport(format: TrafficExportFormat) {
-        let context = ExportScopeContext(
-            format: format,
-            allCount: transactions.count,
-            filteredCount: filteredTransactions.count,
-            selectedCount: selectedTransactionIDs.count,
-            eligibleAllCount: eligibleExportCount(in: transactions, format: format),
-            eligibleFilteredCount: eligibleExportCount(in: filteredTransactions, format: format),
-            eligibleSelectedCount: eligibleExportCount(in: resolveSelectedTransactions(), format: format),
-            initialScope: initialExportScope(format: format)
-        )
-        exportScopeContext = context
-        showExportScope = true
+        exportScopeContext = makeExportScopeContext(format: format)
     }
 
-    /// Opens the existing native export review while locking the scope to the user's selection.
-    /// Used by Assistant handoffs so analysis can never widen an export implicitly.
+    /// Opens the native export review while locking the scope to the user's selection.
+    /// Used by Assistant / Context Dock handoffs so analysis can never widen an export implicitly.
     func presentSelectedExport(format: TrafficExportFormat) {
-        let selected = resolveSelectedTransactions()
-        let context = ExportScopeContext(
+        exportScopeContext = makeExportScopeContext(format: format, restrictsToSelection: true)
+    }
+
+    /// Freezes ordered all/filtered/selected membership from a single captured
+    /// `activeWorkspace` reference. Counts derive from these snapshots, never
+    /// from separate inputs, so nothing that changes after this call can widen
+    /// or alter the reviewed export set.
+    func makeExportScopeContext(
+        format: TrafficExportFormat,
+        restrictsToSelection: Bool = false
+    )
+        -> ExportScopeContext
+    {
+        let workspace = activeWorkspace
+        return ExportScopeContext(
             format: format,
-            allCount: transactions.count,
-            filteredCount: filteredTransactions.count,
-            selectedCount: selected.count,
-            eligibleAllCount: eligibleExportCount(in: transactions, format: format),
-            eligibleFilteredCount: eligibleExportCount(in: filteredTransactions, format: format),
-            eligibleSelectedCount: eligibleExportCount(in: selected, format: format),
-            initialScope: .selected,
-            restrictsToSelection: true
+            originWorkspaceID: workspace.id,
+            originWorkspaceTitle: workspace.title,
+            allTransactions: transactions,
+            filteredTransactions: filteredTransactions,
+            selectedTransactions: resolveSelectedTransactions(),
+            hasActiveFilter: exportFilterIsActive(for: workspace),
+            restrictsToSelection: restrictsToSelection
         )
-        exportScopeContext = context
-        showExportScope = true
     }
 
-    func executeHARExport(scope: ExportScope) {
-        executeExport(format: .har, scope: scope)
-    }
-
-    func executeExport(format: TrafficExportFormat, scope: ExportScope) {
-        showExportScope = false
-
-        let scopedTransactions: [HTTPTransaction] = switch scope {
-        case .all:
-            transactions
-        case .filtered:
-            filteredTransactions
-        case .selected:
-            if selectedTransactionIDs.isEmpty {
-                transactions
-            } else {
-                resolveSelectedTransactions()
-            }
+    /// Validates a chosen scope against the frozen context and returns a pure
+    /// plan (reviewed source + eligible set + skipped count). Restricted
+    /// contexts reject all/filtered here; empty/invalid scopes fail closed.
+    func makeExportExecutionPlan(context: ExportScopeContext, scope: ExportScope) -> ExportExecutionPlan? {
+        guard context.isEnabled(scope) else {
+            return nil
         }
+        let snapshot = context.snapshot(for: scope)
+        guard !snapshot.eligibleTransactions.isEmpty else {
+            return nil
+        }
+        return ExportExecutionPlan(
+            format: context.format,
+            scope: scope,
+            reviewedSource: snapshot.transactions,
+            eligibleTransactions: snapshot.eligibleTransactions,
+            skippedCount: snapshot.skippedCount
+        )
+    }
 
-        let transactionsToExport = eligibleExportTransactions(scopedTransactions, format: format)
-        guard !transactionsToExport.isEmpty else {
+    /// Consumes only the passed review context — never live coordinator
+    /// transactions, filteredTransactions, selection, or workspace state.
+    func executeExport(context: ExportScopeContext, scope: ExportScope) {
+        let format = context.format
+        exportScopeContext = nil
+
+        guard let plan = makeExportExecutionPlan(context: context, scope: scope) else {
             activeToast = ToastMessage(style: .error, text: String(localized: "No transactions to export"))
             return
         }
 
         let data: Data
+        let exportedCount: Int
         let skippedCount: Int
         do {
             switch format {
             case .har:
-                data = try HARExporter().export(transactions: transactionsToExport)
+                data = try HARExporter().export(transactions: plan.eligibleTransactions)
+                exportedCount = plan.eligibleTransactions.count
                 skippedCount = 0
             case .openAPIYAML:
                 let result = try OpenAPIExporter().export(
-                    transactions: scopedTransactions,
+                    transactions: plan.eligibleTransactions,
                     options: OpenAPIExportOptions(format: .yaml)
                 )
                 data = result.data
-                skippedCount = result.skippedTransactionCount
+                exportedCount = result.exportedTransactionCount
+                skippedCount = plan.skippedCount + result.skippedTransactionCount
             case .openAPIHTML:
                 let result = try OpenAPIExporter().export(
-                    transactions: scopedTransactions,
+                    transactions: plan.eligibleTransactions,
                     options: OpenAPIExportOptions(format: .html)
                 )
                 data = result.data
-                skippedCount = result.skippedTransactionCount
+                exportedCount = result.exportedTransactionCount
+                skippedCount = plan.skippedCount + result.skippedTransactionCount
             }
         } catch {
             Self.logger.error("Failed to serialize export: \(error.localizedDescription)")
@@ -124,16 +132,16 @@ extension MainContentCoordinator {
         }
 
         do {
-            try data.write(to: url)
+            try data.write(to: url, options: .atomic)
             activeToast = ToastMessage(
                 style: .success,
                 text: exportSuccessMessage(
                     format: format,
-                    count: transactionsToExport.count,
+                    count: exportedCount,
                     skippedCount: skippedCount
                 )
             )
-            Self.logger.info("Exported \(transactionsToExport.count) transactions to \(url.path())")
+            Self.logger.info("Exported \(exportedCount) transactions to \(url.path())")
         } catch {
             Self.logger.error("Failed to export traffic: \(error.localizedDescription)")
             showExportError(
@@ -247,11 +255,14 @@ extension MainContentCoordinator {
     func eligibleExportTransactions(
         _ source: [HTTPTransaction],
         format: TrafficExportFormat
-    ) -> [HTTPTransaction] {
+    )
+        -> [HTTPTransaction]
+    {
         switch format {
         case .har:
             source
-        case .openAPIYAML, .openAPIHTML:
+        case .openAPIYAML,
+             .openAPIHTML:
             source.filter(OpenAPIExporter.isEligible)
         }
     }
@@ -332,25 +343,25 @@ extension MainContentCoordinator {
         }
     }
 
-    private func eligibleExportCount(
-        in source: [HTTPTransaction],
-        format: TrafficExportFormat
-    ) -> Int {
-        eligibleExportTransactions(source, format: format).count
-    }
-
-    private func initialExportScope(format: TrafficExportFormat) -> ExportScope {
-        if selectedTransactionIDs.isEmpty == false,
-           eligibleExportCount(in: resolveSelectedTransactions(), format: format) > 0
-        {
-            return .selected
+    /// Whether the workspace has an explicit visibility scope narrowing capture,
+    /// judged from workspace state — search/filter criteria, active
+    /// `FilterRuleEvaluator` rules, an active Focus Set or Traffic Signal, or
+    /// muted sources — never inferred from a count difference between all and
+    /// filtered (which can coincide when a filter simply matches everything).
+    private func exportFilterIsActive(for workspace: WorkspaceState) -> Bool {
+        if !workspace.filterCriteria.isEmpty {
+            return true
         }
-        if filteredTransactions.count != transactions.count,
-           eligibleExportCount(in: filteredTransactions, format: format) > 0
-        {
-            return .filtered
+        let activeRules = FilterRuleEvaluator.activeRules(
+            in: workspace.filterRules,
+            isFilterBarVisible: workspace.isFilterBarVisible
+        )
+        if !activeRules.isEmpty {
+            return true
         }
-        return .all
+        return workspace.activeFocusSet != nil
+            || workspace.activeTrafficSignal != nil
+            || !workspace.mutedTrafficSources.isEmpty
     }
 
     private func allowedContentTypes(for format: TrafficExportFormat) -> [UTType] {
@@ -390,7 +401,9 @@ extension MainContentCoordinator {
         format: TrafficExportFormat,
         count: Int,
         skippedCount: Int
-    ) -> String {
+    )
+        -> String
+    {
         if skippedCount > 0 {
             return String(
                 localized: "Exported \(format.successLabel) from \(count) requests; skipped \(skippedCount) ineligible requests"

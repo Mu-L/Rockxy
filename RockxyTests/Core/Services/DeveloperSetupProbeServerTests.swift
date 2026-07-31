@@ -38,8 +38,8 @@ struct DeveloperSetupProbeResponderTests {
         #expect(header("Cache-Control", in: response) == "no-store")
         #expect(header("X-Content-Type-Options", in: response) == "nosniff")
         #expect(header("Content-Type", in: response) == "application/json; charset=utf-8")
-        #expect(String(decoding: response.body, as: UTF8.self) == "{\"ok\":true}\n")
-        #expect(String(decoding: response.body, as: UTF8.self).contains(session.token) == false)
+        #expect(String(bytes: response.body, encoding: .utf8) == "{\"ok\":true}\n")
+        #expect(String(bytes: response.body, encoding: .utf8)?.contains(session.token) == false)
     }
 
     @Test("wrong token path returns not found")
@@ -89,9 +89,44 @@ struct DeveloperSetupProbeServerTests {
         let httpResponse = try #require(response as? HTTPURLResponse)
 
         #expect(httpResponse.statusCode == 200)
-        #expect(String(decoding: data, as: UTF8.self) == "{\"ok\":true}\n")
+        #expect(String(bytes: data, encoding: .utf8) == "{\"ok\":true}\n")
 
         await server.stop()
+        #expect(await server.isRunning == false)
+    }
+
+    @Test("Concurrent starts publish only the newest target session")
+    func concurrentStartsPublishNewestSession() async throws {
+        let server = DeveloperSetupProbeServer()
+        let firstStart = Task {
+            try await server.start(targetID: .python)
+        }
+        await Task.yield()
+        let secondStart = Task {
+            try await server.start(targetID: .ruby)
+        }
+
+        _ = try? await firstStart.value
+        let newestSession = try await secondStart.value
+
+        #expect(newestSession.targetID == .ruby)
+        #expect(await server.activeSession?.targetID == .ruby)
+        await server.stop()
+    }
+
+    @Test("Stop prevents an in-flight start from publishing afterward")
+    func stopIsPublicationBarrier() async {
+        let server = DeveloperSetupProbeServer()
+        let startTask = Task {
+            try await server.start(targetID: .python)
+        }
+        await Task.yield()
+
+        await server.stop()
+        _ = try? await startTask.value
+        await Task.yield()
+
+        #expect(await server.activeSession == nil)
         #expect(await server.isRunning == false)
     }
 }

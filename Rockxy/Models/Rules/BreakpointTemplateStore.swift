@@ -16,9 +16,7 @@ final class BreakpointTemplateStore {
         self.storageKey = storageKey
         self.seedDefaults = seedDefaults
         load()
-        if selectedTemplateID == nil {
-            selectedTemplateID = templates(for: selectedKind).first?.id
-        }
+        reconcileSelection(preferredID: nil, preferredKind: selectedKind)
     }
 
     // MARK: Internal
@@ -27,14 +25,30 @@ final class BreakpointTemplateStore {
 
     var selectedKind: BreakpointTemplateKind = .request {
         didSet {
-            guard selectedKind != oldValue else {
+            guard !isSynchronizingSelection, selectedKind != oldValue else {
                 return
             }
+            isSynchronizingSelection = true
             selectedTemplateID = templates(for: selectedKind).first?.id
+            isSynchronizingSelection = false
         }
     }
 
-    var selectedTemplateID: UUID?
+    var selectedTemplateID: UUID? {
+        didSet {
+            guard !isSynchronizingSelection,
+                  selectedTemplateID != oldValue,
+                  let selectedTemplateID,
+                  let kind = templates.first(where: { $0.id == selectedTemplateID })?.kind,
+                  kind != selectedKind
+            else {
+                return
+            }
+            isSynchronizingSelection = true
+            selectedKind = kind
+            isSynchronizingSelection = false
+        }
+    }
     private(set) var templates: [BreakpointTemplate] = []
 
     var requestTemplates: [BreakpointTemplate] {
@@ -90,7 +104,7 @@ final class BreakpointTemplateStore {
         let kind = templates[index].kind
         templates.remove(at: index)
         if selectedTemplateID == id {
-            selectedTemplateID = templates(for: kind).first?.id
+            selectedTemplateID = templates(for: kind).first?.id ?? templates.first?.id
         }
         save()
     }
@@ -165,7 +179,10 @@ final class BreakpointTemplateStore {
     }
 
     func reload() {
+        let previousID = selectedTemplateID
+        let previousKind = selectedKind
         load()
+        reconcileSelection(preferredID: previousID, preferredKind: previousKind)
     }
 
     func templates(for kind: BreakpointTemplateKind) -> [BreakpointTemplate] {
@@ -196,8 +213,19 @@ final class BreakpointTemplateStore {
     private let defaults: UserDefaults
     private let storageKey: String
     private let seedDefaults: Bool
+    private var isSynchronizingSelection = false
     private var seedMarkerKey: String {
         "\(storageKey).seeded"
+    }
+
+    private func reconcileSelection(
+        preferredID: UUID?,
+        preferredKind: BreakpointTemplateKind
+    ) {
+        let replacement = preferredID.flatMap { preferredID in
+            templates.first(where: { $0.id == preferredID })
+        } ?? templates(for: preferredKind).first ?? templates.first
+        selectedTemplateID = replacement?.id
     }
 
     private func uniqueName(for kind: BreakpointTemplateKind) -> String {

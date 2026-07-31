@@ -1,10 +1,11 @@
+import CryptoKit
 import Foundation
 
 // Renders the diff interface for the diff workflow.
 
 // MARK: - DiffLineType
 
-enum DiffLineType: Equatable {
+enum DiffLineType: Equatable, Sendable {
     case unchanged
     case added
     case removed
@@ -12,7 +13,7 @@ enum DiffLineType: Equatable {
 
 // MARK: - DiffLine
 
-struct DiffLine: Identifiable, Equatable {
+struct DiffLine: Identifiable, Equatable, Sendable {
     // MARK: Lifecycle
 
     init(lineNumber: Int, content: String, type: DiffLineType) {
@@ -37,7 +38,7 @@ struct DiffLine: Identifiable, Equatable {
 // MARK: - DiffSection
 
 /// A named section within a structured diff result (e.g., "Request Line", "Headers", "Body").
-struct DiffSection: Identifiable {
+struct DiffSection: Identifiable, Sendable {
     let id = UUID()
     let title: String
     let lines: [DiffLine]
@@ -47,16 +48,22 @@ struct DiffSection: Identifiable {
 
 /// A paired row for side-by-side rendering. Both panes render from the same sequence,
 /// so lines always align vertically. nil means a spacer at that position.
-struct SideBySideRow: Identifiable {
-    let id = UUID()
+struct SideBySideRow: Identifiable, Sendable {
+    let id: UUID
     let left: DiffLine?
     let right: DiffLine?
+
+    init(left: DiffLine?, right: DiffLine?) {
+        id = left?.id ?? right?.id ?? UUID()
+        self.left = left
+        self.right = right
+    }
 }
 
 // MARK: - DiffResult
 
 /// Structured diff result containing named sections, each with their own diff lines.
-struct DiffResult {
+struct DiffResult: Sendable {
     static let empty = DiffResult(sections: [])
 
     let sections: [DiffSection]
@@ -110,22 +117,31 @@ struct DiffResult {
 enum DiffEngine {
     // MARK: Internal
 
+    static let maximumLineCount = 1_000
+    static let maximumLineLength = 16_384
+    static let maximumTextPreviewBytes = 512 * 1_024
+
     /// Computes a line-level diff between two string arrays.
     static func diff(old: [String], new: [String]) -> [DiffLine] {
-        let lcs = longestCommonSubsequence(old, new)
+        let boundedOld = boundedLines(old)
+        let boundedNew = boundedLines(new)
+        let lcs = longestCommonSubsequence(boundedOld, boundedNew)
         var result: [DiffLine] = []
         var oldIdx = 0
         var newIdx = 0
         var lineNumber = 1
 
         for commonLine in lcs {
-            while oldIdx < old.count, old[oldIdx] != commonLine {
-                result.append(DiffLine(lineNumber: lineNumber, content: old[oldIdx], type: .removed))
+            guard !Task.isCancelled else {
+                return []
+            }
+            while oldIdx < boundedOld.count, boundedOld[oldIdx] != commonLine {
+                result.append(DiffLine(lineNumber: lineNumber, content: boundedOld[oldIdx], type: .removed))
                 oldIdx += 1
                 lineNumber += 1
             }
-            while newIdx < new.count, new[newIdx] != commonLine {
-                result.append(DiffLine(lineNumber: lineNumber, content: new[newIdx], type: .added))
+            while newIdx < boundedNew.count, boundedNew[newIdx] != commonLine {
+                result.append(DiffLine(lineNumber: lineNumber, content: boundedNew[newIdx], type: .added))
                 newIdx += 1
                 lineNumber += 1
             }
@@ -135,18 +151,32 @@ enum DiffEngine {
             lineNumber += 1
         }
 
-        while oldIdx < old.count {
-            result.append(DiffLine(lineNumber: lineNumber, content: old[oldIdx], type: .removed))
+        while oldIdx < boundedOld.count {
+            result.append(DiffLine(lineNumber: lineNumber, content: boundedOld[oldIdx], type: .removed))
             oldIdx += 1
             lineNumber += 1
         }
-        while newIdx < new.count {
-            result.append(DiffLine(lineNumber: lineNumber, content: new[newIdx], type: .added))
+        while newIdx < boundedNew.count {
+            result.append(DiffLine(lineNumber: lineNumber, content: boundedNew[newIdx], type: .added))
             newIdx += 1
             lineNumber += 1
         }
 
         return result
+    }
+
+    /// Computes a bounded line diff directly from text without first allocating
+    /// an unbounded array for every line in the input.
+    static func diffText(old: String, new: String) -> [DiffLine] {
+        let boundedOld = boundedTextLines(old)
+        guard !Task.isCancelled else {
+            return []
+        }
+        let boundedNew = boundedTextLines(new)
+        guard !Task.isCancelled else {
+            return []
+        }
+        return diff(old: boundedOld, new: boundedNew)
     }
 
     /// Computes a structured diff with named sections, matching by title.
@@ -167,6 +197,9 @@ enum DiffEngine {
         let rightMap = Dictionary(rightSections.map { ($0.0, $0.1) }, uniquingKeysWith: { first, _ in first })
 
         for title in orderedTitles {
+            guard !Task.isCancelled else {
+                return .empty
+            }
             let leftContent = leftMap[title] ?? ""
             let rightContent = rightMap[title] ?? ""
 
@@ -192,6 +225,9 @@ enum DiffEngine {
         var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
 
         for i in 1 ... m {
+            guard !Task.isCancelled else {
+                return []
+            }
             for j in 1 ... n {
                 if a[i - 1] == b[j - 1] {
                     dp[i][j] = dp[i - 1][j - 1] + 1
@@ -217,5 +253,162 @@ enum DiffEngine {
         }
 
         return result.reversed()
+    }
+
+    private static func boundedLines(_ lines: [String]) -> [String] {
+        guard lines.count > maximumLineCount else {
+            return lines.map(boundedLine)
+        }
+
+        let digest = sha256(lines)
+        guard !Task.isCancelled else {
+            return []
+        }
+        return lines.prefix(maximumLineCount - 1).map(boundedLine) + [
+            String(
+                localized:
+                "Comparison limited to \(maximumLineCount - 1) of \(lines.count) lines · SHA-256 \(digest)"
+            ),
+        ]
+    }
+
+    private static func boundedLine(_ line: String) -> String {
+        guard line.count > maximumLineLength else {
+            return line
+        }
+        let prefix = String(line.prefix(maximumLineLength))
+        return String(
+            localized:
+            "\(prefix)… [line limited to \(maximumLineLength) of \(line.count) characters · SHA-256 \(sha256(line))]"
+        )
+    }
+
+    private static func sha256(_ value: String) -> String {
+        var hasher = SHA256()
+        var buffer = Data()
+        buffer.reserveCapacity(hashChunkSize)
+        var processedByteCount = 0
+
+        for byte in value.utf8 {
+            if processedByteCount.isMultiple(of: hashChunkSize), Task.isCancelled {
+                return ""
+            }
+            buffer.append(byte)
+            processedByteCount += 1
+            if buffer.count >= hashChunkSize {
+                hasher.update(data: buffer)
+                buffer.removeAll(keepingCapacity: true)
+            }
+        }
+        if !buffer.isEmpty {
+            hasher.update(data: buffer)
+        }
+        return hexDigest(hasher.finalize())
+    }
+
+    private static func sha256(_ lines: [String]) -> String {
+        var hasher = SHA256()
+        var buffer = Data()
+        buffer.reserveCapacity(hashChunkSize)
+        var processedByteCount = 0
+
+        for (index, line) in lines.enumerated() {
+            for byte in line.utf8 {
+                if processedByteCount.isMultiple(of: hashChunkSize), Task.isCancelled {
+                    return ""
+                }
+                buffer.append(byte)
+                processedByteCount += 1
+                if buffer.count >= hashChunkSize {
+                    hasher.update(data: buffer)
+                    buffer.removeAll(keepingCapacity: true)
+                }
+            }
+            if index < lines.count - 1 {
+                buffer.append(0x0A)
+                processedByteCount += 1
+                if buffer.count >= hashChunkSize {
+                    hasher.update(data: buffer)
+                    buffer.removeAll(keepingCapacity: true)
+                }
+            }
+        }
+        if !buffer.isEmpty {
+            hasher.update(data: buffer)
+        }
+        return hexDigest(hasher.finalize())
+    }
+
+    private static let hashChunkSize = 64 * 1_024
+
+    private static func boundedTextLines(_ text: String) -> [String] {
+        var hasher = SHA256()
+        var hashBuffer = Data()
+        hashBuffer.reserveCapacity(hashChunkSize)
+        var previewData = Data()
+        previewData.reserveCapacity(maximumTextPreviewBytes)
+        var totalByteCount = 0
+        var totalLineCount = 1
+
+        for byte in text.utf8 {
+            if totalByteCount.isMultiple(of: hashChunkSize), Task.isCancelled {
+                return []
+            }
+            if previewData.count < maximumTextPreviewBytes {
+                previewData.append(byte)
+            }
+            if byte == 0x0A {
+                totalLineCount += 1
+            }
+            hashBuffer.append(byte)
+            totalByteCount += 1
+            if hashBuffer.count >= hashChunkSize {
+                hasher.update(data: hashBuffer)
+                hashBuffer.removeAll(keepingCapacity: true)
+            }
+        }
+        if !hashBuffer.isEmpty {
+            hasher.update(data: hashBuffer)
+        }
+        guard !Task.isCancelled else {
+            return []
+        }
+
+        previewData = validUTF8Prefix(previewData)
+        guard let previewText = String(data: previewData, encoding: .utf8) else {
+            return []
+        }
+
+        var lines = previewText.components(separatedBy: "\n")
+        let inputWasLimited = totalByteCount > previewData.count
+        let linesWereLimited = totalLineCount > maximumLineCount
+        guard inputWasLimited || linesWereLimited else {
+            return lines.map(boundedLine)
+        }
+
+        let retainedLineCount = min(lines.count, maximumLineCount - 1)
+        lines = Array(lines.prefix(retainedLineCount))
+        let digest = hexDigest(hasher.finalize())
+        lines.append(
+            String(
+                localized:
+                "Comparison limited to \(retainedLineCount) of \(totalLineCount) lines and \(previewData.count) of \(totalByteCount) UTF-8 bytes · SHA-256 \(digest)"
+            )
+        )
+        return lines.map(boundedLine)
+    }
+
+    private static func validUTF8Prefix(_ data: Data) -> Data {
+        var prefix = data
+        for _ in 0 ..< 4 where String(data: prefix, encoding: .utf8) == nil && !prefix.isEmpty {
+            prefix.removeLast()
+        }
+        return prefix
+    }
+
+    private static func hexDigest(_ digest: SHA256.Digest) -> String {
+        digest
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }

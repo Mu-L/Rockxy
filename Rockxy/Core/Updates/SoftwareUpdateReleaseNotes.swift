@@ -3,17 +3,48 @@ import CoreFoundation
 import Foundation
 import Sparkle
 
+// MARK: - SoftwareUpdateReleaseNotesFont
+
+/// Rendering options for release-note attributed text: the Appearance body size and the Rockxy
+/// font-family preference. Defaults reproduce the legacy 13 pt system-font rendering so existing
+/// callers and fixtures are unchanged.
+struct SoftwareUpdateReleaseNotesFont: Equatable {
+    // MARK: Lifecycle
+
+    init(bodySize: CGFloat = 13, usesMonospacedFamily: Bool = false) {
+        self.bodySize = max(9, bodySize)
+        self.usesMonospacedFamily = usesMonospacedFamily
+    }
+
+    // MARK: Internal
+
+    static let `default` = SoftwareUpdateReleaseNotesFont()
+
+    var bodySize: CGFloat
+    var usesMonospacedFamily: Bool
+
+    func systemFont(ofSize size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        usesMonospacedFamily
+            ? .monospacedSystemFont(ofSize: size, weight: weight)
+            : .systemFont(ofSize: size, weight: weight)
+    }
+}
+
+// MARK: - SoftwareUpdateReleaseNotesContent
+
 enum SoftwareUpdateReleaseNotesContent: Equatable {
     case loading
     case html(String, baseURL: URL?)
     case plainText(String)
     case unavailable(String)
 
+    // MARK: Internal
+
     static func from(appcastItem: SUAppcastItem) -> Self {
         guard let itemDescription = appcastItem.itemDescription?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-            !itemDescription.isEmpty
-        else {
+            !itemDescription.isEmpty else
+        {
             return .loading
         }
 
@@ -31,8 +62,8 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
     static func from(downloadData: SPUDownloadData) -> Self {
         guard let text = decodeText(from: downloadData.data, encodingName: downloadData.textEncodingName)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
-            !text.isEmpty
-        else {
+            !text.isEmpty else
+        {
             return .unavailable(
                 String(localized: "Release notes are unavailable for this update.")
             )
@@ -59,33 +90,40 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
     func nativeDisplayText(fallbackMessage: String? = nil) -> String? {
         switch self {
         case .loading:
-            return fallbackMessage
+            fallbackMessage
         case let .html(html, _):
-            return Self.makeNativeDisplayText(fromHTML: html) ?? fallbackMessage
+            Self.makeNativeDisplayText(fromHTML: html) ?? fallbackMessage
         case let .plainText(text),
              let .unavailable(text):
-            return Self.normalizeDisplayText(text) ?? fallbackMessage
+            Self.normalizeDisplayText(text) ?? fallbackMessage
         }
     }
 
-    func nativeDisplayAttributedString(fallbackMessage: String? = nil) -> NSAttributedString? {
+    func nativeDisplayAttributedString(
+        fallbackMessage: String? = nil,
+        font: SoftwareUpdateReleaseNotesFont = .default
+    )
+        -> NSAttributedString?
+    {
         switch self {
         case .loading:
             guard let fallbackMessage else {
                 return nil
             }
-            return Self.makePlainTextAttributedString(fallbackMessage)
+            return Self.makePlainTextAttributedString(fallbackMessage, font: font)
 
         case let .html(html, _):
-            return Self.makeNativeAttributedString(fromHTML: html)
-                ?? fallbackMessage.map(Self.makePlainTextAttributedString)
+            return Self.makeNativeAttributedString(fromHTML: html, font: font)
+                ?? fallbackMessage.map { Self.makePlainTextAttributedString($0, font: font) }
 
         case let .plainText(text),
              let .unavailable(text):
             let normalizedText = Self.normalizeDisplayText(text) ?? fallbackMessage
-            return normalizedText.map(Self.makePlainTextAttributedString)
+            return normalizedText.map { Self.makePlainTextAttributedString($0, font: font) }
         }
     }
+
+    // MARK: Private
 
     private static func isHTML(mimeType: String?) -> Bool {
         guard let mimeType else {
@@ -120,10 +158,15 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         makeNativeAttributedString(fromHTML: html).flatMap { normalizeDisplayText($0.string) }
     }
 
-    private static func makeNativeAttributedString(fromHTML html: String) -> NSAttributedString? {
+    private static func makeNativeAttributedString(
+        fromHTML html: String,
+        font: SoftwareUpdateReleaseNotesFont = .default
+    )
+        -> NSAttributedString?
+    {
         guard let data = html.data(using: .utf8) else {
             let fallbackText = normalizeDisplayText(stripHTMLTags(in: html))
-            return fallbackText.map(makePlainTextAttributedString)
+            return fallbackText.map { makePlainTextAttributedString($0, font: font) }
         }
 
         do {
@@ -135,10 +178,10 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
                 ],
                 documentAttributes: nil
             )
-            return normalizedNativeAttributedString(attributedText)
+            return normalizedNativeAttributedString(attributedText, font: font)
         } catch {
             let fallbackText = normalizeDisplayText(stripHTMLTags(in: html))
-            return fallbackText.map(makePlainTextAttributedString)
+            return fallbackText.map { makePlainTextAttributedString($0, font: font) }
         }
     }
 
@@ -188,7 +231,9 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         in text: String,
         pattern: String,
         radix: Int
-    ) -> String {
+    )
+        -> String
+    {
         guard let expression = try? NSRegularExpression(pattern: pattern) else {
             return text
         }
@@ -205,8 +250,8 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         for match in matches.reversed() {
             let numericValue = originalNSString.substring(with: match.range(at: 1))
             guard let scalarValue = Int(numericValue, radix: radix),
-                  let scalar = UnicodeScalar(scalarValue)
-            else {
+                  let scalar = UnicodeScalar(scalarValue) else
+            {
                 continue
             }
 
@@ -246,7 +291,12 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         return result.isEmpty ? nil : result
     }
 
-    private static func makePlainTextAttributedString(_ text: String) -> NSAttributedString {
+    private static func makePlainTextAttributedString(
+        _ text: String,
+        font: SoftwareUpdateReleaseNotesFont = .default
+    )
+        -> NSAttributedString
+    {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineHeightMultiple = 1.15
         paragraphStyle.paragraphSpacing = 8
@@ -256,14 +306,19 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         return NSAttributedString(
             string: text,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 13),
+                .font: font.systemFont(ofSize: font.bodySize, weight: .regular),
                 .foregroundColor: NSColor.labelColor,
                 .paragraphStyle: paragraphStyle,
             ]
         )
     }
 
-    private static func normalizedNativeAttributedString(_ attributedText: NSAttributedString) -> NSAttributedString? {
+    private static func normalizedNativeAttributedString(
+        _ attributedText: NSAttributedString,
+        font: SoftwareUpdateReleaseNotesFont = .default
+    )
+        -> NSAttributedString?
+    {
         let mutableText = NSMutableAttributedString(attributedString: attributedText)
         let fullRange = NSRange(location: 0, length: mutableText.length)
 
@@ -271,11 +326,12 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         mutableText.enumerateAttributes(in: fullRange, options: []) { attributes, range, _ in
             var updatedAttributes = attributes
             let sourceFont = (attributes[.font] as? NSFont) ?? NSFont.systemFont(ofSize: 13)
-            let normalizedFont = normalizedSystemFont(from: sourceFont)
+            let normalizedFont = normalizedSystemFont(from: sourceFont, font: font)
             updatedAttributes[.font] = normalizedFont
             updatedAttributes[.foregroundColor] = NSColor.labelColor
 
-            let paragraphStyle = ((attributes[.paragraphStyle] as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle)
+            let paragraphStyle = ((attributes[.paragraphStyle] as? NSParagraphStyle)?
+                .mutableCopy() as? NSMutableParagraphStyle)
                 ?? NSMutableParagraphStyle()
             paragraphStyle.lineHeightMultiple = 1.15
             paragraphStyle.paragraphSpacing = normalizedParagraphSpacing(for: sourceFont)
@@ -291,44 +347,52 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         return mutableText.length > 0 ? mutableText : nil
     }
 
-    private static func normalizedSystemFont(from sourceFont: NSFont) -> NSFont {
+    private static func normalizedSystemFont(
+        from sourceFont: NSFont,
+        font: SoftwareUpdateReleaseNotesFont
+    )
+        -> NSFont
+    {
         let fontManager = NSFontManager.shared
         let traits = fontManager.traits(of: sourceFont)
         let isBold = traits.contains(.boldFontMask)
         let isItalic = traits.contains(.italicFontMask)
+        let base = font.bodySize
 
         let mappedSize: CGFloat
         let mappedWeight: NSFont.Weight
 
+        // Preserve the relative HTML heading/emphasis hierarchy while anchoring the body to the
+        // requested Appearance size. At the default 13 pt this reproduces the legacy 24/18/14/13 map.
         switch sourceFont.pointSize {
         case 22...:
-            mappedSize = 24
+            mappedSize = base + 11
             mappedWeight = .semibold
-        case 17...21.99:
-            mappedSize = 18
+        case 17...:
+            mappedSize = base + 5
             mappedWeight = .semibold
-        case 14...16.99:
-            mappedSize = 14
+        case 14...:
+            mappedSize = base + 1
             mappedWeight = .semibold
         default:
-            mappedSize = 13
+            mappedSize = base
             mappedWeight = isBold ? .semibold : .regular
         }
 
-        var font = NSFont.systemFont(ofSize: mappedSize, weight: mappedWeight)
+        var resolvedFont = font.systemFont(ofSize: mappedSize, weight: mappedWeight)
         if isItalic {
-            font = fontManager.convert(font, toHaveTrait: .italicFontMask)
+            resolvedFont = fontManager.convert(resolvedFont, toHaveTrait: .italicFontMask)
         }
-        return font
+        return resolvedFont
     }
 
     private static func normalizedParagraphSpacing(for sourceFont: NSFont) -> CGFloat {
         switch sourceFont.pointSize {
         case 22...:
             14
-        case 17...21.99:
+        case 17 ... 21.99:
             10
-        case 14...16.99:
+        case 14 ... 16.99:
             8
         default:
             6
@@ -339,7 +403,7 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
         switch sourceFont.pointSize {
         case 22...:
             4
-        case 17...21.99:
+        case 17 ... 21.99:
             2
         default:
             0

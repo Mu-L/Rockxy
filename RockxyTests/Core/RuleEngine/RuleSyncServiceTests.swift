@@ -65,7 +65,7 @@ struct RuleSyncServiceTests {
     }
 
     @Test("setNetworkConditionsToolEnabled persists UserDefaults and updates evaluation gate")
-    func setNetworkConditionsToolEnabledPersistsAndUpdatesGate() async throws {
+    func setNetworkConditionsToolEnabledPersistsAndUpdatesGate() async {
         await withRuleTestLock { [self] in
             let defaultsBackup = backupNetworkConditionsToolDefault()
             let networkRule = ProxyRule(
@@ -200,6 +200,93 @@ struct RuleSyncServiceTests {
         }
     }
 
+    @Test("setModifyHeaderToolEnabled persists UserDefaults and updates evaluation gate")
+    func setModifyHeaderToolEnabledPersistsAndUpdatesGate() async {
+        await withRuleTestLock { [self] in
+            let defaultsBackup = backupModifyHeaderToolDefault()
+            let modifyRule = ProxyRule(
+                name: "Inject Debug Header",
+                isEnabled: true,
+                matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+                action: .modifyHeader(operations: [
+                    HeaderOperation(type: .add, headerName: "X-Debug", headerValue: "1"),
+                ])
+            )
+            let throttleRule = ProxyRule(
+                name: "Fallback",
+                isEnabled: true,
+                matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+                action: .throttle(delayMs: 250)
+            )
+            await RuleSyncService.replaceAllRules([modifyRule, throttleRule])
+
+            await RuleSyncService.setModifyHeaderToolEnabled(false)
+
+            #expect(UserDefaults.standard.object(forKey: Self.modifyHeaderToolEnabledKey) as? Bool == false)
+            guard let url = URL(string: "https://example.com/test") else {
+                Issue.record("Expected test URL to be valid")
+                restoreModifyHeaderToolDefault(defaultsBackup)
+                await RuleEngine.shared.setModifyHeaderToolEnabled(defaultsBackup ?? true)
+                return
+            }
+            let disabledResult = await RuleEngine.shared.evaluate(method: "GET", url: url, headers: [])
+            if case let .throttle(delayMs) = disabledResult {
+                #expect(delayMs == 250)
+            } else {
+                Issue.record("Expected fallback throttle rule while Modify Headers tool is disabled")
+            }
+
+            await RuleSyncService.setModifyHeaderToolEnabled(true)
+            #expect(UserDefaults.standard.object(forKey: Self.modifyHeaderToolEnabledKey) as? Bool == true)
+
+            restoreModifyHeaderToolDefault(defaultsBackup)
+            await RuleEngine.shared.setModifyHeaderToolEnabled(defaultsBackup ?? true)
+        }
+    }
+
+    @Test("loadFromDisk applies persisted Modify Headers tool gate")
+    func loadFromDiskAppliesModifyHeaderToolEnabled() async {
+        await withRuleTestLock { [self] in
+            let defaultsBackup = backupModifyHeaderToolDefault()
+            let modifyRule = ProxyRule(
+                name: "Inject Debug Header",
+                isEnabled: true,
+                matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+                action: .modifyHeader(operations: [
+                    HeaderOperation(type: .add, headerName: "X-Debug", headerValue: "1"),
+                ])
+            )
+            let throttleRule = ProxyRule(
+                name: "Fallback",
+                isEnabled: true,
+                matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+                action: .throttle(delayMs: 250)
+            )
+            await RuleSyncService.replaceAllRules([modifyRule, throttleRule])
+            UserDefaults.standard.set(false, forKey: Self.modifyHeaderToolEnabledKey)
+
+            await RuleEngine.shared.setModifyHeaderToolEnabled(true)
+            await RuleSyncService.loadFromDisk()
+            await RuleEngine.shared.replaceAll([modifyRule, throttleRule])
+
+            guard let url = URL(string: "https://example.com/test") else {
+                Issue.record("Expected test URL to be valid")
+                restoreModifyHeaderToolDefault(defaultsBackup)
+                await RuleEngine.shared.setModifyHeaderToolEnabled(defaultsBackup ?? true)
+                return
+            }
+            let result = await RuleEngine.shared.evaluate(method: "GET", url: url, headers: [])
+            if case let .throttle(delayMs) = result {
+                #expect(delayMs == 250)
+            } else {
+                Issue.record("Expected persisted disabled gate to skip modify header after load")
+            }
+
+            restoreModifyHeaderToolDefault(defaultsBackup)
+            await RuleEngine.shared.setModifyHeaderToolEnabled(defaultsBackup ?? true)
+        }
+    }
+
     // MARK: Private
 
     private struct RulesBackup {
@@ -209,6 +296,7 @@ struct RuleSyncServiceTests {
 
     private static let breakpointToolEnabledKey = "breakpointToolEnabled"
     private static let networkConditionsToolEnabledKey = "networkConditionsToolEnabled"
+    private static let modifyHeaderToolEnabledKey = "modifyHeaderToolEnabled"
 
     private static let rulesPath = RockxyIdentity.current.appSupportPath(TestIdentity.rulesPathComponent)
 
@@ -236,6 +324,18 @@ struct RuleSyncServiceTests {
             UserDefaults.standard.set(value, forKey: Self.networkConditionsToolEnabledKey)
         } else {
             UserDefaults.standard.removeObject(forKey: Self.networkConditionsToolEnabledKey)
+        }
+    }
+
+    private func backupModifyHeaderToolDefault() -> Bool? {
+        UserDefaults.standard.object(forKey: Self.modifyHeaderToolEnabledKey) as? Bool
+    }
+
+    private func restoreModifyHeaderToolDefault(_ value: Bool?) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: Self.modifyHeaderToolEnabledKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.modifyHeaderToolEnabledKey)
         }
     }
 

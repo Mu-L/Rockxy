@@ -261,6 +261,90 @@ struct MapRemoteRewriteTests {
         #expect(URLComponents(url: rewrite.requestData.url, resolvingAgainstBaseURL: false)?.percentEncodedQuery == "filter=hello%20world&id=1&id=2")
     }
 
+    @Test("Encoded path survives rewrite and forwarded request head")
+    func encodedPathSurvivesForwarding() {
+        let requestData = makeRequest(url: "https://prod.example.com/original")
+        let head = makeHead(uri: "/original")
+        let rewrite = ProxyHandlerShared.buildMapRemoteRewrite(
+            configuration: MapRemoteConfiguration(
+                host: "staging.example.com",
+                path: "/files/a%2Fb%20c"
+            ),
+            originalHead: head,
+            requestData: requestData,
+            fallbackScheme: "https",
+            fallbackHost: "prod.example.com"
+        )
+        let forwardHead = ProxyHandlerShared.buildForwardHead(
+            from: rewrite.requestData,
+            originalHead: rewrite.head
+        )
+
+        #expect(rewrite.head.uri == "/files/a%2Fb%20c")
+        #expect(forwardHead.uri == "/files/a%2Fb%20c")
+    }
+
+    @Test("Preserve original target ignores mapped path and query for outbound forwarding")
+    func preserveOriginalTargetForwardsOriginalPathAndQuery() {
+        let requestData = makeRequest(url: "https://prod.example.com/original%20path?source=one%20two")
+        let head = makeHead(uri: "/original%20path?source=one%20two")
+        let rewrite = ProxyHandlerShared.buildMapRemoteRewrite(
+            configuration: MapRemoteConfiguration(
+                host: "staging.example.com",
+                path: "/ignored",
+                query: "ignored=true",
+                preserveOriginalURL: true
+            ),
+            originalHead: head,
+            requestData: requestData,
+            fallbackScheme: "https",
+            fallbackHost: "prod.example.com"
+        )
+        let forwardHead = ProxyHandlerShared.buildForwardHead(
+            from: rewrite.requestData,
+            originalHead: rewrite.head
+        )
+
+        #expect(rewrite.requestData.url.host == "staging.example.com")
+        #expect(rewrite.head.uri == "/original%20path?source=one%20two")
+        #expect(forwardHead.uri == "/original%20path?source=one%20two")
+    }
+
+    @Test("IPv6 destination uses raw connection host and bracketed URL and Host authority")
+    func ipv6DestinationAuthority() {
+        let requestData = makeRequest(url: "https://prod.example.com/api")
+        let head = makeHead(uri: "/api")
+        let rewrite = ProxyHandlerShared.buildMapRemoteRewrite(
+            configuration: MapRemoteConfiguration(host: "2001:db8::1"),
+            originalHead: head,
+            requestData: requestData,
+            fallbackScheme: "https",
+            fallbackHost: "prod.example.com"
+        )
+
+        #expect(rewrite.upstreamHost == "2001:db8::1")
+        #expect(rewrite.requestData.url.absoluteString == "https://[2001:db8::1]/api")
+        #expect(rewrite.head.headers.first(name: "Host") == "[2001:db8::1]")
+    }
+
+    @Test("Inherited IPv6 destination uses raw connection host and bracketed authorities")
+    func inheritedIPv6DestinationAuthority() {
+        let requestData = makeRequest(url: "https://[2001:db8::1]:8443/api")
+        let head = makeHead(uri: "/api")
+        let rewrite = ProxyHandlerShared.buildMapRemoteRewrite(
+            configuration: MapRemoteConfiguration(path: "/v2"),
+            originalHead: head,
+            requestData: requestData,
+            fallbackScheme: "https",
+            fallbackHost: "fallback.example.com"
+        )
+
+        #expect(rewrite.upstreamHost == "2001:db8::1")
+        #expect(rewrite.upstreamPort == 8_443)
+        #expect(rewrite.requestData.url.absoluteString == "https://[2001:db8::1]:8443/v2")
+        #expect(rewrite.head.headers.first(name: "Host") == "[2001:db8::1]:8443")
+    }
+
     @Test("Matched rule metadata is attached to failed mapped transactions")
     func matchedRuleMetadataAttachedToFailedTransaction() throws {
         let rule = ProxyRule(

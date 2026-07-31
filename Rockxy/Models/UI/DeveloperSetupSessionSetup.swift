@@ -2,6 +2,23 @@ import AppKit
 import Foundation
 import Observation
 
+// MARK: - DeveloperSetupPasteboardWriting
+
+@MainActor
+protocol DeveloperSetupPasteboardWriting {
+    func write(_ string: String)
+}
+
+// MARK: - DeveloperSetupSystemPasteboard
+
+@MainActor
+struct DeveloperSetupSystemPasteboard: DeveloperSetupPasteboardWriting {
+    func write(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+    }
+}
+
 // MARK: - SetupTerminalApp
 
 enum SetupTerminalApp: String, CaseIterable, Identifiable {
@@ -36,7 +53,6 @@ enum SetupBrowserApp: String, CaseIterable, Identifiable {
     case chromeNewProfile
     case chromeCurrentProfile
     case firefox
-    case braveComingSoon
 
     // MARK: Internal
 
@@ -52,13 +68,76 @@ enum SetupBrowserApp: String, CaseIterable, Identifiable {
             String(localized: "Google Chrome (Current Profile)...")
         case .firefox:
             String(localized: "Firefox...")
-        case .braveComingSoon:
-            String(localized: "Brave (coming soon)")
         }
     }
 
     var isEnabled: Bool {
-        self != .braveComingSoon
+        true
+    }
+}
+
+// MARK: - DeveloperSetupLaunchError
+
+enum DeveloperSetupLaunchError: LocalizedError {
+    case processFailed(command: String, status: Int32, message: String?)
+    case browserUnavailable(String)
+
+    // MARK: Internal
+
+    var errorDescription: String? {
+        switch self {
+        case let .processFailed(command, status, message):
+            if let message, !message.isEmpty {
+                return String(localized: "\(command) exited with status \(status): \(message)")
+            }
+            return String(localized: "\(command) exited with status \(status).")
+        case let .browserUnavailable(name):
+            return String(localized: "\(name) is not available on this Mac.")
+        }
+    }
+}
+
+// MARK: - DeveloperSetupProcessRunning
+
+/// Injectable seam so launcher outcomes are honest and testable: the runner
+/// waits for the launched process and reports a nonzero exit as an error.
+protocol DeveloperSetupProcessRunning: Sendable {
+    func run(executableURL: URL, arguments: [String]) throws
+}
+
+// MARK: - DeveloperSetupProcessRunner
+
+struct DeveloperSetupProcessRunner: DeveloperSetupProcessRunning {
+    func run(executableURL: URL, arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        let errorPipe = Pipe()
+        process.standardOutput = Pipe()
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+        } catch {
+            throw DeveloperSetupLaunchError.processFailed(
+                command: executableURL.lastPathComponent,
+                status: -1,
+                message: error.localizedDescription
+            )
+        }
+
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let raw = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw DeveloperSetupLaunchError.processFailed(
+                command: executableURL.lastPathComponent,
+                status: process.terminationStatus,
+                message: (raw?.isEmpty == false) ? raw : nil
+            )
+        }
     }
 }
 
@@ -80,7 +159,9 @@ enum RockxySetupScriptBuilder {
     static func generatedScriptURL(
         identity: RockxyIdentity = .current,
         fileManager: FileManager = .default
-    ) -> URL {
+    )
+        -> URL
+    {
         identity.appSupportPath(relativeScriptPath, fileManager: fileManager)
     }
 
@@ -94,7 +175,9 @@ enum RockxySetupScriptBuilder {
         context: RockxySetupScriptContext,
         scriptURL: URL = generatedScriptURL(),
         fileManager: FileManager = .default
-    ) throws -> URL {
+    )
+        throws -> URL
+    {
         let directory = scriptURL.deletingLastPathComponent()
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
@@ -173,35 +256,50 @@ enum RockxySetupScriptBuilder {
 // MARK: - RockxySetupSessionLauncher
 
 enum RockxySetupSessionLauncher {
-    static func openTerminal(_ app: SetupTerminalApp, sourceCommand: String) throws {
+    // MARK: Internal
+
+    static func openTerminal(
+        _ app: SetupTerminalApp,
+        sourceCommand: String,
+        runner: DeveloperSetupProcessRunning = DeveloperSetupProcessRunner()
+    )
+        throws
+    {
         let command = "\(sourceCommand) && printf '\\nRockxy is ready. Start your server or scripts here.\\n'"
 
         switch app {
         case .appleTerminal:
-            try runAppleScript("""
-            tell application "Terminal"
-                activate
-                do script "\(appleScriptString(command))"
-            end tell
-            """)
-        case .iTerm2:
-            try runAppleScript("""
-            tell application "iTerm2"
-                activate
-                create window with default profile
-                tell current session of current window
-                    write text "\(appleScriptString(command))"
+            try runAppleScript(
+                """
+                tell application "Terminal"
+                    activate
+                    do script "\(appleScriptString(command))"
                 end tell
-            end tell
-            """)
+                """,
+                runner: runner
+            )
+        case .iTerm2:
+            try runAppleScript(
+                """
+                tell application "iTerm2"
+                    activate
+                    create window with default profile
+                    tell current session of current window
+                        write text "\(appleScriptString(command))"
+                    end tell
+                end tell
+                """,
+                runner: runner
+            )
         case .ghostty:
-            try runProcess(
-                executable: "/usr/bin/open",
+            try runner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/open"),
                 arguments: ["-na", "Ghostty", "--args", "-e", "/bin/zsh", "-lc", "\(command); exec /bin/zsh -l"]
             )
         case .custom:
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(sourceCommand, forType: .string)
+            // Custom terminals are handled by the target-aware view model, which
+            // copies through its injectable pasteboard seam.
+            return
         }
     }
 
@@ -209,10 +307,13 @@ enum RockxySetupSessionLauncher {
         _ app: SetupBrowserApp,
         proxyHost: String,
         proxyPort: Int,
-        supportDirectory: URL = RockxyIdentity.current.appSupportPath("setup")
-    ) throws {
+        supportDirectory: URL = RockxyIdentity.current.appSupportPath("setup"),
+        runner: DeveloperSetupProcessRunning = DeveloperSetupProcessRunner()
+    )
+        throws
+    {
         guard app.isEnabled else {
-            return
+            throw DeveloperSetupLaunchError.browserUnavailable(app.title)
         }
 
         let proxyServer = "http://\(proxyHost):\(proxyPort)"
@@ -220,8 +321,8 @@ enum RockxySetupSessionLauncher {
         case .chromeNewProfile:
             let profileURL = supportDirectory.appendingPathComponent("Chrome Profile", isDirectory: true)
             try FileManager.default.createDirectory(at: profileURL, withIntermediateDirectories: true)
-            try runProcess(
-                executable: "/usr/bin/open",
+            try runner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/open"),
                 arguments: [
                     "-na", "Google Chrome", "--args",
                     "--user-data-dir=\(profileURL.path)",
@@ -230,8 +331,8 @@ enum RockxySetupSessionLauncher {
                 ]
             )
         case .chromeCurrentProfile:
-            try runProcess(
-                executable: "/usr/bin/open",
+            try runner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/open"),
                 arguments: ["-a", "Google Chrome", "--args", "--proxy-server=\(proxyServer)"]
             )
         case .firefox:
@@ -239,12 +340,10 @@ enum RockxySetupSessionLauncher {
             try FileManager.default.createDirectory(at: profileURL, withIntermediateDirectories: true)
             try firefoxUserJS(proxyHost: proxyHost, proxyPort: proxyPort)
                 .write(to: profileURL.appendingPathComponent("user.js"), atomically: true, encoding: .utf8)
-            try runProcess(
-                executable: "/usr/bin/open",
+            try runner.run(
+                executableURL: URL(fileURLWithPath: "/usr/bin/open"),
                 arguments: ["-na", "Firefox", "--args", "-no-remote", "-profile", profileURL.path]
             )
-        case .braveComingSoon:
-            return
         }
     }
 
@@ -261,17 +360,8 @@ enum RockxySetupSessionLauncher {
 
     // MARK: Private
 
-    private static func runAppleScript(_ script: String) throws {
-        try runProcess(executable: "/usr/bin/osascript", arguments: ["-e", script])
-    }
-
-    private static func runProcess(executable: String, arguments: [String]) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        try process.run()
+    private static func runAppleScript(_ script: String, runner: DeveloperSetupProcessRunning) throws {
+        try runner.run(executableURL: URL(fileURLWithPath: "/usr/bin/osascript"), arguments: ["-e", script])
     }
 
     private static func appleScriptString(_ value: String) -> String {
@@ -288,22 +378,63 @@ enum RockxySetupSessionLauncher {
 final class DeveloperSetupSessionSetupViewModel {
     // MARK: Lifecycle
 
-    init(coordinator: MainContentCoordinator, generatedAt: @escaping () -> Date = Date.init) {
+    init(
+        coordinator: MainContentCoordinator,
+        targetID: SetupTarget.ID = .python,
+        processRunner: DeveloperSetupProcessRunning = DeveloperSetupProcessRunner(),
+        pasteboard: DeveloperSetupPasteboardWriting? = nil,
+        scriptURL: URL = RockxySetupScriptBuilder.generatedScriptURL(),
+        generatedAt: @escaping () -> Date = Date.init
+    ) {
         self.coordinator = coordinator
+        self.targetID = targetID
+        self.processRunner = processRunner
+        self.pasteboard = pasteboard ?? DeveloperSetupSystemPasteboard()
+        self.scriptURL = scriptURL
         self.generatedAt = generatedAt
         context = Self.makeContext(coordinator: coordinator, generatedAt: generatedAt())
     }
 
     // MARK: Internal
 
+    var targetID: SetupTarget.ID
     var selectedTerminalApp: SetupTerminalApp = .appleTerminal
     var selectedBrowserApp: SetupBrowserApp = .chromeNewProfile
     var statusMessage: String?
     var context: RockxySetupScriptContext
 
-    var scriptURL: URL {
-        RockxySetupScriptBuilder.generatedScriptURL()
+    var target: SetupTarget {
+        SetupTarget.target(for: targetID) ?? .python
     }
+
+    var workflow: SetupWorkflow {
+        DeveloperSetupWorkflowCatalog.workflow(for: targetID)
+    }
+
+    var guideContent: SetupGuideContent? {
+        DeveloperSetupGuideCatalog.content(for: targetID)
+    }
+
+    /// Automatic Setup is only offered for shipped terminal-runtime targets.
+    var isRuntimeTerminalTarget: Bool {
+        target.isRuntimeTerminalTarget
+    }
+
+    /// The manual snippet Rockxy would show for a non-terminal target so the
+    /// Manual Setup window never silently falls back to the generic terminal flow.
+    var targetSnippetText: String? {
+        guard let snippetID = workflow.defaultSnippetID else {
+            return nil
+        }
+        return DeveloperSetupWorkflowCatalog.generatedSnippet(
+            for: targetID,
+            snippetID: snippetID,
+            port: context.proxyPort,
+            certificatePath: context.certificatePath
+        )
+    }
+
+    let scriptURL: URL
 
     var manualSourceCommand: String {
         RockxySetupScriptBuilder.sourceCommand(scriptURL: scriptURL)
@@ -318,6 +449,42 @@ final class DeveloperSetupSessionSetupViewModel {
             return String(localized: "Certificate environment hints are ready.")
         }
         return String(localized: "Export the Rockxy root certificate to add certificate environment hints.")
+    }
+
+    static func makeContext(coordinator: MainContentCoordinator, generatedAt: Date) -> RockxySetupScriptContext {
+        let settings = AppSettingsManager.shared.settings
+        let port = DeveloperSetupViewModel.resolveSnippetPort(
+            isProxyRunning: coordinator.isProxyRunning,
+            activePort: coordinator.activeProxyPort,
+            configuredPort: settings.proxyPort
+        )
+        let certificatePath = settings.lastExportedRootCAPath.flatMap { path -> String? in
+            FileManager.default.fileExists(atPath: path) ? path : nil
+        }
+
+        return RockxySetupScriptContext(
+            proxyHost: "127.0.0.1",
+            proxyPort: port,
+            certificatePath: certificatePath,
+            generatedAt: generatedAt,
+            appName: RockxyIdentity.current.displayName
+        )
+    }
+
+    func applyRoute(
+        _ route: DeveloperSetupRoute?,
+        destination: DeveloperSetupRouteDestination
+    ) {
+        guard let route,
+              route.destination == destination,
+              route.generation > lastAppliedRouteGeneration
+        else {
+            return
+        }
+        lastAppliedRouteGeneration = route.generation
+        targetID = route.targetID
+        statusMessage = nil
+        refresh()
     }
 
     func refresh() {
@@ -341,62 +508,93 @@ final class DeveloperSetupSessionSetupViewModel {
     func copyManualCommand() {
         do {
             try prepareScript()
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(manualSourceCommand, forType: .string)
-            statusMessage = String(localized: "Manual Setup command copied.")
+            pasteboard.write(manualSourceCommand)
+            statusMessage = String(localized: "Setup command copied.")
         } catch {
             statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
         }
     }
 
-    func openPreparedTerminal() {
+    func copyTargetSnippet() {
+        guard let snippet = targetSnippetText else {
+            statusMessage = String(localized: "No snippet is available for \(target.title).")
+            return
+        }
+        pasteboard.write(snippet)
+        statusMessage = String(localized: "\(target.title) snippet copied.")
+    }
+
+    func openPreparedTerminal() async {
+        guard prepareScriptForLaunch() else {
+            return
+        }
+
+        if selectedTerminalApp == .custom {
+            pasteboard.write(manualSourceCommand)
+            statusMessage = String(localized: "Setup command copied. Paste it into your terminal.")
+            return
+        }
+
+        let app = selectedTerminalApp
+        let command = manualSourceCommand
+        let runner = processRunner
         do {
-            try prepareScript()
-            try RockxySetupSessionLauncher.openTerminal(selectedTerminalApp, sourceCommand: manualSourceCommand)
-            statusMessage = selectedTerminalApp == .custom
-                ? String(localized: "Setup command copied. Paste it into your terminal.")
-                : String(localized: "Prepared terminal session opened.")
+            try await Task.detached {
+                try RockxySetupSessionLauncher.openTerminal(app, sourceCommand: command, runner: runner)
+            }.value
+            statusMessage = String(localized: "Prepared \(target.title) terminal session opened.")
         } catch {
-            statusMessage = String(localized: "Could not open the prepared terminal: \(error.localizedDescription)")
+            statusMessage = launchFailureMessage(error, action: String(localized: "open the prepared terminal"))
         }
     }
 
-    func openPreparedBrowser() {
+    func openPreparedBrowser() async {
+        guard selectedBrowserApp.isEnabled else {
+            statusMessage = String(localized: "\(selectedBrowserApp.title) is not available.")
+            return
+        }
+        guard prepareScriptForLaunch() else {
+            return
+        }
+
+        let app = selectedBrowserApp
+        let host = context.proxyHost
+        let port = context.proxyPort
+        let runner = processRunner
         do {
-            try prepareScript()
-            try RockxySetupSessionLauncher.openBrowser(
-                selectedBrowserApp,
-                proxyHost: context.proxyHost,
-                proxyPort: context.proxyPort
-            )
-            statusMessage = String(localized: "Prepared browser profile opened.")
+            try await Task.detached {
+                try RockxySetupSessionLauncher.openBrowser(app, proxyHost: host, proxyPort: port, runner: runner)
+            }.value
+            statusMessage = String(localized: "Prepared \(app.title) profile opened.")
         } catch {
-            statusMessage = String(localized: "Could not open the prepared browser: \(error.localizedDescription)")
+            statusMessage = launchFailureMessage(error, action: String(localized: "open the prepared browser"))
         }
-    }
-
-    static func makeContext(coordinator: MainContentCoordinator, generatedAt: Date) -> RockxySetupScriptContext {
-        let settings = AppSettingsManager.shared.settings
-        let port = DeveloperSetupViewModel.resolveSnippetPort(
-            isProxyRunning: coordinator.isProxyRunning,
-            activePort: coordinator.activeProxyPort,
-            configuredPort: settings.proxyPort
-        )
-        let certificatePath = settings.lastExportedRootCAPath.flatMap { path -> String? in
-            FileManager.default.fileExists(atPath: path) ? path : nil
-        }
-
-        return RockxySetupScriptContext(
-            proxyHost: "127.0.0.1",
-            proxyPort: port,
-            certificatePath: certificatePath,
-            generatedAt: generatedAt,
-            appName: RockxyIdentity.current.displayName
-        )
     }
 
     // MARK: Private
 
     private let coordinator: MainContentCoordinator
+    private let processRunner: DeveloperSetupProcessRunning
+    private let pasteboard: DeveloperSetupPasteboardWriting
     private let generatedAt: () -> Date
+    private var lastAppliedRouteGeneration = 0
+
+    private func prepareScriptForLaunch() -> Bool {
+        do {
+            try prepareScript()
+            return true
+        } catch {
+            statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func launchFailureMessage(_ error: Error, action: String) -> String {
+        if let launchError = error as? DeveloperSetupLaunchError,
+           let description = launchError.errorDescription
+        {
+            return String(localized: "Could not \(action): \(description)")
+        }
+        return String(localized: "Could not \(action): \(error.localizedDescription)")
+    }
 }

@@ -1,12 +1,15 @@
 import SwiftUI
 
-// Renders the export scope sheet interface for session export.
+// Renders the native export-scope review sheet. Membership is frozen in the
+// `ExportScopeContext` before this view appears, so the picker only chooses
+// which already-captured set to write — it can never widen the export.
 
 // MARK: - ExportScopeSheet
 
-/// Scope picker sheet for HAR export. Shows radio-style selection for All/Filtered/Selected
-/// transaction scopes with counts, plus a privacy note. Matches the Figma design at file
-/// BmxrbvKOU3Q2wZUe2NT87Y node 8:4.
+/// Scope review sheet for traffic export. The normal flow offers a native
+/// radio-group picker over the available scopes; a selection-locked context
+/// (Assistant / Context Dock handoffs) shows a single locked summary instead of
+/// a misleading set of choices.
 struct ExportScopeSheet: View {
     // MARK: Lifecycle
 
@@ -18,7 +21,11 @@ struct ExportScopeSheet: View {
         self.context = context
         self.onExport = onExport
         self.onCancel = onCancel
-        _selectedScope = State(initialValue: context.initialScope)
+
+        let initial = context.availableScopes.contains(context.initialScope)
+            ? context.initialScope
+            : (context.availableScopes.first ?? context.initialScope)
+        _selectedScope = State(initialValue: initial)
     }
 
     // MARK: Internal
@@ -29,61 +36,161 @@ struct ExportScopeSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            title
+            header
 
-            sectionLabel(String(localized: "SCOPE"))
-
-            scopePicker
+            if context.restrictsToSelection {
+                lockedSelectionSummary
+            } else {
+                scopeSection
+            }
 
             privacyNote
 
-            bottomBar
+            footer
         }
-        .padding(.top, 16)
+        .padding(.top, 18)
         .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.bottom, 18)
         .font(toolMetrics.font())
-        .frame(width: max(420, toolMetrics.fieldWidth(420)))
+        .frame(width: sheetWidth)
         .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("exportScope.sheet")
     }
 
     // MARK: Private
 
-    @State private var selectedScope: ExportScope = .all
+    @State private var selectedScope: ExportScope
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
-    private var title: some View {
-        Text(context.format.title)
-            .font(toolMetrics.font(weight: .semibold))
-            .frame(maxWidth: .infinity, alignment: .center)
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private var scopePicker: some View {
-        VStack(spacing: 0) {
-            scopeRow(
-                scope: .all,
-                label: context.label(for: .all),
-                count: context.eligibleCount(for: .all),
-                isDisabled: !context.isEnabled(.all)
-            )
+    private var footerActionWidth: CGFloat {
+        max(140, toolMetrics.bodyFontSize * 8)
+    }
 
-            dividerLine
+    private var sheetWidth: CGFloat {
+        max(
+            440,
+            footerActionWidth * 2
+                + toolMetrics.controlSpacing
+                + 80
+        )
+    }
 
-            scopeRow(
-                scope: .filtered,
-                label: context.label(for: .filtered),
-                count: context.eligibleCount(for: .filtered),
-                isDisabled: !context.isEnabled(.filtered)
-            )
-
-            dividerLine
-
-            scopeRow(
-                scope: .selected,
-                label: context.label(for: .selected),
-                count: context.eligibleCount(for: .selected),
-                isDisabled: !context.isEnabled(.selected)
-            )
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(context.format.title)
+                .font(toolMetrics.font(weight: .semibold))
+            Text(context.format.subtitle)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("exportScope.header")
+    }
+
+    private var scopeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(String(localized: "Traffic to export"))
+
+            if context.availableScopes.isEmpty {
+                Text(String(localized: "Nothing in this workspace can be exported in this format."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("exportScope.empty")
+            } else {
+                Picker(String(localized: "Scope"), selection: $selectedScope) {
+                    ForEach(ExportScope.allCases, id: \.self) { scope in
+                        Text(optionLabel(for: scope))
+                            .tag(scope)
+                            .disabled(!context.isEnabled(scope))
+                            .accessibilityLabel(context.label(for: scope))
+                            .accessibilityValue(context.countSummary(for: scope))
+                            .accessibilityIdentifier("exportScope.option.\(scope.rawValue)")
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                .accessibilityIdentifier("exportScope.picker")
+            }
+
+            if let skippedNote = context.skippedNote(for: selectedScope),
+               context.availableScopes.contains(selectedScope)
+            {
+                noteRow(skippedNote, systemImage: "scissors", identifier: "exportScope.skipped")
+            }
+
+            ForEach(context.unavailableScopes, id: \.self) { scope in
+                if let reason = context.reason(for: scope) {
+                    noteRow(
+                        String(localized: "\(context.label(for: scope)) — \(reason)"),
+                        systemImage: "minus.circle",
+                        identifier: "exportScope.unavailable.\(scope.rawValue)"
+                    )
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var lockedSelectionSummary: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel(String(localized: "Traffic to export"))
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.fill")
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .frame(width: toolMetrics.bodyFontSize + 4, height: toolMetrics.tableRowHeight)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(context.label(for: .selected))
+                            .font(toolMetrics.font(weight: .medium))
+                            .foregroundStyle(Color(nsColor: .labelColor))
+
+                        Spacer()
+
+                        Text(context.lockedSelectionSummary)
+                            .font(toolMetrics.secondaryFont())
+                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    }
+
+                    Text(
+                        String(
+                            localized: "This review is limited to the selected requests. Other traffic will not be included."
+                        )
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("exportScope.restriction")
+
+            if let skippedNote = context.skippedNote(for: .selected) {
+                noteRow(skippedNote, systemImage: "scissors", identifier: "exportScope.skipped")
+            }
+
+            if let reason = context.reason(for: .selected) {
+                noteRow(reason, systemImage: "exclamationmark.circle", identifier: "exportScope.restrictionReason")
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private var privacyNote: some View {
@@ -91,128 +198,57 @@ struct ExportScopeSheet: View {
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(Color(nsColor: .secondaryLabelColor))
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("exportScope.privacy")
     }
 
-    private var dividerLine: some View {
-        Rectangle()
-            .fill(Color(nsColor: .separatorColor))
-            .frame(height: 1)
-    }
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Spacer()
 
-    private var bottomBar: some View {
-        VStack(spacing: 8) {
-            dividerLine
-
-            HStack(spacing: 8) {
-                Spacer()
-
-                Button(String(localized: "Cancel")) {
-                    onCancel()
-                }
-                .keyboardShortcut(.cancelAction)
-                .frame(width: toolMetrics.footerButtonWidth)
-                .frame(minHeight: toolMetrics.formControlHeight)
-
-                Button {
-                    onExport(selectedScope)
-                } label: {
-                    Text(String(localized: "Export\u{2026}"))
-                        .font(toolMetrics.font(weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: toolMetrics.footerButtonWidth)
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                        .background(Color.accentColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!context.isEnabled(selectedScope))
+            Button {
+                onCancel()
+            } label: {
+                Text(String(localized: "Cancel"))
+                    .frame(width: footerActionWidth)
             }
+            .buttonStyle(.bordered)
+            .frame(minHeight: toolMetrics.formControlHeight)
+            .keyboardShortcut(.cancelAction)
+            .accessibilityIdentifier("exportScope.cancelButton")
+
+            Button {
+                onExport(selectedScope)
+            } label: {
+                Text(String(localized: "Export\u{2026}"))
+                    .frame(width: footerActionWidth)
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(minHeight: toolMetrics.formControlHeight)
+            .keyboardShortcut(.defaultAction)
+            .disabled(!context.isEnabled(selectedScope))
+            .accessibilityIdentifier("exportScope.exportButton")
         }
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(toolMetrics.metadataFont(weight: .medium))
-            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-            .tracking(0.3)
-            .textCase(.uppercase)
+            .font(toolMetrics.font(weight: .medium))
+            .foregroundStyle(Color(nsColor: .labelColor))
     }
 
-    private func scopeRow(
-        scope: ExportScope,
-        label: String,
-        count: Int,
-        isDisabled: Bool
-    )
-        -> some View
-    {
-        let isSelected = selectedScope == scope
-
-        return Button {
-            if !isDisabled {
-                selectedScope = scope
-            }
-        } label: {
-            HStack(spacing: 0) {
-                radioIndicator(isSelected: isSelected, isDisabled: isDisabled)
-
-                Spacer()
-                    .frame(width: 8)
-
-                Text(label)
-                    .font(toolMetrics.font())
-                    .foregroundStyle(
-                        isSelected
-                            ? .white
-                            : isDisabled
-                            ? Color(nsColor: .tertiaryLabelColor)
-                            : Color(nsColor: .labelColor)
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text("\(count)")
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(
-                        isSelected
-                            ? .white
-                            : Color(nsColor: .secondaryLabelColor)
-                    )
-            }
-            .padding(.horizontal, 12)
-            .frame(minHeight: toolMetrics.formControlHeight)
-            .background(
-                isSelected
-                    ? Color.accentColor
-                    : Color.clear
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 5))
+    private func noteRow(_ text: String, systemImage: String, identifier: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: systemImage)
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+        .font(toolMetrics.secondaryFont())
+        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
     }
 
-    private func radioIndicator(isSelected: Bool, isDisabled: Bool) -> some View {
-        Circle()
-            .strokeBorder(
-                isSelected
-                    ? Color.white
-                    : isDisabled
-                    ? Color(nsColor: .tertiaryLabelColor)
-                    : Color(nsColor: .secondaryLabelColor),
-                lineWidth: isSelected ? 4 : 1.5
-            )
-            .background(
-                Circle()
-                    .fill(isSelected ? Color.white : Color.clear)
-                    .padding(isSelected ? 3 : 0)
-            )
-            .frame(width: 14, height: 14)
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func optionLabel(for scope: ExportScope) -> String {
+        "\(context.label(for: scope)) · \(context.countSummary(for: scope))"
     }
 }

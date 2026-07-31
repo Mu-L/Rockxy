@@ -52,6 +52,8 @@ struct CustomTLSIdentity: Sendable {
 // MARK: - CustomCertificateImportIdentity
 
 struct CustomCertificateImportIdentity: Equatable {
+    // MARK: Internal
+
     let displayName: String
     let certificatePEM: String
     let privateKeyPEM: String
@@ -60,7 +62,9 @@ struct CustomCertificateImportIdentity: Equatable {
         certificateData: Data,
         privateKeyData: Data,
         displayName: String
-    ) throws -> Self {
+    )
+        throws -> Self
+    {
         let certificate = try certificatePEM(from: certificateData)
         let privateKeyPEM = try privateKeyPEM(from: privateKeyData)
         return Self(displayName: displayName, certificatePEM: certificate, privateKeyPEM: privateKeyPEM)
@@ -76,6 +80,8 @@ struct CustomCertificateImportIdentity: Equatable {
         }
     }
 
+    // MARK: Private
+
     private static func fromNIOSSLPKCS12(data: Data, displayName: String, passphrase: String) throws -> Self {
         let bundle = try pkcs12Bundle(data: data, passphrase: passphrase)
         guard let leafCertificate = bundle.certificateChain.first else {
@@ -85,10 +91,10 @@ struct CustomCertificateImportIdentity: Equatable {
         let certificateDER = try leafCertificate.toDERBytes()
         let certificate = try Certificate(derEncoded: certificateDER)
 
-        return Self(
+        return try Self(
             displayName: displayName,
-            certificatePEM: try pem(certificate),
-            privateKeyPEM: try privateKeyPEM(from: Data(try bundle.privateKey.derBytes))
+            certificatePEM: pem(certificate),
+            privateKeyPEM: privateKeyPEM(from: Data(bundle.privateKey.derBytes))
         )
     }
 
@@ -102,10 +108,10 @@ struct CustomCertificateImportIdentity: Equatable {
             throw CustomCertificateImportError.invalidPrivateKey
         }
 
-        return Self(
+        return try Self(
             displayName: displayName,
-            certificatePEM: try pem(certificate),
-            privateKeyPEM: try privateKey.serializeAsPEM().pemString
+            certificatePEM: pem(certificate),
+            privateKeyPEM: privateKey.serializeAsPEM().pemString
         )
     }
 
@@ -121,7 +127,12 @@ struct CustomCertificateImportIdentity: Equatable {
         return try NIOSSLPKCS12Bundle(buffer: bytes, passphrase: Array(passphrase.utf8))
     }
 
-    private static func secItemImportIdentity(data: Data, passphrase: String) throws -> (certificate: SecCertificate, privateKey: SecKey) {
+    private static func secItemImportIdentity(
+        data: Data,
+        passphrase: String
+    )
+        throws -> (certificate: SecCertificate, privateKey: SecKey)
+    {
         var format = SecExternalFormat.formatPKCS12
         var itemType = SecExternalItemType.itemTypeAggregate
         let importPassphrase = passphrase as NSString
@@ -147,7 +158,12 @@ struct CustomCertificateImportIdentity: Equatable {
         return try identity(from: importedItems)
     }
 
-    private static func secPKCS12Identity(data: Data, passphrase: String) throws -> (certificate: SecCertificate, privateKey: SecKey) {
+    private static func secPKCS12Identity(
+        data: Data,
+        passphrase: String
+    )
+        throws -> (certificate: SecCertificate, privateKey: SecKey)
+    {
         var importedItems: CFArray?
         let options = [kSecImportExportPassphrase as String: passphrase] as CFDictionary
         let status = SecPKCS12Import(data as CFData, options, &importedItems)
@@ -157,7 +173,9 @@ struct CustomCertificateImportIdentity: Equatable {
         return try identity(from: importedItems)
     }
 
-    private static func identity(from importedItems: CFArray) throws -> (certificate: SecCertificate, privateKey: SecKey) {
+    private static func identity(from importedItems: CFArray) throws
+        -> (certificate: SecCertificate, privateKey: SecKey)
+    {
         let items = importedItems as NSArray
         let rawIdentity = items.compactMap { item -> Any? in
             if CFGetTypeID(item as AnyObject) == SecIdentityGetTypeID() {
@@ -177,13 +195,15 @@ struct CustomCertificateImportIdentity: Equatable {
 
         var certificate: SecCertificate?
         guard SecIdentityCopyCertificate(identity, &certificate) == errSecSuccess,
-              let certificate else {
+              let certificate else
+        {
             throw CustomCertificateImportError.missingCertificate
         }
 
         var privateKey: SecKey?
         guard SecIdentityCopyPrivateKey(identity, &privateKey) == errSecSuccess,
-              let privateKey else {
+              let privateKey else
+        {
             throw CustomCertificateImportError.invalidPrivateKey
         }
 
@@ -240,7 +260,11 @@ protocol SecureDataStore: Sendable {
     func delete(account: String) throws
 }
 
+// MARK: - KeychainSecureDataStore
+
 struct KeychainSecureDataStore: SecureDataStore {
+    // MARK: Internal
+
     func save(_ data: Data, account: String) throws {
         try KeychainHelper.saveSecureData(data, service: service, account: account)
     }
@@ -253,30 +277,56 @@ struct KeychainSecureDataStore: SecureDataStore {
         try KeychainHelper.deleteSecureData(service: service, account: account)
     }
 
+    // MARK: Private
+
     private let service = RockxyIdentity.current.defaultsKey("CustomCertificates")
+}
+
+// MARK: - CustomCertificateMetadataWriter
+
+protocol CustomCertificateMetadataWriter: Sendable {
+    func write(_ data: Data, to url: URL) throws
+}
+
+struct FileCustomCertificateMetadataWriter: CustomCertificateMetadataWriter {
+    func write(_ data: Data, to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try data.write(to: url, options: .atomic)
+    }
 }
 
 // MARK: - CustomCertificateManager
 
 final class CustomCertificateManager: @unchecked Sendable {
-    static let shared = CustomCertificateManager()
+    // MARK: Lifecycle
 
     init(
         storageURL: URL = RockxyIdentity.current.sharedSupportDirectory()
             .appendingPathComponent("Certificates", isDirectory: true)
             .appendingPathComponent("custom-certificates.json"),
-        secureStore: any SecureDataStore = KeychainSecureDataStore()
+        secureStore: any SecureDataStore = KeychainSecureDataStore(),
+        metadataWriter: any CustomCertificateMetadataWriter = FileCustomCertificateMetadataWriter()
     ) {
         self.storageURL = storageURL
         self.secureStore = secureStore
+        self.metadataWriter = metadataWriter
         loadFromDisk()
     }
 
+    // MARK: Internal
+
+    static let shared = CustomCertificateManager()
+
     func metadata(kind: CustomCertificateKind? = nil) -> [CustomCertificateMetadata] {
-        lock.withLock {
-            entries
-                .filter { kind == nil || $0.kind == kind }
-                .sorted { $0.createdAt < $1.createdAt }
+        transactionLock.withLock {
+            lock.withLock {
+                entries
+                    .filter { kind == nil || $0.kind == kind }
+                    .sorted { $0.createdAt < $1.createdAt }
+            }
         }
     }
 
@@ -285,8 +335,16 @@ final class CustomCertificateManager: @unchecked Sendable {
         displayName: String,
         certificatePEM: String,
         privateKeyPEM: String
-    ) throws -> CustomCertificateMetadata {
-        try importIdentity(kind: .root, hostPattern: nil, displayName: displayName, certificatePEM: certificatePEM, privateKeyPEM: privateKeyPEM)
+    )
+        throws -> CustomCertificateMetadata
+    {
+        try importIdentity(
+            kind: .root,
+            hostPattern: nil,
+            displayName: displayName,
+            certificatePEM: certificatePEM,
+            privateKeyPEM: privateKeyPEM
+        )
     }
 
     @discardableResult
@@ -295,8 +353,16 @@ final class CustomCertificateManager: @unchecked Sendable {
         displayName: String,
         certificatePEM: String,
         privateKeyPEM: String
-    ) throws -> CustomCertificateMetadata {
-        try importIdentity(kind: .server, hostPattern: hostPattern, displayName: displayName, certificatePEM: certificatePEM, privateKeyPEM: privateKeyPEM)
+    )
+        throws -> CustomCertificateMetadata
+    {
+        try importIdentity(
+            kind: .server,
+            hostPattern: hostPattern,
+            displayName: displayName,
+            certificatePEM: certificatePEM,
+            privateKeyPEM: privateKeyPEM
+        )
     }
 
     @discardableResult
@@ -305,22 +371,48 @@ final class CustomCertificateManager: @unchecked Sendable {
         displayName: String,
         certificatePEM: String,
         privateKeyPEM: String
-    ) throws -> CustomCertificateMetadata {
-        try importIdentity(kind: .client, hostPattern: hostPattern, displayName: displayName, certificatePEM: certificatePEM, privateKeyPEM: privateKeyPEM)
+    )
+        throws -> CustomCertificateMetadata
+    {
+        try importIdentity(
+            kind: .client,
+            hostPattern: hostPattern,
+            displayName: displayName,
+            certificatePEM: certificatePEM,
+            privateKeyPEM: privateKeyPEM
+        )
     }
 
     func activeRootIssuer() throws -> (certificate: Certificate, privateKey: Certificate.PrivateKey)? {
-        guard let entry = metadata(kind: .root).last else {
+        guard let snapshot = try activeRootIssuerSnapshot() else {
             return nil
         }
-        guard let keyData = try secureStore.load(account: entry.keychainAccount),
-              let privateKeyPEM = String(data: keyData, encoding: .utf8) else {
-            throw CustomCertificateError.missingPrivateKey
+        return (certificate: snapshot.certificate, privateKey: snapshot.privateKey)
+    }
+
+    func activeRootIssuerSnapshot()
+        throws -> (
+            certificate: Certificate,
+            privateKey: Certificate.PrivateKey,
+            fingerprintSHA256: String
+        )?
+    {
+        try transactionLock.withLock {
+            guard let entry = metadata(kind: .root).last else {
+                return nil
+            }
+            guard let keyData = try secureStore.load(account: entry.keychainAccount),
+                  let privateKeyPEM = String(data: keyData, encoding: .utf8) else
+            {
+                throw CustomCertificateError.missingPrivateKey
+            }
+            let certificate = try Certificate(pemEncoded: entry.certificatePEM)
+            return try (
+                certificate: certificate,
+                privateKey: Certificate.PrivateKey(pemEncoded: privateKeyPEM),
+                fingerprintSHA256: entry.fingerprintSHA256 ?? Self.fingerprint(certificate) ?? "custom"
+            )
         }
-        return (
-            certificate: try Certificate(pemEncoded: entry.certificatePEM),
-            privateKey: try Certificate.PrivateKey(pemEncoded: privateKeyPEM)
-        )
     }
 
     func serverIdentity(for host: String) -> CustomTLSIdentity? {
@@ -332,34 +424,53 @@ final class CustomCertificateManager: @unchecked Sendable {
     }
 
     func delete(id: UUID) throws {
-        let removed: CustomCertificateMetadata? = lock.withLock {
-            guard let index = entries.firstIndex(where: { $0.id == id }) else {
-                return nil
+        try transactionLock.withLock {
+            let currentEntries = lock.withLock { entries }
+            guard let removed = currentEntries.first(where: { $0.id == id }) else {
+                return
             }
-            return entries.remove(at: index)
-        }
-        if let removed {
-            try secureStore.delete(account: removed.keychainAccount)
-            try persist()
+            let proposedEntries = currentEntries.filter { $0.id != id }
+            try commitDeletion(
+                currentEntries: currentEntries,
+                proposedEntries: proposedEntries,
+                removedEntries: [removed]
+            )
         }
     }
 
     func deleteAll(kind: CustomCertificateKind? = nil) throws {
-        let removed: [CustomCertificateMetadata] = lock.withLock {
-            let removed = entries.filter { kind == nil || $0.kind == kind }
-            entries.removeAll { kind == nil || $0.kind == kind }
-            return removed
+        try transactionLock.withLock {
+            let currentEntries = lock.withLock { entries }
+            let removedEntries = currentEntries.filter { kind == nil || $0.kind == kind }
+            guard !removedEntries.isEmpty else {
+                return
+            }
+            let proposedEntries = currentEntries.filter { kind != nil && $0.kind != kind }
+            try commitDeletion(
+                currentEntries: currentEntries,
+                proposedEntries: proposedEntries,
+                removedEntries: removedEntries
+            )
         }
-        for entry in removed {
-            try secureStore.delete(account: entry.keychainAccount)
-        }
-        try persist()
     }
+
+    // MARK: Private
 
     private let storageURL: URL
     private let secureStore: any SecureDataStore
+    private let metadataWriter: any CustomCertificateMetadataWriter
+    // activeRootIssuer intentionally reuses metadata ordering while holding this lock.
+    private let transactionLock = NSRecursiveLock()
     private let lock = NSLock()
     private var entries: [CustomCertificateMetadata] = []
+
+    private static func fingerprint(_ certificate: Certificate) -> String? {
+        var serializer = DER.Serializer()
+        guard (try? certificate.serialize(into: &serializer)) != nil else {
+            return nil
+        }
+        return KeychainHelper.computeFingerprintSHA256(Data(serializer.serializedBytes))
+    }
 
     private func importIdentity(
         kind: CustomCertificateKind,
@@ -367,7 +478,9 @@ final class CustomCertificateManager: @unchecked Sendable {
         displayName: String,
         certificatePEM: String,
         privateKeyPEM: String
-    ) throws -> CustomCertificateMetadata {
+    )
+        throws -> CustomCertificateMetadata
+    {
         let certificate = try Certificate(pemEncoded: certificatePEM)
         let privateKey = try Certificate.PrivateKey(pemEncoded: privateKeyPEM)
         guard certificate.publicKey.subjectPublicKeyInfoBytes == privateKey.publicKey.subjectPublicKeyInfoBytes else {
@@ -378,14 +491,14 @@ final class CustomCertificateManager: @unchecked Sendable {
             try validateTLSIdentity(certificatePEM: certificatePEM, privateKeyPEM: privateKeyPEM)
         }
 
+        let normalizedHostPattern = hostPattern?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let keychainAccount = "custom-certificate.\(kind.rawValue).\(UUID().uuidString)"
-        try secureStore.save(Data(privateKeyPEM.utf8), account: keychainAccount)
 
         let entry = CustomCertificateMetadata(
             id: UUID(),
             kind: kind,
             displayName: displayName,
-            hostPattern: hostPattern?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+            hostPattern: normalizedHostPattern,
             certificatePEM: certificatePEM,
             keychainAccount: keychainAccount,
             createdAt: Date(),
@@ -394,33 +507,74 @@ final class CustomCertificateManager: @unchecked Sendable {
             fingerprintSHA256: Self.fingerprint(certificate)
         )
 
-        lock.withLock {
-            entries.removeAll {
-                $0.kind == kind && $0.hostPattern == entry.hostPattern
+        return try transactionLock.withLock {
+            let currentEntries = lock.withLock { entries }
+            let supersededEntries = currentEntries.filter {
+                $0.kind == kind && $0.hostPattern == normalizedHostPattern
             }
-            entries.append(entry)
+            var proposedEntries = currentEntries.filter {
+                !($0.kind == kind && $0.hostPattern == normalizedHostPattern)
+            }
+            proposedEntries.append(entry)
+
+            let accountsToDelete = unreferencedAccounts(
+                removedEntries: supersededEntries,
+                retainedEntries: proposedEntries
+            )
+            let supersededKeys = try loadAccountData(accounts: accountsToDelete)
+
+            try secureStore.save(Data(privateKeyPEM.utf8), account: keychainAccount)
+            do {
+                try persist(entries: proposedEntries)
+            } catch {
+                let persistenceError = error
+                do {
+                    try secureStore.delete(account: keychainAccount)
+                } catch {
+                    throw CustomCertificateTransactionError.recoveryFailed
+                }
+                throw persistenceError
+            }
+
+            do {
+                try deleteAccounts(accountsToDelete)
+            } catch {
+                let deletionError = error
+                try performRecovery([
+                    { try self.persist(entries: currentEntries) },
+                    { try self.restoreAccountData(supersededKeys) },
+                    { try self.secureStore.delete(account: keychainAccount) }
+                ])
+                throw deletionError
+            }
+
+            lock.withLock {
+                entries = proposedEntries
+            }
+            return entry
         }
-        try persist()
-        return entry
     }
 
     private func identity(for host: String, kind: CustomCertificateKind) -> CustomTLSIdentity? {
         let normalizedHost = host.lowercased()
-        let match = lock.withLock {
-            entries.last { entry in
-                guard entry.kind == kind, let pattern = entry.hostPattern else {
-                    return false
+        return transactionLock.withLock {
+            let match = lock.withLock {
+                entries.last { entry in
+                    guard entry.kind == kind, let pattern = entry.hostPattern else {
+                        return false
+                    }
+                    return HostPatternMatcher.matches(pattern: pattern, host: normalizedHost)
                 }
-                return HostPatternMatcher.matches(pattern: pattern, host: normalizedHost)
             }
-        }
 
-        guard let match,
-              let keyData = try? secureStore.load(account: match.keychainAccount),
-              let privateKeyPEM = String(data: keyData, encoding: .utf8) else {
-            return nil
+            guard let match,
+                  let keyData = try? secureStore.load(account: match.keychainAccount),
+                  let privateKeyPEM = String(data: keyData, encoding: .utf8) else
+            {
+                return nil
+            }
+            return CustomTLSIdentity(certificateChainPEM: [match.certificatePEM], privateKeyPEM: privateKeyPEM)
         }
-        return CustomTLSIdentity(certificateChainPEM: [match.certificatePEM], privateKeyPEM: privateKeyPEM)
     }
 
     private func validateTLSIdentity(certificatePEM: String, privateKeyPEM: String) throws {
@@ -434,7 +588,8 @@ final class CustomCertificateManager: @unchecked Sendable {
 
     private func loadFromDisk() {
         guard let data = try? Data(contentsOf: storageURL),
-              let decoded = try? JSONDecoder().decode([CustomCertificateMetadata].self, from: data) else {
+              let decoded = try? JSONDecoder().decode([CustomCertificateMetadata].self, from: data) else
+        {
             return
         }
         lock.withLock {
@@ -442,23 +597,98 @@ final class CustomCertificateManager: @unchecked Sendable {
         }
     }
 
-    private func persist() throws {
-        let snapshot = lock.withLock { entries }
-        try FileManager.default.createDirectory(
-            at: storageURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+    private func commitDeletion(
+        currentEntries: [CustomCertificateMetadata],
+        proposedEntries: [CustomCertificateMetadata],
+        removedEntries: [CustomCertificateMetadata]
+    ) throws {
+        let accountsToDelete = unreferencedAccounts(
+            removedEntries: removedEntries,
+            retainedEntries: proposedEntries
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(snapshot).write(to: storageURL, options: .atomic)
+        let removedKeys = try loadAccountData(accounts: accountsToDelete)
+
+        try persist(entries: proposedEntries)
+        do {
+            try deleteAccounts(accountsToDelete)
+        } catch {
+            let deletionError = error
+            try performRecovery([
+                { try self.persist(entries: currentEntries) },
+                { try self.restoreAccountData(removedKeys) }
+            ])
+            throw deletionError
+        }
+
+        lock.withLock {
+            entries = proposedEntries
+        }
     }
 
-    private static func fingerprint(_ certificate: Certificate) -> String? {
-        var serializer = DER.Serializer()
-        guard (try? certificate.serialize(into: &serializer)) != nil else {
-            return nil
+    private func unreferencedAccounts(
+        removedEntries: [CustomCertificateMetadata],
+        retainedEntries: [CustomCertificateMetadata]
+    ) -> [String] {
+        let retainedAccounts = Set(retainedEntries.map(\.keychainAccount))
+        var seenAccounts = Set<String>()
+        return removedEntries.compactMap { entry in
+            guard !retainedAccounts.contains(entry.keychainAccount),
+                  seenAccounts.insert(entry.keychainAccount).inserted else
+            {
+                return nil
+            }
+            return entry.keychainAccount
         }
-        return KeychainHelper.computeFingerprintSHA256(Data(serializer.serializedBytes))
+    }
+
+    private func loadAccountData(accounts: [String]) throws -> [String: Data] {
+        var result: [String: Data] = [:]
+        for account in accounts {
+            if let data = try secureStore.load(account: account) {
+                result[account] = data
+            }
+        }
+        return result
+    }
+
+    private func deleteAccounts(_ accounts: [String]) throws {
+        for account in accounts {
+            try secureStore.delete(account: account)
+        }
+    }
+
+    private func restoreAccountData(_ accountData: [String: Data]) throws {
+        var restorationFailed = false
+        for (account, data) in accountData {
+            do {
+                try secureStore.save(data, account: account)
+            } catch {
+                restorationFailed = true
+            }
+        }
+        if restorationFailed {
+            throw CustomCertificateTransactionError.recoveryFailed
+        }
+    }
+
+    private func performRecovery(_ actions: [() throws -> Void]) throws {
+        var recoveryFailed = false
+        for action in actions {
+            do {
+                try action()
+            } catch {
+                recoveryFailed = true
+            }
+        }
+        if recoveryFailed {
+            throw CustomCertificateTransactionError.recoveryFailed
+        }
+    }
+
+    private func persist(entries snapshot: [CustomCertificateMetadata]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try metadataWriter.write(encoder.encode(snapshot), to: storageURL)
     }
 }
 
@@ -467,6 +697,8 @@ final class CustomCertificateManager: @unchecked Sendable {
 enum CustomCertificateError: LocalizedError, Equatable {
     case invalidCertificateKeyPair
     case missingPrivateKey
+
+    // MARK: Internal
 
     var errorDescription: String? {
         switch self {
@@ -478,6 +710,18 @@ enum CustomCertificateError: LocalizedError, Equatable {
     }
 }
 
+// MARK: - CustomCertificateTransactionError
+
+enum CustomCertificateTransactionError: LocalizedError, Equatable {
+    case recoveryFailed
+
+    var errorDescription: String? {
+        String(
+            localized: "Rockxy could not fully recover the custom certificate store. Restart Rockxy before making more certificate changes."
+        )
+    }
+}
+
 // MARK: - CustomCertificateImportError
 
 enum CustomCertificateImportError: LocalizedError, Equatable {
@@ -486,6 +730,8 @@ enum CustomCertificateImportError: LocalizedError, Equatable {
     case invalidPKCS12
     case missingCertificate
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .invalidCertificate:
@@ -493,7 +739,9 @@ enum CustomCertificateImportError: LocalizedError, Equatable {
         case .invalidPrivateKey:
             String(localized: "The selected private key must be a valid PEM or DER private key.")
         case .invalidPKCS12:
-            String(localized: "The selected P12 file could not be imported. Check that the file contains a certificate and private key, then try the correct password.")
+            String(
+                localized: "The selected P12 file could not be imported. Check that the file contains a certificate and private key, then try the correct password."
+            )
         case .missingCertificate:
             String(localized: "The selected P12 file does not contain a certificate.")
         }

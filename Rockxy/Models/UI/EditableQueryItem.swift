@@ -6,7 +6,7 @@ import Foundation
 
 /// Editable key-value pair for URL query parameters. Used by the Compose window
 /// and breakpoint editor for bidirectional query-URL synchronization.
-struct EditableQueryItem: Codable, Equatable, Identifiable {
+struct EditableQueryItem: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var name: String
     var value: String

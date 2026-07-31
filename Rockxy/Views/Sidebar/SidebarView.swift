@@ -821,13 +821,13 @@ struct SidebarView: View {
             Button {
                 coordinator.removeFromBypassList(domain)
             } label: {
-                Label(String(localized: "Remove from Bypass Proxy List"), systemImage: "arrow.uturn.right")
+                Label(String(localized: "Remove from Full Proxy Bypass"), systemImage: "arrow.uturn.right")
             }
         } else {
             Button {
                 coordinator.addToBypassList(domain)
             } label: {
-                Label(String(localized: "Add to Bypass Proxy List"), systemImage: "arrow.uturn.right")
+                Label(String(localized: "Add to Full Proxy Bypass"), systemImage: "arrow.uturn.right")
             }
         }
 

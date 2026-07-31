@@ -60,6 +60,90 @@ final class RockxyUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsSidebarToggleStaysInLeadingTitlebar() {
+        let app = XCUIApplication()
+        app.launch()
+        app.typeKey(",", modifierFlags: .command)
+
+        let settingsWindow = app.windows["Rockxy Settings"]
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 5))
+
+        let sidebarToggle = settingsWindow.buttons["Toggle Settings Sidebar"]
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 3))
+
+        let closeButton = settingsWindow.buttons[XCUIIdentifierCloseWindow]
+        let minimizeButton = settingsWindow.buttons[XCUIIdentifierMinimizeWindow]
+        let zoomButton = settingsWindow.buttons[XCUIIdentifierZoomWindow]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(minimizeButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(zoomButton.waitForExistence(timeout: 2))
+
+        let toggleFrame = sidebarToggle.frame
+        let closeFrame = closeButton.frame
+        let minimizeFrame = minimizeButton.frame
+        let zoomFrame = zoomButton.frame
+        let sidebar = settingsWindow.outlines.firstMatch
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 2))
+        let sidebarFrame = sidebar.frame
+        let firstSidebarLabel = sidebar.staticTexts["General"].firstMatch
+        XCTAssertTrue(firstSidebarLabel.waitForExistence(timeout: 2))
+        let firstSidebarLabelFrame = firstSidebarLabel.frame
+
+        XCTAssertLessThan(
+            abs(closeFrame.midY - minimizeFrame.midY),
+            2,
+            "Traffic-light controls must share one titlebar baseline"
+        )
+        XCTAssertLessThan(
+            abs(minimizeFrame.midY - zoomFrame.midY),
+            2,
+            "Traffic-light controls must share one titlebar baseline"
+        )
+        XCTAssertLessThan(
+            abs(toggleFrame.midY - zoomFrame.midY),
+            3,
+            "Native toolbar items must share the titlebar control baseline"
+        )
+        XCTAssertGreaterThan(
+            toggleFrame.minX,
+            zoomFrame.maxX + 36,
+            "Sidebar toggle must align to the sidebar edge, not the traffic lights"
+        )
+        XCTAssertGreaterThan(
+            toggleFrame.midX,
+            sidebarFrame.midX,
+            "Sidebar toggle must live in the trailing half of the sidebar"
+        )
+        XCTAssertLessThanOrEqual(
+            toggleFrame.maxX,
+            sidebarFrame.maxX,
+            "Sidebar toggle must remain inside the sidebar boundary"
+        )
+        XCTAssertGreaterThan(
+            sidebarFrame.maxX - toggleFrame.maxX,
+            0,
+            "Sidebar toggle hit area must not cross the rounded trailing edge"
+        )
+        XCTAssertLessThan(
+            sidebarFrame.maxX - toggleFrame.maxX,
+            24,
+            "Sidebar toggle must stay close to the sidebar's trailing edge"
+        )
+        XCTAssertGreaterThan(
+            firstSidebarLabelFrame.minY - toggleFrame.maxY,
+            14,
+            "Sidebar items need breathing room below the titlebar control"
+        )
+
+        sidebarToggle.click()
+        XCTAssertTrue(sidebar.waitForNonExistence(timeout: 2))
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 2))
+
+        sidebarToggle.click()
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testLaunchPerformance() {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {

@@ -1,16 +1,20 @@
 import ServiceManagement
 import SwiftUI
 
-// Renders the welcome interface for first-run onboarding.
+// Renders the original four-step onboarding flow with native macOS hierarchy and helper recovery.
 
 // MARK: - WelcomeStepItem
 
 private struct WelcomeStepItem: Identifiable {
     let id: Int
     let title: String
+    let detail: String
+    let symbol: String
     let actionLabel: String?
     let isCompleted: Bool
     let isDisabled: Bool
+    let activeAction: WelcomeViewModel.ActiveAction
+    let errorArea: WelcomeViewModel.ErrorArea
     let action: (() async -> Void)?
 }
 
@@ -26,11 +30,12 @@ struct WelcomeView: View {
         VStack(spacing: 0) {
             headerSection
             Divider()
-            stepsList
+            stepsSection
             Divider()
             footerSection
         }
-        .frame(width: 520, height: 480)
+        .frame(width: windowWidth, height: windowHeight)
+        .interactiveDismissDisabled(viewModel.isBusy)
         .task {
             await viewModel.loadInitialStatus()
         }
@@ -46,75 +51,105 @@ struct WelcomeView: View {
         .onChange(of: ReadinessCoordinator.shared.proxyMode) {
             viewModel.syncFromCoordinator()
         }
+        .alert(
+            String(localized: "Repair Helper Tool?"),
+            isPresented: $showingHelperRepairConfirmation
+        ) {
+            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Repair & Reinstall"), role: .destructive) {
+                Task {
+                    await viewModel.repairAndReinstallHelper()
+                }
+            }
+        } message: {
+            Text(
+                String(
+                    localized: """
+                    Rockxy will stop capture, request administrator approval, remove stale helper files and registration state, then reinstall the helper from this app.
+
+                    Use this when Install, Retry, Update, or Reinstall cannot recover the helper.
+                    """
+                )
+            )
+        }
     }
 
     // MARK: Private
 
     @State private var viewModel = WelcomeViewModel()
+    @State private var showingHelperRepairConfirmation = false
     @AppStorage("showWelcomeOnLaunch") private var showWelcomeOnLaunch = true
     @AppStorage(RockxyIdentity.current.defaultsKey("onboardingCompletedOnce")) private var onboardingCompletedOnce =
         false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var windowWidth: CGFloat {
+        max(540, min(620, toolMetrics.bodyFontSize * 5 + 495))
+    }
+
+    private var windowHeight: CGFloat {
+        max(540, min(660, toolMetrics.bodyFontSize * 8 + 456))
+    }
 
     private var steps: [WelcomeStepItem] {
         [
             WelcomeStepItem(
                 id: 1,
                 title: String(localized: "Generate Root Certificate"),
+                detail: String(localized: "Create Rockxy's local certificate authority for HTTPS inspection."),
+                symbol: "lock.badge.plus",
                 actionLabel: viewModel.certInstalled ? nil : String(localized: "Install"),
                 isCompleted: viewModel.certInstalled,
                 isDisabled: false,
+                activeAction: .certificate,
+                errorArea: .certificate,
                 action: { await viewModel.installCert() }
             ),
             WelcomeStepItem(
                 id: 2,
                 title: String(localized: "Trust Root Certificate"),
+                detail: String(localized: "Trust the certificate so intercepted HTTPS connections are accepted."),
+                symbol: "checkmark.shield",
                 actionLabel: viewModel.certTrusted ? nil : String(localized: "Trust"),
                 isCompleted: viewModel.certTrusted,
                 isDisabled: !viewModel.certInstalled,
+                activeAction: .certificate,
+                errorArea: .certificate,
                 action: { await viewModel.installCert() }
             ),
             WelcomeStepItem(
                 id: 3,
                 title: String(localized: "Install Helper Tool"),
-                actionLabel: helperActionLabel,
+                detail: String(
+                    localized: "Install the privileged service used for reliable proxy changes and recovery."
+                ),
+                symbol: "wrench.and.screwdriver",
+                actionLabel: viewModel.helperActionLabel,
                 isCompleted: viewModel.helperStatus == .installedCompatible,
                 isDisabled: false,
-                action: {
-                    if viewModel.helperStatus == .requiresApproval {
-                        SMAppService.openSystemSettingsLoginItems()
-                    } else if viewModel.helperStatus == .installedOutdated || viewModel
-                        .helperStatus == .installedIncompatible
-                    {
-                        await viewModel.updateHelper()
-                    } else if viewModel.helperStatus == .signingMismatch {
-                        if case .identityMismatch = viewModel.helperSigningIssue {
-                            await viewModel.reinstallHelper()
-                        }
-                    } else if viewModel.helperStatus == .unreachable {
-                        await viewModel.retryHelperConnection()
-                    } else {
-                        await viewModel.installHelper()
-                    }
-                }
+                activeAction: .helper,
+                errorArea: .helper,
+                action: performHelperAction
             ),
             WelcomeStepItem(
                 id: 4,
                 title: String(localized: "Enable System Proxy"),
+                detail: String(localized: "Route macOS network traffic through Rockxy for capture."),
+                symbol: "network",
                 actionLabel: viewModel.systemProxyEnabled ? nil : String(localized: "Enable"),
                 isCompleted: viewModel.systemProxyEnabled,
                 isDisabled: false,
+                activeAction: .systemProxy,
+                errorArea: .systemProxy,
                 action: { await viewModel.enableProxy() }
             ),
         ]
-    }
-
-    private var helperActionLabel: String? {
-        HelperManager.helperActionLabel(
-            status: viewModel.helperStatus,
-            signingIssue: viewModel.helperSigningIssue
-        )
     }
 
     private var appVersion: String {
@@ -123,212 +158,298 @@ struct WelcomeView: View {
         return "Version \(version) (\(build))"
     }
 
+    // MARK: - Header
+
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            Spacer()
-                .frame(height: 8)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: toolMetrics.headerSpacing) {
+                Image(nsImage: AppIconProvider.appIcon)
+                    .resizable()
+                    .frame(width: 56, height: 56)
 
-            Image(nsImage: AppIconProvider.appIcon)
-                .resizable()
-                .frame(width: 80, height: 80)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "Welcome to Rockxy"))
+                        .font(
+                            toolMetrics.appMetrics.swiftUIFont(
+                                size: max(20, toolMetrics.bodyFontSize + 7),
+                                weight: .semibold
+                            )
+                        )
+                    Text(
+                        isFirstLaunch
+                            ? String(localized: "Complete these four steps to prepare network debugging.")
+                            : String(localized: "Review the four setup steps before continuing.")
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
 
-            Text(String(localized: "Welcome to Rockxy"))
-                .font(.title)
-                .fontWeight(.bold)
+                Spacer(minLength: 0)
+            }
 
-            Text(String(localized: "Complete the steps below to set up network debugging."))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            progressSection
-
-            Spacer()
-                .frame(height: 4)
-        }
-        .padding(.horizontal, 40)
-    }
-
-    private var progressSection: some View {
-        VStack(spacing: 6) {
-            ProgressView(
-                value: Double(viewModel.completedSteps),
-                total: Double(viewModel.totalSteps)
-            )
-            .tint(.accentColor)
-
-            Text(
-                String(
-                    localized: "\(viewModel.completedSteps) of \(viewModel.totalSteps) steps complete"
+            HStack(spacing: 10) {
+                ProgressView(
+                    value: Double(viewModel.completedSteps),
+                    total: Double(viewModel.totalSteps)
                 )
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 20)
-    }
+                .tint(.accentColor)
 
-    private var stepsList: some View {
-        ScrollView {
-            VStack(spacing: 2) {
-                ForEach(steps) { step in
-                    stepRow(step)
+                if viewModel.isCheckingSystem {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(String(localized: "Checking system…"))
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "Checking system readiness"))
+                    .font(toolMetrics.metadataFont(weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                } else {
+                    Text(String(localized: "\(viewModel.completedSteps) of \(viewModel.totalSteps) complete"))
+                        .font(toolMetrics.metadataFont(weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
                 }
             }
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
+    }
+
+    // MARK: - Steps
+
+    private var stepsSection: some View {
+        ScrollView {
+            GroupBox {
+                VStack(spacing: 0) {
+                    ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                        stepRow(step)
+                        if index < steps.count - 1 {
+                            Divider()
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.vertical, 12)
-            .padding(.horizontal, 40)
         }
         .frame(maxHeight: .infinity)
     }
 
+    @ViewBuilder private var helperSupplement: some View {
+        if let detail = viewModel.helperStatusDetail {
+            Text(detail)
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(viewModel.helperStatus == .installedCompatible ? Color.green : Color.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if viewModel.shouldOfferHelperRepair {
+            Button(role: .destructive) {
+                showingHelperRepairConfirmation = true
+            } label: {
+                Label(
+                    String(localized: "Repair & Reinstall…"),
+                    systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+                )
+                .font(toolMetrics.metadataFont(weight: .medium))
+            }
+            .buttonStyle(.link)
+            .disabled(viewModel.isBusy)
+        }
+
+        if viewModel.errorArea == .helper || viewModel.helperFailureRecovery == .rebuildApp {
+            Button {
+                openWindow(id: "advancedProxySettings")
+            } label: {
+                Label(
+                    String(localized: "View Advanced Diagnostics"),
+                    systemImage: "wrench.and.screwdriver"
+                )
+                .font(toolMetrics.metadataFont(weight: .medium))
+            }
+            .buttonStyle(.link)
+        }
+    }
+
+    // MARK: - Footer
+
     private var footerSection: some View {
-        VStack(spacing: 12) {
-            Spacer()
-                .frame(height: 4)
-
-            if let errorMessage = viewModel.errorMessage {
-                VStack(spacing: 6) {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .lineLimit(2)
-                    Button {
-                        openWindow(id: "advancedProxySettings")
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "wrench.and.screwdriver")
-                                .font(.system(size: 10))
-                            Text(String(localized: "View Advanced Diagnostics"))
-                                .font(.caption)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+        VStack(spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: toolMetrics.controlSpacing) {
+                    startupToggle
+                    Spacer(minLength: toolMetrics.controlSpacing)
+                    footerButtons
                 }
-                .padding(.horizontal, 40)
+
+                VStack(alignment: .trailing, spacing: toolMetrics.controlSpacing) {
+                    footerButtons
+                    startupToggle
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-
-            if viewModel.helperStatus == .requiresApproval {
-                VStack(spacing: 8) {
-                    HStack(alignment: .top, spacing: 4) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
-                            .font(.system(size: 10))
-                        Text(
-                            String(
-                                localized: "macOS requires you to approve the helper tool in System Settings \u{2192} General \u{2192} Login Items."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    Button {
-                        Task {
-                            await viewModel.forceResetHelper()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 10))
-                            Text(String(localized: "Force Reset Helper"))
-                                .font(.caption)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-                    .disabled(viewModel.isPerformingAction)
-                }
-                .padding(.horizontal, 40)
-            }
-
-            HStack {
-                Toggle(isOn: $showWelcomeOnLaunch) {
-                    Text(String(localized: "Show on startup"))
-                        .font(.caption)
-                }
-                .toggleStyle(.checkbox)
-
-                Spacer()
-
-                if viewModel.canGetStarted {
-                    Button(String(localized: "Debug My App…")) {
-                        onboardingCompletedOnce = true
-                        openWindow(id: "developerSetupHub")
-                        if let onComplete {
-                            onComplete()
-                        } else {
-                            dismiss()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-
-                Button(String(localized: "Get Started")) {
-                    onboardingCompletedOnce = true
-                    if let onComplete {
-                        onComplete()
-                    } else {
-                        dismiss()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(!viewModel.canGetStarted)
-            }
-            .padding(.horizontal, 40)
 
             Text(appVersion)
-                .font(.caption2)
+                .font(toolMetrics.metadataFont())
                 .foregroundStyle(.quaternary)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.footerTopPadding)
+        .padding(.bottom, toolMetrics.footerBottomPadding)
+    }
 
-            Spacer()
-                .frame(height: 8)
+    private var startupToggle: some View {
+        Toggle(isOn: $showWelcomeOnLaunch) {
+            Text(String(localized: "Show on startup"))
+                .font(toolMetrics.secondaryFont())
+        }
+        .toggleStyle(.checkbox)
+    }
+
+    private var footerButtons: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            if viewModel.canGetStarted {
+                Button(String(localized: "Debug My App…")) {
+                    finish(openDeveloperSetup: true)
+                }
+                .controlSize(.large)
+            }
+
+            Button(String(localized: "Get Started")) {
+                finish(openDeveloperSetup: false)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .keyboardShortcut(.defaultAction)
+            .disabled(!viewModel.canGetStarted || viewModel.isBusy)
         }
     }
 
     private func stepRow(_ step: WelcomeStepItem) -> some View {
-        HStack(spacing: 12) {
-            statusIcon(for: step)
-                .font(.title3)
+        HStack(alignment: .top, spacing: 12) {
+            stepStatus(step)
 
-            Text(step.title)
-                .foregroundStyle(step.isDisabled ? .tertiary : .primary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(step.title)
+                    .font(toolMetrics.font(weight: .semibold))
+                    .foregroundStyle(step.isDisabled ? .tertiary : .primary)
 
-            Spacer()
+                Text(step.detail)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(step.isDisabled ? .tertiary : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            if let actionLabel = step.actionLabel, !step.isDisabled {
-                Button(actionLabel) {
-                    Task {
-                        await step.action?()
-                    }
+                if step.id == 3 {
+                    helperSupplement
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(viewModel.isPerformingAction)
+
+                if viewModel.errorArea == step.errorArea, let errorMessage = viewModel.errorMessage {
+                    inlineError(errorMessage)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            stepAction(step)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(step.isCompleted ? Color.green.opacity(0.055) : Color.clear)
+    }
+
+    private func stepStatus(_ step: WelcomeStepItem) -> some View {
+        ZStack {
+            Circle()
+                .fill(step.isCompleted
+                    ? Color.green
+                    : (step.isDisabled ? Color.secondary.opacity(0.12) : Color.accentColor.opacity(0.12)))
+            if step.isCompleted {
+                Image(systemName: "checkmark")
+                    .font(toolMetrics.metadataFont(weight: .bold))
+                    .foregroundStyle(.white)
+            } else {
+                Image(systemName: step.symbol)
+                    .font(toolMetrics.metadataFont(weight: .semibold))
+                    .foregroundStyle(step.isDisabled ? Color.secondary.opacity(0.55) : Color.accentColor)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(step.isCompleted ? Color.green.opacity(0.06) : Color.clear)
+        .frame(width: 28, height: 28)
+        .accessibilityLabel(
+            step.isCompleted
+                ? String(localized: "Completed")
+                : String(localized: "Step \(step.id)")
         )
     }
 
-    private func statusIcon(for step: WelcomeStepItem) -> some View {
-        Group {
-            if step.isCompleted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            } else if step.isDisabled {
-                Image(systemName: "circle")
-                    .foregroundStyle(.tertiary)
-            } else {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.yellow)
+    @ViewBuilder
+    private func stepAction(_ step: WelcomeStepItem) -> some View {
+        if viewModel.activeAction == step.activeAction {
+            ProgressView()
+                .controlSize(.small)
+                .frame(minWidth: 88)
+                .padding(.top, 3)
+        } else if let actionLabel = step.actionLabel, !step.isDisabled {
+            Button(actionLabel) {
+                Task {
+                    await step.action?()
+                }
             }
+            .controlSize(.small)
+            .frame(minWidth: 88)
+            .disabled(viewModel.isBusy)
+        }
+    }
+
+    private func inlineError(_ message: String) -> some View {
+        Label {
+            Text(message)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+        }
+        .font(toolMetrics.metadataFont())
+        .foregroundStyle(.red)
+        .padding(.top, 2)
+    }
+
+    private func performHelperAction() async {
+        switch viewModel.helperStatus {
+        case .requiresApproval:
+            SMAppService.openSystemSettingsLoginItems()
+        case .installedOutdated,
+             .installedIncompatible:
+            await viewModel.updateHelper()
+        case .signingMismatch:
+            if case .identityMismatch = viewModel.helperSigningIssue {
+                await viewModel.reinstallHelper()
+            }
+        case .unreachable:
+            await viewModel.retryHelperConnection()
+        case .notInstalled:
+            await viewModel.installHelper()
+        case .installedCompatible:
+            break
+        }
+    }
+
+    private func finish(openDeveloperSetup: Bool) {
+        guard viewModel.canGetStarted else {
+            return
+        }
+        onboardingCompletedOnce = true
+        if openDeveloperSetup {
+            openWindow(id: "developerSetupHub")
+        }
+        if let onComplete {
+            onComplete()
+        } else {
+            dismiss()
         }
     }
 }
@@ -336,5 +457,5 @@ struct WelcomeView: View {
 // MARK: - Preview
 
 #Preview {
-    WelcomeView()
+    WelcomeView(isFirstLaunch: true)
 }

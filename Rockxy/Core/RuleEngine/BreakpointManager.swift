@@ -69,13 +69,17 @@ final class BreakpointManager {
 
         return await withCheckedContinuation { continuation in
             continuations[itemId] = continuation
+            let wasEmpty = pausedItems.isEmpty
             pausedItems.append(item)
-            if selectedItemId == nil {
+            if !hasValidSelection {
                 selectedItemId = itemId
             }
-            BreakpointWindowModel.shared.selectPausedItem(item.id)
-            Self.logger.info("Breakpoint paused: \(host)\(path)")
-            NotificationCenter.default.post(name: .breakpointHit, object: nil)
+            Self.logger.info("Breakpoint paused")
+            // Auto-raise the queue window once per burst: notify only on the
+            // empty → non-empty transition, not on every subsequent hit.
+            if wasEmpty {
+                NotificationCenter.default.post(name: .breakpointHit, object: nil)
+            }
         }
     }
 
@@ -86,25 +90,28 @@ final class BreakpointManager {
         }
         let item = pausedItems[index]
         pausedItems.remove(at: index)
+        let resolvedDecision = safeDecision(decision, for: item)
 
         if let continuation = continuations.removeValue(forKey: id) {
-            continuation.resume(returning: (decision, item.editableDraft))
+            continuation.resume(returning: (resolvedDecision, item.editableDraft))
         }
 
         if selectedItemId == id {
-            selectedItemId = pausedItems.first?.id
+            // Move selection to the nearest surviving item: the row now
+            // occupying the removed index, or the previous final row when the
+            // removed item was last. Empty queue clears the selection.
+            selectedItemId = pausedItems.isEmpty ? nil : pausedItems[min(index, pausedItems.count - 1)].id
         }
 
-        BreakpointWindowModel.shared.handlePausedResolutionFallback(remainingPausedItems: pausedItems)
-
-        Self.logger.info("Breakpoint resolved (\(String(describing: decision))): \(item.host)\(item.path)")
+        Self.logger.info("Breakpoint resolved (\(String(describing: resolvedDecision)))")
     }
 
     /// Resolve all paused items at once with the same decision.
     func resolveAll(decision: BreakpointDecision) {
         for item in pausedItems {
             if let continuation = continuations.removeValue(forKey: item.id) {
-                continuation.resume(returning: (decision, item.editableDraft))
+                let resolvedDecision = safeDecision(decision, for: item)
+                continuation.resume(returning: (resolvedDecision, item.editableDraft))
             }
         }
         let count = pausedItems.count
@@ -136,20 +143,27 @@ final class BreakpointManager {
     private var continuations: [UUID: CheckedContinuation<(BreakpointDecision, BreakpointRequestData), Never>] = [:]
     private var nextSequenceNumber = 0
 
-    private func selectAdjacentItem(offset: Int) {
-        guard !pausedItems.isEmpty else {
-            selectedItemId = nil
-            return
+    /// True when `selectedItemId` still points at a currently-paused item. A
+    /// newly enqueued item only steals selection when this is false, so a burst
+    /// of hits never yanks focus away from the item the user is editing.
+    private var hasValidSelection: Bool {
+        guard let selectedItemId else {
+            return false
         }
-        guard let selectedItemId,
-              let index = pausedItems.firstIndex(where: { $0.id == selectedItemId }) else
-        {
-            selectedItemId = pausedItems.first?.id
-            return
+        return pausedItems.contains { $0.id == selectedItemId }
+    }
+
+    private func safeDecision(
+        _ decision: BreakpointDecision,
+        for item: PausedBreakpointItem
+    )
+        -> BreakpointDecision
+    {
+        if case .execute = decision, !item.editableDraft.isBodyEditable {
+            Self.logger.warning("Protected breakpoint payload cannot be edited; continuing original")
+            return .cancel
         }
-        let nextIndex = (index + offset + pausedItems.count) % pausedItems.count
-        self.selectedItemId = pausedItems[nextIndex].id
-        BreakpointWindowModel.shared.selectPausedItem(pausedItems[nextIndex].id)
+        return decision
     }
 
     private static func displayURL(from urlString: String) -> String {
@@ -224,5 +238,20 @@ final class BreakpointManager {
             return ""
         }
         return operationName
+    }
+
+    private func selectAdjacentItem(offset: Int) {
+        guard !pausedItems.isEmpty else {
+            selectedItemId = nil
+            return
+        }
+        guard let selectedItemId,
+              let index = pausedItems.firstIndex(where: { $0.id == selectedItemId }) else
+        {
+            selectedItemId = pausedItems.first?.id
+            return
+        }
+        let nextIndex = (index + offset + pausedItems.count) % pausedItems.count
+        self.selectedItemId = pausedItems[nextIndex].id
     }
 }

@@ -71,9 +71,6 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     static let sidebarTrackingSeparatorIdentifier = NSToolbarItem.Identifier(
         "\(RockxyIdentity.current.logSubsystem).toolbar.sidebarTrackingSeparator"
     )
-    static let workspaceTitleIdentifier = NSToolbarItem.Identifier(
-        "\(RockxyIdentity.current.logSubsystem).toolbar.workspaceTitle"
-    )
     static let proxyStatusIdentifier = NSToolbarItem.Identifier(
         "\(RockxyIdentity.current.logSubsystem).toolbar.proxyStatus"
     )
@@ -113,7 +110,6 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             .flexibleSpace,
             Self.sidebarToggleIdentifier,
             Self.sidebarTrackingSeparatorIdentifier,
-            Self.workspaceTitleIdentifier,
             .flexibleSpace,
             Self.proxyStatusIdentifier,
             .flexibleSpace,
@@ -140,13 +136,6 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                 identifier: Self.sidebarTrackingSeparatorIdentifier,
                 splitView: splitViewController.splitView,
                 dividerIndex: 0
-            )
-        case Self.workspaceTitleIdentifier:
-            return hostingItem(
-                identifier: itemIdentifier,
-                rootView: AnyView(
-                    NativeWorkspaceTitleToolbarView(coordinator: coordinator)
-                )
             )
         case Self.proxyStatusIdentifier:
             return hostingItem(
@@ -311,19 +300,6 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     @objc
     private func toggleContextDock(_ sender: Any?) {
         coordinator.toggleInspectorRight()
-    }
-}
-
-// MARK: - NativeWorkspaceTitleToolbarView
-
-private struct NativeWorkspaceTitleToolbarView: View {
-    @Bindable var coordinator: MainContentCoordinator
-
-    var body: some View {
-        Text(coordinator.activeWorkspace.title)
-            .font(.headline)
-            .lineLimit(1)
-            .help(coordinator.activeWorkspace.title)
     }
 }
 

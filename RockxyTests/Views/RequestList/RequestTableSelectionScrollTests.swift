@@ -887,34 +887,113 @@ struct RequestTableSelectionScrollTests {
         #expect(leadingConstraintConstant(for: nameLabel, in: clientView) == expected.tableClientIconSize + 4)
     }
 
-    @Test("Request table reapplies header font to custom columns after appearance changes")
-    func requestTableHeaderMetricsApplyToCustomColumns() throws {
+    @Test("Custom header snapshots sync live without disturbing table state")
+    func customHeaderSnapshotsSyncLive() throws {
         var selectedIDs = Set<UUID>()
         var appUI = AppUISettings()
         appUI.fontSize = 28
+        let selectionBinding = Binding(
+            get: { selectedIDs },
+            set: { selectedIDs = $0 }
+        )
+        let rows = (0 ..< 20).map { index in
+            RequestListRow(
+                from: TestFixtures.makeTransaction(url: "https://example.com/\(index)"),
+                sslState: .insecure
+            )
+        }
+        let requestColumn = HeaderColumn(headerName: "X-Request-ID", source: .request)
+        let responseColumn = HeaderColumn(headerName: "ETag", source: .response, isEnabled: false)
         let parent = RequestTableView(
             workspaceID: UUID(),
-            rows: [],
+            rows: rows,
             refreshToken: 0,
             isAppendOnly: false,
             displayMetricsOverride: AppUIDisplayMetrics(settings: appUI),
-            selectedIDs: Binding(
-                get: { selectedIDs },
-                set: { selectedIDs = $0 }
-            )
+            selectedIDs: selectionBinding,
+            headerColumns: [requestColumn, responseColumn]
         )
         let coordinator = RequestTableView.Coordinator(parent: parent)
-        let tableView = makeTableView(rowCount: 1, coordinator: coordinator, columns: ["url"])
-        let customColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("reqHeader.X-Test"))
-        tableView.addTableColumn(customColumn)
-
+        coordinator.rows = rows
+        let tableView = makeTableView(rowCount: rows.count, coordinator: coordinator, columns: ["url"])
+        let scrollView = makeScrollView(documentView: tableView)
+        tableView.selectRowIndexes(IndexSet(integer: 10), byExtendingSelection: false)
         _ = coordinator.applyDisplayMetrics(to: tableView)
-        coordinator.applyHeaderMetrics(to: tableView)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: 80))
+        let initialScrollY = scrollView.contentView.bounds.origin.y
+        coordinator.syncHeaderColumns(in: tableView)
 
         let expected = AppUIDisplayMetrics(settings: appUI).secondaryFontSize
-        let customHeaderFont = try #require(customColumn.headerCell.font)
+        let liveRequestColumn = try #require(
+            tableView.tableColumns.first {
+                $0.identifier.rawValue == requestColumn.columnIdentifier
+            }
+        )
+        let customHeaderFont = try #require(liveRequestColumn.headerCell.font)
 
         #expect(customHeaderFont.pointSize == expected)
+        #expect(
+            tableView.tableColumns
+                .filter { $0.identifier.rawValue.hasPrefix("reqHeader.") }
+                .count == 1
+        )
+        #expect(!tableView.tableColumns.contains { $0.identifier.rawValue == responseColumn.columnIdentifier })
+        #expect(tableView.selectedRowIndexes == IndexSet(integer: 10))
+
+        let requestSort = NSSortDescriptor(key: requestColumn.columnIdentifier, ascending: true)
+        coordinator.parent = RequestTableView(
+            workspaceID: parent.workspaceID,
+            rows: rows,
+            refreshToken: 1,
+            isAppendOnly: false,
+            displayMetricsOverride: AppUIDisplayMetrics(settings: appUI),
+            selectedIDs: selectionBinding,
+            headerColumns: [
+                HeaderColumn(
+                    id: requestColumn.id,
+                    headerName: requestColumn.headerName,
+                    source: requestColumn.source,
+                    isEnabled: false
+                ),
+                HeaderColumn(
+                    id: responseColumn.id,
+                    headerName: responseColumn.headerName,
+                    source: responseColumn.source
+                ),
+            ]
+        )
+        coordinator.syncHeaderColumns(in: tableView)
+        let reconciledSortDescriptors = coordinator.sortDescriptors(
+            [requestSort],
+            availableIn: tableView
+        )
+        coordinator.syncSortDescriptors(from: reconciledSortDescriptors, into: tableView)
+
+        #expect(!tableView.tableColumns.contains { $0.identifier.rawValue == requestColumn.columnIdentifier })
+        #expect(tableView.tableColumns.contains { $0.identifier.rawValue == responseColumn.columnIdentifier })
+        #expect(tableView.selectedRowIndexes == IndexSet(integer: 10))
+        #expect(reconciledSortDescriptors.isEmpty)
+        #expect(tableView.sortDescriptors.isEmpty)
+        #expect(scrollView.contentView.bounds.origin.y == initialScrollY)
+
+        coordinator.parent = RequestTableView(
+            workspaceID: parent.workspaceID,
+            rows: rows,
+            refreshToken: 2,
+            isAppendOnly: false,
+            displayMetricsOverride: AppUIDisplayMetrics(settings: appUI),
+            selectedIDs: selectionBinding,
+            headerColumns: []
+        )
+        coordinator.syncHeaderColumns(in: tableView)
+
+        #expect(
+            !tableView.tableColumns.contains {
+                $0.identifier.rawValue.hasPrefix("reqHeader.")
+                    || $0.identifier.rawValue.hasPrefix("resHeader.")
+            }
+        )
+        #expect(tableView.selectedRowIndexes == IndexSet(integer: 10))
     }
 
     private func makeScrollView(documentView: NSTableView) -> NSScrollView {

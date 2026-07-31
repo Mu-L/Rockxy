@@ -68,6 +68,30 @@ struct ComposeResponseViewer: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    @ViewBuilder private var responseTabPicker: some View {
+        if toolMetrics.bodyFontSize >= 20 {
+            Picker(String(localized: "Response Section"), selection: $selectedTab) {
+                ForEach(ComposeResponseTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(minWidth: 130)
+            .accessibilityLabel(String(localized: "Response section"))
+        } else {
+            Picker(String(localized: "Response Section"), selection: $selectedTab) {
+                ForEach(ComposeResponseTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .accessibilityLabel(String(localized: "Response section"))
+        }
+    }
+
     // MARK: - Success State
 
     private func successState(_ response: ComposeResponse) -> some View {
@@ -75,15 +99,10 @@ struct ComposeResponseViewer: View {
             responseSummary(response)
             Divider()
 
-            Picker("", selection: $selectedTab) {
-                ForEach(ComposeResponseTab.allCases) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
+            responseTabPicker
+                .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+                .padding(.top, toolMetrics.controlSpacing)
+                .padding(.bottom, 4)
 
             Divider()
 
@@ -107,6 +126,11 @@ struct ComposeResponseViewer: View {
             Text(response.statusMessage)
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
+            if response.bodyTruncated {
+                Label(String(localized: "History snapshot truncated"), systemImage: "scissors")
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.orange)
+            }
             Spacer()
             Text(Self.formatBodySize(response.bodySize))
                 .font(toolMetrics.metadataFont())
@@ -116,18 +140,17 @@ struct ComposeResponseViewer: View {
         .padding(.vertical, 6)
     }
 
+    @ViewBuilder
     private func responseBody(_ response: ComposeResponse) -> some View {
-        Group {
-            if response.contentType == .json {
-                JSONTreeView(data: response.bodyData)
-            } else {
-                ScrollView([.horizontal, .vertical]) {
-                    Text(response.bodyDisplayText)
-                        .font(toolMetrics.font(monospaced: true))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                }
+        if response.contentType == .json {
+            JSONTreeView(data: response.bodyData)
+        } else {
+            ScrollView([.horizontal, .vertical]) {
+                Text(response.bodyDisplayText)
+                    .font(toolMetrics.font(monospaced: true))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
             }
         }
     }
@@ -136,10 +159,10 @@ struct ComposeResponseViewer: View {
         ScrollView {
             LazyVGrid(columns: Self.headerColumns, alignment: .leading, spacing: 4) {
                 Text(String(localized: "Name"))
-                    .font(toolMetrics.secondaryFont(weight: .bold))
+                    .font(toolMetrics.tableHeaderFont())
                     .foregroundStyle(.secondary)
                 Text(String(localized: "Value"))
-                    .font(toolMetrics.secondaryFont(weight: .bold))
+                    .font(toolMetrics.tableHeaderFont())
                     .foregroundStyle(.secondary)
 
                 ForEach(Array(response.headers.enumerated()), id: \.offset) { _, header in
@@ -170,9 +193,15 @@ struct ComposeResponseViewer: View {
 
     private func unsupportedState(_ message: String) -> some View {
         ContentUnavailableView {
-            Label(String(localized: "Replay Not Supported"), systemImage: "exclamationmark.triangle")
+            Label(String(localized: "Cannot Send This Request"), systemImage: "exclamationmark.triangle")
         } description: {
             Text(message)
+        } actions: {
+            if viewModel.sourceHasUnsupportedBinaryBody || viewModel.sourceHasTruncatedHistoryBody {
+                Button(String(localized: "Use Empty Body")) {
+                    viewModel.replaceUnavailableBody(with: "")
+                }
+            }
         }
     }
 

@@ -7,7 +7,8 @@ import os
 final class HeaderColumnStore {
     // MARK: Lifecycle
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -109,27 +110,41 @@ final class HeaderColumnStore {
     }
 
     func discoverHeaders(from transactions: [HTTPTransaction]) -> DiscoveredHeaders {
-        var requestHeaders: Set<String> = []
-        var responseHeaders: Set<String> = []
+        var requestHeadersByNormalizedName: [String: String] = [:]
+        var responseHeadersByNormalizedName: [String: String] = [:]
 
         let sampleSize = min(transactions.count, 200)
         for transaction in transactions.prefix(sampleSize) {
             for header in transaction.request.headers {
-                requestHeaders.insert(header.name)
+                let normalizedName = header.name.lowercased()
+                requestHeadersByNormalizedName[normalizedName] = min(
+                    requestHeadersByNormalizedName[normalizedName] ?? header.name,
+                    header.name
+                )
             }
             if let response = transaction.response {
                 for header in response.headers {
-                    responseHeaders.insert(header.name)
+                    let normalizedName = header.name.lowercased()
+                    responseHeadersByNormalizedName[normalizedName] = min(
+                        responseHeadersByNormalizedName[normalizedName] ?? header.name,
+                        header.name
+                    )
                 }
             }
         }
 
-        let existingRequestNames = Set(requestColumns.map(\.headerName))
-        let existingResponseNames = Set(responseColumns.map(\.headerName))
+        let existingRequestNames = Set(requestColumns.map { $0.headerName.lowercased() })
+        let existingResponseNames = Set(responseColumns.map { $0.headerName.lowercased() })
 
         return DiscoveredHeaders(
-            request: requestHeaders.subtracting(existingRequestNames).sorted(),
-            response: responseHeaders.subtracting(existingResponseNames).sorted()
+            request: requestHeadersByNormalizedName
+                .filter { !existingRequestNames.contains($0.key) }
+                .map(\.value)
+                .sorted(),
+            response: responseHeadersByNormalizedName
+                .filter { !existingResponseNames.contains($0.key) }
+                .map(\.value)
+                .sorted()
         )
     }
 
@@ -152,8 +167,8 @@ final class HeaderColumnStore {
         discoveredResponseHeaderSet = responseHeaders
         discoveredRequestHeaders = requestHeaders.sorted()
         discoveredResponseHeaders = responseHeaders.sorted()
-        UserDefaults.standard.set(discoveredRequestHeaders, forKey: Self.discoveredReqKey)
-        UserDefaults.standard.set(discoveredResponseHeaders, forKey: Self.discoveredResKey)
+        defaults.set(discoveredRequestHeaders, forKey: Self.discoveredReqKey)
+        defaults.set(discoveredResponseHeaders, forKey: Self.discoveredResKey)
     }
 
     /// Incremental header discovery from a batch of new transactions. O(batch_size) per call
@@ -178,8 +193,8 @@ final class HeaderColumnStore {
         if changed {
             discoveredRequestHeaders = discoveredRequestHeaderSet.sorted()
             discoveredResponseHeaders = discoveredResponseHeaderSet.sorted()
-            UserDefaults.standard.set(discoveredRequestHeaders, forKey: Self.discoveredReqKey)
-            UserDefaults.standard.set(discoveredResponseHeaders, forKey: Self.discoveredResKey)
+            defaults.set(discoveredRequestHeaders, forKey: Self.discoveredReqKey)
+            defaults.set(discoveredResponseHeaders, forKey: Self.discoveredResKey)
         }
     }
 
@@ -220,14 +235,16 @@ final class HeaderColumnStore {
     private static let visibleDefaultHiddenColumnsKey = RockxyIdentity.current.defaultsKey("visibleDefaultHiddenBuiltInColumns")
     private static let defaultHiddenBuiltInColumns: Set<String> = []
 
+    private let defaults: UserDefaults
+
     // Internal dedup sets for O(1) membership checks during incremental discovery
     private var discoveredRequestHeaderSet: Set<String> = []
     private var discoveredResponseHeaderSet: Set<String> = []
 
     private func saveHiddenColumns() {
         let array = Array(hiddenBuiltInColumns)
-        UserDefaults.standard.set(array, forKey: Self.hiddenColumnsKey)
-        UserDefaults.standard.set(
+        defaults.set(array, forKey: Self.hiddenColumnsKey)
+        defaults.set(
             Array(visibleDefaultHiddenBuiltInColumns),
             forKey: Self.visibleDefaultHiddenColumnsKey
         )
@@ -238,28 +255,28 @@ final class HeaderColumnStore {
     private func save() {
         do {
             let data = try JSONEncoder().encode(columns)
-            UserDefaults.standard.set(data, forKey: Self.storageKey)
+            defaults.set(data, forKey: Self.storageKey)
         } catch {
             Self.logger.error("Failed to save header columns: \(error.localizedDescription)")
         }
     }
 
     private func load() {
-        if let hidden = UserDefaults.standard.stringArray(forKey: Self.hiddenColumnsKey) {
+        if let hidden = defaults.stringArray(forKey: Self.hiddenColumnsKey) {
             hiddenBuiltInColumns = Set(hidden)
         }
-        if let visibleDefaultHidden = UserDefaults.standard.stringArray(forKey: Self.visibleDefaultHiddenColumnsKey) {
+        if let visibleDefaultHidden = defaults.stringArray(forKey: Self.visibleDefaultHiddenColumnsKey) {
             visibleDefaultHiddenBuiltInColumns = Set(visibleDefaultHidden)
         }
-        if let reqHeaders = UserDefaults.standard.stringArray(forKey: Self.discoveredReqKey) {
+        if let reqHeaders = defaults.stringArray(forKey: Self.discoveredReqKey) {
             discoveredRequestHeaders = reqHeaders
             discoveredRequestHeaderSet = Set(reqHeaders)
         }
-        if let resHeaders = UserDefaults.standard.stringArray(forKey: Self.discoveredResKey) {
+        if let resHeaders = defaults.stringArray(forKey: Self.discoveredResKey) {
             discoveredResponseHeaders = resHeaders
             discoveredResponseHeaderSet = Set(resHeaders)
         }
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey) else {
+        guard let data = defaults.data(forKey: Self.storageKey) else {
             return
         }
         do {

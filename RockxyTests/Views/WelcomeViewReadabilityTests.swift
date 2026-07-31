@@ -1,0 +1,86 @@
+import Foundation
+@testable import Rockxy
+import Testing
+
+// Source-level contract that protects the original Welcome flow while allowing visual polish.
+
+@MainActor
+struct WelcomeViewReadabilityTests {
+    // MARK: Internal
+
+    @Test("Welcome preserves all four original steps and completion actions")
+    func welcomePreservesOriginalFlow() throws {
+        let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")
+
+        #expect(view.contains("String(localized: \"Generate Root Certificate\")"))
+        #expect(view.contains("String(localized: \"Trust Root Certificate\")"))
+        #expect(view.contains("String(localized: \"Install Helper Tool\")"))
+        #expect(view.contains("String(localized: \"Enable System Proxy\")"))
+        #expect(view.contains("String(localized: \"Debug My App…\")"))
+        #expect(view.contains("String(localized: \"Get Started\")"))
+        #expect(view.contains(".disabled(!viewModel.canGetStarted || viewModel.isBusy)"))
+        #expect(view.contains("WelcomeView(isFirstLaunch: true)"))
+    }
+
+    @Test("Welcome uses native metrics and a compact ordered setup surface")
+    func welcomeUsesNativeOrderedLayout() throws {
+        let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")
+
+        #expect(view.contains("ToolWindowDisplayMetrics"))
+        #expect(view.contains("@Environment(\\.appUIDisplayMetrics) private var appMetrics"))
+        #expect(view.contains("GroupBox"))
+        #expect(view.contains("ProgressView("))
+        #expect(view.contains("String(localized: \"Checking system…\")"))
+        #expect(view.contains(".accessibilityLabel(String(localized: \"Checking system readiness\"))"))
+        #expect(view.contains("ForEach(Array(steps.enumerated())"))
+        #expect(view.contains("ViewThatFits(in: .horizontal)"))
+        #expect(view.contains(".interactiveDismissDisabled(viewModel.isBusy)"))
+    }
+
+    @Test("helper failures have a confirmed recovery path without changing the other steps")
+    func helperFailureRecoveryIsScoped() throws {
+        let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")
+        let model = try readProjectFile("Rockxy/ViewModels/WelcomeViewModel.swift")
+
+        #expect(view.contains("String(localized: \"Repair & Reinstall…\")"))
+        #expect(view.contains("showingHelperRepairConfirmation"))
+        #expect(view.contains("await viewModel.repairAndReinstallHelper()"))
+        #expect(view.contains("SMAppService.openSystemSettingsLoginItems()"))
+        #expect(model.contains("forceResetAndReinstall(resetBackgroundItems: false)"))
+        #expect(model.contains("SystemProxyManager.shared.enableSystemProxy"))
+        #expect(model.contains("certInstalled && certTrusted && helperStatus == .installedCompatible"))
+    }
+
+    @Test("main app wiring and migration still require the original four readiness states")
+    func welcomeAppWiringPreservesOriginalGate() throws {
+        let app = try readProjectFile("Rockxy/RockxyApp.swift")
+
+        #expect(app.contains("WelcomeView(isFirstLaunch: true, onComplete:"))
+        #expect(app.contains("let certInstalled = await CertificateManager.shared.isRootCAInstalled()"))
+        #expect(app.contains("let helperOK = HelperManager.shared.status == .installedCompatible"))
+        #expect(app.contains("if certInstalled, certTrusted, helperOK, proxyOK {"))
+    }
+
+    // MARK: Private
+
+    private enum ResolveError: Error {
+        case rootNotFound
+    }
+
+    private func readProjectFile(_ relativePath: String) throws -> String {
+        let root = try resolveProjectRoot()
+        return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
+    }
+
+    private func resolveProjectRoot() throws -> URL {
+        var url = URL(fileURLWithPath: #filePath)
+        while url.lastPathComponent != "RockxyTests", url.path != "/" {
+            url.deleteLastPathComponent()
+        }
+        guard url.lastPathComponent == "RockxyTests" else {
+            throw ResolveError.rootNotFound
+        }
+        url.deleteLastPathComponent()
+        return url
+    }
+}

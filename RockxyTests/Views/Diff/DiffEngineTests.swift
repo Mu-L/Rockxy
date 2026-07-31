@@ -157,4 +157,66 @@ struct DiffEngineTests {
         // Section B: left is empty, right has content → all added
         #expect(result.sections[1].lines.contains { $0.type == .added })
     }
+
+    @Test("Large comparisons are bounded with an explicit digest marker")
+    func boundedLineCount() {
+        let lines = (0 ... DiffEngine.maximumLineCount).map { "line \($0)" }
+
+        let result = DiffEngine.diff(old: lines, new: lines)
+
+        #expect(result.count == DiffEngine.maximumLineCount)
+        #expect(result.last?.content.contains("Comparison limited") == true)
+        #expect(result.last?.content.contains("SHA-256") == true)
+    }
+
+    @Test("Very long lines are bounded with an explicit digest marker")
+    func boundedLineLength() {
+        let line = String(repeating: "a", count: DiffEngine.maximumLineLength + 1)
+
+        let result = DiffEngine.diff(old: [line], new: [line])
+
+        #expect(result.count == 1)
+        #expect(result[0].content.contains("line limited") == true)
+        #expect(result[0].content.contains("SHA-256") == true)
+    }
+
+    @Test("Changes beyond the line limit remain detectable through the digest marker")
+    func changedTailBeyondLineLimit() {
+        let shared = (0 ..< DiffEngine.maximumLineCount).map { "line \($0)" }
+
+        let result = DiffEngine.diff(
+            old: shared + ["left tail"],
+            new: shared + ["right tail"]
+        )
+
+        #expect(result.contains { $0.type == .removed })
+        #expect(result.contains { $0.type == .added })
+        #expect(result.contains { $0.content.contains("SHA-256") })
+    }
+
+    @Test("Changes beyond the line length limit remain detectable through the digest marker")
+    func changedTailBeyondLineLength() {
+        let shared = String(repeating: "a", count: DiffEngine.maximumLineLength)
+
+        let result = DiffEngine.diff(
+            old: [shared + "left"],
+            new: [shared + "right"]
+        )
+
+        #expect(result.filter { $0.type != .unchanged }.count == 2)
+        #expect(result.contains { $0.content.contains("line limited") })
+    }
+
+    @Test("Pasted text changes beyond the byte preview remain detectable")
+    func changedTailBeyondTextPreview() {
+        let shared = String(repeating: "a", count: DiffEngine.maximumTextPreviewBytes)
+
+        let result = DiffEngine.diffText(
+            old: shared + "left",
+            new: shared + "right"
+        )
+
+        #expect(result.filter { $0.type != .unchanged }.count == 2)
+        #expect(result.contains { $0.content.contains("UTF-8 bytes") })
+    }
 }

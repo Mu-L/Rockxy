@@ -3,54 +3,51 @@ import UniformTypeIdentifiers
 
 // MARK: - SSLProxyingListView
 
-/// Window for managing SSL proxying rules with Include and Exclude lists.
-/// Follows the AllowListWindowView / BreakpointRulesWindowView pattern.
+/// HTTPS Decryption management window. Presents every `SSLProxyingRule` in one
+/// unified native `Table` with an explicit per-row behavior column, following the
+/// AllowListWindowView / NetworkConditionsWindowView shell pattern.
 struct SSLProxyingListView: View {
     // MARK: Internal
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
+        VStack(alignment: .leading, spacing: 0) {
+            header
             Divider()
             infoBanner
             Divider()
-            tabPicker
-            tabDescription
+            tableContent
             Divider()
-            content
-            if viewModel.isFilterBarVisible {
-                Divider()
-                filterBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-            Divider()
-            bottomBar
-            Divider()
-            outerBottomBar
+            footer
         }
         .font(toolMetrics.font())
-        .frame(width: toolMetrics.fieldWidth(860), height: 620)
+        .frame(width: toolMetrics.fieldWidth(880), height: 620)
         .onChange(of: viewModel.manager.rules) { _, _ in
             viewModel.reconcileSelectionAfterRulesChange()
         }
-        .onChange(of: viewModel.currentTabRules.map(\.id)) { _, _ in
+        .onChange(of: viewModel.searchText) { _, _ in
             viewModel.reconcileSelectionAfterRulesChange()
         }
         .sheet(isPresented: $viewModel.showAddDomainSheet) {
             viewModel.editingRule = nil
         } content: {
-            AddSSLDomainSheet(editingRule: viewModel.editingRule) { domain in
+            AddSSLDomainSheet(
+                editingRule: viewModel.editingRule,
+                existingRules: viewModel.manager.rules
+            ) { domain, listType in
                 if let editing = viewModel.editingRule {
-                    viewModel.updateRule(id: editing.id, domain: domain)
+                    let didUpdate = viewModel.updateRule(id: editing.id, domain: domain, listType: listType)
+                    if didUpdate {
+                        viewModel.editingRule = nil
+                    }
+                    return didUpdate
                 } else {
-                    viewModel.addRule(domain: domain)
+                    return viewModel.addRule(domain: domain, listType: listType)
                 }
-                viewModel.editingRule = nil
             }
         }
         .sheet(isPresented: $viewModel.showAddAppSheet) {
-            AddSSLAppDomainSheet { domains in
-                viewModel.addRules(domains)
+            AddSSLAppDomainSheet(existingRules: viewModel.manager.rules) { domains, listType in
+                viewModel.addRules(domains, listType: listType)
             }
         }
         .sheet(isPresented: $viewModel.showBypassSheet) {
@@ -71,8 +68,34 @@ struct SSLProxyingListView: View {
         ) { result in
             handleImport(result)
         }
+        .confirmationDialog(
+            String(localized: "Replace existing HTTPS decryption settings?"),
+            isPresented: Binding(
+                get: { pendingImportSource != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingImportSource = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Choose File and Replace…"), role: .destructive) {
+                guard let pendingImportSource else {
+                    return
+                }
+                importSource = pendingImportSource
+                self.pendingImportSource = nil
+                showImporter = true
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {
+                pendingImportSource = nil
+            }
+        } message: {
+            Text(importConfirmationMessage)
+        }
         .alert(
-            String(localized: "Import Failed"),
+            String(localized: "HTTPS Decryption"),
             isPresented: Binding(
                 get: { importError != nil },
                 set: { newValue in
@@ -88,12 +111,22 @@ struct SSLProxyingListView: View {
                 Text(error)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.isFilterBarVisible)
+        .onDeleteCommand {
+            viewModel.removeSelected()
+        }
+        .background {
+            Button("") {
+                isSearchFocused = true
+            }
+            .keyboardShortcut("f", modifiers: .command)
+            .opacity(0)
+            .accessibilityHidden(true)
+        }
     }
 
     // MARK: Private
 
-    private enum ImportSource {
+    private enum ImportSource: Equatable {
         case rockxy
         case charlesProxy
         case proxyman
@@ -108,276 +141,341 @@ struct SSLProxyingListView: View {
     @State private var exportDocument: SSLProxyingJSONDocument?
     @State private var importError: String?
     @State private var importSource: ImportSource = .rockxy
+    @State private var pendingImportSource: ImportSource?
 
-    @FocusState private var isFilterFocused: Bool
+    @FocusState private var isSearchFocused: Bool
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.openWindow) private var openWindow
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private var tabDescriptionText: String {
-        switch viewModel.selectedTab {
-        case .include:
-            String(localized: "Intercept & Decrypt HTTPS in below list")
-        case .exclude:
-            String(
-                localized: "DO NOT Decrypt HTTPS in below list. Useful to exclude some domains/apps from the Include List"
-            )
-        }
+    private var canInterceptHTTPS: Bool {
+        ReadinessCoordinator.shared.canInterceptHTTPS
     }
 
-    // MARK: - Toolbar
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-    private var toolbar: some View {
-        HStack {
-            Text(String(localized: "SSL Proxying List"))
-                .font(toolMetrics.font(weight: .semibold))
-            Spacer()
-            Toggle(
-                String(localized: "Enable SSL Proxying Tool"),
-                isOn: Binding(
-                    get: { viewModel.isSSLProxyingEnabled },
-                    set: { viewModel.setEnabled($0) }
-                )
+    private var infoBannerMessage: String {
+        if !viewModel.isSSLProxyingEnabled {
+            return String(
+                localized:
+                "HTTPS decryption is off. All HTTPS connections are tunneled unread; individual rules keep their state."
             )
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .font(toolMetrics.font())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        if canInterceptHTTPS {
+            return String(
+                localized:
+                "Decrypt rules apply to new HTTPS connections. Tunnel rules take priority on overlaps; row order does not affect matching."
+            )
+        }
+        return String(
+            localized:
+            "HTTPS decryption is unavailable until the Rockxy root certificate is trusted. HTTPS is tunneled unread for now."
+        )
+    }
+
+    private var footerHint: String {
+        let countText = isSearching
+            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
+            : String(localized: "\(viewModel.ruleCount) rules")
+        let breakdown = String(
+            localized: "\(viewModel.decryptCount) decrypt · \(viewModel.tunnelCount) tunnel"
+        )
+        return "\(countText) · \(breakdown)"
+    }
+
+    private var statusCapsuleText: String {
+        if !viewModel.isSSLProxyingEnabled {
+            return String(localized: "TOOL OFF")
+        }
+        if !canInterceptHTTPS {
+            return String(localized: "PASSTHROUGH ACTIVE")
+        }
+        if viewModel.enabledDecryptCount == 0 {
+            return String(localized: "NO DECRYPT RULES")
+        }
+        return String(localized: "DECRYPTION READY")
+    }
+
+    private var statusCapsuleColor: Color {
+        if !viewModel.isSSLProxyingEnabled || viewModel.enabledDecryptCount == 0 {
+            return .secondary
+        }
+        return canInterceptHTTPS ? .green : .orange
+    }
+
+    private var statusCapsuleUsesWhiteText: Bool {
+        viewModel.isSSLProxyingEnabled && canInterceptHTTPS && viewModel.enabledDecryptCount > 0
+    }
+
+    private var importConfirmationMessage: String {
+        if pendingImportSource == .rockxy {
+            return String(
+                localized:
+                "Rockxy import replaces the current rules, master state, and TLS passthrough exceptions. Export first if you need a backup."
+            )
+        }
+        return String(
+            localized:
+            "This import replaces the current HTTPS rules. The master state and TLS passthrough exceptions remain unchanged."
+        )
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Toggle(
+                    String(localized: "Enable HTTPS Decryption"),
+                    isOn: Binding(
+                        get: { viewModel.isSSLProxyingEnabled },
+                        set: { viewModel.setEnabled($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font(weight: .medium))
+                .help(
+                    String(
+                        localized:
+                        "When off, Rockxy tunnels all HTTPS without decrypting it. Individual rules keep their state."
+                    )
+                )
+
+                Text(
+                    String(
+                        localized:
+                        "Rules decide which HTTPS hosts Rockxy decrypts. Other hosts still pass through Rockxy as opaque TLS tunnels."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(width: 240, height: toolMetrics.formControlHeight)
+                .focused($isSearchFocused)
+                .accessibilityLabel(String(localized: "Search HTTPS decryption rules"))
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.headerBottomPadding)
     }
 
     // MARK: - Info Banner
 
     private var infoBanner: some View {
         HStack(spacing: 6) {
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-            Text(
-                String(
-                    localized: "Define Clients or Domains (wildcard) that Rockxy will decrypt their HTTPS Request/Response."
-                )
-            )
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.quaternary.opacity(0.5))
-    }
-
-    // MARK: - Tab Picker
-
-    private var tabPicker: some View {
-        UtilitySegmentedHeader(width: 260) {
-            Picker("", selection: Binding(
-                get: { viewModel.selectedTab },
-                set: { viewModel.switchTab(to: $0) }
-            )) {
-                Text(String(localized: "Include List")).tag(SSLProxyingListType.include)
-                Text(String(localized: "Exclude List")).tag(SSLProxyingListType.exclude)
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-
-    private var tabDescription: some View {
-        HStack {
-            Text(tabDescriptionText)
+            Image(systemName: infoBannerSystemImage)
+                .foregroundStyle(infoBannerColor)
+            Text(infoBannerMessage)
                 .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(canInterceptHTTPS || !viewModel.isSSLProxyingEnabled ? Color.secondary : Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
-
-    // MARK: - Content
-
-    @ViewBuilder private var content: some View {
-        if viewModel.currentTabRules.isEmpty {
-            emptyState
-        } else {
-            VStack(spacing: 0) {
-                columnHeader
-                Divider()
-                List(selection: $viewModel.selectedRuleID) {
-                    ForEach(viewModel.currentTabRules) { rule in
-                        SSLProxyingRuleRow(rule: rule) {
-                            viewModel.selectRule(id: rule.id)
-                        } onToggle: { newValue in
-                            viewModel.setRuleEnabled(id: rule.id, enabled: newValue)
-                        }
-                        .tag(rule.id)
-                    }
+            if !canInterceptHTTPS {
+                Button(String(localized: "Open Advanced Proxy Settings…")) {
+                    openWindow(id: "advancedProxySettings")
                 }
-                .listStyle(.inset(alternatesRowBackgrounds: true))
-                .contextMenu(forSelectionType: UUID.self) { items in
-                    if let id = items.first {
-                        contextMenuItems(for: id)
-                    }
-                } primaryAction: { items in
-                    if let id = items.first {
-                        viewModel.presentEditor(for: id)
-                    }
-                }
+                .buttonStyle(.link)
+                .font(toolMetrics.secondaryFont())
             }
         }
-    }
-
-    private var columnHeader: some View {
-        HStack(spacing: 10) {
-            Spacer().frame(width: 24)
-            Text(String(localized: "Name"))
-                .font(toolMetrics.tableHeaderFont())
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(.background.tertiary)
-    }
-
-    private var emptyState: some View {
-        VStack(alignment: .center, spacing: 12) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: max(20, toolMetrics.bodyFontSize + 7)))
-                .foregroundStyle(.tertiary)
-
-            if viewModel.selectedTab == .exclude {
-                Text(String(localized: "⌘N: Add new apps"))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.tertiary)
-                Text(String(localized: "⇧⌘N: Add custom Domains / Wildcards"))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.tertiary)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+        .background {
+            if canInterceptHTTPS || !viewModel.isSSLProxyingEnabled {
+                Color(nsColor: .controlBackgroundColor).opacity(0.5)
             } else {
-                Text(String(localized: "No SSL Proxying Rules"))
-                    .font(toolMetrics.font(weight: .medium))
-                    .foregroundStyle(.secondary)
-                Text(String(localized: "Add domains or apps to intercept their HTTPS traffic."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                Color.orange.opacity(0.12)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
     }
 
-    // MARK: - Filter Bar
-
-    private var filterBar: some View {
-        HStack(spacing: 8) {
-            TextField(
-                String(localized: "Filter"),
-                text: $viewModel.filterText,
-                prompt: Text(String(localized: "Filter (Hide: ESC)"))
-            )
-            .textFieldStyle(.roundedBorder)
-            .font(toolMetrics.font())
-            .frame(minHeight: toolMetrics.formControlHeight)
-            .focused($isFilterFocused)
-            .onExitCommand { hideFilterBar() }
-            .onAppear { isFilterFocused = true }
+    private var infoBannerSystemImage: String {
+        if !viewModel.isSSLProxyingEnabled {
+            return "pause.circle"
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.background)
+        return canInterceptHTTPS ? "info.circle" : "exclamationmark.triangle.fill"
     }
 
-    // MARK: - Bottom Bar
+    private var infoBannerColor: Color {
+        canInterceptHTTPS || !viewModel.isSSLProxyingEnabled ? .secondary : .orange
+    }
 
-    private var bottomBar: some View {
-        HStack(spacing: 8) {
-            plusMenu
+    // MARK: - Table
+
+    private var tableContent: some View {
+        Table(viewModel.filteredRules, selection: $viewModel.selectedRuleID) {
+            TableColumn(String(localized: "Enabled")) { rule in
+                Toggle("", isOn: Binding(
+                    get: { rule.isEnabled },
+                    set: { viewModel.setRuleEnabled(id: rule.id, enabled: $0) }
+                ))
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityLabel(String(localized: "Enable \(rule.domain)"))
+            }
+            .width(62)
+
+            TableColumn(String(localized: "Host Pattern")) { rule in
+                Text(rule.domain)
+                    .font(toolMetrics.font(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(rule.domain)
+                    .opacity(rule.isEnabled ? 1.0 : 0.5)
+            }
+            .width(min: 220, ideal: 340)
+
+            TableColumn(String(localized: "Behavior")) { rule in
+                HStack(spacing: 6) {
+                    Image(systemName: rule.listType == .include ? "lock.open" : "lock")
+                        .font(toolMetrics.metadataFont())
+                        .foregroundStyle(rule.listType == .include ? Color.accentColor : Color.secondary)
+                    Text(SSLProxyingListViewModel.behaviorLabel(for: rule.listType))
+                        .lineLimit(1)
+                    if hasOppositeBehaviorOverlap(for: rule) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(toolMetrics.metadataFont())
+                            .foregroundStyle(.orange)
+                            .help(
+                                String(
+                                    localized:
+                                    "This host has both behaviors. Tunnel Without Decryption takes priority."
+                                )
+                            )
+                    }
+                }
+                .opacity(rule.isEnabled ? 1.0 : 0.5)
+            }
+            .width(min: 190, ideal: 220)
+        }
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            tableContextMenu(ids: ids)
+        } primaryAction: { ids in
+            if let id = ids.first {
+                viewModel.presentEditor(for: id)
+            }
+        }
+        .overlay {
+            if viewModel.filteredRules.isEmpty {
+                ContentUnavailableView(
+                    isSearching
+                        ? String(localized: "No matching rules")
+                        : String(localized: "No HTTPS decryption rules"),
+                    systemImage: isSearching ? "magnifyingglass" : "lock.shield",
+                    description: Text(
+                        isSearching
+                            ? String(localized: "Try a different host pattern or behavior.")
+                            : String(localized: "Add a host pattern or observed domains to decrypt their HTTPS.")
+                    )
+                )
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            addRemoveControl
+
+            Text(footerHint)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            moreMenu
+
+            Text(statusCapsuleText)
+                .font(toolMetrics.metadataFont(weight: .semibold))
+                .foregroundStyle(statusCapsuleUsesWhiteText ? Color.white : statusCapsuleColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(statusCapsuleColor.opacity(statusCapsuleUsesWhiteText ? 1 : 0.14))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var addRemoveControl: some View {
+        HStack(spacing: 0) {
+            Menu {
+                Button(String(localized: "Add Host Pattern…")) {
+                    viewModel.editingRule = nil
+                    viewModel.showAddDomainSheet = true
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+
+                Button(String(localized: "Add Observed Domains…")) {
+                    viewModel.showAddAppSheet = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(String(localized: "Add Rule"))
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.7))
+                .frame(width: 1, height: 18)
 
             Button {
                 viewModel.removeSelected()
             } label: {
                 Image(systemName: "minus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(viewModel.selectedRuleID == nil ? .tertiary : .primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .disabled(viewModel.selectedRuleID == nil)
             .help(String(localized: "Delete Rule"))
-
-            Divider()
-                .frame(height: 16)
-
-            Text(
-                "\(viewModel.ruleCount) \(viewModel.ruleCount == 1 ? String(localized: "rule") : String(localized: "rules"))"
-            )
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Button {
-                viewModel.isFilterBarVisible = true
-            } label: {
-                Label(String(localized: "Filter"), systemImage: "line.3.horizontal.decrease.circle")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("f", modifiers: .command)
-
-            moreMenu
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private var plusMenu: some View {
-        Menu {
-            Button(String(localized: "Add App…")) {
-                viewModel.showAddAppSheet = true
-            }
-            .keyboardShortcut("n", modifiers: .command)
-
-            Button(String(localized: "Add Domain…")) {
-                viewModel.showAddDomainSheet = true
-            }
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-        } label: {
-            Image(systemName: "plus")
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help(String(localized: "Add Rule"))
+        .frame(width: toolMetrics.compactButtonSize * 2 + 1, height: toolMetrics.footerControlHeight)
     }
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Add App…")) {
-                viewModel.showAddAppSheet = true
-            }
-
-            Button(String(localized: "Add Domain…")) {
-                viewModel.showAddDomainSheet = true
-            }
-
-            Divider()
-
             Button(String(localized: "Edit…")) {
                 viewModel.presentEditorForSelection()
             }
-            .keyboardShortcut("e", modifiers: .command)
-            .disabled(viewModel.selectedRuleID == nil)
-
-            Divider()
-
-            Button(viewModel.enableDisableLabel) {
-                if let id = viewModel.selectedRuleID {
-                    viewModel.toggleRule(id: id)
-                }
-            }
-            .keyboardShortcut(.return, modifiers: [])
+            .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
 
             Button(viewModel.enableDisableLabel) {
@@ -388,115 +486,121 @@ struct SSLProxyingListView: View {
             .keyboardShortcut(.space, modifiers: [])
             .disabled(viewModel.selectedRuleID == nil)
 
+            Divider()
+
+            Section(String(localized: "Bypass")) {
+                Button(String(localized: "TLS Passthrough Exceptions…")) {
+                    viewModel.showBypassSheet = true
+                }
+                .help(
+                    String(
+                        localized:
+                        "Hosts here skip decryption but still flow through Rockxy. It never disables Rockxy proxying."
+                    )
+                )
+
+                Button(String(localized: "Full Proxy Bypass…")) {
+                    openWindow(id: "bypassProxyList")
+                }
+                .help(
+                    String(
+                        localized:
+                        "System-proxy clients connect directly. Manually configured clients that still reach Rockxy are tunneled without decryption."
+                    )
+                )
+            }
+
+            Divider()
+
+            Menu(String(localized: "Import Settings")) {
+                Button(String(localized: "From Rockxy…")) {
+                    requestImport(from: .rockxy)
+                }
+
+                Divider()
+
+                Button(String(localized: "From Proxyman…")) {
+                    requestImport(from: .proxyman)
+                }
+
+                Button(String(localized: "From Charles Proxy…")) {
+                    requestImport(from: .charlesProxy)
+                }
+
+                Button(String(localized: "From HTTP Toolkit…")) {
+                    requestImport(from: .httpToolkit)
+                }
+            }
+
+            Button(String(localized: "Export Settings…")) {
+                prepareExport()
+            }
+
+            Divider()
+
             Button(String(localized: "Delete"), role: .destructive) {
                 viewModel.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
-            Text(String(localized: "More"))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Image(systemName: "chevron.down")
-                .font(toolMetrics.metadataFont())
-        }
-        .menuStyle(.borderlessButton)
-    }
-
-    // MARK: - Outer Bottom Bar
-
-    private var outerBottomBar: some View {
-        HStack(spacing: 8) {
-            Button(String(localized: "Bypass Proxy Setting…")) {
-                viewModel.showBypassSheet = true
+            HStack(spacing: 6) {
+                Text(String(localized: "More"))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
-            .buttonStyle(.borderless)
-
-            Spacer()
-
-            outerMoreMenu
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private var outerMoreMenu: some View {
-        Menu {
-            Menu(String(localized: "Import Settings")) {
-                Button(String(localized: "From Rockxy…")) {
-                    importSource = .rockxy
-                    showImporter = true
-                }
-
-                Divider()
-
-                Button(String(localized: "From Proxyman…")) {
-                    importSource = .proxyman
-                    showImporter = true
-                }
-
-                Button(String(localized: "From Charles Proxy…")) {
-                    importSource = .charlesProxy
-                    showImporter = true
-                }
-
-                Button(String(localized: "From HTTPToolkit…")) {
-                    importSource = .httpToolkit
-                    showImporter = true
-                }
-            }
-
-            Divider()
-
-            Button(String(localized: "Export Settings…")) {
-                prepareExport()
-            }
-        } label: {
-            Text(String(localized: "More"))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Image(systemName: "chevron.down")
-                .font(toolMetrics.metadataFont())
-        }
-        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .buttonStyle(.bordered)
+        .fixedSize()
     }
 
     // MARK: - Context Menu
 
     @ViewBuilder
-    private func contextMenuItems(for id: UUID) -> some View {
-        Button(String(localized: "Edit…")) {
-            viewModel.presentEditor(for: id)
-        }
+    private func tableContextMenu(ids: Set<UUID>) -> some View {
+        if let id = ids.first {
+            Button(String(localized: "Edit…")) {
+                viewModel.presentEditor(for: id)
+            }
+            .keyboardShortcut(.return, modifiers: .command)
 
-        Button(enableDisableLabel(for: id)) {
-            viewModel.toggleRule(id: id)
-        }
+            Button(viewModel.toggleLabel(for: id)) {
+                viewModel.toggleRule(id: id)
+            }
+            .keyboardShortcut(.space, modifiers: [])
 
-        Divider()
+            Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
-            viewModel.removeRule(id: id)
+            Button(String(localized: "Delete"), role: .destructive) {
+                viewModel.selectedRuleID = id
+                viewModel.removeSelected()
+            }
+            .keyboardShortcut(.delete, modifiers: .command)
         }
-    }
-
-    private func enableDisableLabel(for id: UUID) -> String {
-        guard let rule = viewModel.manager.rules.first(where: { $0.id == id }) else {
-            return String(localized: "Enable Rule")
-        }
-        return rule.isEnabled
-            ? String(localized: "Disable Rule")
-            : String(localized: "Enable Rule")
     }
 
     // MARK: - Import / Export
 
+    private func hasOppositeBehaviorOverlap(for rule: SSLProxyingRule) -> Bool {
+        viewModel.manager.rules.contains {
+            $0.id != rule.id
+                && $0.listType != rule.listType
+                && $0.domain.caseInsensitiveCompare(rule.domain) == .orderedSame
+        }
+    }
+
     private func prepareExport() {
         guard let data = viewModel.manager.exportRules() else {
+            importError = String(localized: "Rockxy could not prepare the HTTPS Decryption export.")
             return
         }
         exportDocument = SSLProxyingJSONDocument(data: data)
         showExporter = true
+    }
+
+    private func requestImport(from source: ImportSource) {
+        pendingImportSource = source
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
@@ -506,9 +610,11 @@ struct SSLProxyingListView: View {
                 return
             }
             let didStart = url.startAccessingSecurityScopedResource()
-            defer { if didStart {
-                url.stopAccessingSecurityScopedResource()
-            } }
+            defer {
+                if didStart {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
             do {
                 let resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
                 if let fileSize = resourceValues.fileSize, fileSize > Self.maxImportFileBytes {
@@ -516,6 +622,10 @@ struct SSLProxyingListView: View {
                     return
                 }
                 let data = try Data(contentsOf: url)
+                guard data.count <= Self.maxImportFileBytes else {
+                    importError = String(localized: "File is too large to import (max 1 MB).")
+                    return
+                }
                 switch importSource {
                 case .rockxy:
                     try viewModel.manager.importRules(from: data)
@@ -535,55 +645,6 @@ struct SSLProxyingListView: View {
         case let .failure(error):
             importError = error.localizedDescription
         }
-    }
-
-    private func hideFilterBar() {
-        viewModel.isFilterBarVisible = false
-        viewModel.filterText = ""
-    }
-}
-
-// MARK: - SSLProxyingRuleRow
-
-private struct SSLProxyingRuleRow: View {
-    let rule: SSLProxyingRule
-    let onSelect: () -> Void
-    let onToggle: (Bool) -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Toggle("", isOn: Binding(
-                get: { rule.isEnabled },
-                set: { newValue in
-                    onSelect()
-                    onToggle(newValue)
-                }
-            ))
-            .toggleStyle(.checkbox)
-            .labelsHidden()
-
-            Image(systemName: "circle.slash")
-                .font(toolMetrics.metadataFont())
-                .foregroundStyle(.tertiary)
-
-            Text(rule.domain)
-                .font(toolMetrics.font(monospaced: true))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, max(2, (toolMetrics.tableRowHeight - toolMetrics.bodyFontSize - 14) / 2))
-        .opacity(rule.isEnabled ? 1.0 : 0.5)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            onSelect()
-        }
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }
 

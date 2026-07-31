@@ -11,17 +11,16 @@ struct ToolsSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                checkboxRow(
-                    title: String(localized: "Disable caching (No-Cache headers)"),
-                    isOn: $noCaching
-                )
-
-                Spacer()
+        SettingsPane {
+            SettingsSectionCard(String(localized: "Request Behavior")) {
+                SettingsIndentedContent {
+                    Toggle(
+                        String(localized: "Disable caching (No-Cache headers)"),
+                        isOn: $noCaching
+                    )
+                    .toggleStyle(.checkbox)
+                }
             }
-            .padding(.horizontal, settingsMetrics.contentPadding)
-            .padding(.top, 20)
         }
         .font(settingsMetrics.font())
     }
@@ -34,13 +33,5 @@ struct ToolsSettingsTab: View {
 
     private var settingsMetrics: SettingsDisplayMetrics {
         SettingsDisplayMetrics(appMetrics: appMetrics)
-    }
-
-    private func checkboxRow(title: String, isOn: Binding<Bool>) -> some View {
-        HStack {
-            Color.clear.frame(width: settingsMetrics.rowLeading)
-            Toggle(title, isOn: isOn)
-                .toggleStyle(.checkbox)
-        }
     }
 }

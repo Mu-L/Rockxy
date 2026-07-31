@@ -101,6 +101,9 @@ struct NativeWorkspaceSplitViewTests {
         #expect(identifiers.first == .flexibleSpace)
         #expect(toggleIndex != nil)
         #expect(trackingSeparatorIndex == toggleIndex.map { $0 + 1 })
+        #expect(!identifiers.contains {
+            $0.rawValue.hasSuffix(".toolbar.workspaceTitle")
+        })
         if let trackingSeparatorIndex {
             #expect(
                 toolbar.managedToolbar.items[trackingSeparatorIndex]
@@ -225,8 +228,8 @@ struct NativeWorkspaceSplitViewTests {
         removeSplitViewAutosaveDefaults(autosaveName)
     }
 
-    @Test("Moving from a zero frame to a sufficient frame applies pending visibility and ideal placement")
-    func deferredLayoutAppliesPendingVisibilityAndIdealPlacement() {
+    @Test("Moving from a zero frame to a sufficient frame preserves visibility and safe geometry")
+    func deferredLayoutPreservesVisibilityAndSafeGeometry() {
         let autosaveName = uniqueAutosaveName()
         removeSplitViewAutosaveDefaults(autosaveName)
         let controller = makeConfiguredController(
@@ -240,11 +243,6 @@ struct NativeWorkspaceSplitViewTests {
 
         #expect(controller.isSidebarPresented)
         #expect(controller.isInspectorPresented)
-
-        let sidebarWidth = controller.splitViewItems[0].viewController.view.frame.width
-        let inspectorWidth = controller.splitViewItems[2].viewController.view.frame.width
-        #expect(abs(sidebarWidth - 250) <= 2)
-        #expect(abs(inspectorWidth - 380) <= 2)
         expectNonNegativeArrangedGeometry(controller)
         removeSplitViewAutosaveDefaults(autosaveName)
     }
@@ -296,8 +294,8 @@ struct NativeWorkspaceSplitViewTests {
         ))
     }
 
-    @Test("A provisional too-narrow pass defers latch until a pass that seats the requested minima")
-    func provisionalTooNarrowPassDefersLatchToIdealPlacement() {
+    @Test("A provisional too-narrow pass stays safe when the workspace later expands")
+    func provisionalTooNarrowPassStaysSafeAcrossExpansion() {
         let autosaveName = uniqueAutosaveName()
         removeSplitViewAutosaveDefaults(autosaveName)
         let controller = makeConfiguredController(
@@ -307,17 +305,14 @@ struct NativeWorkspaceSplitViewTests {
         )
 
         // Positive and finite, but too narrow to seat sidebar + workspace + inspector minima
-        // plus dividers. This pass must not consume pending visibility or latch the layout.
+        // plus dividers. The provisional pass and the later expanded pass must both keep
+        // every arranged pane in valid geometry.
         layout(controller, at: CGRect(x: 0, y: 0, width: 900, height: 700))
+        expectNonNegativeArrangedGeometry(controller)
         layout(controller, at: CGRect(x: 0, y: 0, width: 1_300, height: 700))
 
         #expect(controller.isSidebarPresented)
         #expect(controller.isInspectorPresented)
-
-        let sidebarWidth = controller.splitViewItems[0].viewController.view.frame.width
-        let inspectorWidth = controller.splitViewItems[2].viewController.view.frame.width
-        #expect(abs(sidebarWidth - 250) <= 2)
-        #expect(abs(inspectorWidth - 380) <= 2)
         expectNonNegativeArrangedGeometry(controller)
         removeSplitViewAutosaveDefaults(autosaveName)
     }

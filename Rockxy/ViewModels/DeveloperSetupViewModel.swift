@@ -55,20 +55,30 @@ final class DeveloperSetupViewModel {
     var pinnedTargetIDs: Set<SetupTarget.ID>
     var selectedTab: SetupDetailTab = .overview
     var sourceListSearchText = ""
-    var showsAutomationSheet = false
+    var snapshot: SetupSnapshot
+    var activeIssue: SetupIssue?
+
     var selectedSnippetID: SetupSnippetID = .pythonRequests {
         didSet {
             snapshot.selectedSnippetID = selectedSnippetID
         }
     }
 
-    var snapshot: SetupSnapshot
-    var activeIssue: SetupIssue?
-    private var validationRunID: UUID?
-    private var validationTaskToken: ValidationTaskToken?
-
     var filteredTargetSections: [SetupTargetSection] {
-        SetupTarget.filteredSections(matching: sourceListSearchText, pinnedTargetIDs: pinnedTargetIDs)
+        let sections = SetupTarget.filteredSections(
+            matching: sourceListSearchText,
+            pinnedTargetIDs: pinnedTargetIDs
+        )
+        return sections.compactMap { section in
+            guard section.category != .pinned else {
+                return section
+            }
+            let uniqueTargets = section.targets.filter { !pinnedTargetIDs.contains($0.id) }
+            guard !uniqueTargets.isEmpty else {
+                return nil
+            }
+            return SetupTargetSection(category: section.category, targets: uniqueTargets)
+        }
     }
 
     var currentWorkflow: SetupWorkflow {
@@ -98,10 +108,6 @@ final class DeveloperSetupViewModel {
         DeveloperSetupGuideCatalog.content(for: selectedTarget.id)
     }
 
-    var currentAutomationPreview: SetupAutomationPreview? {
-        SetupTarget.automationPreview(for: selectedTarget)
-    }
-
     var setupModeActions: SetupModeActionState {
         SetupModeActionState(target: selectedTarget)
     }
@@ -121,11 +127,24 @@ final class DeveloperSetupViewModel {
     }
 
     var toolbarCopyEnabled: Bool {
-        currentSnippetText != nil
+        switch selectedTab {
+        case .snippets:
+            currentSnippetText != nil
+        case .validate:
+            currentValidationSnippetText != nil || currentSnippetText != nil
+        case .overview,
+             .setup,
+             .troubleshooting:
+            false
+        }
     }
 
     var toolbarVerifyEnabled: Bool {
         supportsValidation
+    }
+
+    var hasValidationProbeForSelectedTarget: Bool {
+        probeSession?.targetID == selectedTarget.id
     }
 
     var infoBannerText: String {
@@ -133,7 +152,9 @@ final class DeveloperSetupViewModel {
             if selectedTarget.automationSupport.isAvailable {
                 return [
                     selectedTarget.currentSupportSummary,
-                    String(localized: "Automatic Setup can prepare a scoped session for this target; Manual Setup remains available."),
+                    String(
+                        localized: "Automatic Setup can prepare a scoped session for this target; Manual Setup remains available."
+                    ),
                 ].joined(separator: " ")
             }
 
@@ -147,13 +168,12 @@ final class DeveloperSetupViewModel {
     }
 
     var bottomStatusText: String {
-        let snippetTitle: String
-        if selectedTarget.supportStatus != .availableNow {
-            snippetTitle = String(localized: "Guide only")
+        let snippetTitle: String = if selectedTarget.supportStatus != .availableNow {
+            String(localized: "Guide only")
         } else if currentWorkflow.supportsSnippets {
-            snippetTitle = selectedSnippetTitle
+            selectedSnippetTitle
         } else {
-            snippetTitle = String(localized: "Manual guide")
+            String(localized: "Manual guide")
         }
 
         let automationTitle = selectedTarget.automationSupport.isAvailable
@@ -187,7 +207,7 @@ final class DeveloperSetupViewModel {
                 configuredPort: AppSettingsManager.shared.settings.proxyPort
             ),
             certificatePath: certificatePathHint
-            )
+        )
     }
 
     var currentValidationSnippetText: String? {
@@ -216,8 +236,8 @@ final class DeveloperSetupViewModel {
 
         guard let path = AppSettingsManager.shared.settings.lastExportedRootCAPath,
               !path.isEmpty,
-              FileManager.default.fileExists(atPath: path)
-        else {
+              FileManager.default.fileExists(atPath: path) else
+        {
             return nil
         }
 
@@ -282,21 +302,133 @@ final class DeveloperSetupViewModel {
         return issues
     }
 
+    static func resolveSnippetPort(isProxyRunning: Bool, activePort: Int, configuredPort: Int) -> Int {
+        isProxyRunning ? activePort : configuredPort
+    }
+
+    static func reachableLANAddress(
+        for effectiveListenAddress: String,
+        discoverLANAddress: () -> String? = { RootCADownloadServer.lanIPv4Addresses().first }
+    )
+        -> String?
+    {
+        let normalizedListenAddress = effectiveListenAddress
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard !normalizedListenAddress.isEmpty else {
+            return nil
+        }
+        if isWildcardListenAddress(normalizedListenAddress) {
+            return discoverLANAddress()
+        }
+        guard !isLoopbackListenAddress(normalizedListenAddress) else {
+            return nil
+        }
+        return effectiveListenAddress
+    }
+
+    static func validationIssue(
+        for target: SetupTarget,
+        snapshot: SetupSnapshot,
+        workflow: SetupWorkflow,
+        validation: SetupValidationSpec? = nil
+    )
+        -> SetupIssue?
+    {
+        if let deviceProxyIssue = deviceProxyIssue(for: target, snapshot: snapshot) {
+            return deviceProxyIssue
+        }
+        guard target.supportStatus == .availableNow else {
+            return .targetIsGuideOnly
+        }
+        guard workflow.supportsValidation else {
+            return .manualValidationOnly
+        }
+        if !snapshot.runtimeReady {
+            return .runtimeNotInstalled
+        }
+        if !snapshot.proxyRunning {
+            return .proxyStopped
+        }
+        if !snapshot.recordingEnabled {
+            return .recordingPaused
+        }
+        if !snapshot.certificateTrusted {
+            return .certificateNotTrusted
+        }
+        if !snapshot.certificateExportable || !snapshot.certificateFileReady {
+            return .certificateExportUnavailable
+        }
+        if let validation,
+           let validationURL = URL(string: validation.urlString),
+           AllowListManager.shared.isActive,
+           !AllowListManager.shared.isRequestAllowed(method: validation.method, url: validationURL)
+        {
+            return .allowListBlockedValidation
+        }
+        return nil
+    }
+
+    static func deviceProxyIssue(for target: SetupTarget, snapshot: SetupSnapshot) -> SetupIssue? {
+        guard target.supportStatus == .availableNow,
+              target.requiresReachableLANProxy else
+        {
+            return nil
+        }
+        guard !isLoopbackListenAddress(snapshot.effectiveListenAddress.lowercased()),
+              snapshot.reachableLANAddress != nil else
+        {
+            return .deviceProxyUnreachable
+        }
+        return nil
+    }
+
+    static func matchesValidationTransaction(
+        _ transaction: HTTPTransaction,
+        baselineSequenceNumber: Int,
+        validation: SetupValidationSpec
+    )
+        -> Bool
+    {
+        transaction.sequenceNumber > baselineSequenceNumber
+            && transaction.request.method == validation.method
+            && transaction.request.host == validation.host
+            && transaction.request.path == validation.path
+    }
+
     func isPinned(_ target: SetupTarget) -> Bool {
         pinnedTargetIDs.contains(target.id)
     }
 
     func refreshSnapshot() async {
+        snapshotRefreshGeneration += 1
+        let refreshGeneration = snapshotRefreshGeneration
         let settings = AppSettingsManager.shared.settings
         let readiness = ReadinessCoordinator.shared
+        let generation = targetGeneration
         let originalTargetID = selectedTarget.id
         let certificateSnapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: false)
+        guard targetGeneration == generation,
+              snapshotRefreshGeneration == refreshGeneration
+        else {
+            return
+        }
         let pem = try? await CertificateManager.shared.getRootCAPEM()
-        guard selectedTarget.id == originalTargetID else {
+        guard targetGeneration == generation,
+              snapshotRefreshGeneration == refreshGeneration,
+              selectedTarget.id == originalTargetID
+        else {
             return
         }
 
         let runtimeReadiness = await DeveloperSetupRuntimeTooling.readinessAsync(for: originalTargetID)
+        guard targetGeneration == generation,
+              snapshotRefreshGeneration == refreshGeneration,
+              selectedTarget.id == originalTargetID
+        else {
+            return
+        }
         let workflow = currentWorkflow
         let target = selectedTarget
 
@@ -320,21 +452,37 @@ final class DeveloperSetupViewModel {
 
         let priorVerificationState = snapshot.verificationState
         let isTerminalState = switch priorVerificationState {
-        case .success, .timedOut, .cancelled:
+        case .success,
+             .timedOut,
+             .cancelled:
             true
         default:
             false
         }
-        guard !isTerminalState else {
+        let probeReady = await prepareValidationProbe(
+            targetID: originalTargetID,
+            targetGeneration: generation
+        )
+        guard targetGeneration == generation,
+              snapshotRefreshGeneration == refreshGeneration,
+              selectedTarget.id == originalTargetID
+        else {
             return
         }
-
-        let probeReady = await prepareValidationProbe()
         let validationSpec = probeReady ? currentValidationSpec : nil
         let nextIssue = probeReady
             ? Self.validationIssue(for: target, snapshot: snapshot, workflow: workflow, validation: validationSpec)
             : .localProbeUnavailable
         activeIssue = nextIssue
+        if isTerminalState {
+            if priorVerificationState == .success, nextIssue != nil {
+                snapshot.matchedTransactionID = nil
+                snapshot.matchedHost = nil
+                snapshot.matchedMethod = nil
+                snapshot.matchedPath = nil
+            }
+            return
+        }
         if workflow.supportsValidation {
             if priorVerificationState != .waitingForTraffic {
                 snapshot.verificationState = nextIssue == nil ? .readyToVerify : .readinessFailed
@@ -345,11 +493,13 @@ final class DeveloperSetupViewModel {
     }
 
     func selectTarget(_ target: SetupTarget) async {
-        if selectedTarget.id != target.id, snapshot.verificationState == .waitingForTraffic {
+        if snapshot.verificationState == .waitingForTraffic {
             cancelValidation(markCancelled: true)
         }
 
-        showsAutomationSheet = false
+        targetGeneration += 1
+        let generation = targetGeneration
+
         selectedTarget = target
         selectedTab = .overview
         selectedSnippetID = defaultSnippetID(for: target.id)
@@ -360,11 +510,18 @@ final class DeveloperSetupViewModel {
         snapshot.matchedMethod = nil
         snapshot.matchedPath = nil
         probeSession = nil
-        Task { await probeServer.stop() }
+
+        // Serialize probe lifecycle across a target switch: fully stop the prior
+        // target's probe before any later probe can start, so two targets never
+        // race the single probe server.
+        await probeServer.stop()
+        guard targetGeneration == generation else {
+            return
+        }
 
         let targetID = target.id
         let runtimeReadiness = await DeveloperSetupRuntimeTooling.readinessAsync(for: targetID)
-        guard selectedTarget.id == targetID else {
+        guard targetGeneration == generation, selectedTarget.id == targetID else {
             return
         }
 
@@ -373,7 +530,11 @@ final class DeveloperSetupViewModel {
         activeIssue = Self.validationIssue(for: target, snapshot: snapshot, workflow: currentWorkflow)
 
         if supportsValidation {
-            snapshot.verificationState = Self.validationIssue(for: target, snapshot: snapshot, workflow: currentWorkflow) == nil
+            snapshot.verificationState = Self.validationIssue(
+                for: target,
+                snapshot: snapshot,
+                workflow: currentWorkflow
+            ) == nil
                 ? .readyToVerify
                 : .readinessFailed
         } else {
@@ -393,15 +554,26 @@ final class DeveloperSetupViewModel {
         selectedTab = tab
     }
 
-    func openAutomationSheet() {
-        guard supportsAutomation else {
+    /// Apply a hub route as one awaitable target + tab transition. Consumers can
+    /// await completion, while the route generation prevents an older in-flight
+    /// transition from committing after a newer one.
+    func applyHubRoute(_ route: DeveloperSetupRoute?) async {
+        guard let route,
+              route.destination == .hub,
+              route.generation > lastAppliedHubRouteGeneration,
+              let target = SetupTarget.target(for: route.targetID)
+        else {
             return
         }
-        showsAutomationSheet = true
-    }
-
-    func closeAutomationSheet() {
-        showsAutomationSheet = false
+        lastAppliedHubRouteGeneration = route.generation
+        await selectTarget(target)
+        guard lastAppliedHubRouteGeneration == route.generation,
+              selectedTarget.id == route.targetID
+        else {
+            return
+        }
+        selectTab(route.tab)
+        await refreshSnapshot()
     }
 
     func copyTextForCurrentContext() -> String? {
@@ -445,11 +617,10 @@ final class DeveloperSetupViewModel {
             }
 
             await self.refreshSnapshot()
-            guard
-                self.selectedTarget.id == capturedTargetID,
-                self.validationTaskToken === capturedTaskToken,
-                self.validationRunID == validationRunID
-            else {
+            guard self.selectedTarget.id == capturedTargetID,
+                  self.validationTaskToken === capturedTaskToken,
+                  self.validationRunID == validationRunID else
+            {
                 return
             }
 
@@ -492,11 +663,10 @@ final class DeveloperSetupViewModel {
 
                 while !Task.isCancelled {
                     if !self.supportsValidation {
-                        guard
-                            self.selectedTarget.id == capturedTargetID,
-                            self.validationTaskToken === capturedTaskToken,
-                            self.validationRunID == validationRunID
-                        else {
+                        guard self.selectedTarget.id == capturedTargetID,
+                              self.validationTaskToken === capturedTaskToken,
+                              self.validationRunID == validationRunID else
+                        {
                             return
                         }
                         self.cancelValidation(markCancelled: true)
@@ -507,11 +677,10 @@ final class DeveloperSetupViewModel {
                         || !self.coordinator.isProxyRunning
                         || !self.coordinator.isRecording
                     {
-                        guard
-                            self.selectedTarget.id == capturedTargetID,
-                            self.validationTaskToken === capturedTaskToken,
-                            self.validationRunID == validationRunID
-                        else {
+                        guard self.selectedTarget.id == capturedTargetID,
+                              self.validationTaskToken === capturedTaskToken,
+                              self.validationRunID == validationRunID else
+                        {
                             return
                         }
                         self.cancelValidation(markCancelled: true)
@@ -543,11 +712,10 @@ final class DeveloperSetupViewModel {
                     try? await Task.sleep(for: .milliseconds(250))
                 }
 
-                guard
-                    self.selectedTarget.id == capturedTargetID,
-                    self.validationTaskToken === capturedTaskToken,
-                    self.validationRunID == validationRunID
-                else {
+                guard self.selectedTarget.id == capturedTargetID,
+                      self.validationTaskToken === capturedTaskToken,
+                      self.validationRunID == validationRunID else
+                {
                     return
                 }
                 self.cancelValidation(markCancelled: true)
@@ -588,112 +756,66 @@ final class DeveloperSetupViewModel {
         }
     }
 
-    static func resolveSnippetPort(isProxyRunning: Bool, activePort: Int, configuredPort: Int) -> Int {
-        isProxyRunning ? activePort : configuredPort
-    }
-
-    static func reachableLANAddress(
-        for effectiveListenAddress: String,
-        discoverLANAddress: () -> String? = { RootCADownloadServer.lanIPv4Addresses().first }
-    ) -> String? {
-        let normalizedListenAddress = effectiveListenAddress
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-
-        guard !normalizedListenAddress.isEmpty else {
-            return nil
-        }
-        if isWildcardListenAddress(normalizedListenAddress) {
-            return discoverLANAddress()
-        }
-        guard !isLoopbackListenAddress(normalizedListenAddress) else {
-            return nil
-        }
-        return effectiveListenAddress
-    }
-
-    static func validationIssue(
-        for target: SetupTarget,
-        snapshot: SetupSnapshot,
-        workflow: SetupWorkflow,
-        validation: SetupValidationSpec? = nil
-    ) -> SetupIssue? {
-        if let deviceProxyIssue = deviceProxyIssue(for: target, snapshot: snapshot) {
-            return deviceProxyIssue
-        }
-        guard target.supportStatus == .availableNow else {
-            return .targetIsGuideOnly
-        }
-        guard workflow.supportsValidation else {
-            return .manualValidationOnly
-        }
-        if !snapshot.runtimeReady {
-            return .runtimeNotInstalled
-        }
-        if !snapshot.proxyRunning {
-            return .proxyStopped
-        }
-        if !snapshot.recordingEnabled {
-            return .recordingPaused
-        }
-        if !snapshot.certificateTrusted {
-            return .certificateNotTrusted
-        }
-        if !snapshot.certificateExportable || !snapshot.certificateFileReady {
-            return .certificateExportUnavailable
-        }
-        if let validation,
-           let validationURL = URL(string: validation.urlString),
-           AllowListManager.shared.isActive,
-           !AllowListManager.shared.isRequestAllowed(method: validation.method, url: validationURL)
-        {
-            return .allowListBlockedValidation
-        }
-        return nil
-    }
-
     func stopValidationProbe() async {
         await probeServer.stop()
         probeSession = nil
     }
 
-    static func deviceProxyIssue(for target: SetupTarget, snapshot: SetupSnapshot) -> SetupIssue? {
-        guard target.supportStatus == .availableNow,
-              target.requiresReachableLANProxy
-        else {
-            return nil
-        }
-        guard !isLoopbackListenAddress(snapshot.effectiveListenAddress.lowercased()),
-              snapshot.reachableLANAddress != nil
-        else {
-            return .deviceProxyUnreachable
-        }
-        return nil
-    }
-
-    static func matchesValidationTransaction(
-        _ transaction: HTTPTransaction,
-        baselineSequenceNumber: Int,
-        validation: SetupValidationSpec
-    ) -> Bool {
-        transaction.sequenceNumber > baselineSequenceNumber
-            && transaction.request.method == validation.method
-            && transaction.request.host == validation.host
-            && transaction.request.path == validation.path
-    }
-
     // MARK: Private
+
+    private final class ValidationTaskToken {}
+
+    private var validationRunID: UUID?
+    private var validationTaskToken: ValidationTaskToken?
+
+    /// Incremented on every target switch. Any async continuation (snapshot
+    /// refresh, probe start, route application) captures the generation at its
+    /// start and refuses to commit results if the generation has moved on, so a
+    /// stale result can never land in a newer target's state.
+    private var targetGeneration = 0
+    private var lastAppliedHubRouteGeneration = 0
+    private var snapshotRefreshGeneration = 0
 
     private var validationTask: Task<Void, Never>?
     private let pinnedStore: DeveloperSetupPinnedStore
     private let probeServer = DeveloperSetupProbeServer()
     private var probeSession: DeveloperSetupProbeSession?
 
-    private final class ValidationTaskToken {}
-
     private var selectedSnippetTitle: String {
         currentSnippetOptions.first(where: { $0.id == selectedSnippetID })?.title
             ?? String(localized: "Guide only")
+    }
+
+    private static func exportedCertificateFileReady(from settings: AppSettings) -> Bool {
+        guard let path = settings.lastExportedRootCAPath, !path.isEmpty else {
+            return false
+        }
+
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    private static func isWildcardListenAddress(_ address: String) -> Bool {
+        switch address {
+        case "0.0.0.0",
+             "::",
+             "[::]",
+             "*":
+            true
+        default:
+            false
+        }
+    }
+
+    private static func isLoopbackListenAddress(_ address: String) -> Bool {
+        switch address {
+        case "127.0.0.1",
+             "::1",
+             "[::1]",
+             "localhost":
+            true
+        default:
+            false
+        }
     }
 
     private func ensureSelectedSnippetMatchesCurrentTarget() {
@@ -711,51 +833,35 @@ final class DeveloperSetupViewModel {
     }
 
     @discardableResult
-    private func prepareValidationProbe() async -> Bool {
+    private func prepareValidationProbe(
+        targetID: SetupTarget.ID,
+        targetGeneration generation: Int
+    ) async -> Bool {
         guard supportsValidation else {
             probeSession = nil
             await probeServer.stop()
             return false
         }
 
-        if probeSession?.targetID == selectedTarget.id {
+        if probeSession?.targetID == targetID {
             return true
         }
 
         do {
-            probeSession = try await probeServer.start(targetID: selectedTarget.id)
+            let session = try await probeServer.start(targetID: targetID)
+            guard targetGeneration == generation, selectedTarget.id == targetID else {
+                return false
+            }
+            probeSession = session
             return true
         } catch {
+            guard targetGeneration == generation, selectedTarget.id == targetID else {
+                return false
+            }
             probeSession = nil
             activeIssue = .localProbeUnavailable
             snapshot.verificationState = .readinessFailed
             return false
-        }
-    }
-
-    private static func exportedCertificateFileReady(from settings: AppSettings) -> Bool {
-        guard let path = settings.lastExportedRootCAPath, !path.isEmpty else {
-            return false
-        }
-
-        return FileManager.default.fileExists(atPath: path)
-    }
-
-    private static func isWildcardListenAddress(_ address: String) -> Bool {
-        switch address {
-        case "0.0.0.0", "::", "[::]", "*":
-            true
-        default:
-            false
-        }
-    }
-
-    private static func isLoopbackListenAddress(_ address: String) -> Bool {
-        switch address {
-        case "127.0.0.1", "::1", "[::1]", "localhost":
-            true
-        default:
-            false
         }
     }
 }

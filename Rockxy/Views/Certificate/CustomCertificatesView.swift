@@ -9,300 +9,558 @@ import X509
 // MARK: - CustomCertificatesView
 
 struct CustomCertificatesView: View {
-    @State private var selectedTab = Tab.root
-    @State private var rootEntries: [CustomCertificateMetadata] = []
-    @State private var serverEntries: [CustomCertificateMetadata] = []
-    @State private var clientEntries: [CustomCertificateMetadata] = []
-    @State private var defaultRootCertificate: CertificatePreviewItem?
-    @State private var defaultRootSnapshot: RootCAStatusSnapshot?
-    @State private var isLoadingDefaultRoot = false
-    @State private var errorMessage: String?
+    // MARK: Internal
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
+            modePicker
             Divider()
-            Picker(String(localized: "Certificate Type"), selection: $selectedTab) {
-                ForEach(Tab.allCases) { tab in
-                    Text(tab.title).tag(tab)
+            content
+            Divider()
+            footer
+        }
+        .font(toolMetrics.font())
+        .frame(
+            minWidth: min(900, max(720, toolMetrics.bodyFontSize * 18 + 486)),
+            minHeight: min(680, max(520, toolMetrics.bodyFontSize * 8 + 420))
+        )
+        .task {
+            await viewModel.refreshDefaultRoot()
+        }
+        .onChange(of: viewModel.mode) { _, newMode in
+            if newMode == .root {
+                Task { await viewModel.refreshDefaultRoot() }
+            }
+        }
+        .onChange(of: viewModel.serverEntries.map(\.id)) { _, _ in
+            viewModel.reconcileSelection()
+        }
+        .onChange(of: viewModel.clientEntries.map(\.id)) { _, _ in
+            viewModel.reconcileSelection()
+        }
+        .alert(
+            String(localized: "Custom Certificate Failed"),
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: {
+                    if !$0 {
+                        viewModel.errorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            viewModel.pendingDeletion?.title ?? "",
+            isPresented: Binding(
+                get: { viewModel.pendingDeletion != nil },
+                set: {
+                    if !$0 {
+                        viewModel.pendingDeletion = nil
+                    }
+                }
+            ),
+            presenting: viewModel.pendingDeletion
+        ) { request in
+            Button(request.confirmLabel, role: .destructive) {
+                confirmDeletion()
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {
+                viewModel.pendingDeletion = nil
+            }
+        } message: { request in
+            Text(request.message)
+        }
+        .onDeleteCommand {
+            guard !viewModel.isBusy else {
+                return
+            }
+            viewModel.requestPrimaryDeletion()
+        }
+    }
+
+    // MARK: Private
+
+    private struct HostSelection {
+        let value: String?
+    }
+
+    private static let helpURL = URL(string: "https://docs.rockxy.io/features/custom-certificates")
+
+    @State private var viewModel = CustomCertificatesViewModel()
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var rootDetailLabelWidth: CGFloat {
+        min(220, max(toolMetrics.formLabelWidth, toolMetrics.bodyFontSize * 7.2))
+    }
+
+    private var rootStatusSymbol: String {
+        switch viewModel.rootStatus {
+        case .customVerifying:
+            "arrow.triangle.2.circlepath"
+        case .customActive:
+            "checkmark.seal.fill"
+        case .customUnavailable:
+            "xmark.shield.fill"
+        case .installedTrusted:
+            "checkmark.shield.fill"
+        case .installedNotTrusted:
+            "exclamationmark.shield.fill"
+        case .generated:
+            "shield.lefthalf.filled"
+        case .unavailable:
+            "xmark.shield"
+        }
+    }
+
+    private var rootStatusColor: Color {
+        switch viewModel.rootStatus {
+        case .customVerifying:
+            .secondary
+        case .customActive,
+             .installedTrusted:
+            .green
+        case .customUnavailable:
+            .red
+        case .installedNotTrusted:
+            .orange
+        case .generated,
+             .unavailable:
+            .secondary
+        }
+    }
+
+    private var modePicker: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Picker(String(localized: "Certificate Type"), selection: $viewModel.mode) {
+                ForEach(CustomCertificatesViewModel.Mode.allCases) { mode in
+                    Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 560)
-            .padding(.top, 20)
-
-            content
-                .padding(28)
-
+            .frame(width: min(560, max(420, toolMetrics.bodyFontSize * 18)))
+            .disabled(viewModel.isBusy)
             Spacer(minLength: 0)
-            bottomBar
         }
-        .frame(minWidth: 900, minHeight: 540)
-        .task {
-            reload()
-            await refreshDefaultRootCertificate()
-        }
-        .alert(String(localized: "Custom Certificate Failed"), isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button(String(localized: "OK"), role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "")
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch viewModel.mode {
+        case .root:
+            rootContent
+        case .server:
+            listContent(
+                entries: viewModel.serverEntries,
+                selection: $viewModel.selectedServerID,
+                role: .server
+            )
+        case .client:
+            listContent(
+                entries: viewModel.clientEntries,
+                selection: $viewModel.selectedClientID,
+                role: .client
+            )
         }
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "certificate")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-            Text(String(localized: "Custom Certificates"))
-                .font(.headline)
-            Spacer()
+    // MARK: - Root
+
+    private var rootContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                rootSummaryCard
+                if let certificate = viewModel.previewItem {
+                    rootDetails(certificate)
+                } else if viewModel.isLoadingDefaultRoot {
+                    loadingRow
+                } else if viewModel.rootStatus == .customUnavailable {
+                    Label(
+                        String(
+                            localized:
+                            "Re-import this custom root and private key, or revert to Rockxy's default root certificate."
+                        ),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.red)
+                } else if let rootLoadErrorMessage = viewModel.rootLoadErrorMessage {
+                    Label(rootLoadErrorMessage, systemImage: "exclamationmark.triangle")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.orange)
+                } else {
+                    certificateEmptyState(
+                        title: String(localized: "No Root Certificate"),
+                        systemImage: "shield.slash",
+                        description: String(
+                            localized:
+                            "Create and trust Rockxy's root certificate from the Mac Setup Guide before intercepting HTTPS."
+                        )
+                    )
+                    .frame(maxWidth: .infinity, minHeight: toolMetrics.tableRowHeight * 6)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+            .padding(.vertical, toolMetrics.controlSpacing)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var rootSummaryCard: some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            Image(systemName: "checkmark.seal")
+                .font(.system(size: toolMetrics.compactIconFontSize + 5))
+                .foregroundStyle(viewModel.hasCustomRoot ? Color.accentColor : Color.secondary)
+                .symbolRenderingMode(.hierarchical)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(viewModel.rootTitle)
+                    .font(toolMetrics.font(weight: .medium))
+                    .textSelection(.enabled)
+                Text(viewModel.rootSubtitle)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label(viewModel.rootStatusText, systemImage: rootStatusSymbol)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(rootStatusColor)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(toolMetrics.controlSpacing + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+    }
+
+    private var loadingRow: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            ProgressView().controlSize(.small)
+            Text(String(localized: "Loading certificate details…"))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: toolMetrics.controlSpacing) {
+            importMenu
+
+            Button(viewModel.primaryDestructiveTitle, role: .destructive) {
+                viewModel.requestPrimaryDeletion()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canPerformPrimaryDestructive || viewModel.isBusy)
+
+            if viewModel.isBusy {
+                ProgressView().controlSize(.small)
+                Text(viewModel.isImporting ? String(localized: "Importing…") : String(localized: "Deleting…"))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+            } else if let statusMessage = viewModel.statusMessage {
+                Label(statusMessage, systemImage: statusSymbol)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(statusColor)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Button(String(localized: "Preview")) {
+                presentPreview()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canPreview || viewModel.isBusy)
+
+            if let helpURL = Self.helpURL {
+                HelpLink(destination: helpURL)
+            }
+        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+    }
+
+    private var importMenu: some View {
+        Menu {
+            switch viewModel.mode {
+            case .root:
+                Button(String(localized: "Import P12…")) {
+                    importPKCS12(kind: .root)
+                }
+            case .server,
+                 .client:
+                Button(String(localized: "Import PEM / DER…")) {
+                    importPEMOrDER(kind: viewModel.mode.kind)
+                }
+                Divider()
+                Button(String(localized: "Import P12…")) {
+                    importPKCS12(kind: viewModel.mode.kind)
+                }
+            }
+        } label: {
+            Text(String(localized: "Import"))
+        }
+        .menuStyle(.button)
+        .fixedSize()
+        .disabled(viewModel.isBusy)
+    }
+
+    private func rootDetails(_ certificate: CertificatePreviewItem) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            detailRow(String(localized: "Common Name"), certificate.commonName)
+            detailRow(String(localized: "Not Valid Before"), certificate.notValidBefore.map(Self.format))
+            detailRow(String(localized: "Not Valid After"), certificate.notValidAfter.map(Self.format))
+            detailRow(String(localized: "SHA-256"), certificate.fingerprintSHA256, monospaced: true)
+            detailRow(String(localized: "Subject"), certificate.subjectSummary)
+            detailRow(String(localized: "Issuer"), certificate.issuerSummary)
+        }
+        .padding(.horizontal, 2)
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch selectedTab {
-        case .root:
-            RootCertificateTab(
-                entries: rootEntries,
-                defaultRootCertificate: defaultRootCertificate,
-                defaultRootSnapshot: defaultRootSnapshot,
-                isLoadingDefaultRoot: isLoadingDefaultRoot
-            )
+    private func detailRow(_ label: String, _ value: String?, monospaced: Bool = false) -> some View {
+        if let value, !value.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: toolMetrics.controlSpacing) {
+                Text(label)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(width: rootDetailLabelWidth, alignment: .trailing)
+                Text(value)
+                    .font(toolMetrics.secondaryFont(monospaced: monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(monospaced ? 1 : 2)
+                    .truncationMode(monospaced ? .middle : .tail)
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    // MARK: - Server / Client Lists
+
+    private func listContent(
+        entries: [CustomCertificateMetadata],
+        selection: Binding<UUID?>,
+        role: CustomCertificateKind
+    )
+        -> some View
+    {
+        Table(entries, selection: selection) {
+            TableColumn(String(localized: "Host")) { entry in
+                Text(entry.hostPattern ?? "—")
+                    .font(toolMetrics.font(monospaced: true))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(entry.hostPattern ?? "")
+            }
+            .width(min: 150, ideal: 220)
+
+            TableColumn(String(localized: "Certificate")) { entry in
+                Text(entry.displayName)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(entry.displayName)
+            }
+            .width(min: 150, ideal: 240)
+
+            TableColumn(String(localized: "Expires")) { entry in
+                Text(entry.notValidAfter.map(Self.format) ?? String(localized: "Unknown"))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 120, ideal: 170)
+        }
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            listContextMenu(ids: ids)
+        }
+        .overlay {
+            if entries.isEmpty {
+                emptyState(for: role)
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .frame(minHeight: toolMetrics.tableRowHeight * 8, maxHeight: .infinity)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.controlSpacing)
+    }
+
+    @ViewBuilder
+    private func listContextMenu(ids: Set<UUID>) -> some View {
+        Button(String(localized: "Preview")) {
+            if let id = ids.first {
+                viewModel.select(id: id)
+                presentPreview()
+            }
+        }
+        .disabled(ids.isEmpty)
+
+        Divider()
+
+        Button(String(localized: "Delete"), role: .destructive) {
+            if let id = ids.first {
+                viewModel.requestDeletion(certificateID: id)
+            }
+        }
+        .disabled(ids.isEmpty)
+    }
+
+    private func emptyState(for role: CustomCertificateKind) -> some View {
+        switch role {
         case .server:
-            CertificateListTab(
-                title: String(localized: "Config Server Certificates used when establishing SSL connections to clients"),
-                subtitle: String(localized: "Suitable for apps that use certificate pinning."),
-                entries: serverEntries,
-                firstColumnTitle: String(localized: "Host"),
-                emptyMessage: String(localized: "No custom server certificates have been imported.")
+            certificateEmptyState(
+                title: String(localized: "No Server Certificates"),
+                systemImage: "lock.doc",
+                description: String(
+                    localized: "Import a certificate and private key to present a pinned server identity for matching hosts."
+                )
             )
-        case .client:
-            CertificateListTab(
-                title: String(localized: "Config Client Certificates used when establishing SSL connections to selected servers"),
-                subtitle: String(localized: "Suitable for upstream services that require mutual TLS."),
-                entries: clientEntries,
-                firstColumnTitle: String(localized: "Host"),
-                emptyMessage: String(localized: "No client certificates have been imported.")
+        default:
+            certificateEmptyState(
+                title: String(localized: "No Client Certificates"),
+                systemImage: "lock.doc",
+                description: String(
+                    localized: "Import a certificate and private key to answer mutual-TLS challenges from matching hosts."
+                )
             )
         }
     }
 
-    private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Button(selectedTab == .root ? String(localized: "Revert") : String(localized: "Delete")) {
-                deleteSelectedKind()
-            }
-                .buttonStyle(.bordered)
-                .disabled(currentEntries.isEmpty)
-
-            Button(String(localized: "How to generate self-signed certificates")) {
-                if let helpURL = URL(string: "https://docs.rockxy.io/features/custom-certificates") {
-                    NSWorkspace.shared.open(helpURL)
-                }
-            }
-            .buttonStyle(.bordered)
-
-            Spacer()
-
-            if let helpURL = URL(string: "https://docs.rockxy.io/features/custom-certificates") {
-                HelpLink(destination: helpURL)
-            }
-
-            Button(String(localized: "Preview")) {
-                previewCurrentCertificate()
-            }
-                .buttonStyle(.bordered)
-                .disabled(currentPreviewItem == nil)
-
-            Menu {
-                switch selectedTab {
-                case .root:
-                    Button(String(localized: "Import P12...")) {
-                        importPKCS12Certificate(kind: .root)
-                    }
-                case .server, .client:
-                    Button(String(localized: "Import PEM / DER...")) {
-                        importPEMOrDERCertificate(kind: selectedTab.kind)
-                    }
-                    Divider()
-                    Button(String(localized: "Import P12...")) {
-                        importPKCS12Certificate(kind: selectedTab.kind)
-                    }
-                }
-            } label: {
-                Text(String(localized: "Import"))
-            }
-            .menuStyle(.button)
+    private func certificateEmptyState(
+        title: String,
+        systemImage: String,
+        description: String
+    )
+        -> some View
+    {
+        VStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: max(22, toolMetrics.emptyStateFontSize + 8)))
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(toolMetrics.font(weight: .medium))
+            Text(description)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 28)
-        .padding(.bottom, 22)
+        .padding(toolMetrics.contentHorizontalPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var currentEntries: [CustomCertificateMetadata] {
-        switch selectedTab {
-        case .root:
-            rootEntries
-        case .server:
-            serverEntries
-        case .client:
-            clientEntries
+    nonisolated private static func format(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func confirmDeletion() {
+        let wasRoot = viewModel.mode == .root
+        Task {
+            await viewModel.confirmPendingDeletion()
+            if wasRoot {
+                await viewModel.refreshDefaultRoot()
+            }
         }
     }
 
-    private var currentPreviewItem: CertificatePreviewItem? {
-        switch selectedTab {
-        case .root:
-            if let customRoot = rootEntries.last.flatMap({ try? CertificatePreviewItem(metadata: $0) }) {
-                return customRoot
-            }
-            return defaultRootCertificate
-        case .server:
-            return serverEntries.last.flatMap { try? CertificatePreviewItem(metadata: $0) }
-        case .client:
-            return clientEntries.last.flatMap { try? CertificatePreviewItem(metadata: $0) }
-        }
-    }
-
-    private func reload() {
-        rootEntries = CustomCertificateManager.shared.metadata(kind: .root)
-        serverEntries = CustomCertificateManager.shared.metadata(kind: .server)
-        clientEntries = CustomCertificateManager.shared.metadata(kind: .client)
-    }
-
-    private func deleteSelectedKind() {
-        do {
-            try CustomCertificateManager.shared.deleteAll(kind: selectedTab.kind)
-            reload()
-            Task { await refreshDefaultRootCertificate() }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func importPEMOrDERCertificate(kind: CustomCertificateKind) {
-        do {
-            guard let certificateURL = chooseFile(
-                title: String(localized: "Choose Certificate PEM or DER"),
-                allowedContentTypes: CertificateImportFileType.certificateTypes
-            ),
-                let privateKeyURL = chooseFile(
-                    title: String(localized: "Choose Private Key PEM or DER"),
-                    allowedContentTypes: CertificateImportFileType.privateKeyTypes
-                ) else {
-                return
-            }
-            let identity = try CustomCertificateImportIdentity.fromCertificateAndPrivateKey(
-                certificateData: Data(contentsOf: certificateURL),
-                privateKeyData: Data(contentsOf: privateKeyURL),
-                displayName: certificateURL.deletingPathExtension().lastPathComponent
-            )
-            try importIdentity(identity, kind: kind)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func importPKCS12Certificate(kind: CustomCertificateKind) {
-        do {
-            guard let pkcs12URL = chooseFile(
-                title: String(localized: "Choose P12 Certificate"),
-                allowedContentTypes: CertificateImportFileType.pkcs12Types
-            ),
-                let passphrase = promptPKCS12Passphrase() else {
-                return
-            }
-            let identity = try CustomCertificateImportIdentity.fromPKCS12(
-                data: Data(contentsOf: pkcs12URL),
-                displayName: pkcs12URL.deletingPathExtension().lastPathComponent,
-                passphrase: passphrase
-            )
-            try importIdentity(identity, kind: kind)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func importIdentity(_ identity: CustomCertificateImportIdentity, kind: CustomCertificateKind) throws {
-        switch kind {
-        case .root:
-            try CustomCertificateManager.shared.importRoot(
-                displayName: identity.displayName,
-                certificatePEM: identity.certificatePEM,
-                privateKeyPEM: identity.privateKeyPEM
-            )
-            selectedTab = .root
-        case .server:
-            guard let hostPattern = promptHostPattern(
-                title: String(localized: "Server Certificate Host"),
-                message: String(localized: "Enter the host or wildcard pattern this server certificate should match.")
-            ) else {
-                return
-            }
-            try CustomCertificateManager.shared.importServerIdentity(
-                hostPattern: hostPattern,
-                displayName: identity.displayName,
-                certificatePEM: identity.certificatePEM,
-                privateKeyPEM: identity.privateKeyPEM
-            )
-            selectedTab = .server
-        case .client:
-            guard let hostPattern = promptHostPattern(
-                title: String(localized: "Client Certificate Host"),
-                message: String(localized: "Enter the upstream host or wildcard pattern that should receive this client identity.")
-            ) else {
-                return
-            }
-            try CustomCertificateManager.shared.importClientIdentity(
-                hostPattern: hostPattern,
-                displayName: identity.displayName,
-                certificatePEM: identity.certificatePEM,
-                privateKeyPEM: identity.privateKeyPEM
-            )
-            selectedTab = .client
-        }
-
-        reload()
-        Task { await refreshDefaultRootCertificate() }
-    }
-
-    private func refreshDefaultRootCertificate() async {
-        isLoadingDefaultRoot = true
-        defer { isLoadingDefaultRoot = false }
-
-        do {
-            try await CertificateManager.shared.ensureRootCA()
-            defaultRootSnapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: false)
-            let material = try await CertificateManager.shared.exportMaterial()
-            guard let certificate = material.certificate else {
-                defaultRootCertificate = nil
-                return
-            }
-            defaultRootCertificate = try CertificatePreviewItem(
-                certificate: certificate,
-                displayName: String(localized: "Rockxy Default Root Certificate"),
-                fingerprintSHA256: defaultRootSnapshot?.fingerprintSHA256
-            )
-        } catch {
-            defaultRootSnapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: false)
-            defaultRootCertificate = nil
-        }
-    }
-
-    private func previewCurrentCertificate() {
-        guard let item = currentPreviewItem else {
+    private func presentPreview() {
+        guard let item = viewModel.previewItem else {
             return
         }
-
         let panel = SFCertificatePanel.shared()
         panel?.runModal(for: item.secTrust, showGroup: true)
+    }
+
+    private func importPEMOrDER(kind: CustomCertificateKind) {
+        guard let certificateURL = chooseFile(
+            title: String(localized: "Choose Certificate PEM or DER"),
+            allowedContentTypes: CertificateImportFileType.certificateTypes
+        ),
+            let privateKeyURL = chooseFile(
+                title: String(localized: "Choose Private Key PEM or DER"),
+                allowedContentTypes: CertificateImportFileType.privateKeyTypes
+            ) else
+        {
+            return
+        }
+        guard let hostPattern = collectHostIfNeeded(kind: kind) else {
+            return
+        }
+        let displayName = certificateURL.deletingPathExtension().lastPathComponent
+        Task {
+            await viewModel.importCertificateAndKey(
+                certificateURL: certificateURL,
+                privateKeyURL: privateKeyURL,
+                displayName: displayName,
+                kind: kind,
+                hostPattern: hostPattern.value
+            )
+        }
+    }
+
+    private func importPKCS12(kind: CustomCertificateKind) {
+        guard let pkcs12URL = chooseFile(
+            title: String(localized: "Choose P12 Certificate"),
+            allowedContentTypes: CertificateImportFileType.pkcs12Types
+        ),
+            let passphrase = promptPKCS12Passphrase() else
+        {
+            return
+        }
+        guard let hostPattern = collectHostIfNeeded(kind: kind) else {
+            return
+        }
+        let displayName = pkcs12URL.deletingPathExtension().lastPathComponent
+        Task {
+            await viewModel.importPKCS12(
+                url: pkcs12URL,
+                displayName: displayName,
+                passphrase: passphrase,
+                kind: kind,
+                hostPattern: hostPattern.value
+            )
+        }
+    }
+
+    /// Collects a host pattern for server / client imports. Returns `nil` when the user
+    /// cancels the prompt so the import is aborted before any Keychain / metadata write.
+    private func collectHostIfNeeded(kind: CustomCertificateKind) -> HostSelection? {
+        switch kind {
+        case .root:
+            HostSelection(value: nil)
+        case .server:
+            promptHostPattern(
+                title: String(localized: "Server Certificate Host"),
+                message: String(localized: "Enter the host or wildcard pattern this server certificate should match.")
+            ).map { HostSelection(value: $0) }
+        case .client:
+            promptHostPattern(
+                title: String(localized: "Client Certificate Host"),
+                message: String(
+                    localized: "Enter the upstream host or wildcard pattern that should receive this client identity."
+                )
+            ).map { HostSelection(value: $0) }
+        }
     }
 
     private func chooseFile(title: String, allowedContentTypes: [UTType]) -> URL? {
@@ -318,7 +576,9 @@ struct CustomCertificatesView: View {
     private func promptPKCS12Passphrase() -> String? {
         let alert = NSAlert()
         alert.messageText = String(localized: "P12 Password")
-        alert.informativeText = String(localized: "Enter the password for this P12 file. Leave it empty if the file has no password.")
+        alert
+            .informativeText =
+            String(localized: "Enter the password for this P12 file. Leave it empty if the file has no password.")
         alert.addButton(withTitle: String(localized: "Import"))
         alert.addButton(withTitle: String(localized: "Cancel"))
 
@@ -333,50 +593,58 @@ struct CustomCertificatesView: View {
     }
 
     private func promptHostPattern(title: String, message: String) -> String? {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.addButton(withTitle: String(localized: "Continue"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        var validationMessage: String?
+        while true {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = validationMessage ?? message
+            alert.alertStyle = validationMessage == nil ? .informational : .warning
+            alert.addButton(withTitle: String(localized: "Continue"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.placeholderString = "api.example.com or *.example.com"
-        alert.accessoryView = field
+            let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+            field.placeholderString = "api.example.com or *.example.com"
+            alert.accessoryView = field
 
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return nil
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                return nil
+            }
+            let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if value.isEmpty {
+                validationMessage = String(localized: "Enter a host pattern.")
+                continue
+            }
+            if let message = viewModel.hostValidationMessage(for: value) {
+                validationMessage = message
+                continue
+            }
+            return viewModel.normalizedHostPattern(value)
         }
-        let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
     }
 
-    private enum Tab: CaseIterable, Identifiable {
-        case root
-        case server
-        case client
-
-        var id: Self { self }
-
-        var title: String {
-            switch self {
-            case .root:
-                String(localized: "Root Certificate")
-            case .server:
-                String(localized: "Server Certificates")
-            case .client:
-                String(localized: "Client Certificates")
-            }
+    private var statusSymbol: String {
+        switch viewModel.statusTone {
+        case .neutral:
+            "info.circle"
+        case .success:
+            "checkmark.circle.fill"
+        case .warning:
+            "exclamationmark.triangle.fill"
+        case .error:
+            "xmark.circle.fill"
         }
+    }
 
-        var kind: CustomCertificateKind {
-            switch self {
-            case .root:
-                .root
-            case .server:
-                .server
-            case .client:
-                .client
-            }
+    private var statusColor: Color {
+        switch viewModel.statusTone {
+        case .neutral:
+            .secondary
+        case .success:
+            .green
+        case .warning:
+            .orange
+        case .error:
+            .red
         }
     }
 }
@@ -384,195 +652,23 @@ struct CustomCertificatesView: View {
 // MARK: - CertificateImportFileType
 
 private enum CertificateImportFileType {
+    // MARK: Internal
+
     static let certificateTypes = extensions(["pem", "der", "cer", "crt"])
     static let privateKeyTypes = extensions(["pem", "key", "der"])
     static let pkcs12Types = extensions(["p12", "pfx"])
+
+    // MARK: Private
 
     private static func extensions(_ values: [String]) -> [UTType] {
         values.map { UTType(filenameExtension: $0) ?? .data }
     }
 }
 
-// MARK: - RootCertificateTab
-
-private struct RootCertificateTab: View {
-    let entries: [CustomCertificateMetadata]
-    let defaultRootCertificate: CertificatePreviewItem?
-    let defaultRootSnapshot: RootCAStatusSnapshot?
-    let isLoadingDefaultRoot: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(rootTitle)
-                    .font(.title3)
-                Text(String(localized: "This certificate is used for generating proxy certificates during SSL handshakes to clients and servers."))
-                    .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 18) {
-                Image(systemName: "certificate.fill")
-                    .font(.system(size: 54))
-                    .foregroundStyle(.yellow)
-                    .symbolRenderingMode(.hierarchical)
-
-                if isLoadingDefaultRoot, entries.isEmpty {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(String(localized: "Loading certificate details..."))
-                        .foregroundStyle(.secondary)
-                } else {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(activeTitle)
-                            .font(.headline)
-
-                        if let certificate = activeCertificate {
-                            Text(validityLine(prefix: String(localized: "Not Valid Before:"), date: certificate.notValidBefore))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                            Text(validityLine(prefix: String(localized: "Not Valid After:"), date: certificate.notValidAfter))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                            if let fingerprint = certificate.fingerprintSHA256 {
-                                Text(String(localized: "SHA-256: \(fingerprint)"))
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .textSelection(.enabled)
-                            }
-                        } else {
-                            Text(String(localized: "No generated root certificate details are available yet."))
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Label(statusText, systemImage: "checkmark.circle.fill")
-                            .font(.callout)
-                            .foregroundStyle(.green)
-                    }
-                }
-                Spacer()
-            }
-            .padding(18)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            if let certificate = activeCertificate {
-                certificateSummary(certificate)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var activeCertificate: CertificatePreviewItem? {
-        if let entry = entries.last {
-            return try? CertificatePreviewItem(metadata: entry)
-        }
-        return defaultRootCertificate
-    }
-
-    private var activeTitle: String {
-        activeCertificate?.displayName ?? String(localized: "Rockxy Default Root Certificate")
-    }
-
-    private var statusText: String {
-        if !entries.isEmpty {
-            return String(localized: "Custom Root Active")
-        }
-        if defaultRootSnapshot?.isInstalledInKeychain == true,
-           defaultRootSnapshot?.isSystemTrustValidated == true
-        {
-            return String(localized: "Installed & Trusted")
-        }
-        return String(localized: "Default Root Active")
-    }
-
-    private func certificateSummary(_ certificate: CertificatePreviewItem) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-            if let commonName = certificate.commonName {
-                summaryRow(label: String(localized: "Common Name"), value: commonName)
-            }
-            summaryRow(label: String(localized: "Subject"), value: certificate.subjectSummary)
-            summaryRow(label: String(localized: "Issuer"), value: certificate.issuerSummary)
-        }
-        .font(.caption)
-        .padding(.horizontal, 6)
-    }
-
-    private func summaryRow(label: String, value: String) -> some View {
-        GridRow {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .gridColumnAlignment(.trailing)
-            Text(value)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .textSelection(.enabled)
-        }
-    }
-
-    private var rootTitle: String {
-        if entries.isEmpty {
-            String(localized: "Rockxy is using the Default Rockxy Root Certificate")
-        } else {
-            String(localized: "Rockxy is using a Custom Root Certificate")
-        }
-    }
-
-    private func validityLine(prefix: String, date: Date?) -> String {
-        let value = date?.formatted(date: .complete, time: .shortened) ?? String(localized: "Unknown")
-        return "\(prefix) \(value)"
-    }
-}
-
-// MARK: - CertificateListTab
-
-private struct CertificateListTab: View {
-    let title: String
-    let subtitle: String
-    let entries: [CustomCertificateMetadata]
-    let firstColumnTitle: String
-    let emptyMessage: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.title3)
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
-            }
-
-            Table(entries) {
-                TableColumn(firstColumnTitle) { entry in
-                    Text(entry.hostPattern ?? "—")
-                }
-                TableColumn(String(localized: "Certificates")) { entry in
-                    Text(entry.displayName)
-                }
-            }
-            .overlay {
-                if entries.isEmpty {
-                    ContentUnavailableView(emptyMessage, systemImage: "certificate")
-                }
-            }
-            .frame(minHeight: 280)
-        }
-    }
-}
-
 // MARK: - CertificatePreviewItem
 
 struct CertificatePreviewItem {
-    let displayName: String
-    let notValidBefore: Date?
-    let notValidAfter: Date?
-    let fingerprintSHA256: String?
-    let commonName: String?
-    let subjectSummary: String
-    let issuerSummary: String
-    let secCertificate: SecCertificate
-    let secTrust: SecTrust
+    // MARK: Lifecycle
 
     init(metadata: CustomCertificateMetadata) throws {
         try self.init(
@@ -586,7 +682,9 @@ struct CertificatePreviewItem {
         certificate: Certificate,
         displayName: String?,
         fingerprintSHA256: String?
-    ) throws {
+    )
+        throws
+    {
         self.displayName = displayName ?? Self.commonName(from: certificate.subject) ?? String(localized: "Certificate")
         notValidBefore = certificate.notValidBefore
         notValidAfter = certificate.notValidAfter
@@ -597,6 +695,20 @@ struct CertificatePreviewItem {
         secCertificate = try Self.secCertificate(from: certificate)
         secTrust = try Self.secTrust(for: secCertificate)
     }
+
+    // MARK: Internal
+
+    let displayName: String
+    let notValidBefore: Date?
+    let notValidAfter: Date?
+    let fingerprintSHA256: String?
+    let commonName: String?
+    let subjectSummary: String
+    let issuerSummary: String
+    let secCertificate: SecCertificate
+    let secTrust: SecTrust
+
+    // MARK: Private
 
     private static func secCertificate(from certificate: Certificate) throws -> SecCertificate {
         var serializer = DER.Serializer()
@@ -628,7 +740,9 @@ struct CertificatePreviewItem {
 
     private static func commonName(from name: DistinguishedName) -> String? {
         for relativeDistinguishedName in name {
-            for attribute in relativeDistinguishedName where attribute.type == ASN1ObjectIdentifier.NameAttributes.commonName {
+            for attribute in relativeDistinguishedName
+                where attribute.type == ASN1ObjectIdentifier.NameAttributes.commonName
+            {
                 return String(describing: attribute.value)
             }
         }
@@ -668,15 +782,23 @@ struct CertificatePreviewItem {
     }
 }
 
+// MARK: - CertificateNameRow
+
 private struct CertificateNameRow: Identifiable {
     let label: String
     let value: String
 
-    var id: String { "\(label)-\(value)" }
+    var id: String {
+        "\(label)-\(value)"
+    }
 }
+
+// MARK: - CustomCertificatePreviewError
 
 private enum CustomCertificatePreviewError: LocalizedError {
     case invalidCertificate
+
+    // MARK: Internal
 
     var errorDescription: String? {
         switch self {

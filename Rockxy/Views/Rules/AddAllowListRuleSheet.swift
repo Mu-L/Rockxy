@@ -53,22 +53,18 @@ struct AddAllowListRuleSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                Text(isEditing ? String(localized: "Edit Allow Rule") : String(localized: "New Allow Rule"))
+                    .font(
+                        .system(
+                            size: max(15, toolMetrics.bodyFontSize + 2),
+                            weight: .semibold
+                        )
+                    )
+
                 provenanceBanner
 
-                formRow(String(localized: "Name:")) {
-                    TextField("", text: $ruleName, prompt: Text(String(localized: "Untitled")))
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                formRow(String(localized: "Matching Rule:")) {
-                    TextField("", text: $urlPattern, prompt: Text("https://example.com/api/*"))
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                }
-
-                methodAndMatchRow
-
-                conditionalFields
+                ruleDetailsSection
+                captureEffectSection
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)
             .padding(.top, toolMetrics.formVerticalPadding)
@@ -78,15 +74,14 @@ struct AddAllowListRuleSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button {
                     dismiss()
+                } label: {
+                    footerButtonLabel(String(localized: "Cancel"))
                 }
                 .keyboardShortcut(.cancelAction)
 
-                let trimmedName = ruleName.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedURL = urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                Button(isEditing ? String(localized: "Save") : String(localized: "Add")) {
+                Button {
                     // `includeSubpaths` is a wildcard-only display toggle.
                     // Zero it out for regex rules so we never persist stale
                     // state from a user who flipped the match type.
@@ -99,15 +94,17 @@ struct AddAllowListRuleSheet: View {
                         effectiveIncludeSubpaths
                     )
                     dismiss()
+                } label: {
+                    footerButtonLabel(primaryButtonTitle)
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(trimmedURL.isEmpty)
+                .disabled(trimmedURL.isEmpty || validationMessage != nil)
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)
             .padding(.vertical, toolMetrics.controlSpacing)
         }
         .font(toolMetrics.font())
-        .frame(minWidth: max(640, toolMetrics.bodyFontSize * 20 + 380))
+        .frame(minWidth: max(720, toolMetrics.bodyFontSize * 24 + 408))
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -128,8 +125,24 @@ struct AddAllowListRuleSheet: View {
         return false
     }
 
-    private var labelWidth: CGFloat {
-        max(122, toolMetrics.formLabelWidth)
+    private var primaryButtonTitle: String {
+        isEditing ? String(localized: "Save") : String(localized: "Add")
+    }
+
+    private var trimmedName: String {
+        ruleName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedURL: String {
+        urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var validationMessage: String? {
+        AllowListRulePatternValidation.editorMessage(
+            rawPattern: trimmedURL,
+            matchType: matchType,
+            includeSubpaths: includeSubpaths
+        )
     }
 
     private var quickCreateContext: AllowListEditorContext? {
@@ -167,6 +180,9 @@ struct AddAllowListRuleSheet: View {
                 }
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(provenanceDescription(context))
                 Spacer()
             }
             .padding(.horizontal, 8)
@@ -176,29 +192,89 @@ struct AddAllowListRuleSheet: View {
         }
     }
 
-    private var methodAndMatchRow: some View {
-        HStack(spacing: toolMetrics.controlSpacing) {
-            Spacer()
-                .frame(width: labelWidth + toolMetrics.controlSpacing)
-            Picker("", selection: $httpMethod) {
-                ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
-                    Text(method.rawValue).tag(method)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "HTTP Method"))
-            .frame(width: toolMetrics.menuWidth(90))
+    private var ruleDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Rule Details"))
+                .font(toolMetrics.font(weight: .semibold))
 
-            Picker("", selection: $matchType) {
-                ForEach(RuleMatchType.allCases, id: \.self) { type in
-                    Text(type.rawValue).tag(type)
+            VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
+                identityFields
+                methodAndMatchRow
+                conditionalFields
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+        }
+    }
+
+    private var identityFields: some View {
+        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+            fieldGroup(String(localized: "Name")) {
+                TextField(String(localized: "Untitled"), text: $ruleName)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(String(localized: "Rule name"))
+            }
+            .frame(width: max(250, toolMetrics.fieldWidth(250)))
+
+            fieldGroup(String(localized: "URL pattern")) {
+                TextField("https://example.com/api/*", text: $urlPattern)
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font(monospaced: true))
+                    .accessibilityLabel(String(localized: "URL pattern"))
+
+                if let validationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.red)
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .accessibilityLabel(String(localized: "Match Type"))
-            .frame(width: toolMetrics.menuWidth(175))
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var methodAndMatchRow: some View {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
+            inlineField(String(localized: "Method")) {
+                Menu {
+                    ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
+                        Button {
+                            httpMethod = method
+                        } label: {
+                            menuCheckmarkLabel(method.rawValue, isSelected: httpMethod == method)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(httpMethod.rawValue, width: toolMetrics.menuWidth(90))
+                }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "HTTP Method"))
+                .frame(width: toolMetrics.menuWidth(90))
+            }
+
+            inlineField(String(localized: "Match type")) {
+                Menu {
+                    ForEach(RuleMatchType.allCases, id: \.self) { type in
+                        Button {
+                            matchType = type
+                        } label: {
+                            menuCheckmarkLabel(type.rawValue, isSelected: matchType == type)
+                        }
+                    }
+                } label: {
+                    dataEntryMenuLabel(matchType.rawValue, width: toolMetrics.menuWidth(175))
+                }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Match Type"))
+                .frame(width: toolMetrics.menuWidth(175))
+            }
 
             if matchType == .wildcard {
                 Text(String(localized: "Support wildcard * and ?."))
@@ -206,41 +282,140 @@ struct AddAllowListRuleSheet: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Spacer()
         }
     }
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            HStack(spacing: toolMetrics.controlSpacing) {
+            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
+        }
+    }
+
+    private var captureEffectSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(String(localized: "Capture Effect"))
+                .font(toolMetrics.font(weight: .semibold))
+
+            HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(String(localized: "Record matching traffic"))
+                        .font(toolMetrics.font(weight: .medium))
+                    Text(
+                        String(
+                            localized:
+                            "Matching requests appear in the session. Other traffic continues through the proxy without being recorded."
+                        )
+                    )
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                }
+
                 Spacer()
-                    .frame(width: labelWidth + toolMetrics.controlSpacing)
-                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
+            }
+            .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
+            .padding(.vertical, toolMetrics.formVerticalPadding - 2)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
         }
     }
 
-    private func formRow(
+    private func inlineField(
         _ label: String,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
-        HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
+        HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
             Text(label)
                 .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: labelWidth, alignment: .trailing)
-                .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 4) {
-                content()
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(height: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func fieldGroup(
+        _ label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(toolMetrics.font())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            content()
+                .font(toolMetrics.font())
+                .controlSize(.regular)
+                .frame(minHeight: toolMetrics.formControlHeight)
+        }
+    }
+
+    private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .frame(width: width, height: toolMetrics.formControlHeight, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func menuCheckmarkLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 7) {
+            if isSelected {
+                Image(systemName: "checkmark")
             }
-            .frame(minHeight: toolMetrics.formControlHeight)
+            Text(title)
+        }
+    }
+
+    private func provenanceDescription(_ context: AllowListEditorContext) -> String {
+        switch context.origin {
+        case .selectedTransaction:
+            if let method = context.sourceMethod {
+                return String(localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")")
+            }
+            return String(localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")")
+        case .domainQuickCreate:
+            return String(localized: "Created from domain: \(context.sourceHost)")
         }
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private func footerButtonLabel(_ title: String) -> some View {
+        Text(title)
+            .frame(
+                width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
+                height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+            )
     }
 }

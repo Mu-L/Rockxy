@@ -1,9 +1,47 @@
 import SwiftUI
 
+// MARK: - SettingsPane
+
+/// Shared scroll surface for standard Settings panes.
+/// Keeping the outer insets here prevents individual categories from drifting
+/// when they are hosted inside the common sidebar/content shell.
+struct SettingsPane<Content: View>: View {
+    // MARK: Lifecycle
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    // MARK: Internal
+
+    let content: Content
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: settingsMetrics.sectionSpacing) {
+                content
+            }
+            .padding(.horizontal, settingsMetrics.contentPadding)
+            .padding(.vertical, settingsMetrics.paneContentPadding)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var settingsMetrics: SettingsDisplayMetrics {
+        SettingsDisplayMetrics(appMetrics: appMetrics)
+    }
+}
+
 // MARK: - SettingsSectionCard
 
-/// Shared visual grouping for dense Settings panes.
-/// Matches the section title, inset card, and field alignment used by General Settings.
+/// Shared grouping for dense Settings panes.
+/// A restrained native `GroupBox` — the section title is the group label and
+/// fields align via `SettingsFieldRow` / `SettingsIndentedContent`.
 struct SettingsSectionCard<Content: View>: View {
     // MARK: Lifecycle
 
@@ -21,29 +59,15 @@ struct SettingsSectionCard<Content: View>: View {
     let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(settingsMetrics.font(weight: .medium))
-
-            VStack(alignment: .leading, spacing: 14) {
+        GroupBox {
+            VStack(alignment: .leading, spacing: settingsMetrics.sectionContentSpacing) {
                 content
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 9)
-                            .fill(Color.primary.opacity(0.035))
-                    }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 9)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.62), lineWidth: 0.75)
-            }
-            .shadow(color: .black.opacity(0.07), radius: 1, y: 1)
+            .padding(.top, 4)
+        } label: {
+            Text(title)
+                .font(settingsMetrics.font(weight: .medium))
         }
     }
 

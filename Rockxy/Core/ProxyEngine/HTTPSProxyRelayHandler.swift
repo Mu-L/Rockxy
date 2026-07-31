@@ -150,7 +150,6 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             nil
         }
         let urlString = "https://\(host)\(head.uri)"
-        // swiftlint:disable:next force_unwrapping
         let fallbackURL = URL(string: "https://localhost/")!
         let parsedURL = URL(string: urlString) ?? URL(string: "https://\(host)/") ?? fallbackURL
         var requestData = HTTPRequestData(
@@ -890,13 +889,16 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         }
 
         let urlString = "https://\(host)\(head.uri)"
+        let bodyProjection = BreakpointRequestData.editableBodyProjection(from: requestData.body)
         let breakpointData = BreakpointRequestData(
             method: head.method.rawValue,
             url: urlString,
             headers: requestData.headers.map { EditableHeader(name: $0.name, value: $0.value) },
-            body: requestData.body.flatMap { String(data: $0, encoding: .utf8) } ?? "",
+            body: bodyProjection.text,
             statusCode: 200,
-            phase: .request
+            phase: .request,
+            isBodyEditable: bodyProjection.isEditable,
+            fixedHTTPSAuthority: host
         )
 
         let eventLoop = context.eventLoop

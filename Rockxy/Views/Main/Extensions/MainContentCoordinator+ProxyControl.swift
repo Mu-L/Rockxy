@@ -65,11 +65,19 @@ extension MainContentCoordinator {
                     )
                 }
 
-                await configureProxy(port: resolvedPort)
+                // Configure with the exact settings snapshot resolved above so
+                // the running server cannot drift from a settings reload mid-start.
+                await configureProxy(port: resolvedPort, settings: settings)
 
                 try await proxyServer.start()
                 isProxyRunning = true
                 proxyStartedAt = Date()
+                runtimeListenerSnapshot = ProxyListenerSnapshot(
+                    requestedPort: settings.proxyPort,
+                    resolvedPort: resolvedPort,
+                    listenAddress: settings.effectiveListenAddress,
+                    autoSelectPort: settings.autoSelectPort
+                )
                 startBandwidthTimer()
                 startLogCapture()
 
@@ -143,6 +151,7 @@ extension MainContentCoordinator {
             stopBandwidthTimer()
             resetInstantaneousSpeeds()
             proxyStartedAt = nil
+            runtimeListenerSnapshot = nil
             activeProxyPort = AppSettingsStorage.load().proxyPort
             NotificationCenter.default.post(name: .proxyDidStop, object: nil)
             Self.logger.info("Proxy stopped")
@@ -267,7 +276,6 @@ extension MainContentCoordinator {
         errorCount = 0
         sessionProvenance = nil
         importPreview = nil
-        showExportScope = false
         exportScopeContext = nil
         activeToast = nil
         clearAllWorkspaces()
@@ -295,8 +303,8 @@ extension MainContentCoordinator {
 
     // MARK: - Proxy Configuration
 
-    func configureProxy(port: Int? = nil) async {
-        let settings = AppSettingsStorage.load()
+    func configureProxy(port: Int? = nil, settings: AppSettings? = nil) async {
+        let settings = settings ?? AppSettingsStorage.load()
         let resolvedPort = port ?? settings.proxyPort
         let manager = sessionManager
 
