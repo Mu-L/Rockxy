@@ -113,13 +113,13 @@ struct GitHubSettingsTab: View {
             alignedRow(label: String(localized: "Publish as:")) {
                 VStack(alignment: .leading, spacing: 14) {
                     radioRow(
-                        title: String(localized: "Private Gist"),
-                        subtitle: String(localized: "Only the owner or colleagues who have a link can access the Gist."),
+                        title: GitHubGistVisibility.secret.title,
+                        subtitle: GitHubGistVisibility.secret.sharingDescription,
                         value: .secret
                     )
                     radioRow(
-                        title: String(localized: "Public Gist"),
-                        subtitle: String(localized: "Anyone can access the Gist."),
+                        title: GitHubGistVisibility.public.title,
+                        subtitle: GitHubGistVisibility.public.sharingDescription,
                         value: .public
                     )
 
