@@ -328,10 +328,11 @@ struct ContextDetailsView: View {
                     .disabled(selectedTransactions.count != 2)
                     Spacer()
                     Button {
-                        coordinator.presentExport(format: .har)
+                        coordinator.presentSelectedExport(format: .har)
                     } label: {
                         Label(String(localized: "Export Selection"), systemImage: "square.and.arrow.up")
                     }
+                    .disabled(selectedTransactions.isEmpty)
                 }
                 .controlSize(.small)
             }

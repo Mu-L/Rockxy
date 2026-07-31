@@ -236,7 +236,6 @@ final class MainContentCoordinator {
     // MARK: - UI State — Import/Export
 
     var importPreview: ImportPreview?
-    var showExportScope = false
     var exportScopeContext: ExportScopeContext?
     var gistPublishContext: GistPublishContext?
     var sessionProvenance: SessionProvenance?

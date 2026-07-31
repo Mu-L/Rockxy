@@ -113,12 +113,15 @@ struct RequestTableRefreshTests {
         coordinator.transactions = [TestFixtures.makeTransaction()]
         coordinator.activeSortDescriptors = [NSSortDescriptor(key: "url", ascending: true)]
         coordinator.recomputeFilteredTransactions()
+        coordinator.presentExport(format: .har)
+        #expect(coordinator.exportScopeContext != nil)
 
         let sortBefore = coordinator.activeSortDescriptors
 
         await coordinator.clearSession()
 
         #expect(coordinator.filteredRows.isEmpty)
+        #expect(coordinator.exportScopeContext == nil)
         #expect(!coordinator.activeSortDescriptors.isEmpty)
         #expect(coordinator.activeSortDescriptors.count == sortBefore.count)
         #expect(coordinator.activeSortDescriptors.first?.key == "url")
@@ -575,13 +578,129 @@ struct RequestTableRefreshTests {
         coordinator.selectedTransactionIDs = []
 
         coordinator.presentExport(format: .har)
-        #expect(coordinator.exportScopeContext?.selectedCount == 0)
+        #expect(coordinator.exportScopeContext?.count(for: .selected) == 0)
         #expect(coordinator.exportScopeContext?.initialScope != .selected)
 
         coordinator.workspaceStore.selectWorkspace(id: firstWorkspaceID)
         coordinator.presentExport(format: .har)
-        #expect(coordinator.exportScopeContext?.selectedCount == 1)
+        #expect(coordinator.exportScopeContext?.count(for: .selected) == 1)
         #expect(coordinator.exportScopeContext?.initialScope == .selected)
+    }
+
+    @Test("Export plans keep the reviewed all-scope membership and order")
+    func exportPlanFreezesAllScopeMembership() throws {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        let second = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        let appended = TestFixtures.makeTransaction(url: "https://gamma.example.com/3")
+        coordinator.transactions = [first, second]
+        coordinator.recomputeFilteredTransactions()
+
+        let context = coordinator.makeExportScopeContext(format: .har)
+        coordinator.transactions.append(appended)
+
+        let plan = try #require(coordinator.makeExportExecutionPlan(context: context, scope: .all))
+        #expect(plan.reviewedSource.map(\.id) == [first.id, second.id])
+        #expect(plan.eligibleTransactions.map(\.id) == [first.id, second.id])
+    }
+
+    @Test("Export plans keep the origin workspace filter after workspace and filter changes")
+    func exportPlanFreezesFilteredScope() throws {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://api.example.com/1")
+        let second = TestFixtures.makeTransaction(url: "https://api.example.com/2")
+        coordinator.transactions = [first, second]
+        coordinator.filterCriteria.searchText = "api.example.com"
+        coordinator.recomputeFilteredTransactions()
+
+        let originWorkspaceID = coordinator.activeWorkspace.id
+        let context = coordinator.makeExportScopeContext(format: .har)
+        #expect(context.originWorkspaceID == originWorkspaceID)
+        #expect(context.hasActiveFilter)
+        #expect(context.isEnabled(.filtered))
+
+        coordinator.filterCriteria = .empty
+        let otherWorkspace = coordinator.workspaceStore.createWorkspace(title: "Other")
+        coordinator.workspaceStore.selectWorkspace(id: otherWorkspace.id)
+        coordinator.filteredTransactions = []
+
+        let plan = try #require(coordinator.makeExportExecutionPlan(context: context, scope: .filtered))
+        #expect(plan.reviewedSource.map(\.id) == [first.id, second.id])
+    }
+
+    @Test("OpenAPI export excludes requests that become eligible after review")
+    func openAPIExportFreezesIneligibleMembership() throws {
+        let coordinator = MainContentCoordinator()
+        let reviewedEligible = TestFixtures.makeTransaction(url: "https://api.example.com/eligible")
+        let reviewedIneligible = TestFixtures.makeTransaction(
+            url: "https://api.example.com/websocket",
+            statusCode: 101
+        )
+        coordinator.transactions = [reviewedEligible, reviewedIneligible]
+        coordinator.recomputeFilteredTransactions()
+
+        let context = coordinator.makeExportScopeContext(format: .openAPIYAML)
+        reviewedIneligible.response = TestFixtures.makeResponse(statusCode: 200)
+
+        let plan = try #require(coordinator.makeExportExecutionPlan(context: context, scope: .all))
+        #expect(plan.reviewedSource.map(\.id) == [reviewedEligible.id, reviewedIneligible.id])
+        #expect(plan.eligibleTransactions.map(\.id) == [reviewedEligible.id])
+        #expect(plan.skippedCount == 1)
+    }
+
+    @Test("OpenAPI export reconciles requests that become ineligible after review")
+    func openAPIExportReconcilesRuntimeIneligibility() throws {
+        let coordinator = MainContentCoordinator()
+        let stillEligible = TestFixtures.makeTransaction(url: "https://api.example.com/stable")
+        let becomesIneligible = TestFixtures.makeTransaction(url: "https://api.example.com/websocket")
+        coordinator.transactions = [stillEligible, becomesIneligible]
+        coordinator.recomputeFilteredTransactions()
+
+        let context = coordinator.makeExportScopeContext(format: .openAPIYAML)
+        becomesIneligible.response = TestFixtures.makeResponse(statusCode: 101)
+
+        let plan = try #require(coordinator.makeExportExecutionPlan(context: context, scope: .all))
+        let result = try OpenAPIExporter().export(
+            transactions: plan.eligibleTransactions,
+            options: OpenAPIExportOptions(format: .yaml)
+        )
+        let reconciledSkippedCount = plan.skippedCount + result.skippedTransactionCount
+
+        #expect(plan.reviewedSource.map(\.id) == [stillEligible.id, becomesIneligible.id])
+        #expect(result.exportedTransactionCount == 1)
+        #expect(reconciledSkippedCount == 1)
+        #expect(result.exportedTransactionCount + reconciledSkippedCount == plan.reviewedSource.count)
+    }
+
+    @Test("Selection-locked export plans fail closed and keep the reviewed selection")
+    func selectionLockedExportPlanFailsClosed() throws {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        let second = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        coordinator.transactions = [first, second]
+        coordinator.recomputeFilteredTransactions()
+        coordinator.selectedTransactionIDs = [second.id]
+
+        let context = coordinator.makeExportScopeContext(format: .har, restrictsToSelection: true)
+        coordinator.selectedTransactionIDs = [first.id]
+
+        #expect(coordinator.makeExportExecutionPlan(context: context, scope: .all).map { _ in true } == nil)
+        #expect(coordinator.makeExportExecutionPlan(context: context, scope: .filtered).map { _ in true } == nil)
+        let plan = try #require(coordinator.makeExportExecutionPlan(context: context, scope: .selected))
+        #expect(plan.reviewedSource.map(\.id) == [second.id])
+    }
+
+    @Test("An empty selection never falls back to all traffic")
+    func emptySelectionExportFailsClosed() {
+        let coordinator = MainContentCoordinator()
+        coordinator.transactions = [TestFixtures.makeTransaction()]
+        coordinator.recomputeFilteredTransactions()
+        coordinator.selectedTransactionIDs = []
+
+        let context = coordinator.makeExportScopeContext(format: .har, restrictsToSelection: true)
+
+        #expect(coordinator.makeExportExecutionPlan(context: context, scope: .selected).map { _ in true } == nil)
+        #expect(coordinator.makeExportExecutionPlan(context: context, scope: .all).map { _ in true } == nil)
     }
 
     // MARK: - Persisted Delete Durability

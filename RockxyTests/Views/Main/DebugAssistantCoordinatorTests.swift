@@ -560,7 +560,7 @@ struct DebugAssistantCoordinatorTests {
         #expect(result.blockedToolCallCount == 1)
         #expect(ComposeStore.shared.draftVersion == composeVersion)
         #expect(ComposeStore.shared.pendingTransaction == nil)
-        #expect(!coordinator.showExportScope)
+        #expect(coordinator.exportScopeContext == nil)
         #expect(coordinator.gistPublishContext == nil)
     }
 
@@ -588,10 +588,11 @@ struct DebugAssistantCoordinatorTests {
         #expect(ComposeStore.shared.draftVersion == composeVersion &+ 1)
 
         coordinator.performUserInitiatedDebugAssistantHandoff(.export, result: result)
-        #expect(coordinator.showExportScope)
+        #expect(coordinator.exportScopeContext != nil)
         #expect(coordinator.exportScopeContext?.initialScope == .selected)
         #expect(coordinator.exportScopeContext?.restrictsToSelection == true)
         #expect(coordinator.exportScopeContext?.isEnabled(.all) == false)
+        #expect(coordinator.exportScopeContext?.selectedSnapshot.orderedIDs == [transaction.id])
 
         coordinator.performUserInitiatedDebugAssistantHandoff(.share, result: result)
         #expect(coordinator.gistPublishContext?.transactions.map(\.id) == [transaction.id])

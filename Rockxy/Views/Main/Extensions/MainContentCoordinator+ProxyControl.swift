@@ -276,7 +276,6 @@ extension MainContentCoordinator {
         errorCount = 0
         sessionProvenance = nil
         importPreview = nil
-        showExportScope = false
         exportScopeContext = nil
         activeToast = nil
         clearAllWorkspaces()
