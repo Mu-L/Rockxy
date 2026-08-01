@@ -6,36 +6,41 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.31.0 (build 48)</title>
-      <pubDate>Fri, 24 Jul 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-07-24T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.32.0 (build 49)</title>
+      <pubDate>Sat, 01 Aug 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-08-01T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.31.0/Rockxy-0.31.0-48.dmg"
-        sparkle:version="48"
-        sparkle:shortVersionString="0.31.0"
-        sparkle:edSignature="90L6alyTaxwxRt4qVd8pyT/HwE90dHF/kz8CfTbFSvNrsYnY3TLUOPuZ3wSXkpBbKhQphzyLMaPbXSZxDt3ZDw=="
-        length="31903032"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.32.0/Rockxy-0.32.0-49.dmg"
+        sparkle:version="49"
+        sparkle:shortVersionString="0.32.0"
+        sparkle:edSignature="RLkDLHVmxAiN2OBXb84MS5R71gQe4CBkuB33JK17VG3/wWNq0RuW0IZ4EKsjyCkys+5Rqpc8oClLhxyMHmGyCQ=="
+        length="33811967"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.31.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.32.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
   <li>Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.</li>
-  <li>Added built-in local analysis and optional configured model workflows, with a review step before selected traffic is shared.</li>
+  <li>Added privacy-aware local analysis and optional configured model workflows, with a review step before selected traffic is shared.</li>
   <li>Added secure Babylon pairing and capture intake for supported companion traffic sessions.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
   <li>Kept investigations anchored to the exact request being reviewed.</li>
-  <li>Prevented provider traffic from being recaptured into the active session.</li>
+  <li>Prevented configured provider traffic from being captured back into the active session.</li>
+  <li>Fixed certificate-share and Developer Setup probe lifecycle races so Stop reliably prevents an in-flight server start from publishing afterward.</li>
   <li>Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.</li>
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Rebuilt the workspace around native macOS split views for more stable sidebar, request list, Context Dock, and inspector sizing.</li>
-  <li>Expanded local model setup, provider configuration, context limits, and response-review controls.</li>
-  <li>Refined workspace typography, mode switching, inspector persistence, and narrow-window actions.</li>
+  <li>Rebuilt the workspace around native macOS split views for steadier sidebar, request list, Context Dock, and inspector resizing.</li>
+  <li>Refined Settings with a stable native sidebar width and correctly aligned titlebar toggle.</li>
+  <li>Restored the Workspace login item beside the Start/Stop controls and refreshed its login flow with native macOS controls.</li>
+  <li>Clarified that Workspace connection and Pro license activation are separate states, keeping their displayed status synchronized.</li>
+  <li>Reworked Developer Setup into a compact, target-aware workflow with contextual guidance, resizable windows, clearer actions, and accurate launch results.</li>
+  <li>Refined license activation, Workspace sharing, Android automation, export review, and publishing confirmation flows for consistent keyboard and accessibility behavior.</li>
+  <li>Kept advanced model, Web3, and gRPC inspector tabs available at the end of the inspector tab row.</li>
 </ul>
       ]]></description>
     </item>

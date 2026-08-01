@@ -61,25 +61,30 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.31.0** — 2026-07-24
+**v0.32.0** — 2026-08-01
 
 ### Added
 
 - Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.
-- Added built-in local analysis and optional configured model workflows, with a review step before selected traffic is shared.
+- Added privacy-aware local analysis and optional configured model workflows, with a review step before selected traffic is shared.
 - Added secure Babylon pairing and capture intake for supported companion traffic sessions.
 
 ### Fixed
 
 - Kept investigations anchored to the exact request being reviewed.
-- Prevented provider traffic from being recaptured into the active session.
+- Prevented configured provider traffic from being captured back into the active session.
+- Fixed certificate-share and Developer Setup probe lifecycle races so Stop reliably prevents an in-flight server start from publishing afterward.
 - Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.
 
 ### Changed
 
-- Rebuilt the workspace around native macOS split views for more stable sidebar, request list, Context Dock, and inspector sizing.
-- Expanded local model setup, provider configuration, context limits, and response-review controls.
-- Refined workspace typography, mode switching, inspector persistence, and narrow-window actions.
+- Rebuilt the workspace around native macOS split views for steadier sidebar, request list, Context Dock, and inspector resizing.
+- Refined Settings with a stable native sidebar width and correctly aligned titlebar toggle.
+- Restored the Workspace login item beside the Start/Stop controls and refreshed its login flow with native macOS controls.
+- Clarified that Workspace connection and Pro license activation are separate states, keeping their displayed status synchronized.
+- Reworked Developer Setup into a compact, target-aware workflow with contextual guidance, resizable windows, clearer actions, and accurate launch results.
+- Refined license activation, Workspace sharing, Android automation, export review, and publishing confirmation flows for consistent keyboard and accessibility behavior.
+- Kept advanced model, Web3, and gRPC inspector tabs available at the end of the inspector tab row.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
