@@ -96,6 +96,10 @@ struct CenterContentView: View {
                     "\($0.request.method) \($0.request.path)"
                 },
                 sessionProvenance: coordinator.sessionProvenance,
+                activeRules: coordinator.rules,
+                mapLocalToolEnabled: mapLocalToolEnabled,
+                mapRemoteToolEnabled: mapRemoteToolEnabled,
+                breakpointToolEnabled: breakpointToolEnabled,
                 onClear: {
                     Task { @MainActor in
                         await coordinator.clearSession()
@@ -138,6 +142,9 @@ struct CenterContentView: View {
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false
+    @AppStorage("mapLocalToolEnabled") private var mapLocalToolEnabled = true
+    @AppStorage("mapRemoteToolEnabled") private var mapRemoteToolEnabled = true
+    @AppStorage("breakpointToolEnabled") private var breakpointToolEnabled = true
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
     @State private var selectedIDs: Set<UUID> = []

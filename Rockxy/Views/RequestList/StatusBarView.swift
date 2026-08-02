@@ -108,6 +108,144 @@ struct FooterActionDescriptor: Identifiable, Equatable {
     }
 }
 
+// MARK: - FooterMutationIndicator
+
+/// A live active-mutation indicator for the footer: shows a rule tool category
+/// (Map Local, Map Remote, Breakpoints) together with its enabled-rule count.
+/// Purely derived from `[ProxyRule]` plus the tool-level master switches so the
+/// footer can expose active mutation state without displacing traffic.
+struct FooterMutationIndicator: Identifiable, Equatable {
+    // MARK: Lifecycle
+
+    init(category: Category, count: Int) {
+        id = category
+        self.count = count
+    }
+
+    // MARK: Internal
+
+    enum Category: String, CaseIterable {
+        case mapLocal
+        case mapRemote
+        case breakpoint
+
+        // MARK: Internal
+
+        /// The `RuleAction.toolCategory` value that maps to this indicator.
+        var toolCategory: String {
+            switch self {
+            case .mapLocal: "mapLocal"
+            case .mapRemote: "mapRemote"
+            case .breakpoint: "breakpoint"
+            }
+        }
+
+        /// The tool-window ID opened when the indicator is activated.
+        var windowID: String {
+            switch self {
+            case .mapLocal: "mapLocal"
+            case .mapRemote: "mapRemote"
+            case .breakpoint: "breakpointRules"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .mapLocal: String(localized: "Map Local")
+            case .mapRemote: String(localized: "Map Remote")
+            case .breakpoint: String(localized: "Breakpoints")
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .mapLocal: "folder.badge.gearshape"
+            case .mapRemote: "arrow.triangle.branch"
+            case .breakpoint: "pause.circle"
+            }
+        }
+    }
+
+    let id: Category
+    let count: Int
+
+    var title: String {
+        id.title
+    }
+
+    var systemImage: String {
+        id.systemImage
+    }
+
+    var windowID: String {
+        id.windowID
+    }
+
+    var help: String {
+        switch id {
+        case .mapLocal:
+            if count == 1 {
+                return String(localized: "1 active Map Local rule. Open Map Local.")
+            }
+            return String(localized: "\(count) active Map Local rules. Open Map Local.")
+        case .mapRemote:
+            if count == 1 {
+                return String(localized: "1 active Map Remote rule. Open Map Remote.")
+            }
+            return String(localized: "\(count) active Map Remote rules. Open Map Remote.")
+        case .breakpoint:
+            if count == 1 {
+                return String(localized: "1 active Breakpoint rule. Open Breakpoint Rules.")
+            }
+            return String(localized: "\(count) active Breakpoint rules. Open Breakpoint Rules.")
+        }
+    }
+
+    var accessibilityLabel: String {
+        String(localized: "\(id.title), \(count) active rules")
+    }
+}
+
+// MARK: - FooterMutationIndicatorBuilder
+
+/// Pure builder that derives the ordered footer mutation indicators from the
+/// current rule set and the three tool-level master switches. A category is
+/// surfaced only when its master switch is enabled AND it has at least one
+/// enabled rule. Order is always Map Local, Map Remote, then Breakpoint.
+enum FooterMutationIndicatorBuilder {
+    static func indicators(
+        rules: [ProxyRule],
+        mapLocalToolEnabled: Bool,
+        mapRemoteToolEnabled: Bool,
+        breakpointToolEnabled: Bool
+    )
+        -> [FooterMutationIndicator]
+    {
+        var counts: [String: Int] = [:]
+        for rule in rules where rule.isEnabled {
+            counts[rule.action.toolCategory, default: 0] += 1
+        }
+
+        let toolSwitches: [FooterMutationIndicator.Category: Bool] = [
+            .mapLocal: mapLocalToolEnabled,
+            .mapRemote: mapRemoteToolEnabled,
+            .breakpoint: breakpointToolEnabled,
+        ]
+
+        let order: [FooterMutationIndicator.Category] = [.mapLocal, .mapRemote, .breakpoint]
+        return order.compactMap { category in
+            guard toolSwitches[category] == true else {
+                return nil
+            }
+            let count = counts[category.toolCategory, default: 0]
+            guard count > 0 else {
+                return nil
+            }
+            return FooterMutationIndicator(category: category, count: count)
+        }
+    }
+}
+
 // MARK: - FooterToolingButton
 
 private struct FooterToolingButton: View {
@@ -132,6 +270,65 @@ private struct FooterToolingButton: View {
     // MARK: Private
 
     @State private var isHovered = false
+}
+
+// MARK: - FooterMutationIndicatorButton
+
+/// Compact active-mutation chip rendered in the footer. Shows the tool category
+/// plus its live enabled-rule count, and opens the matching tool window when
+/// activated. The parent group chooses the titled or compact form based on the
+/// horizontal space available in the existing fixed-height footer.
+private struct FooterMutationIndicatorButton: View {
+    // MARK: Internal
+
+    let indicator: FooterMutationIndicator
+    let showsTitle: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            chip
+        }
+        .buttonStyle(.plain)
+        .help(indicator.help)
+        .accessibilityLabel(indicator.accessibilityLabel)
+        .onHover { isHovered = $0 }
+    }
+
+    // MARK: Private
+
+    @State private var isHovered = false
+    @Environment(\.appUIDisplayMetrics) private var metrics
+
+    private var indicatorColor: Color {
+        switch indicator.id {
+        case .mapLocal, .mapRemote:
+            Color(nsColor: .systemOrange)
+        case .breakpoint:
+            Color(nsColor: .systemPurple)
+        }
+    }
+
+    private var chip: some View {
+        HStack(spacing: 4) {
+            Image(systemName: indicator.systemImage)
+            if showsTitle {
+                Text(indicator.title)
+            }
+            Text("\(indicator.count)")
+                .monospacedDigit()
+        }
+        .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+        .foregroundStyle(indicatorColor)
+        .lineLimit(1)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(indicatorColor.opacity(isHovered ? 0.24 : 0.14), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(indicatorColor.opacity(isHovered ? 0.55 : 0.32), lineWidth: 0.5)
+        }
+    }
 }
 
 // MARK: - FooterProxyOverrideButton
@@ -267,7 +464,7 @@ private struct FooterPrimaryButton: View {
     }
 }
 
-// MARK: - StatusBarView
+// MARK: - StatusBarRequestSummary
 
 enum StatusBarRequestSummary {
     static func text(
@@ -291,6 +488,8 @@ enum StatusBarRequestSummary {
         return String(localized: "\(visibleCount) requests")
     }
 }
+
+// MARK: - StatusBarView
 
 /// Bottom status bar showing request counts, bandwidth stats (upload/download speed),
 /// and quick-action buttons for clearing, toggling filters, and auto-select mode.
@@ -316,6 +515,10 @@ struct StatusBarView: View {
     var proxyStartedAt: Date?
     var selectedRequestInfo: String?
     var sessionProvenance: SessionProvenance?
+    var activeRules: [ProxyRule] = []
+    var mapLocalToolEnabled: Bool = true
+    var mapRemoteToolEnabled: Bool = true
+    var breakpointToolEnabled: Bool = true
 
     var onClear: () -> Void = {}
     var onFilter: () -> Void = {}
@@ -327,6 +530,7 @@ struct StatusBarView: View {
         WorkspaceFooterBar(horizontalPadding: 12) {
             HStack(spacing: 0) {
                 quickTools
+                mutationIndicators
                 Spacer(minLength: 24)
                 centerStatus
                 Spacer(minLength: 24)
@@ -348,6 +552,72 @@ struct StatusBarView: View {
 
     private var formattedDataSize: String {
         ByteCountFormatter.string(fromByteCount: totalDataSize, countStyle: .file)
+    }
+
+    private var mutationIndicatorList: [FooterMutationIndicator] {
+        FooterMutationIndicatorBuilder.indicators(
+            rules: activeRules,
+            mapLocalToolEnabled: mapLocalToolEnabled,
+            mapRemoteToolEnabled: mapRemoteToolEnabled,
+            breakpointToolEnabled: breakpointToolEnabled
+        )
+    }
+
+    @ViewBuilder private var mutationIndicators: some View {
+        let indicators = mutationIndicatorList
+        if !indicators.isEmpty {
+            HStack(spacing: 6) {
+                Divider()
+                    .frame(height: 12)
+                ViewThatFits(in: .horizontal) {
+                    mutationIndicatorRow(indicators, showsTitles: true)
+                    mutationIndicatorRow(indicators, showsTitles: false)
+                    mutationIndicatorMenu(indicators)
+                }
+            }
+            .padding(.leading, 8)
+            .layoutPriority(1)
+        }
+    }
+
+    private func mutationIndicatorRow(
+        _ indicators: [FooterMutationIndicator],
+        showsTitles: Bool
+    ) -> some View {
+        HStack(spacing: 6) {
+            ForEach(indicators) { indicator in
+                FooterMutationIndicatorButton(indicator: indicator, showsTitle: showsTitles) {
+                    onOpenToolWindow(indicator.windowID)
+                }
+            }
+        }
+    }
+
+    private func mutationIndicatorMenu(_ indicators: [FooterMutationIndicator]) -> some View {
+        Menu {
+            ForEach(indicators) { indicator in
+                Button {
+                    onOpenToolWindow(indicator.windowID)
+                } label: {
+                    Label("\(indicator.title)  \(indicator.count)", systemImage: indicator.systemImage)
+                }
+            }
+        } label: {
+            Label(
+                "\(indicators.reduce(0) { $0 + $1.count })",
+                systemImage: "bolt.horizontal.circle"
+            )
+            .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+            .foregroundStyle(Color(nsColor: .systemOrange))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Color(nsColor: .systemOrange).opacity(0.14), in: Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(String(localized: "Active mutation rules"))
+        .accessibilityLabel(String(localized: "Active mutation rules"))
     }
 
     private var centerStatus: some View {
