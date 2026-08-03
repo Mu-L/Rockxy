@@ -102,12 +102,14 @@ struct ActiveFilterSummaryBar: View {
                         )
                     }
 
-                    if !coordinator.filterCriteria.activeProtocolFilters.isEmpty {
-                        let count = coordinator.filterCriteria.activeProtocolFilters.count
+                    ForEach(
+                        ProtocolFilterSelection.summaryFilters(in: coordinator.filterCriteria.activeProtocolFilters),
+                        id: \.self
+                    ) { filter in
                         FilterChip(
-                            label: String(localized: "\(count) protocol filters"),
+                            label: filter.displayName,
                             onRemove: {
-                                coordinator.filterCriteria.activeProtocolFilters.removeAll()
+                                coordinator.filterCriteria.activeProtocolFilters.remove(filter)
                                 coordinator.recomputeFilteredTransactions()
                             }
                         )
