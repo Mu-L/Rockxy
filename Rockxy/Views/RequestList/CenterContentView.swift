@@ -135,8 +135,6 @@ struct CenterContentView: View {
 
     // MARK: Private
 
-    private static let minimumBottomTableHeight: CGFloat = 200
-    private static let minimumBottomInspectorHeight: CGFloat = 320
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
         "workspaceBottomInspectorSplit.v1"
     )
@@ -188,12 +186,16 @@ struct CenterContentView: View {
         )
     }
 
+    private var bottomInspectorLayoutMetrics: BottomInspectorLayoutMetrics {
+        BottomInspectorLayoutMetrics(appMetrics: displayMetrics)
+    }
+
     private var inspectorWorkspace: some View {
         NativeBottomInspectorSplitView(
             isInspectorPresented: bottomInspectorVisibility,
             autosaveName: Self.bottomInspectorSplitAutosaveName,
-            primaryMinimumHeight: Self.minimumBottomTableHeight,
-            inspectorMinimumHeight: Self.minimumBottomInspectorHeight
+            primaryMinimumHeight: bottomInspectorLayoutMetrics.requestListMinimumHeight,
+            inspectorMinimumHeight: bottomInspectorLayoutMetrics.inspectorMinimumHeight
         ) {
             tableContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
