@@ -79,6 +79,15 @@ struct ActiveFilterSummaryBar: View {
                         }
                     }
 
+                    if coordinator.filterCriteria.sidebarScope == .notes {
+                        FilterChip(label: String(localized: "Notes")) {
+                            coordinator.filterCriteria.sidebarScope = .allTraffic
+                            coordinator.filterCriteria.exactTransactionID = nil
+                            coordinator.sidebarSelection = nil
+                            coordinator.recomputeFilteredTransactions()
+                        }
+                    }
+
                     if coordinator.filterCriteria.isSearchEnabled,
                        !coordinator.filterCriteria.searchText.isEmpty
                     {
@@ -145,6 +154,7 @@ struct ActiveFilterSummaryBar: View {
             || coordinator.filterCriteria.sidebarApp != nil
             || coordinator.filterCriteria.sidebarScope == .saved
             || coordinator.filterCriteria.sidebarScope == .pinned
+            || coordinator.filterCriteria.sidebarScope == .notes
             || (coordinator.filterCriteria.isSearchEnabled && !coordinator.filterCriteria.searchText.isEmpty)
             || !coordinator.filterCriteria.activeProtocolFilters.isEmpty
             || (coordinator.isFilterBarVisible

@@ -921,7 +921,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Add Comment…")) {
+            Button(String(localized: "Add Note…")) {
                 actions?.addComment()
             }
             .disabled(actions?.hasSelectedTransaction != true)

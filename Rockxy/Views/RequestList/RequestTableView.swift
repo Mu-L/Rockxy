@@ -1548,7 +1548,7 @@ extension RequestTableView {
 
         private func buildAnnotationGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Add Comment…"), action: #selector(handleAddComment(_:)),
+                String(localized: "Add Note…"), action: #selector(handleAddComment(_:)),
                 key: "l", symbol: "pencil.line", transaction: transaction
             ))
 

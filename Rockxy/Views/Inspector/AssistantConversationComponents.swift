@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 
+// MARK: - AssistantClipboard
+
 enum AssistantClipboard {
     static func copy(_ text: String) {
         let pasteboard = NSPasteboard.general
@@ -12,34 +14,28 @@ enum AssistantClipboard {
 // MARK: - AssistantResponseCard
 
 struct AssistantResponseCard<Content: View>: View {
-    let content: Content
+    // MARK: Internal
 
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "waveform.badge.magnifyingglass")
                     .foregroundStyle(.secondary)
                 Text(String(localized: "Rockxy Assistant"))
-                    .font(metrics.swiftUIFont(size: metrics.metadataFontSize, weight: .semibold))
+                    .font(.system(size: metrics.metadataFontSize, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
             content
         }
-        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9))
-        .overlay {
-            RoundedRectangle(cornerRadius: 9)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "AI Assistant Response"))
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
@@ -47,6 +43,8 @@ struct AssistantResponseCard<Content: View>: View {
 // MARK: - AssistantProgressRow
 
 struct AssistantProgressRow: View {
+    // MARK: Internal
+
     let title: String
     var systemImage: String?
     var color = Color.secondary
@@ -62,10 +60,12 @@ struct AssistantProgressRow: View {
                     .foregroundStyle(color)
             }
             Text(title)
-                .font(metrics.swiftUIFont(size: metrics.secondaryFontSize, weight: .medium))
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
             Spacer(minLength: 0)
         }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
@@ -73,6 +73,8 @@ struct AssistantProgressRow: View {
 // MARK: - AssistantConversationContextMismatchBanner
 
 struct AssistantConversationContextMismatchBanner: View {
+    // MARK: Internal
+
     let context: DebugAssistantConversationContext?
     let onRestore: () -> Void
     let onStartNew: () -> Void
@@ -83,7 +85,8 @@ struct AssistantConversationContextMismatchBanner: View {
                 String(localized: "This conversation belongs to different traffic"),
                 systemImage: "arrow.trianglehead.branch"
             )
-            .font(metrics.swiftUIFont(size: metrics.secondaryFontSize, weight: .semibold))
+            .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
+            .foregroundStyle(.orange)
 
             if let context {
                 Text(
@@ -91,7 +94,7 @@ struct AssistantConversationContextMismatchBanner: View {
                         localized: "It was started with \(context.summary). Restore that selection or start a clean conversation for the traffic shown above."
                     )
                 )
-                .font(metrics.swiftUIFont(size: metrics.metadataFontSize))
+                .font(.system(size: metrics.metadataFontSize))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -106,40 +109,48 @@ struct AssistantConversationContextMismatchBanner: View {
                     .controlSize(.small)
             }
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.08))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "Conversation traffic changed"))
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
-// MARK: - AssistantUserMessageBubble
+// MARK: - AssistantQueryRow
 
-struct AssistantUserMessageBubble: View {
+/// A user prompt rendered as a compact, full-width investigation query event — a labelled row that
+/// reads as part of the inspector's evidence trail, not a trailing chat bubble aligned to one side.
+struct AssistantQueryRow: View {
+    // MARK: Internal
+
     let text: String
 
     var body: some View {
-        HStack {
-            Spacer(minLength: 44)
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: "text.magnifyingglass")
+                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(text)
-                .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                }
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "You: \(text)"))
+        .accessibilityLabel(String(localized: "Investigation query: \(text)"))
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
@@ -147,6 +158,8 @@ struct AssistantUserMessageBubble: View {
 // MARK: - AssistantResponseActionBar
 
 struct AssistantResponseActionBar: View {
+    // MARK: Internal
+
     let canCopy: Bool
     let canRevealRequest: Bool
     let canRetry: Bool
@@ -191,10 +204,12 @@ struct AssistantResponseActionBar: View {
                 }
             }
         }
-        .font(metrics.swiftUIFont(size: metrics.metadataFontSize))
+        .font(.system(size: metrics.metadataFontSize))
         .foregroundStyle(.secondary)
         .padding(.top, 2)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 
@@ -202,7 +217,9 @@ struct AssistantResponseActionBar: View {
         _ title: String,
         systemImage: String,
         action: @escaping () -> Void
-    ) -> some View {
+    )
+        -> some View
+    {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .lineLimit(1)
@@ -217,7 +234,9 @@ struct AssistantResponseActionBar: View {
         _ title: String,
         systemImage: String,
         action: @escaping () -> Void
-    ) -> some View {
+    )
+        -> some View
+    {
         Button(action: action) {
             Image(systemName: systemImage)
                 .frame(minWidth: 18, minHeight: 18)
@@ -234,6 +253,8 @@ struct AssistantResponseActionBar: View {
 /// Renders common model Markdown as native SwiftUI text without exposing formatting markers.
 /// Block parsing runs away from the main actor and is retained by the view's stable message identity.
 struct AssistantMarkdownText: View {
+    // MARK: Internal
+
     let source: String
 
     var body: some View {
@@ -242,7 +263,7 @@ struct AssistantMarkdownText: View {
                 AssistantMarkdownDocumentView(document: document)
             } else {
                 Text(AssistantMarkdownInlineRenderer.render(source))
-                    .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+                    .font(.system(size: metrics.primaryFontSize))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -258,21 +279,29 @@ struct AssistantMarkdownText: View {
         }
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
     @State private var document: AssistantMarkdownDocument?
 }
 
+// MARK: - AssistantStreamingText
+
 /// Streaming output deliberately stays plain and cheap. Completed messages are parsed into
 /// native Markdown once, after the provider finishes.
 struct AssistantStreamingText: View {
+    // MARK: Internal
+
     let source: String
 
     var body: some View {
         Text(source)
-            .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+            .font(.system(size: metrics.primaryFontSize))
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
@@ -282,6 +311,8 @@ struct AssistantStreamingText: View {
 struct AssistantMarkdownDocument: Equatable, Sendable {
     let blocks: [AssistantMarkdownBlock]
 }
+
+// MARK: - AssistantMarkdownBlock
 
 enum AssistantMarkdownBlock: Equatable, Sendable {
     case heading(level: Int, text: String)
@@ -293,6 +324,8 @@ enum AssistantMarkdownBlock: Equatable, Sendable {
     case separator
 }
 
+// MARK: - AssistantMarkdownListItem
+
 struct AssistantMarkdownListItem: Equatable, Sendable {
     let number: Int
     let text: String
@@ -301,6 +334,8 @@ struct AssistantMarkdownListItem: Equatable, Sendable {
 // MARK: - AssistantMarkdownDocumentParser
 
 enum AssistantMarkdownDocumentParser {
+    // MARK: Internal
+
     static func parse(_ source: String) -> AssistantMarkdownDocument {
         let lines = source
             .replacingOccurrences(of: "\r\n", with: "\n")
@@ -440,6 +475,8 @@ enum AssistantMarkdownDocumentParser {
         return AssistantMarkdownDocument(blocks: blocks)
     }
 
+    // MARK: Private
+
     private static func heading(from line: String) -> (level: Int, text: String)? {
         let markerCount = line.prefix(while: { $0 == "#" }).count
         guard (1 ... 6).contains(markerCount),
@@ -488,6 +525,8 @@ enum AssistantMarkdownDocumentParser {
 // MARK: - AssistantMarkdownDocumentView
 
 private struct AssistantMarkdownDocumentView: View {
+    // MARK: Internal
+
     let document: AssistantMarkdownDocument
 
     var body: some View {
@@ -499,6 +538,8 @@ private struct AssistantMarkdownDocumentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     @ViewBuilder
@@ -506,15 +547,12 @@ private struct AssistantMarkdownDocumentView: View {
         switch block {
         case let .heading(level, text):
             Text(AssistantMarkdownInlineRenderer.render(text))
-                .font(metrics.swiftUIFont(
-                    size: headingFontSize(level),
-                    weight: .semibold
-                ))
+                .font(.system(size: headingFontSize(level), weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, level <= 2 ? 2 : 0)
         case let .paragraph(text):
             Text(AssistantMarkdownInlineRenderer.render(text))
-                .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+                .font(.system(size: metrics.primaryFontSize))
                 .fixedSize(horizontal: false, vertical: true)
         case let .unorderedList(items):
             VStack(alignment: .leading, spacing: 5) {
@@ -527,7 +565,7 @@ private struct AssistantMarkdownDocumentView: View {
                     }
                 }
             }
-            .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+            .font(.system(size: metrics.primaryFontSize))
             .padding(.leading, 4)
         case let .orderedList(items):
             VStack(alignment: .leading, spacing: 5) {
@@ -542,17 +580,17 @@ private struct AssistantMarkdownDocumentView: View {
                     }
                 }
             }
-            .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+            .font(.system(size: metrics.primaryFontSize))
         case let .code(language, text):
             VStack(alignment: .leading, spacing: 5) {
                 if let language {
-                    Text(language.uppercased())
-                        .font(metrics.swiftUIFont(size: metrics.metadataFontSize, weight: .medium))
+                    Text(language)
+                        .font(.system(size: metrics.metadataFontSize, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
                 ScrollView(.horizontal) {
                     Text(text)
-                        .font(metrics.swiftUIFont(size: metrics.secondaryFontSize, monospaced: true))
+                        .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -573,7 +611,7 @@ private struct AssistantMarkdownDocumentView: View {
                     .fill(Color(nsColor: .separatorColor))
                     .frame(width: 2)
                 Text(AssistantMarkdownInlineRenderer.render(text))
-                    .font(metrics.swiftUIFont(size: metrics.primaryFontSize))
+                    .font(.system(size: metrics.primaryFontSize))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

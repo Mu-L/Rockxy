@@ -104,6 +104,8 @@ extension MainContentCoordinator {
             allSavedTransactions
         case .pinned:
             allPinnedTransactions
+        case .notes:
+            allNotesTransactions
         case .allTraffic:
             transactions
         }
@@ -131,6 +133,8 @@ extension MainContentCoordinator {
             allSavedTransactions
         case .pinned:
             allPinnedTransactions
+        case .notes:
+            allNotesTransactions
         case .allTraffic:
             transactions
         }
@@ -298,6 +302,8 @@ extension MainContentCoordinator {
             allSavedTransactions
         case .pinned:
             allPinnedTransactions
+        case .notes:
+            allNotesTransactions
         case .allTraffic:
             transactions
         }

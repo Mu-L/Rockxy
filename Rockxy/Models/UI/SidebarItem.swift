@@ -17,8 +17,10 @@ enum SidebarItem: Hashable, Codable {
     case logStream(id: UUID)
     case pinnedTransaction(id: UUID)
     case savedTransaction(id: UUID)
+    case noteTransaction(id: UUID)
     case allApps
     case allDomains
     case allPinned
     case allSaved
+    case allNotes
 }

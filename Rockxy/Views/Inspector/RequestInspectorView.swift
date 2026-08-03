@@ -125,7 +125,7 @@ struct RequestInspectorView: View {
         case .synopsis:
             SynopsisInspectorView(transaction: transaction)
         case .comments:
-            CommentsTabView(transaction: transaction)
+            CommentsTabView(coordinator: coordinator, transaction: transaction)
         }
     }
 
