@@ -830,6 +830,7 @@ struct RockxyMenuCommands: Commands {
                 actions?.toggleInspectorBottom()
             }
             .keyboardShortcut("]", modifiers: [.command, .control])
+            .disabled(actions?.canToggleBottomInspector != true)
 
             Button(
                 actions?.isContextDockVisible == true

@@ -73,6 +73,16 @@ struct ContextDetailsView: View {
         ]
     }
 
+    private var emptyStateCopy: ContextDockEmptyStateCopy {
+        ContextDockEmptyStateCopy(
+            ContextDockEmptyState.resolve(
+                hasCapturedTraffic: !coordinator.transactions.isEmpty,
+                hasVisibleResults: !coordinator.filteredTransactions.isEmpty,
+                isCapturing: coordinator.isProxyRunning
+            )
+        )
+    }
+
     @ViewBuilder private var contextContent: some View {
         if selectedTransactions.count > 1 {
             multiSelectionContent
@@ -85,11 +95,12 @@ struct ContextDetailsView: View {
     }
 
     private var noSelectionContent: some View {
-        VStack(spacing: 0) {
+        let copy = emptyStateCopy
+        return VStack(spacing: 0) {
             InspectorEmptyStateView(
-                requestSelectionDescription: coordinator.isProxyRunning
-                    ? String(localized: "Select a request to see diagnostics and related traffic.")
-                    : String(localized: "Start capture, then select a request to inspect its context.")
+                copy.title,
+                systemImage: copy.systemImage,
+                description: copy.description
             )
 
             WorkspaceFooterBar(horizontalPadding: 12) {

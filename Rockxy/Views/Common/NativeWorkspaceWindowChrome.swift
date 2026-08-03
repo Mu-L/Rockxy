@@ -91,6 +91,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                 await withCheckedContinuation { continuation in
                     withObservationTracking {
                         _ = coordinator.isProxyRunning
+                        _ = coordinator.hasPayloadInspectorSelection
                     } onChange: {
                         continuation.resume()
                     }
@@ -161,6 +162,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     ] = [:]
     private var observationTask: Task<Void, Never>?
     private weak var proxyToggleItem: NSToolbarItem?
+    private weak var bottomInspectorItem: NSToolbarItem?
 
     private func makeSidebarToggleItem() -> NSToolbarItem {
         let item = imageItem(
@@ -202,6 +204,9 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             systemImage: "rectangle.split.1x2",
             action: #selector(toggleBottomInspector(_:))
         )
+        bottomInspectorItem.isEnabled = coordinator.canToggleBottomInspector
+        bottomInspectorItem.toolTip = bottomInspectorToolTip
+        self.bottomInspectorItem = bottomInspectorItem
         let contextDockItem = imageItem(
             identifier: NSToolbarItem.Identifier(
                 "\(Self.actionGroupIdentifier.rawValue).contextDock"
@@ -268,6 +273,14 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             systemSymbolName: isRunning ? "stop.fill" : "play.fill",
             accessibilityDescription: label
         )
+        bottomInspectorItem?.isEnabled = coordinator.canToggleBottomInspector
+        bottomInspectorItem?.toolTip = bottomInspectorToolTip
+    }
+
+    private var bottomInspectorToolTip: String {
+        coordinator.canToggleBottomInspector
+            ? String(localized: "Show or hide the bottom inspector panel")
+            : String(localized: "Select a request to use the bottom inspector")
     }
 
     @objc

@@ -172,6 +172,22 @@ struct CenterContentView: View {
             + (coordinator.activeWorkspace.mutedTrafficSources.isEmpty ? 0 : 1)
     }
 
+    private var bottomInspectorVisibility: Binding<Bool> {
+        Binding(
+            get: { coordinator.isBottomInspectorEffectivelyPresented },
+            set: { isPresented in
+                // A false transition driven purely by losing the selection (the effective
+                // getter collapsing) must not persist a hidden preference — only a manual or
+                // native collapse while something is still selected should. Expansions always
+                // pass through.
+                if !isPresented, !coordinator.hasPayloadInspectorSelection {
+                    return
+                }
+                coordinator.setBottomInspectorVisible(isPresented)
+            }
+        )
+    }
+
     private var inspectorWorkspace: some View {
         NativeBottomInspectorSplitView(
             isInspectorPresented: bottomInspectorVisibility,
@@ -191,13 +207,6 @@ struct CenterContentView: View {
             .appUIDisplayMetrics(displayMetrics)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var bottomInspectorVisibility: Binding<Bool> {
-        Binding(
-            get: { coordinator.inspectorLayout == .bottom },
-            set: { coordinator.setBottomInspectorVisible($0) }
-        )
     }
 
     private var tableContent: some View {
