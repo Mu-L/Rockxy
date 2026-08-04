@@ -239,5 +239,13 @@ struct CenterContentView: View {
             mainCoordinator: coordinator,
             headerColumns: coordinator.headerColumnStore.columns
         )
+        .overlay {
+            // Overlay (not replacement) so the table stays mounted: live append, native column
+            // widths, selection, and scroll position survive an empty-then-populated transition.
+            RequestListEmptyStateView(
+                coordinator: coordinator,
+                hasVisibleRows: !coordinator.filteredRows.isEmpty
+            )
+        }
     }
 }

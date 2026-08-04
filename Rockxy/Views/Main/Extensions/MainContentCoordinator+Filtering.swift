@@ -98,6 +98,32 @@ extension MainContentCoordinator {
         recomputeFilteredTransactions()
     }
 
+    /// True when any workspace-level filter narrows the visible traffic: search/method/status/etc.
+    /// via `FilterCriteria`, an active advanced rule, a Traffic Signal, a Focus Set, or muted sources.
+    /// A merely-visible but empty advanced editor is intentionally not treated as active.
+    var hasActiveWorkspaceFilters: Bool {
+        !filterCriteria.isEmpty
+            || !FilterRuleEvaluator.activeRules(in: filterRules, isFilterBarVisible: isFilterBarVisible).isEmpty
+            || activeWorkspace.activeTrafficSignal != nil
+            || activeWorkspace.activeFocusSet != nil
+            || !activeWorkspace.mutedTrafficSources.isEmpty
+    }
+
+    /// Full reset of every workspace filter, scope, and focus/noise dimension back to "All Traffic",
+    /// then recompute. Single source of truth for the filter-summary "Clear All" chip and the
+    /// request-list empty-state recovery actions so they cannot drift apart.
+    func clearAllWorkspaceFilters() {
+        filterCriteria = .empty
+        filterCriteria.sidebarScope = .allTraffic
+        sidebarSelection = nil
+        isFilterBarVisible = false
+        filterRules = [FilterRule()]
+        activeWorkspace.activeTrafficSignal = nil
+        activeWorkspace.activeFocusSetID = nil
+        activeWorkspace.mutedTrafficSources.removeAll()
+        recomputeFilteredTransactions()
+    }
+
     var availableTransactionCountForCurrentScope: Int {
         let baseList: [HTTPTransaction] = switch filterCriteria.sidebarScope {
         case .saved:

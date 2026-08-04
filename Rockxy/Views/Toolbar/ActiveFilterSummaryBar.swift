@@ -129,7 +129,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     Button(String(localized: "Clear All")) {
-                        clearAllFilters()
+                        coordinator.clearAllWorkspaceFilters()
                     }
                     .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                     .foregroundStyle(Color.accentColor)
@@ -161,18 +161,6 @@ struct ActiveFilterSummaryBar: View {
             || !coordinator.filterCriteria.activeProtocolFilters.isEmpty
             || (coordinator.isFilterBarVisible
                 && coordinator.filterRules.contains(where: { $0.isEnabled && !$0.value.isEmpty }))
-    }
-
-    private func clearAllFilters() {
-        coordinator.filterCriteria = .empty
-        coordinator.filterCriteria.sidebarScope = .allTraffic
-        coordinator.sidebarSelection = nil
-        coordinator.isFilterBarVisible = false
-        coordinator.filterRules = [FilterRule()]
-        coordinator.activeWorkspace.activeTrafficSignal = nil
-        coordinator.activeWorkspace.activeFocusSetID = nil
-        coordinator.activeWorkspace.mutedTrafficSources.removeAll()
-        coordinator.recomputeFilteredTransactions()
     }
 }
 
