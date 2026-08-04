@@ -8,6 +8,7 @@ enum SidebarScope: Codable, Hashable {
     case allTraffic
     case saved
     case pinned
+    case notes
 }
 
 // MARK: - FilterCriteria

@@ -81,7 +81,7 @@ private struct AIAssistantDockView: View {
         }
         .background(Color.clear)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Rockxy AI Assistant"))
+        .accessibilityLabel(String(localized: "AI Assistant"))
         .sheet(item: reviewPackBinding) { _ in
             DebugAssistantReviewDataSheet(
                 coordinator: coordinator,
@@ -514,12 +514,12 @@ private struct AIAssistantDockView: View {
                 .foregroundStyle(.secondary)
 
             Text(primaryTransaction == nil
-                ? String(localized: "Ask about captured traffic")
-                : String(localized: "What should I check?"))
+                ? String(localized: "Investigate captured traffic")
+                : String(localized: "Start an investigation"))
                 .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
 
             if primaryTransaction == nil {
-                Text(String(localized: "Select a request or start typing below."))
+                Text(String(localized: "Select a request to investigate, or type a question below."))
                     .font(assistantFont(appMetrics.secondaryFontSize))
                     .foregroundStyle(.secondary)
             } else {
@@ -531,9 +531,15 @@ private struct AIAssistantDockView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Compact horizontal suggestion cards in a two-column grid — the original GPT-style recipe
+    /// launcher. Each card shows an icon + title only; the full `recipe.detail` stays in the tooltip
+    /// rather than crowding the card.
     private var suggestionGrid: some View {
         LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+            columns: [
+                GridItem(.flexible(), spacing: 6),
+                GridItem(.flexible(), spacing: 6),
+            ],
             spacing: 6
         ) {
             ForEach(DebugAssistantRecipe.allCases) { recipe in
@@ -542,16 +548,14 @@ private struct AIAssistantDockView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: recipe.systemImage)
-                            .frame(width: 14)
+                            .foregroundStyle(.secondary)
                         Text(recipe.title)
-                            .font(assistantFont(appMetrics.metadataFontSize, weight: .medium))
+                            .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
                             .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 7)
-                    .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -559,7 +563,7 @@ private struct AIAssistantDockView: View {
                 .help(recipe.detail)
             }
         }
-        .frame(maxWidth: 360)
+        .frame(maxWidth: 420)
     }
 
     @ViewBuilder private var activeAssistantTurn: some View {
@@ -890,13 +894,11 @@ private struct AIAssistantDockView: View {
     private func conversationMessage(_ message: DebugAssistantMessage) -> some View {
         switch message.role {
         case .user:
-            AssistantUserMessageBubble(text: message.text)
+            AssistantQueryRow(text: message.text)
         case .assistant:
-            VStack(alignment: .leading, spacing: 8) {
-                if let investigation = message.investigation {
-                    completedWorkEvent(investigation)
-                }
-
+            if message.investigation != nil {
+                investigationReport(message)
+            } else {
                 assistantBubble {
                     AssistantMarkdownText(
                         source: message.text.isEmpty
@@ -904,17 +906,13 @@ private struct AIAssistantDockView: View {
                             : message.text
                     )
 
-                    if let investigation = message.investigation {
-                        investigationDetails(investigation)
-                    }
-
                     if let modelResult = message.modelResult {
                         modelAttribution(modelResult)
                     }
 
                     assistantResponseActions(
                         text: message.text,
-                        investigation: message.investigation,
+                        investigation: nil,
                         canRetryModel: message.modelResult != nil
                     )
                 }
@@ -962,91 +960,31 @@ private struct AIAssistantDockView: View {
         )
     }
 
-    private func investigationDetails(_ result: InvestigationResult) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            if !result.evidence.isEmpty {
-                DisclosureGroup {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(result.evidence.prefix(3)) { evidence in
-                            Button {
-                                coordinator.revealDebugAssistantEvidence(evidence)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(evidenceColor(evidence.kind))
-                                        .frame(width: 6, height: 6)
-                                    Text(evidence.title)
-                                        .font(assistantFont(appMetrics.metadataFontSize, weight: .medium))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                    Spacer(minLength: 0)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(evidence.sourceTransactionID == nil)
-                            .help(evidence.detail)
-                        }
-                    }
-                    .padding(.top, 4)
-                } label: {
-                    Label(
-                        String(localized: "\(result.evidence.count) Findings"),
-                        systemImage: "list.bullet"
-                    )
-                    .font(assistantFont(appMetrics.metadataFontSize, weight: .medium))
-                    .foregroundStyle(.secondary)
+    @ViewBuilder
+    private func investigationReport(_ message: DebugAssistantMessage) -> some View {
+        if let result = message.investigation {
+            InvestigationReportView(
+                message: message,
+                isCurrentResult: isCurrentResult(result),
+                showsContinueWithModel: isCurrentResult(result)
+                    && coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
+                    && configuredModelIsAvailable,
+                isPreparingReview: coordinator.activeWorkspace.isPreparingDebugAssistantReview,
+                onReveal: coordinator.revealDebugAssistantEvidence,
+                onContinueWithModel: { coordinator.prepareDebugAssistantReview() },
+                onHandoff: { handoff, target in
+                    coordinator.performUserInitiatedDebugAssistantHandoff(handoff, result: target)
+                },
+                onPrepareReplay: { resultPendingReplay = $0 }
+            ) {
+                if let modelResult = message.modelResult {
+                    modelAttribution(modelResult)
                 }
-            }
-
-            Label(result.nextStep, systemImage: "arrow.turn.down.right")
-                .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if isCurrentResult(result),
-               coordinator.activeWorkspace.debugAssistantUsesConfiguredModel,
-               configuredModelIsAvailable
-            {
-                HStack(spacing: 8) {
-                    if coordinator.activeWorkspace.isPreparingDebugAssistantReview {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(String(localized: "Preparing redacted preview…"))
-                            .font(assistantFont(appMetrics.secondaryFontSize))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Button {
-                            coordinator.prepareDebugAssistantReview()
-                        } label: {
-                            Label(String(localized: "Continue With Model"), systemImage: "lock.shield")
-                        }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
-                    }
-                }
-            }
-
-            if isCurrentResult(result) {
-                assistantHandoffButtons(for: result)
-            }
-        }
-    }
-
-    private func assistantHandoffButtons(for result: InvestigationResult) -> some View {
-        HStack(spacing: 6) {
-            ForEach(AssistantTrustPolicy.recommendedHandoffs(for: result.recipe)) { handoff in
-                Button {
-                    if handoff == .prepareReplay {
-                        resultPendingReplay = result
-                    } else {
-                        coordinator.performUserInitiatedDebugAssistantHandoff(handoff, result: result)
-                    }
-                } label: {
-                    Label(handoff.title, systemImage: handoff.systemImage)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                assistantResponseActions(
+                    text: message.text,
+                    investigation: result,
+                    canRetryModel: message.modelResult != nil
+                )
             }
         }
     }
@@ -1144,20 +1082,6 @@ private struct AIAssistantDockView: View {
         }
     }
 
-    private func completedWorkEvent(_ result: InvestigationResult) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(String(localized: "Local analysis · \(result.scopeTransactionIDs.count) requests"))
-                .font(assistantFont(appMetrics.metadataFontSize, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func failureTurn(_ message: String) -> some View {
         assistantBubble {
             Label(
@@ -1198,6 +1122,10 @@ private struct AIAssistantDockView: View {
         }
     }
 
+    /// Explicit `.system(size:)` roles that mirror the horizontal request/response inspector:
+    /// UI labels and prose stay proportional; callers opt into monospaced only for technical data
+    /// (request summaries, model IDs, endpoints). Deliberately does not honor the global
+    /// `useMonospacedFont` preference, so prose never renders monospaced.
     private func assistantFont(
         _ size: CGFloat,
         weight: Font.Weight = .regular,
@@ -1205,7 +1133,9 @@ private struct AIAssistantDockView: View {
     )
         -> Font
     {
-        appMetrics.swiftUIFont(size: size, weight: weight, monospaced: monospaced)
+        monospaced
+            ? .system(size: size, weight: weight, design: .monospaced)
+            : .system(size: size, weight: weight)
     }
 }
 
@@ -1239,15 +1169,6 @@ private extension AIAssistantDockView {
     func requestSummary(for transaction: HTTPTransaction) -> String {
         let status = transaction.response.map { String($0.statusCode) } ?? "—"
         return "\(transaction.request.method) \(status)  \(transaction.request.host)\(transaction.request.path)"
-    }
-
-    func evidenceColor(_ kind: InvestigationEvidenceKind) -> Color {
-        switch kind {
-        case .observed: .blue
-        case .derived: .purple
-        case .inferred: .orange
-        case .unknown: .secondary
-        }
     }
 
     func statusColor(for transaction: HTTPTransaction) -> Color {

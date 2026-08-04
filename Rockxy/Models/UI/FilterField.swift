@@ -39,7 +39,7 @@ enum FilterField: String, CaseIterable, Codable, Hashable {
         case .cookies: "Cookies"
         case .clientApp: "Client/App"
         case .contentType: "Content Type"
-        case .comment: "Comment"
+        case .comment: "Note"
         case .color: "Color"
         }
     }

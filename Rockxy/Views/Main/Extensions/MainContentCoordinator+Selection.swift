@@ -92,6 +92,22 @@ extension MainContentCoordinator {
             filterCriteria.exactTransactionID = nil
             recomputeFilteredTransactions()
             selectTransaction(transaction(for: id))
+        case .allNotes:
+            filterCriteria.sidebarDomain = nil
+            filterCriteria.sidebarPathPrefix = nil
+            filterCriteria.sidebarApp = nil
+            filterCriteria.sidebarScope = .notes
+            filterCriteria.exactTransactionID = nil
+            selectTransaction(nil)
+            recomputeFilteredTransactions()
+        case let .noteTransaction(id):
+            filterCriteria.sidebarDomain = nil
+            filterCriteria.sidebarPathPrefix = nil
+            filterCriteria.sidebarApp = nil
+            filterCriteria.sidebarScope = .notes
+            filterCriteria.exactTransactionID = nil
+            recomputeFilteredTransactions()
+            selectTransaction(transaction(for: id))
         default:
             filterCriteria.sidebarDomain = nil
             filterCriteria.sidebarPathPrefix = nil

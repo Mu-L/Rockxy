@@ -830,6 +830,7 @@ struct RockxyMenuCommands: Commands {
                 actions?.toggleInspectorBottom()
             }
             .keyboardShortcut("]", modifiers: [.command, .control])
+            .disabled(actions?.canToggleBottomInspector != true)
 
             Button(
                 actions?.isContextDockVisible == true
@@ -921,7 +922,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Add Comment…")) {
+            Button(String(localized: "Add Note…")) {
                 actions?.addComment()
             }
             .disabled(actions?.hasSelectedTransaction != true)

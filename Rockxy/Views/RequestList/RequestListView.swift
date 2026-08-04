@@ -54,11 +54,7 @@ struct RequestListView: View {
 
     @ViewBuilder private var trafficListView: some View {
         if coordinator.filteredTransactions.isEmpty {
-            ContentUnavailableView(
-                "No Traffic",
-                systemImage: "network.slash",
-                description: Text("Start the proxy to capture network traffic")
-            )
+            RequestListEmptyStateView(coordinator: coordinator, hasVisibleRows: false)
         } else {
             List(coordinator.filteredTransactions, selection: Binding(
                 get: { coordinator.selectedTransaction?.id },

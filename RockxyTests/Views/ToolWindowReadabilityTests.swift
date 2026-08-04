@@ -153,7 +153,12 @@ struct ToolWindowReadabilityTests {
         let switcherStyleSource = try readProjectFile("Rockxy/Views/Common/UtilitySegmentedHeader.swift")
 
         #expect(source.contains("@Environment(\\.appUIDisplayMetrics)"))
-        #expect(source.contains("appMetrics.swiftUIFont(size:"))
+        // UI/prose uses explicit proportional .system(size:) roles derived from Appearance metrics,
+        // no longer routed through swiftUIFont (which could force all prose monospaced). Technical
+        // data (request summaries, model IDs) stays explicitly monospaced. Restored switcher labels
+        // (Details / AI Assistant) are asserted in ContextDockPresentationTests.
+        #expect(!source.contains("swiftUIFont"))
+        #expect(source.contains("assistantFont(appMetrics."))
         #expect(source.contains("monospaced: true"))
         #expect(!source.contains(".font(.caption"))
         #expect(!source.contains(".font(.callout"))
@@ -161,8 +166,6 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains(".disabled(isBusy || primaryTransaction == nil)"))
         #expect(!source.contains(".disabled(conversationIsEmpty && !isBusy)"))
         #expect(source.contains("Ask Rockxy AI Assistant…"))
-        #expect(source.contains("Text(String(localized: \"Details\"))"))
-        #expect(source.contains("Text(String(localized: \"AI Assistant\"))"))
         #expect(source.contains("ContextDetailsView(coordinator: coordinator)"))
         #expect(source.contains("AIAssistantDockView("))
         #expect(source.contains(".workspaceModeSwitcherStyle()"))
@@ -177,7 +180,7 @@ struct ToolWindowReadabilityTests {
         let components = try readProjectFile("Rockxy/Views/Inspector/AssistantConversationComponents.swift")
 
         #expect(source.contains("ContentUnavailableView"))
-        #expect(source.contains("DisclosureGroup"))
+        #expect(source.contains("InvestigationReportView("))
         #expect(source.contains("Image(systemName: \"arrow.up\")"))
         #expect(source.contains("accessibilityLabel(String(localized: \"Conversation History\"))"))
         #expect(source.contains("accessibilityLabel(String(localized: \"New Conversation\"))"))
@@ -189,7 +192,8 @@ struct ToolWindowReadabilityTests {
         #expect(components.contains("compactAction("))
         #expect(components.contains(".accessibilityLabel(title)"))
         #expect(components.contains(".help(title)"))
-        #expect(components.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9)"))
+        #expect(!components.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9)"))
+        #expect(components.contains("AssistantQueryRow"))
         #expect(components.contains("AssistantMarkdownText"))
         #expect(components.contains("inlineOnlyPreservingWhitespace"))
         #expect(source.contains("AssistantMarkdownText("))

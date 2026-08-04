@@ -7,9 +7,15 @@ import Foundation
 enum FavoriteTransactionSection: String, CaseIterable {
     case pinned
     case saved
+    case notes
 
     var deleteTitle: String {
-        String(localized: "Delete")
+        switch self {
+        case .pinned, .saved:
+            String(localized: "Delete")
+        case .notes:
+            String(localized: "Remove Note")
+        }
     }
 
     var displayName: String {
@@ -18,6 +24,8 @@ enum FavoriteTransactionSection: String, CaseIterable {
             String(localized: "Pinned")
         case .saved:
             String(localized: "Saved")
+        case .notes:
+            String(localized: "Notes")
         }
     }
 
@@ -27,6 +35,8 @@ enum FavoriteTransactionSection: String, CaseIterable {
             .pinnedTransaction(id: id)
         case .saved:
             .savedTransaction(id: id)
+        case .notes:
+            .noteTransaction(id: id)
         }
     }
 
@@ -36,6 +46,8 @@ enum FavoriteTransactionSection: String, CaseIterable {
             .allPinned
         case .saved:
             .allSaved
+        case .notes:
+            .allNotes
         }
     }
 }

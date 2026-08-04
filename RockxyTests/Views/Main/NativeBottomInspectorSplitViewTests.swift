@@ -4,8 +4,24 @@ import SwiftUI
 import Testing
 
 @MainActor
+@Suite(.serialized)
 struct NativeBottomInspectorSplitViewTests {
     // MARK: Internal
+
+    @Test("Bottom inspector minimum heights scale with the app font")
+    func fontAwareLayoutMetrics() {
+        let defaultMetrics = BottomInspectorLayoutMetrics()
+        var largeSettings = AppUISettings.default
+        largeSettings.fontSize = 28
+        let largeMetrics = BottomInspectorLayoutMetrics(
+            appMetrics: AppUIDisplayMetrics(settings: largeSettings)
+        )
+
+        #expect(defaultMetrics.requestListMinimumHeight == 200)
+        #expect(defaultMetrics.inspectorMinimumHeight == 232)
+        #expect(largeMetrics.requestListMinimumHeight > defaultMetrics.requestListMinimumHeight)
+        #expect(largeMetrics.inspectorMinimumHeight > defaultMetrics.inspectorMinimumHeight)
+    }
 
     @Test("Bottom inspector sizing preserves the proposed workspace size")
     func proposedSizeIsPreserved() throws {
@@ -27,7 +43,89 @@ struct NativeBottomInspectorSplitViewTests {
         #expect(!controller.splitViewItems[0].canCollapse)
         #expect(controller.splitViewItems[1].canCollapse)
         #expect(controller.splitViewItems[0].minimumThickness == 200)
-        #expect(controller.splitViewItems[1].minimumThickness == 320)
+        #expect(controller.splitViewItems[1].minimumThickness == 232)
+    }
+
+    @Test("Fresh bottom split configures a sixty-two percent request list")
+    func freshLayoutUsesBalancedDefaultRatio() {
+        let autosaveName = uniqueAutosaveName()
+        removeSplitViewAutosaveDefaults(autosaveName)
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+
+        let divider = controller.splitView.dividerThickness
+        let expectedPrimaryHeight = (700 - divider)
+            * NativeBottomInspectorSplitSizing.defaultRequestListRatio
+        let primaryHeight = NativeBottomInspectorSplitSizing.idealPrimaryHeight(
+            totalHeight: 700,
+            dividerThickness: divider,
+            requestListRatio: NativeBottomInspectorSplitSizing.defaultRequestListRatio,
+            primaryMinimumHeight: 200,
+            inspectorMinimumHeight: 232
+        )
+
+        #expect(primaryHeight == expectedPrimaryHeight)
+        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.62) < 0.0001)
+        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.38) < 0.0001)
+        #expect(controller.defaultDividerApplicationCount == 1)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Autosaved split frames take precedence over the default ratio")
+    func autosavedFramesSkipDefaultRatio() {
+        let autosaveName = uniqueAutosaveName()
+        setSplitViewAutosaveFrames(autosaveName)
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+
+        #expect(controller.hasAutosavedFrames)
+        #expect(controller.defaultDividerApplicationCount == 0)
+        expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Window resizing never reapplies the default divider ratio")
+    func resizeDoesNotReapplyDefaultRatio() {
+        let autosaveName = uniqueAutosaveName()
+        removeSplitViewAutosaveDefaults(autosaveName)
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+        controller.splitView.setPosition(300, ofDividerAt: 0)
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 800))
+
+        #expect(controller.defaultDividerApplicationCount == 1)
+        expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Font-driven minimum updates preserve the applied divider")
+    func minimumUpdatesPreserveDivider() {
+        let autosaveName = uniqueAutosaveName()
+        removeSplitViewAutosaveDefaults(autosaveName)
+        let controller = makeConfiguredController(
+            isInspectorPresented: true,
+            autosaveName: autosaveName
+        )
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 800))
+
+        controller.updateMinimumHeights(primary: 312, inspector: 397)
+
+        #expect(controller.splitViewItems[0].minimumThickness == 312)
+        #expect(controller.splitViewItems[1].minimumThickness == 397)
+        #expect(controller.defaultDividerApplicationCount == 1)
+        removeSplitViewAutosaveDefaults(autosaveName)
     }
 
     @Test("Bottom split collapses without recreating either pane")
@@ -70,8 +168,36 @@ struct NativeBottomInspectorSplitViewTests {
         #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(
             CGRect(x: 0, y: 0, width: 1_200, height: CGFloat.infinity)
         ))
+        #expect(!NativeBottomInspectorSplitSizing.isLayoutReady(
+            CGRect(x: 0, y: 0, width: 1_200, height: -700)
+        ))
         #expect(NativeBottomInspectorSplitSizing.isLayoutReady(
             CGRect(x: 0, y: 0, width: 1_200, height: 700)
+        ))
+    }
+
+    @Test("Bottom split readiness includes both pane minima and the divider")
+    func minimumReadinessIncludesDivider() {
+        #expect(!NativeBottomInspectorSplitSizing.canSeatRequestedMinima(
+            totalHeight: 432,
+            dividerThickness: 1,
+            inspectorPresented: true,
+            primaryMinimumHeight: 200,
+            inspectorMinimumHeight: 232
+        ))
+        #expect(NativeBottomInspectorSplitSizing.canSeatRequestedMinima(
+            totalHeight: 433,
+            dividerThickness: 1,
+            inspectorPresented: true,
+            primaryMinimumHeight: 200,
+            inspectorMinimumHeight: 232
+        ))
+        #expect(NativeBottomInspectorSplitSizing.canSeatRequestedMinima(
+            totalHeight: 200,
+            dividerThickness: 1,
+            inspectorPresented: false,
+            primaryMinimumHeight: 200,
+            inspectorMinimumHeight: 232
         ))
     }
 
@@ -153,7 +279,7 @@ struct NativeBottomInspectorSplitViewTests {
             isInspectorPresented: isInspectorPresented,
             autosaveName: autosaveName,
             primaryMinimumHeight: 200,
-            inspectorMinimumHeight: 320
+            inspectorMinimumHeight: 232
         )
         return controller
     }
@@ -176,5 +302,15 @@ struct NativeBottomInspectorSplitViewTests {
 
     private func removeSplitViewAutosaveDefaults(_ autosaveName: String) {
         UserDefaults.standard.removeObject(forKey: "NSSplitView Subview Frames \(autosaveName)")
+    }
+
+    private func setSplitViewAutosaveFrames(_ autosaveName: String) {
+        UserDefaults.standard.set(
+            [
+                "0.000000, 0.000000, 1200.000000, 300.000000, NO, NO",
+                "0.000000, 301.000000, 1200.000000, 399.000000, NO, NO",
+            ],
+            forKey: "NSSplitView Subview Frames \(autosaveName)"
+        )
     }
 }

@@ -40,40 +40,37 @@ struct RequestInspectorView: View {
     @State private var showPreviewPopover = false
     @Environment(\.appUIDisplayMetrics) private var metrics
 
-    private var inspectorTabBar: some View {
-        InspectorTabStrip {
-            ForEach(RequestInspectorTab.allCases, id: \.self) { tab in
-                InspectorTabButton(
-                    title: tab.displayName,
-                    isActive: selectedPreviewTab == nil && selectedTab == tab
+    private var tabDescriptors: [InspectorTabDescriptor] {
+        var descriptors: [InspectorTabDescriptor] = RequestInspectorTab.allCases.map { tab in
+            InspectorTabDescriptor(
+                id: "native.\(tab.rawValue)",
+                title: tab.displayName,
+                isActive: selectedPreviewTab == nil && selectedTab == tab
+            ) {
+                selectedPreviewTab = nil
+                selectedTab = tab
+            }
+        }
+
+        for (index, tab) in previewTabStore.requestTabs.enumerated() {
+            descriptors.append(
+                InspectorTabDescriptor(
+                    id: "preview.\(tab.id)",
+                    title: tab.name,
+                    isActive: selectedPreviewTab == tab,
+                    startsNewGroup: index == 0
                 ) {
-                    selectedPreviewTab = nil
-                    selectedTab = tab
+                    selectedPreviewTab = tab
                 }
-            }
+            )
+        }
 
-            if !previewTabStore.requestTabs.isEmpty {
-                Divider()
-                    .frame(height: max(14, metrics.controlFontSize + 2))
-                    .padding(.horizontal, 4)
+        return descriptors
+    }
 
-                ForEach(previewTabStore.requestTabs) { tab in
-                    InspectorTabButton(
-                        title: tab.name,
-                        isActive: selectedPreviewTab == tab
-                    ) {
-                        selectedPreviewTab = tab
-                    }
-                }
-            }
-
-            Divider()
-                .frame(height: max(14, metrics.controlFontSize + 2))
-                .padding(.horizontal, 4)
-
+    private var inspectorTabBar: some View {
+        InspectorTabStrip(tabs: tabDescriptors) {
             previewTabMenuButton
-        } trailingContent: {
-            EmptyView()
         }
     }
 
@@ -125,7 +122,7 @@ struct RequestInspectorView: View {
         case .synopsis:
             SynopsisInspectorView(transaction: transaction)
         case .comments:
-            CommentsTabView(transaction: transaction)
+            CommentsTabView(coordinator: coordinator, transaction: transaction)
         }
     }
 

@@ -79,6 +79,15 @@ struct ActiveFilterSummaryBar: View {
                         }
                     }
 
+                    if coordinator.filterCriteria.sidebarScope == .notes {
+                        FilterChip(label: String(localized: "Notes")) {
+                            coordinator.filterCriteria.sidebarScope = .allTraffic
+                            coordinator.filterCriteria.exactTransactionID = nil
+                            coordinator.sidebarSelection = nil
+                            coordinator.recomputeFilteredTransactions()
+                        }
+                    }
+
                     if coordinator.filterCriteria.isSearchEnabled,
                        !coordinator.filterCriteria.searchText.isEmpty
                     {
@@ -93,12 +102,14 @@ struct ActiveFilterSummaryBar: View {
                         )
                     }
 
-                    if !coordinator.filterCriteria.activeProtocolFilters.isEmpty {
-                        let count = coordinator.filterCriteria.activeProtocolFilters.count
+                    ForEach(
+                        ProtocolFilterSelection.summaryFilters(in: coordinator.filterCriteria.activeProtocolFilters),
+                        id: \.self
+                    ) { filter in
                         FilterChip(
-                            label: String(localized: "\(count) protocol filters"),
+                            label: filter.displayName,
                             onRemove: {
-                                coordinator.filterCriteria.activeProtocolFilters.removeAll()
+                                coordinator.filterCriteria.activeProtocolFilters.remove(filter)
                                 coordinator.recomputeFilteredTransactions()
                             }
                         )
@@ -118,7 +129,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     Button(String(localized: "Clear All")) {
-                        clearAllFilters()
+                        coordinator.clearAllWorkspaceFilters()
                     }
                     .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                     .foregroundStyle(Color.accentColor)
@@ -145,22 +156,11 @@ struct ActiveFilterSummaryBar: View {
             || coordinator.filterCriteria.sidebarApp != nil
             || coordinator.filterCriteria.sidebarScope == .saved
             || coordinator.filterCriteria.sidebarScope == .pinned
+            || coordinator.filterCriteria.sidebarScope == .notes
             || (coordinator.filterCriteria.isSearchEnabled && !coordinator.filterCriteria.searchText.isEmpty)
             || !coordinator.filterCriteria.activeProtocolFilters.isEmpty
             || (coordinator.isFilterBarVisible
                 && coordinator.filterRules.contains(where: { $0.isEnabled && !$0.value.isEmpty }))
-    }
-
-    private func clearAllFilters() {
-        coordinator.filterCriteria = .empty
-        coordinator.filterCriteria.sidebarScope = .allTraffic
-        coordinator.sidebarSelection = nil
-        coordinator.isFilterBarVisible = false
-        coordinator.filterRules = [FilterRule()]
-        coordinator.activeWorkspace.activeTrafficSignal = nil
-        coordinator.activeWorkspace.activeFocusSetID = nil
-        coordinator.activeWorkspace.mutedTrafficSources.removeAll()
-        coordinator.recomputeFilteredTransactions()
     }
 }
 

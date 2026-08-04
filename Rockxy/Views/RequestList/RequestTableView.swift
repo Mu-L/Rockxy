@@ -1548,7 +1548,7 @@ extension RequestTableView {
 
         private func buildAnnotationGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Add Comment…"), action: #selector(handleAddComment(_:)),
+                String(localized: "Add Note…"), action: #selector(handleAddComment(_:)),
                 key: "l", symbol: "pencil.line", transaction: transaction
             ))
 
@@ -2160,6 +2160,7 @@ extension RequestTableView {
                 }
                 nameLabel?.stringValue = appName
                 nameLabel?.font = parent.effectiveDisplayMetrics.appKitFont()
+                nameLabel?.toolTip = appName.isEmpty ? nil : appName
                 if let icon = appIcon(for: appName) {
                     imageView?.image = icon
                     imageView?.isHidden = false
@@ -2212,6 +2213,7 @@ extension RequestTableView {
 
             // Populate content
             nameLabel.stringValue = appName
+            nameLabel.toolTip = appName.isEmpty ? nil : appName
             if let icon = appIcon(for: appName) {
                 imageView.image = icon
                 imageView.isHidden = false
@@ -2328,6 +2330,7 @@ extension RequestTableView {
 
             case "url":
                 cell.stringValue = rowData.host + rowData.path
+                cell.toolTip = cell.stringValue
                 cell.font = metrics.appKitFont(monospaced: true)
                 cell.textColor = .labelColor
 
@@ -2426,7 +2429,9 @@ extension RequestTableView {
 
             default:
                 if column.hasPrefix("reqHeader.") || column.hasPrefix("resHeader.") {
-                    cell.stringValue = RequestListRow.resolveHeaderValue(for: column, row: rowData)
+                    let headerValue = RequestListRow.resolveHeaderValue(for: column, row: rowData)
+                    cell.stringValue = headerValue
+                    cell.toolTip = headerValue.isEmpty ? nil : headerValue
                     cell.font = metrics.appKitFont(monospaced: true)
                     cell.textColor = .secondaryLabelColor
                 } else {

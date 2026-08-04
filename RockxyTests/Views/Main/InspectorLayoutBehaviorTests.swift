@@ -59,7 +59,10 @@ struct InspectorLayoutBehaviorTests {
         defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
         let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
 
-        coordinator.toggleInspectorBottom()
+        coordinator.selectTransaction(TestFixtures.makeTransaction())
+        // Establish an explicit visible preference through the same persistence seam the
+        // native split item drives while the inspector has content.
+        coordinator.setBottomInspectorVisible(true)
         coordinator.toggleInspectorRight()
         let newWorkspace = coordinator.workspaceStore.createWorkspace()
 
@@ -118,6 +121,93 @@ struct InspectorLayoutBehaviorTests {
         #expect(MainContentCoordinator(
             workspaceLayoutPreferences: environment.preferences
         ).inspectorLayout == .hidden)
+    }
+
+    @Test("Deselecting collapses the bottom inspector without losing the layout preference")
+    func deselectCollapsesWithoutPreferenceLoss() throws {
+        let environment = try makeEnvironment()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
+        let transaction = TestFixtures.makeTransaction()
+        coordinator.selectTransaction(transaction)
+
+        #expect(coordinator.isBottomInspectorEffectivelyPresented)
+        #expect(coordinator.hasPayloadInspectorSelection)
+
+        coordinator.selectTransaction(nil)
+
+        #expect(!coordinator.isBottomInspectorEffectivelyPresented)
+        #expect(!coordinator.hasPayloadInspectorSelection)
+        #expect(coordinator.inspectorLayout == .bottom)
+    }
+
+    @Test("Reselecting restores the effective bottom inspector after a deselect")
+    func reselectRestoresEffectivePresentation() throws {
+        let environment = try makeEnvironment()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
+        coordinator.selectTransaction(TestFixtures.makeTransaction())
+        coordinator.selectTransaction(nil)
+
+        #expect(!coordinator.isBottomInspectorEffectivelyPresented)
+
+        coordinator.selectTransaction(TestFixtures.makeTransaction())
+
+        #expect(coordinator.isBottomInspectorEffectivelyPresented)
+        #expect(coordinator.inspectorLayout == .bottom)
+    }
+
+    @Test("An explicit hide wins over the effective presentation across deselect and reselect")
+    func explicitHideWinsOverEffectivePresentation() throws {
+        let environment = try makeEnvironment()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
+        let transaction = TestFixtures.makeTransaction()
+        coordinator.selectTransaction(transaction)
+
+        coordinator.toggleInspectorBottom()
+
+        #expect(coordinator.inspectorLayout == .hidden)
+        #expect(!coordinator.isBottomInspectorEffectivelyPresented)
+
+        coordinator.selectTransaction(nil)
+        coordinator.selectTransaction(transaction)
+
+        #expect(coordinator.inspectorLayout == .hidden)
+        #expect(!coordinator.isBottomInspectorEffectivelyPresented)
+    }
+
+    @Test("A multi-selection is eligible for and presents the bottom inspector")
+    func multiSelectionIsEligible() throws {
+        let environment = try makeEnvironment()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
+        let first = TestFixtures.makeTransaction()
+        let second = TestFixtures.makeTransaction()
+        coordinator.selectTransaction(first)
+
+        coordinator.selectedTransactionIDs = [first.id, second.id]
+
+        #expect(coordinator.bottomInspectorContent == .summary)
+        #expect(coordinator.hasPayloadInspectorSelection)
+        #expect(coordinator.canToggleBottomInspector)
+        #expect(coordinator.isBottomInspectorEffectivelyPresented)
+    }
+
+    @Test("With no selection the bottom inspector toggle is disabled and a no-op")
+    func toggleDisabledWithoutSelection() throws {
+        let environment = try makeEnvironment()
+        defer { environment.defaults.removePersistentDomain(forName: environment.suiteName) }
+        let coordinator = MainContentCoordinator(workspaceLayoutPreferences: environment.preferences)
+
+        #expect(!coordinator.hasPayloadInspectorSelection)
+        #expect(!coordinator.canToggleBottomInspector)
+        #expect(coordinator.inspectorLayout == .hidden)
+
+        coordinator.toggleInspectorBottom()
+
+        #expect(coordinator.inspectorLayout == .hidden)
+        #expect(!coordinator.isBottomInspectorEffectivelyPresented)
     }
 
     // MARK: Private

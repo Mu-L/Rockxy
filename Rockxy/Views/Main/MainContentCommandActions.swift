@@ -25,7 +25,11 @@ struct MainContentCommandActions {
     }
 
     var isBottomInspectorVisible: Bool {
-        coordinator.inspectorLayout == .bottom
+        coordinator.isBottomInspectorEffectivelyPresented
+    }
+
+    var canToggleBottomInspector: Bool {
+        coordinator.canToggleBottomInspector
     }
 
     var isContextDockVisible: Bool {

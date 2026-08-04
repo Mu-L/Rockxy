@@ -1,8 +1,12 @@
 import SwiftUI
 
+// MARK: - ContextDetailsView
+
 /// Selection-aware request diagnostics shown in the Details tab of the Context Dock.
 /// Raw request and response payloads remain in the horizontal inspector below the traffic table.
 struct ContextDetailsView: View {
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
 
     var body: some View {
@@ -11,6 +15,8 @@ struct ContextDetailsView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(String(localized: "Inspector Details"))
     }
+
+    // MARK: Private
 
     private struct ContextInsight: Identifiable {
         let id: String
@@ -26,8 +32,58 @@ struct ContextDetailsView: View {
         let duration: TimeInterval
     }
 
-    @ViewBuilder
-    private var contextContent: some View {
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var isTimingExpanded = false
+    @State private var isRelatedExpanded = false
+
+    private var selectedTransactions: [HTTPTransaction] {
+        coordinator.resolveSelectedTransactions()
+    }
+
+    private var selectedErrorCount: Int {
+        selectedTransactions.count { ($0.response?.statusCode ?? 0) >= 400 || $0.state == .failed }
+    }
+
+    private var selectedTransferredText: String {
+        let bytes = selectedTransactions.reduce(Int64(0)) { partial, transaction in
+            partial + Int64(transaction.request.body?.count ?? 0)
+                + Int64(transaction.response?.body?.count ?? 0)
+        }
+        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private var multiSelectionFields: [ContextTableField] {
+        [
+            ContextTableField(label: String(localized: "Requests"), value: "\(selectedTransactions.count)"),
+            ContextTableField(
+                label: String(localized: "Hosts"),
+                value: "\(Set(selectedTransactions.map(\.request.host)).count)"
+            ),
+            ContextTableField(
+                label: String(localized: "Errors"),
+                value: "\(selectedErrorCount)",
+                color: selectedErrorCount > 0 ? .red : .primary
+            ),
+            ContextTableField(
+                label: String(localized: "Rules Hit"),
+                value: "\(selectedTransactions.count { $0.matchedRuleID != nil })"
+            ),
+            ContextTableField(label: String(localized: "Transferred"), value: selectedTransferredText),
+        ]
+    }
+
+    private var emptyStateCopy: ContextDockEmptyStateCopy {
+        ContextDockEmptyStateCopy(
+            ContextDockEmptyState.resolve(
+                hasCapturedTraffic: !coordinator.transactions.isEmpty,
+                hasVisibleResults: !coordinator.filteredTransactions.isEmpty,
+                isCapturing: coordinator.isProxyRunning
+            )
+        )
+    }
+
+    @ViewBuilder private var contextContent: some View {
         if selectedTransactions.count > 1 {
             multiSelectionContent
         } else if let transaction = coordinator.selectedTransaction {
@@ -39,11 +95,12 @@ struct ContextDetailsView: View {
     }
 
     private var noSelectionContent: some View {
-        VStack(spacing: 0) {
+        let copy = emptyStateCopy
+        return VStack(spacing: 0) {
             InspectorEmptyStateView(
-                requestSelectionDescription: coordinator.isProxyRunning
-                    ? String(localized: "Select a request to see diagnostics and related traffic.")
-                    : String(localized: "Start capture, then select a request to inspect its context.")
+                copy.title,
+                systemImage: copy.systemImage,
+                description: copy.description
             )
 
             WorkspaceFooterBar(horizontalPadding: 12) {
@@ -56,8 +113,51 @@ struct ContextDetailsView: View {
                     )
                     Spacer()
                 }
-                .font(.caption)
+                .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var multiSelectionContent: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ContextInspectorFieldTable(
+                        title: String(localized: "Selection"),
+                        fields: multiSelectionFields
+                    )
+
+                    Text(String(localized: "Select one request to inspect payload and timing details."))
+                        .font(.system(size: metrics.secondaryFontSize))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            WorkspaceFooterBar(horizontalPadding: 10) {
+                HStack(spacing: 8) {
+                    Button {
+                        let transactions = selectedTransactions
+                        guard transactions.count == 2 else {
+                            return
+                        }
+                        coordinator.compareTransactions(transactions[0], transactions[1])
+                    } label: {
+                        Label(String(localized: "Compare"), systemImage: "arrow.left.arrow.right")
+                    }
+                    .disabled(selectedTransactions.count != 2)
+                    Spacer()
+                    Button {
+                        coordinator.presentSelectedExport(format: .har)
+                    } label: {
+                        Label(String(localized: "Export Selection"), systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(selectedTransactions.isEmpty)
+                }
+                .controlSize(.small)
             }
         }
     }
@@ -67,16 +167,20 @@ struct ContextDetailsView: View {
             selectionHeader(transaction)
             Divider()
 
-            List {
-                overviewSection(transaction)
-                insightSection(transaction)
-                timingSection(transaction)
-                payloadSection(transaction)
-                relatedSection(transaction)
-                toolsSection(transaction)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ruleImpactSection(transaction)
+                    overviewSection(transaction)
+                    payloadSection(transaction)
+                    insightSection(transaction)
+                    timingSection(transaction)
+                    relatedSection(transaction)
+                    notesSection(transaction)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listStyle(.inset)
-            .scrollContentBackground(.hidden)
 
             singleSelectionActionBar(transaction)
         }
@@ -86,65 +190,55 @@ struct ContextDetailsView: View {
         HStack(alignment: .top, spacing: 9) {
             Circle()
                 .fill(statusColor(for: transaction))
-                .frame(width: 9, height: 9)
+                .frame(width: 8, height: 8)
                 .padding(.top, 5)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(transaction.request.method)
-                        .font(.caption.weight(.semibold).monospaced())
+                        .font(.system(size: metrics.secondaryFontSize, weight: .semibold, design: .monospaced))
                     Text(transaction.response.map { String($0.statusCode) } ?? String(localized: "Pending"))
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(.system(size: metrics.secondaryFontSize, weight: .semibold, design: .monospaced))
                         .foregroundStyle(statusColor(for: transaction))
                 }
                 Text(transaction.request.host)
-                    .font(.headline)
+                    .font(.system(size: metrics.primaryFontSize, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .textSelection(.enabled)
                 Text(transaction.request.path)
-                    .font(.caption.monospaced())
+                    .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .truncationMode(.middle)
+                    .textSelection(.enabled)
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.clear)
     }
 
     private func overviewSection(_ transaction: HTTPTransaction) -> some View {
-        Section(String(localized: "Overview")) {
-            nativeValueRow(String(localized: "Outcome"), outcomeText(for: transaction), color: statusColor(for: transaction))
-            nativeValueRow(String(localized: "Application"), transaction.clientApp ?? String(localized: "Unknown"))
-            nativeValueRow(String(localized: "Protocol"), transaction.request.httpVersion)
-            nativeValueRow(String(localized: "Transport"), transportText(for: transaction))
-            nativeValueRow(String(localized: "Duration"), durationText(for: transaction))
-            nativeValueRow(String(localized: "Transferred"), transferredText(for: transaction))
-            if let sourcePort = transaction.sourcePort {
-                nativeValueRow(String(localized: "Source Port"), String(sourcePort))
-            }
-        }
+        ContextInspectorFieldTable(
+            title: String(localized: "Details"),
+            fields: overviewFields(transaction)
+        )
     }
 
     private func insightSection(_ transaction: HTTPTransaction) -> some View {
-        Section(String(localized: "Insights")) {
-            ForEach(insights(for: transaction)) { insight in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: insight.systemImage)
-                        .foregroundStyle(insight.color)
-                        .frame(width: 16)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(insight.title)
-                            .font(.subheadline.weight(.medium))
-                        Text(insight.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        let values = insights(for: transaction)
+        return ContextInspectorTable(title: String(localized: "Insights")) {
+            ForEach(Array(values.enumerated()), id: \.element.id) { index, insight in
+                if index > 0 {
+                    Divider()
                 }
-                .listRowBackground(insight.color.opacity(0.08))
+                ContextInspectorInsightRow(
+                    systemImage: insight.systemImage,
+                    title: insight.title,
+                    detail: insight.detail,
+                    color: insight.color
+                )
             }
         }
     }
@@ -154,101 +248,187 @@ struct ContextDetailsView: View {
         if let timing = transaction.timingInfo {
             let phases = timingPhases(timing)
             let slowest = phases.max { $0.duration < $1.duration }
-            Section(String(localized: "Timing")) {
+            ContextInspectorDisclosureTable(
+                title: String(localized: "Timing"),
+                isExpanded: $isTimingExpanded,
+                summary: formatDuration(timing.totalDuration)
+            ) {
                 if let slowest {
-                    nativeValueRow(String(localized: "Slowest Phase"), slowest.title)
+                    ContextInspectorFieldRow(field: ContextTableField(
+                        label: String(localized: "Slowest Phase"),
+                        value: slowest.title,
+                        monospaced: false
+                    ))
+                    Divider()
                 }
-                ForEach(phases) { phase in
-                    LabeledContent(phase.title) {
-                        Text(phaseDurationText(phase.duration, total: timing.totalDuration))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                ForEach(Array(phases.enumerated()), id: \.element.id) { index, phase in
+                    if index > 0 {
+                        Divider()
                     }
-                    .font(.caption)
+                    ContextInspectorFieldRow(field: ContextTableField(
+                        label: phase.title,
+                        value: phaseDurationText(phase.duration, total: timing.totalDuration)
+                    ))
                 }
             }
         }
     }
 
     private func payloadSection(_ transaction: HTTPTransaction) -> some View {
-        Section(String(localized: "Payload")) {
-            nativeValueRow(
-                String(localized: "Request"),
-                payloadSummary(body: transaction.request.body, contentType: transaction.request.contentType)
-            )
-            nativeValueRow(
-                String(localized: "Response"),
-                payloadSummary(body: transaction.response?.body, contentType: transaction.response?.contentType)
-            )
-            nativeValueRow(String(localized: "Request Headers"), "\(transaction.request.headers.count)")
-            nativeValueRow(String(localized: "Response Headers"), "\(transaction.response?.headers.count ?? 0)")
+        ContextInspectorTable(title: String(localized: "Payload")) {
+            ContextInspectorFieldRow(field: ContextTableField(
+                label: String(localized: "Request"),
+                value: payloadSummary(body: transaction.request.body, contentType: transaction.request.contentType)
+            ))
+            Divider()
+            ContextInspectorFieldRow(field: ContextTableField(
+                label: String(localized: "Response"),
+                value: payloadSummary(
+                    body: transaction.response?.body,
+                    contentType: transaction.response?.contentType
+                )
+            ))
+            Divider()
+            ContextInspectorFieldRow(field: ContextTableField(
+                label: String(localized: "Request Headers"),
+                value: "\(transaction.request.headers.count)"
+            ))
+            Divider()
+            ContextInspectorFieldRow(field: ContextTableField(
+                label: String(localized: "Response Headers"),
+                value: "\(transaction.response?.headers.count ?? 0)"
+            ))
             if transaction.response?.bodyTruncated == true {
-                Label(String(localized: "Response body was truncated during capture"), systemImage: "scissors")
-                    .font(.caption)
+                Divider()
+                ContextInspectorFullRow {
+                    Label(
+                        String(localized: "Response body was truncated during capture"),
+                        systemImage: "scissors"
+                    )
+                    .font(.system(size: metrics.metadataFontSize))
                     .foregroundStyle(.orange)
+                }
             }
         }
     }
 
     private func relatedSection(_ transaction: HTTPTransaction) -> some View {
-        let related = relatedTransactions(to: transaction)
-        return Section(String(localized: "Related Requests")) {
+        let related = Array(relatedTransactions(to: transaction).prefix(6))
+        return ContextInspectorDisclosureTable(
+            title: String(localized: "Related Requests"),
+            isExpanded: $isRelatedExpanded,
+            summary: related.isEmpty ? nil : "\(related.count)"
+        ) {
             if related.isEmpty {
-                Text(String(localized: "No other requests to this host in the current session."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ContextInspectorFullRow {
+                    Text(String(localized: "No other requests to this host in the current session."))
+                        .font(.system(size: metrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
+                }
             } else {
-                ForEach(related.prefix(6)) { item in
-                    Button {
-                        coordinator.selectedTransactionIDs = [item.id]
-                        coordinator.selectTransaction(item)
-                    } label: {
-                        HStack(spacing: 7) {
-                            Circle()
-                                .fill(statusColor(for: item))
-                                .frame(width: 6, height: 6)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(item.request.path)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                Text(relativeTimeText(item.timestamp, from: transaction.timestamp))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 6)
-                            Text(item.response.map { String($0.statusCode) } ?? "—")
-                                .monospacedDigit()
-                                .foregroundStyle(statusColor(for: item))
-                        }
-                        .font(.caption)
-                        .contentShape(Rectangle())
+                ForEach(Array(related.enumerated()), id: \.element.id) { index, item in
+                    if index > 0 {
+                        Divider()
                     }
-                    .buttonStyle(.plain)
+                    relatedRequestRow(item, reference: transaction)
                 }
             }
         }
     }
 
-    private func toolsSection(_ transaction: HTTPTransaction) -> some View {
-        Section(String(localized: "Rules & Tools")) {
-            if transaction.matchedRuleID != nil {
-                Label {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(transaction.matchedRuleName ?? String(localized: "Rule matched"))
-                        if let summary = transaction.matchedRuleActionSummary {
-                            Text(summary).font(.caption).foregroundStyle(.secondary)
-                        }
-                        if let pattern = transaction.matchedRulePattern {
-                            Text(pattern).font(.caption2.monospaced()).foregroundStyle(.tertiary)
-                        }
+    private func relatedRequestRow(_ item: HTTPTransaction, reference: HTTPTransaction) -> some View {
+        Button {
+            coordinator.selectedTransactionIDs = [item.id]
+            coordinator.selectTransaction(item)
+        } label: {
+            ContextInspectorFullRow {
+                HStack(spacing: 7) {
+                    Circle()
+                        .fill(statusColor(for: item))
+                        .frame(width: 6, height: 6)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.request.path)
+                            .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(relativeTimeText(item.timestamp, from: reference.timestamp))
+                            .font(.system(size: metrics.metadataFontSize))
+                            .foregroundStyle(.secondary)
                     }
-                } icon: {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Spacer(minLength: 6)
+                    Text(item.response.map { String($0.statusCode) } ?? "—")
+                        .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                        .foregroundStyle(statusColor(for: item))
+                }
+                .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func ruleImpactSection(_ transaction: HTTPTransaction) -> some View {
+        ContextInspectorTable(title: String(localized: "Rule Impact")) {
+            if transaction.matchedRuleID != nil {
+                ContextInspectorFieldRow(field: ContextTableField(
+                    label: String(localized: "Rule"),
+                    value: transaction.matchedRuleName ?? String(localized: "Rule matched"),
+                    monospaced: false,
+                    color: .green
+                ))
+                if let summary = transaction.matchedRuleActionSummary {
+                    Divider()
+                    ContextInspectorFieldRow(field: ContextTableField(
+                        label: String(localized: "Action"),
+                        value: summary,
+                        monospaced: false
+                    ))
+                }
+                if let pattern = transaction.matchedRulePattern {
+                    Divider()
+                    ContextInspectorFieldRow(field: ContextTableField(
+                        label: String(localized: "Pattern"),
+                        value: pattern
+                    ))
+                }
+                if let target = matchedRuleNavigationTarget(transaction), let windowID = target.windowID {
+                    Divider()
+                    openRuleActionRow(windowID: windowID, help: target.openHelp)
                 }
             } else {
-                Label(String(localized: "No rule modified this request"), systemImage: "minus.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ContextInspectorFullRow {
+                    Label(String(localized: "No rule modified this request"), systemImage: "minus.circle")
+                        .font(.system(size: metrics.secondaryFontSize))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func openRuleActionRow(windowID: String, help: String?) -> some View {
+        Button {
+            openWindow(id: windowID)
+        } label: {
+            ContextInspectorFullRow {
+                HStack(spacing: 6) {
+                    Label(String(localized: "Open Rule"), systemImage: "arrow.up.forward.app")
+                        .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                        .foregroundStyle(Color.accentColor)
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: metrics.metadataFontSize, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.plain)
+        .help(help ?? String(localized: "Open the rule's editor window"))
+    }
+
+    private func notesSection(_ transaction: HTTPTransaction) -> some View {
+        ContextInspectorTable(title: String(localized: "Notes")) {
+            ContextInspectorFullRow {
+                ContextNotesEditor(coordinator: coordinator, transaction: transaction)
             }
         }
     }
@@ -285,74 +465,39 @@ struct ContextDetailsView: View {
         }
     }
 
-    private var multiSelectionContent: some View {
-        VStack(spacing: 0) {
-            List {
-                Section(String(localized: "Selection")) {
-                    nativeValueRow(String(localized: "Requests"), "\(selectedTransactions.count)")
-                    nativeValueRow(
-                        String(localized: "Hosts"),
-                        "\(Set(selectedTransactions.map { $0.request.host }).count)"
-                    )
-                    nativeValueRow(
-                        String(localized: "Errors"),
-                        "\(selectedErrorCount)",
-                        color: selectedErrorCount > 0 ? .red : .secondary
-                    )
-                    nativeValueRow(
-                        String(localized: "Rules Hit"),
-                        "\(selectedTransactions.count { $0.matchedRuleID != nil })"
-                    )
-                    nativeValueRow(String(localized: "Transferred"), selectedTransferredText)
-                }
-
-                Section(String(localized: "Inspector")) {
-                    Text(String(localized: "Select one request to inspect payload and timing details."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .listStyle(.inset)
-
-            WorkspaceFooterBar(horizontalPadding: 10) {
-                HStack(spacing: 8) {
-                    Button {
-                        let transactions = selectedTransactions
-                        guard transactions.count == 2 else {
-                            return
-                        }
-                        coordinator.compareTransactions(transactions[0], transactions[1])
-                    } label: {
-                        Label(String(localized: "Compare"), systemImage: "arrow.left.arrow.right")
-                    }
-                    .disabled(selectedTransactions.count != 2)
-                    Spacer()
-                    Button {
-                        coordinator.presentSelectedExport(format: .har)
-                    } label: {
-                        Label(String(localized: "Export Selection"), systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(selectedTransactions.isEmpty)
-                }
-                .controlSize(.small)
-            }
+    private func overviewFields(_ transaction: HTTPTransaction) -> [ContextTableField] {
+        var fields: [ContextTableField] = [
+            ContextTableField(
+                label: String(localized: "Outcome"),
+                value: outcomeText(for: transaction),
+                color: statusColor(for: transaction)
+            ),
+            ContextTableField(
+                label: String(localized: "Application"),
+                value: transaction.clientApp ?? String(localized: "Unknown"),
+                monospaced: false
+            ),
+            ContextTableField(label: String(localized: "Protocol"), value: transaction.request.httpVersion),
+            ContextTableField(label: String(localized: "Transport"), value: transportText(for: transaction)),
+            ContextTableField(label: String(localized: "Duration"), value: durationText(for: transaction)),
+            ContextTableField(label: String(localized: "Transferred"), value: transferredText(for: transaction)),
+        ]
+        if let sourcePort = transaction.sourcePort {
+            fields.append(ContextTableField(label: String(localized: "Source Port"), value: String(sourcePort)))
         }
+        return fields
     }
 
-    private var selectedTransactions: [HTTPTransaction] {
-        coordinator.resolveSelectedTransactions()
-    }
-
-    private var selectedErrorCount: Int {
-        selectedTransactions.count { ($0.response?.statusCode ?? 0) >= 400 || $0.state == .failed }
-    }
-
-    private var selectedTransferredText: String {
-        let bytes = selectedTransactions.reduce(Int64(0)) { partial, transaction in
-            partial + Int64(transaction.request.body?.count ?? 0)
-                + Int64(transaction.response?.body?.count ?? 0)
+    /// Resolves the live matched rule so "Open Rule" routes to the correct existing tool window.
+    /// Returns `nil` when the rule was deleted or has no dedicated window, so the button hides
+    /// instead of routing to a wrong surface.
+    private func matchedRuleNavigationTarget(_ transaction: HTTPTransaction) -> MatchedRuleNavigationTarget? {
+        guard let id = transaction.matchedRuleID,
+              let rule = coordinator.rules.first(where: { $0.id == id }) else
+        {
+            return nil
         }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        return MatchedRuleNavigationTarget(action: rule.action)
     }
 
     private func insights(for transaction: HTTPTransaction) -> [ContextInsight] {
@@ -403,7 +548,9 @@ struct ContextDetailsView: View {
             values.append(ContextInsight(
                 id: "host-baseline",
                 title: String(localized: "Slower than this host's recent requests"),
-                detail: String(localized: "About \(percent)% slower than the session median of \(formatDuration(baseline))."),
+                detail: String(
+                    localized: "About \(percent)% slower than the session median of \(formatDuration(baseline))."
+                ),
                 systemImage: "chart.line.uptrend.xyaxis",
                 color: .orange
             ))
@@ -463,7 +610,7 @@ struct ContextDetailsView: View {
             values.append(ContextInsight(
                 id: "rule",
                 title: String(localized: "A rule affected this request"),
-                detail: transaction.matchedRuleActionSummary ?? String(localized: "Review Rules & Tools below."),
+                detail: transaction.matchedRuleActionSummary ?? String(localized: "Review Rule Impact above."),
                 systemImage: "wand.and.stars",
                 color: .green
             ))
@@ -528,16 +675,6 @@ struct ContextDetailsView: View {
         ]
     }
 
-    private func nativeValueRow(_ label: String, _ value: String, color: Color = .secondary) -> some View {
-        LabeledContent(label) {
-            Text(value)
-                .foregroundStyle(color)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
-        }
-        .font(.caption)
-    }
-
     private func outcomeText(for transaction: HTTPTransaction) -> String {
         if let response = transaction.response {
             return "\(response.statusCode) \(response.statusMessage)"
@@ -599,5 +736,90 @@ struct ContextDetailsView: View {
         case 500...: return .red
         default: return .secondary
         }
+    }
+}
+
+// MARK: - ContextNotesEditor
+
+/// Compact Notes editor for the Context Dock. Routes every edit through the coordinator's note seam
+/// (`updateNoteDraft`) so whitespace is normalized, the Library's Notes collection stays in sync, and
+/// persistence is debounced instead of rewriting the transaction row on every keystroke. Its own
+/// `@State` seeds from the selection because the enclosing single-selection content carries
+/// `.id(transaction.id)`; `onDisappear` flushes any pending write when the selection changes.
+private struct ContextNotesEditor: View {
+    // MARK: Internal
+
+    let coordinator: MainContentCoordinator
+    let transaction: HTTPTransaction
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .topLeading) {
+                if noteText.isEmpty {
+                    Text(String(localized: "Add a note about this request…"))
+                        .font(.system(size: metrics.primaryFontSize))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 4)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $noteText)
+                    .font(.system(size: metrics.primaryFontSize))
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 52, maxHeight: 108)
+                    .padding(.horizontal, 1)
+                    .accessibilityLabel(String(localized: "Request note"))
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color(nsColor: .textBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                    )
+            )
+
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                Button(action: saveNote) {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .disabled(!isDirty)
+                .help(String(localized: "Save Note"))
+                .accessibilityLabel(String(localized: "Save Note"))
+            }
+        }
+        .onAppear {
+            noteText = transaction.comment ?? ""
+            lastExplicitlySavedNote = MainContentCoordinator.normalizedNote(noteText)
+        }
+        .onChange(of: noteText) { _, newValue in
+            coordinator.updateNoteDraft(newValue, for: transaction)
+        }
+        .onDisappear {
+            coordinator.flushNotePersistence(for: transaction)
+        }
+    }
+
+    // MARK: Private
+
+    @State private var noteText = ""
+    @State private var lastExplicitlySavedNote: String?
+    @Environment(\.appUIDisplayMetrics) private var metrics
+
+    /// Tracks changes since the user's last explicit save. Inline editing still keeps the existing
+    /// debounce and selection-change safety, while this state gives the Save action a stable lifecycle
+    /// even though the coordinator updates the in-memory transaction immediately.
+    private var isDirty: Bool {
+        MainContentCoordinator.normalizedNote(noteText) != lastExplicitlySavedNote
+    }
+
+    /// Commits the current draft immediately, cancelling the debounced write so the note is
+    /// persisted right away instead of waiting on the autosave timer.
+    private func saveNote() {
+        coordinator.setNote(noteText, for: transaction)
+        lastExplicitlySavedNote = MainContentCoordinator.normalizedNote(noteText)
     }
 }

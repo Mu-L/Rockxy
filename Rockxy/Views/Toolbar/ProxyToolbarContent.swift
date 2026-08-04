@@ -7,8 +7,7 @@ import SwiftUI
 /// Main window toolbar providing start/stop, Developer Setup access, and inspector
 /// layout toggle buttons, plus the central proxy status indicator.
 struct ProxyToolbarContent: ToolbarContent {
-    @Environment(\.openWindow) private var openWindow
-    @ObservedObject private var updater = AppUpdater.shared
+    // MARK: Internal
 
     @Bindable var coordinator: MainContentCoordinator
 
@@ -48,7 +47,12 @@ struct ProxyToolbarContent: ToolbarContent {
                     systemImage: "rectangle.split.1x2"
                 )
             }
-            .help(String(localized: "Show or hide the bottom inspector panel"))
+            .help(
+                coordinator.canToggleBottomInspector
+                    ? String(localized: "Show or hide the bottom inspector panel")
+                    : String(localized: "Select a request to use the bottom inspector")
+            )
+            .disabled(!coordinator.canToggleBottomInspector)
 
             Button {
                 coordinator.toggleInspectorRight()
@@ -77,13 +81,18 @@ struct ProxyToolbarContent: ToolbarContent {
             )
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.openWindow) private var openWindow
+    @ObservedObject private var updater = AppUpdater.shared
 }
 
 // MARK: - ProxyToolbarStatusView
 
 /// Reusable status content for the AppKit-owned main toolbar.
 struct ProxyToolbarStatusView: View {
-    @ObservedObject private var updater = AppUpdater.shared
+    // MARK: Internal
 
     @Bindable var coordinator: MainContentCoordinator
 
@@ -101,4 +110,8 @@ struct ProxyToolbarStatusView: View {
             showPopover: $coordinator.showProxyStatusPopover
         )
     }
+
+    // MARK: Private
+
+    @ObservedObject private var updater = AppUpdater.shared
 }

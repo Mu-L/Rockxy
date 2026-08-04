@@ -139,20 +139,19 @@ extension MainContentCoordinator {
 
     func promptComment(for transaction: HTTPTransaction) {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Add Comment")
-        alert.informativeText = String(localized: "Enter a comment for this request:")
+        alert.messageText = String(localized: "Add Note")
+        alert.informativeText = String(localized: "Enter a note for this request:")
         alert.addButton(withTitle: String(localized: "OK"))
         alert.addButton(withTitle: String(localized: "Cancel"))
 
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         input.stringValue = transaction.comment ?? ""
-        input.placeholderString = String(localized: "Comment…")
+        input.placeholderString = String(localized: "Note…")
         alert.accessoryView = input
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            transaction.comment = input.stringValue.isEmpty ? nil : input.stringValue
-            refreshRowsAfterMutation()
+            setNote(input.stringValue, for: transaction)
         }
     }
 
@@ -311,6 +310,7 @@ extension MainContentCoordinator {
         filter.sidebarScope = switch section {
         case .pinned: .pinned
         case .saved: .saved
+        case .notes: .notes
         }
 
         let title = favoriteTransactionDisplayName(transaction)
@@ -329,6 +329,9 @@ extension MainContentCoordinator {
             transaction.isPinned = false
         case .saved:
             transaction.isSaved = false
+        case .notes:
+            noteFlushTasks.removeValue(forKey: transaction.id)?.cancel()
+            transaction.comment = nil
         }
 
         invalidateSidebarFavoriteCache()
@@ -422,13 +425,13 @@ extension MainContentCoordinator {
 
     // MARK: - Row Refresh After Mutation
 
-    /// Refreshes all workspaces after a row-visible property mutation (pin, save, comment,
-    /// highlight). Workspaces in saved/pinned scopes get a full recompute because membership
-    /// may have changed. Other workspaces just re-derive rows.
+    /// Refreshes all workspaces after a row-visible property mutation (pin, save, note,
+    /// highlight). Library scopes get a full recompute because membership may have changed.
     func refreshRowsAfterMutation() {
         for workspace in workspaceStore.workspaces {
             if workspace.filterCriteria.sidebarScope == .saved
                 || workspace.filterCriteria.sidebarScope == .pinned
+                || workspace.filterCriteria.sidebarScope == .notes
             {
                 recomputeFilteredTransactions(for: workspace)
             } else {
@@ -440,7 +443,7 @@ extension MainContentCoordinator {
 
     // MARK: - Persistence
 
-    private func persistTransaction(_ transaction: HTTPTransaction) {
+    func persistTransaction(_ transaction: HTTPTransaction) {
         do {
             let store = try resolveSessionStore()
             Task {
@@ -455,12 +458,12 @@ extension MainContentCoordinator {
         }
     }
 
-    private func updatePersistedFavoriteCache(after transaction: HTTPTransaction) {
+    func updatePersistedFavoriteCache(after transaction: HTTPTransaction) {
         guard let index = persistedFavorites.firstIndex(where: { $0.id == transaction.id }) else {
             return
         }
 
-        if transaction.isPinned || transaction.isSaved {
+        if transaction.isPinned || transaction.isSaved || transaction.hasNote {
             persistedFavorites[index] = transaction
         } else {
             persistedFavorites.remove(at: index)
