@@ -33,6 +33,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.33.0] - 2026-08-04
+
+### Added
+
+- Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.
+- New empty-state guidance explains why no requests are visible and provides relevant recovery actions.
+
+### Fixed
+
+- Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.
+
+### Changed
+
+- Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.
+- Request and response inspectors remain readable when resizing the workspace or bottom panel.
+- Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.
+- Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.
+
 ## [0.32.0] - 2026-08-01
 
 ### Added

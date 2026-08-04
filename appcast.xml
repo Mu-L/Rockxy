@@ -6,41 +6,34 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.32.0 (build 49)</title>
-      <pubDate>Sat, 01 Aug 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-08-01T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.33.0 (build 50)</title>
+      <pubDate>Tue, 04 Aug 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-08-04T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.32.0/Rockxy-0.32.0-49.dmg"
-        sparkle:version="49"
-        sparkle:shortVersionString="0.32.0"
-        sparkle:edSignature="RLkDLHVmxAiN2OBXb84MS5R71gQe4CBkuB33JK17VG3/wWNq0RuW0IZ4EKsjyCkys+5Rqpc8oClLhxyMHmGyCQ=="
-        length="33811967"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.33.0/Rockxy-0.33.0-50.dmg"
+        sparkle:version="50"
+        sparkle:shortVersionString="0.33.0"
+        sparkle:edSignature="tEv9owKa5iK5VdBdUEnuxeLKksI2dGc8Gonw2iLxPWEmfKiLTqZu9i+8/dlBtKpSA7URUz8t/geOK8gghdFLDA=="
+        length="34038077"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.32.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.33.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
-  <li>Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.</li>
-  <li>Added privacy-aware local analysis and optional configured model workflows, with a review step before selected traffic is shared.</li>
-  <li>Added secure Babylon pairing and capture intake for supported companion traffic sessions.</li>
+  <li>Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.</li>
+  <li>New empty-state guidance explains why no requests are visible and provides relevant recovery actions.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
-  <li>Kept investigations anchored to the exact request being reviewed.</li>
-  <li>Prevented configured provider traffic from being captured back into the active session.</li>
-  <li>Fixed certificate-share and Developer Setup probe lifecycle races so Stop reliably prevents an in-flight server start from publishing afterward.</li>
-  <li>Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.</li>
+  <li>Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.</li>
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Rebuilt the workspace around native macOS split views for steadier sidebar, request list, Context Dock, and inspector resizing.</li>
-  <li>Refined Settings with a stable native sidebar width and correctly aligned titlebar toggle.</li>
-  <li>Restored the Workspace login item beside the Start/Stop controls and refreshed its login flow with native macOS controls.</li>
-  <li>Clarified that Workspace connection and Pro license activation are separate states, keeping their displayed status synchronized.</li>
-  <li>Reworked Developer Setup into a compact, target-aware workflow with contextual guidance, resizable windows, clearer actions, and accurate launch results.</li>
-  <li>Refined license activation, Workspace sharing, Android automation, export review, and publishing confirmation flows for consistent keyboard and accessibility behavior.</li>
-  <li>Kept advanced model, Web3, and gRPC inspector tabs available at the end of the inspector tab row.</li>
+  <li>Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.</li>
+  <li>Request and response inspectors remain readable when resizing the workspace or bottom panel.</li>
+  <li>Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.</li>
+  <li>Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.</li>
 </ul>
       ]]></description>
     </item>

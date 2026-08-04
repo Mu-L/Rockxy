@@ -59,30 +59,23 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.32.0** — 2026-08-01
+**v0.33.0** — 2026-08-04
 
 ### Added
 
-- Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.
-- Added privacy-aware local analysis and optional configured model workflows, with a review step before selected traffic is shared.
-- Added secure Babylon pairing and capture intake for supported companion traffic sessions.
+- Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.
+- New empty-state guidance explains why no requests are visible and provides relevant recovery actions.
 
 ### Fixed
 
-- Kept investigations anchored to the exact request being reviewed.
-- Prevented configured provider traffic from being captured back into the active session.
-- Fixed certificate-share and Developer Setup probe lifecycle races so Stop reliably prevents an in-flight server start from publishing afterward.
-- Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.
+- Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.
 
 ### Changed
 
-- Rebuilt the workspace around native macOS split views for steadier sidebar, request list, Context Dock, and inspector resizing.
-- Refined Settings with a stable native sidebar width and correctly aligned titlebar toggle.
-- Restored the Workspace login item beside the Start/Stop controls and refreshed its login flow with native macOS controls.
-- Clarified that Workspace connection and Pro license activation are separate states, keeping their displayed status synchronized.
-- Reworked Developer Setup into a compact, target-aware workflow with contextual guidance, resizable windows, clearer actions, and accurate launch results.
-- Refined license activation, Workspace sharing, Android automation, export review, and publishing confirmation flows for consistent keyboard and accessibility behavior.
-- Kept advanced model, Web3, and gRPC inspector tabs available at the end of the inspector tab row.
+- Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.
+- Request and response inspectors remain readable when resizing the workspace or bottom panel.
+- Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.
+- Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
