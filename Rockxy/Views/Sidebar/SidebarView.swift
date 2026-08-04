@@ -200,6 +200,7 @@ struct SidebarView: View {
     @State private var isDomainsExpanded = false
     @State private var isPinnedExpanded = false
     @State private var isSavedExpanded = false
+    @State private var isNotesExpanded = false
     @State private var expandedAppNames: Set<String> = []
     @State private var expandedDomainNodeIDs: Set<String> = []
     @Environment(\.appUIDisplayMetrics) private var metrics
@@ -236,6 +237,10 @@ struct SidebarView: View {
 
     private var savedTransactions: [HTTPTransaction] {
         SidebarSearchFilter.transactions(coordinator.allSavedTransactions, query: sidebarFilterText)
+    }
+
+    private var notesTransactions: [HTTPTransaction] {
+        SidebarSearchFilter.transactions(coordinator.allNotesTransactions, query: sidebarFilterText)
     }
 
     private var filteredFavorites: [SidebarItem] {
@@ -481,6 +486,44 @@ struct SidebarView: View {
                     .frame(minHeight: metrics.sidebarRowHeight)
                     .contentShape(Rectangle())
                     .onTapGesture { coordinator.selectSidebarItem(.allSaved) }
+            }
+
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isNotesExpanded)) {
+                let notes = notesTransactions
+                if notes.isEmpty {
+                    Text(
+                        SidebarSearchFilter.hasQuery(sidebarFilterText)
+                            ? String(localized: "No matching notes")
+                            : String(localized: "No notes")
+                    )
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: metrics.sidebarSecondaryFontSize))
+                        .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
+                } else {
+                    ForEach(notes) { transaction in
+                        Label {
+                            Text(transaction.request.host + transaction.request.path)
+                                .font(sidebarNavigationFont)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: "note.text")
+                                .font(sidebarIconFont)
+                        }
+                        .font(sidebarNavigationFont)
+                        .tag(SidebarItem.noteTransaction(id: transaction.id))
+                        .frame(minHeight: metrics.sidebarRowHeight)
+                        .contextMenu {
+                            favoriteTransactionContextMenu(transaction, section: .notes)
+                        }
+                    }
+                }
+            } label: {
+                Label(String(localized: "Notes"), systemImage: "note.text")
+                    .badge(notesTransactions.count)
+                    .tag(SidebarItem.allNotes)
+                    .frame(minHeight: metrics.sidebarRowHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { coordinator.selectSidebarItem(.allNotes) }
             }
 
             ForEach(filteredFavorites, id: \.self) { item in

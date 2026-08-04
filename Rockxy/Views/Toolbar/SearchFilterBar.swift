@@ -6,15 +6,42 @@ import SwiftUI
 
 /// Single-field search bar with a field selector (URL, host, path, method) and enable/disable toggle.
 struct SearchFilterBar: View {
+    // MARK: Internal
+
     @Binding var searchText: String
     @Binding var filterField: FilterField
     @Binding var isEnabled: Bool
+
     let isAdvancedFilterVisible: Bool
     let advancedFilterCount: Int
     let onAddFilter: () -> Void
     let onToggleAdvancedFilters: () -> Void
 
     var body: some View {
+        // Widest tier first; `ViewThatFits` keeps the first that fits. The search field carries a
+        // useful minimum width so it stays the flexible dominant area and never collapses; when the
+        // wide row no longer fits, the compact fallback narrows the picker and drops the visible
+        // `Add Filter` title while keeping every control and its order intact.
+        ViewThatFits(in: .horizontal) {
+            filterRow(pickerWidth: 130, showsAddFilterTitle: true)
+            filterRow(pickerWidth: 100, showsAddFilterTitle: false)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, max(4, (metrics.fontSize - 10) / 3))
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .bottom) { Divider() }
+        .onReceive(NotificationCenter.default.publisher(for: .focusMainSearchField)) { _ in
+            isEnabled = true
+            isSearchFocused = true
+        }
+    }
+
+    // MARK: Private
+
+    @FocusState private var isSearchFocused: Bool
+    @Environment(\.appUIDisplayMetrics) private var metrics
+
+    private func filterRow(pickerWidth: CGFloat, showsAddFilterTitle: Bool) -> some View {
         HStack(spacing: 8) {
             Toggle("", isOn: $isEnabled)
                 .toggleStyle(.checkbox)
@@ -25,12 +52,13 @@ struct SearchFilterBar: View {
                     Text(field.displayName).tag(field)
                 }
             }
-            .frame(width: 130)
+            .frame(width: pickerWidth)
 
             TextField(String(localized: "Search..."), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(metrics.swiftUIFont())
                 .focused($isSearchFocused)
+                .frame(minWidth: 220, maxWidth: .infinity)
 
             if !searchText.isEmpty {
                 Button {
@@ -40,17 +68,23 @@ struct SearchFilterBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(String(localized: "Clear search"))
             }
 
             Divider()
                 .frame(height: 18)
 
             Button(action: onAddFilter) {
-                Label(String(localized: "Add Filter"), systemImage: "plus")
+                if showsAddFilterTitle {
+                    Label(String(localized: "Add Filter"), systemImage: "plus")
+                } else {
+                    Image(systemName: "plus")
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help(String(localized: "Add a compound filter rule"))
+            .accessibilityLabel(String(localized: "Add Filter"))
 
             Button(action: onToggleAdvancedFilters) {
                 HStack(spacing: 4) {
@@ -69,16 +103,5 @@ struct SearchFilterBar: View {
                 ? String(localized: "Hide compound filters")
                 : String(localized: "Show compound filters"))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, max(4, (metrics.fontSize - 10) / 3))
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) { Divider() }
-        .onReceive(NotificationCenter.default.publisher(for: .focusMainSearchField)) { _ in
-            isEnabled = true
-            isSearchFocused = true
-        }
     }
-
-    @FocusState private var isSearchFocused: Bool
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }

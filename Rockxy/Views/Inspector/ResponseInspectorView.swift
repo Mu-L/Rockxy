@@ -63,10 +63,6 @@ struct ResponseInspectorView: View {
     @State private var showPreviewPopover = false
     @Environment(\.appUIDisplayMetrics) private var metrics
 
-    private var hasProtocolTabs: Bool {
-        !ProtocolTabKind.availableTabs(for: transaction).isEmpty
-    }
-
     private var httpsPromptModel: HTTPSInspectionPromptModel? {
         HTTPSInspectionPromptModel.make(
             transaction: transaction,
@@ -89,10 +85,12 @@ struct ResponseInspectorView: View {
         return clientApp
     }
 
-    private var inspectorTabBar: some View {
-        InspectorTabStrip {
-            ForEach(ResponseInspectorTab.availableTabs(hasAIInspection: hasAIInspection), id: \.self) { tab in
-                InspectorTabButton(
+    private var tabDescriptors: [InspectorTabDescriptor] {
+        var descriptors: [InspectorTabDescriptor] = ResponseInspectorTab
+            .availableTabs(hasAIInspection: hasAIInspection)
+            .map { tab in
+                InspectorTabDescriptor(
+                    id: "native.\(tab.rawValue)",
                     title: tab.displayName,
                     isActive: protocolTab == nil && selectedPreviewTab == nil && selectedTab == tab
                 ) {
@@ -103,51 +101,42 @@ struct ResponseInspectorView: View {
                 }
             }
 
-            if !previewTabStore.responseTabs.isEmpty {
-                Divider()
-                    .frame(height: max(14, metrics.controlFontSize + 2))
-                    .padding(.horizontal, 4)
-
-                ForEach(previewTabStore.responseTabs) { tab in
-                    InspectorTabButton(
-                        title: tab.name,
-                        isActive: selectedPreviewTab == tab
-                    ) {
-                        selectionIntent = .preview
-                        protocolTab = nil
-                        selectedPreviewTab = tab
-                    }
+        for (index, tab) in previewTabStore.responseTabs.enumerated() {
+            descriptors.append(
+                InspectorTabDescriptor(
+                    id: "preview.\(tab.id)",
+                    title: tab.name,
+                    isActive: selectedPreviewTab == tab,
+                    startsNewGroup: index == 0
+                ) {
+                    selectionIntent = .preview
+                    protocolTab = nil
+                    selectedPreviewTab = tab
                 }
-            }
-
-            if hasProtocolTabs {
-                Divider()
-                    .frame(height: max(14, metrics.controlFontSize + 2))
-                    .padding(.horizontal, 4)
-
-                protocolTabButtons
-            }
-
-            Divider()
-                .frame(height: max(14, metrics.controlFontSize + 2))
-                .padding(.horizontal, 4)
-
-            previewTabMenuButton
-        } trailingContent: {
-            inspectorTrailingControls
+            )
         }
+
+        for (index, tab) in ProtocolTabKind.availableTabs(for: transaction).enumerated() {
+            descriptors.append(
+                InspectorTabDescriptor(
+                    id: "protocol.\(String(describing: tab))",
+                    title: tab.displayName,
+                    isActive: protocolTab == tab,
+                    startsNewGroup: index == 0
+                ) {
+                    selectionIntent = .protocolSpecific
+                    protocolTab = tab
+                    selectedPreviewTab = nil
+                }
+            )
+        }
+
+        return descriptors
     }
 
-    @ViewBuilder private var protocolTabButtons: some View {
-        ForEach(ProtocolTabKind.availableTabs(for: transaction), id: \.self) { tab in
-            InspectorTabButton(
-                title: tab.displayName,
-                isActive: protocolTab == tab
-            ) {
-                selectionIntent = .protocolSpecific
-                protocolTab = tab
-                selectedPreviewTab = nil
-            }
+    private var inspectorTabBar: some View {
+        InspectorTabStrip(tabs: tabDescriptors) {
+            inspectorTrailingControls
         }
     }
 
@@ -167,14 +156,16 @@ struct ResponseInspectorView: View {
         }
     }
 
-    @ViewBuilder private var inspectorTrailingControls: some View {
-        if protocolTab == nil,
-           selectedPreviewTab == nil,
-           selectedTab == .body
-        {
-            responseBodyOptionsMenu
-        } else {
-            EmptyView()
+    private var inspectorTrailingControls: some View {
+        HStack(spacing: 4) {
+            previewTabMenuButton
+
+            if protocolTab == nil,
+               selectedPreviewTab == nil,
+               selectedTab == .body
+            {
+                responseBodyOptionsMenu
+            }
         }
     }
 

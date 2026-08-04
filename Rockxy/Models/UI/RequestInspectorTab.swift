@@ -20,7 +20,7 @@ enum RequestInspectorTab: String, CaseIterable {
         case .cookies: "Cookies"
         case .raw: "Raw"
         case .synopsis: "Synopsis"
-        case .comments: "Comments"
+        case .comments: "Notes"
         }
     }
 }

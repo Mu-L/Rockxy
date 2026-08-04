@@ -173,6 +173,49 @@ struct AppUIDisplayMetrics: Equatable {
     }
 }
 
+// MARK: - BottomInspectorLayoutMetrics
+
+/// Font-aware minimum heights for the request-list / bottom-inspector split.
+///
+/// Pure and value-typed so the sizing can be verified without a live window. Both minima are
+/// derived from `AppUIDisplayMetrics` so the split tracks the Rockxy app font size instead of
+/// pinning fixed point values.
+struct BottomInspectorLayoutMetrics: Equatable {
+    // MARK: Lifecycle
+
+    init(appMetrics: AppUIDisplayMetrics = AppUIDisplayMetrics()) {
+        self.appMetrics = appMetrics
+    }
+
+    // MARK: Internal
+
+    let appMetrics: AppUIDisplayMetrics
+
+    /// Minimum height that keeps roughly six request rows plus the compact table header and
+    /// surrounding chrome visible. ≈200pt at the default 13pt app font, scaling up with it.
+    var requestListMinimumHeight: CGFloat {
+        let rowHeight = appMetrics.tableRowHeight
+        let rows = rowHeight * Self.visibleRequestRows
+        let header = rowHeight
+        return (rows + header + Self.requestChromeInset).rounded()
+    }
+
+    /// Minimum height for a compact, native inspector: the tab strip plus a readable stack of
+    /// content lines and vertical chrome. ≈232pt at 13pt, scaling up for larger app fonts.
+    var inspectorMinimumHeight: CGFloat {
+        let tabStrip = appMetrics.inspectorTabHeight
+        let contentLines = appMetrics.tableTextHeight * Self.inspectorVisibleLines
+        return (tabStrip + contentLines + Self.inspectorChromeInset).rounded()
+    }
+
+    // MARK: Private
+
+    private static let visibleRequestRows: CGFloat = 6
+    private static let requestChromeInset: CGFloat = 4
+    private static let inspectorVisibleLines: CGFloat = 10
+    private static let inspectorChromeInset: CGFloat = 29
+}
+
 // MARK: - DeveloperSetupDisplayMetrics
 
 struct DeveloperSetupDisplayMetrics: Equatable {

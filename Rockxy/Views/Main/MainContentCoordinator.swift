@@ -126,6 +126,7 @@ final class MainContentCoordinator {
         let key: SidebarFavoritesCacheKey
         let pinned: [HTTPTransaction]
         let saved: [HTTPTransaction]
+        let notes: [HTTPTransaction]
     }
 
     struct DebugAssistantTaskHandle {
@@ -249,6 +250,11 @@ final class MainContentCoordinator {
     @ObservationIgnored var observedDomainCountsByApp: [String: [String: Int]] = [:]
 
     nonisolated(unsafe) var sslProxyingObserver: NSObjectProtocol?
+
+    /// Pending debounced note-persistence tasks, keyed by transaction id. Inline note
+    /// editors update the model immediately but coalesce SQLite writes through these so a
+    /// large transaction row is not rewritten on every keystroke. See `+Notes`.
+    @ObservationIgnored var noteFlushTasks: [UUID: Task<Void, Never>] = [:]
 
     var systemProxyWarning: SystemProxyWarning? {
         guard let warning = readiness.activeWarning else {
@@ -405,6 +411,10 @@ final class MainContentCoordinator {
         sidebarFavoriteTransactions().saved
     }
 
+    var allNotesTransactions: [HTTPTransaction] {
+        sidebarFavoriteTransactions().notes
+    }
+
     var totalDomainCount: Int {
         activeWorkspace.totalDomainCount
     }
@@ -557,10 +567,14 @@ final class MainContentCoordinator {
         let liveSaved = transactions.filter(\.isSaved)
         let persistedSaved = persistedFavorites.filter(\.isSaved)
         let liveSavedIds = Set(liveSaved.map(\.id))
+        let liveNotes = transactions.filter(\.hasNote)
+        let persistedNotes = persistedFavorites.filter(\.hasNote)
+        let liveNoteIds = Set(liveNotes.map(\.id))
         let cache = SidebarFavoritesCache(
             key: key,
             pinned: livePinned + persistedPinned.filter { !livePinnedIds.contains($0.id) },
-            saved: liveSaved + persistedSaved.filter { !liveSavedIds.contains($0.id) }
+            saved: liveSaved + persistedSaved.filter { !liveSavedIds.contains($0.id) },
+            notes: liveNotes + persistedNotes.filter { !liveNoteIds.contains($0.id) }
         )
         sidebarFavoritesCache = cache
         return cache

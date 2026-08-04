@@ -69,6 +69,16 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     /// column sort. Must not be used by export, persistence, inspector, or replay.
     var sequenceNumber: Int = 0
 
+    /// Whether this transaction carries a user note. Membership in the Library's Notes
+    /// collection is derived from a non-empty, whitespace-trimmed `comment` — there is no
+    /// separate stored flag, unlike `isPinned` / `isSaved`.
+    var hasNote: Bool {
+        guard let comment else {
+            return false
+        }
+        return !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func applyMatchedRuleMetadata(from rule: ProxyRule) {
         matchedRuleID = rule.id
         matchedRuleName = rule.name

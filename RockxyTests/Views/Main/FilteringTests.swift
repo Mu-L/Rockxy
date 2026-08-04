@@ -761,6 +761,51 @@ struct FilteringTests {
         #expect(coordinator.filteredTransactions[0].id == match.id)
     }
 
+    // MARK: - Centralized Filter Reset
+
+    @Test("clearAllWorkspaceFilters clears every filter, focus, and scope field and restores traffic")
+    func clearAllWorkspaceFiltersResetsEverything() {
+        let coordinator = MainContentCoordinator()
+        let saved = TestFixtures.makeTransaction(url: "https://api.example.com/users/1")
+        saved.isSaved = true
+        let other = TestFixtures.makeTransaction(url: "https://other.com/test")
+        coordinator.transactions = [saved, other]
+
+        coordinator.filterCriteria.searchText = "users"
+        coordinator.filterCriteria.methods = ["GET"]
+        coordinator.filterCriteria.activeProtocolFilters = [.https]
+        coordinator.filterCriteria.sidebarDomain = "example.com"
+        coordinator.filterCriteria.sidebarScope = .saved
+        coordinator.filterCriteria.exactTransactionID = saved.id
+        coordinator.sidebarSelection = .allSaved
+        coordinator.isFilterBarVisible = true
+        coordinator.filterRules = [
+            FilterRule(isEnabled: true, field: .url, filterOperator: .contains, value: "users"),
+        ]
+        coordinator.activeWorkspace.activeTrafficSignal = .errors
+        let focusSet = FocusSet(name: "API", domain: "example.com")
+        coordinator.activeWorkspace.focusSets = [focusSet]
+        coordinator.activeWorkspace.activeFocusSetID = focusSet.id
+        coordinator.activeWorkspace.mutedTrafficSources = [.host("ads.example.com")]
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.hasActiveWorkspaceFilters)
+
+        coordinator.clearAllWorkspaceFilters()
+
+        #expect(coordinator.filterCriteria.sidebarScope == .allTraffic)
+        #expect(coordinator.filterCriteria.isEmpty)
+        #expect(coordinator.sidebarSelection == nil)
+        #expect(!coordinator.isFilterBarVisible)
+        #expect(coordinator.filterRules.count == 1)
+        #expect(coordinator.filterRules[0].value.isEmpty)
+        #expect(coordinator.activeWorkspace.activeTrafficSignal == nil)
+        #expect(coordinator.activeWorkspace.activeFocusSetID == nil)
+        #expect(coordinator.activeWorkspace.activeFocusSet == nil)
+        #expect(coordinator.activeWorkspace.mutedTrafficSources.isEmpty)
+        #expect(!coordinator.hasActiveWorkspaceFilters)
+        #expect(coordinator.filteredTransactions.count == 2)
+    }
+
     // MARK: Private
 
     // MARK: - Setup

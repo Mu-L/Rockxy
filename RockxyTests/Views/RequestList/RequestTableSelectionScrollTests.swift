@@ -636,11 +636,13 @@ struct RequestTableSelectionScrollTests {
         )
         let coordinator = RequestTableView.Coordinator(parent: parent)
         coordinator.rows = rows
-        let tableView = makeTableView(rowCount: rows.count, coordinator: coordinator, columns: ["method"])
+        let tableView = makeTableView(rowCount: rows.count, coordinator: coordinator, columns: ["method", "url"])
 
         let measuredWidth = coordinator.tableView(tableView, sizeToFitWidthOfColumn: 0)
         let cellView = coordinator.tableView(tableView, viewFor: tableView.tableColumns[0], row: 0)
         let textField = cellView?.subviews.first as? NSTextField
+        let urlCellView = coordinator.tableView(tableView, viewFor: tableView.tableColumns[1], row: 0)
+        let urlTextField = urlCellView?.subviews.first as? NSTextField
 
         #expect(measuredWidth <= 82)
         #expect(textField?.stringValue == "CONNECT")
@@ -648,6 +650,10 @@ struct RequestTableSelectionScrollTests {
         #expect(textField?.cell?.wraps == false)
         #expect((textField?.cell as? NSTextFieldCell)?.usesSingleLineMode == true)
         #expect((textField?.cell as? NSTextFieldCell)?.truncatesLastVisibleLine == true)
+        #expect(textField?.allowsExpansionToolTips == false)
+        #expect(urlTextField?.allowsExpansionToolTips == false)
+        #expect(urlTextField?.toolTip?.isEmpty == false)
+        #expect(urlTextField?.toolTip == urlTextField?.stringValue)
     }
 
     @Test("Request table SSL icon constraints shrink after large-to-small metric changes")
@@ -753,6 +759,8 @@ struct RequestTableSelectionScrollTests {
         #expect(fallbackView.frame.size.width == expected)
         #expect(fallbackView.frame.size.height == expected)
         #expect(leadingConstraintConstant(for: nameLabel, in: smallView) == expected + 4)
+        #expect(nameLabel.allowsExpansionToolTips == false)
+        #expect(nameLabel.toolTip == "Example Client")
     }
 
     @Test("Request table status, SSL, and client icons remain consistent after repeated metric changes")

@@ -105,6 +105,10 @@ struct NativeBottomInspectorSplitView<Primary: View, Inspector: View>: NSViewCon
         // Replacing either root during an outer SwiftUI/AppKit constraint pass can recurse
         // through SplitViewChildController and crash in swift_beginAccess.
         updateVisibilityCallback(on: controller)
+        controller.updateMinimumHeights(
+            primary: primaryMinimumHeight,
+            inspector: inspectorMinimumHeight
+        )
         if context.coordinator.shouldApplyPresentation(isInspectorPresented) {
             controller.setInspectorPresented(isInspectorPresented, animated: true)
         }
@@ -153,6 +157,10 @@ struct NativeBottomDeferredContent<Content: View>: View {
 // MARK: - NativeBottomInspectorSplitSizing
 
 enum NativeBottomInspectorSplitSizing {
+    /// Fraction of the available height seated above the divider (request list) on a fresh
+    /// layout, leaving the remainder to the inspector — ≈62% / 38%.
+    static let defaultRequestListRatio: CGFloat = 0.62
+
     static func resolve(_ proposal: ProposedViewSize, naturalHeight: CGFloat) -> CGSize? {
         let resolved = proposal.replacingUnspecifiedDimensions(
             by: CGSize(width: 800, height: naturalHeight)
@@ -166,11 +174,88 @@ enum NativeBottomInspectorSplitSizing {
     /// The split view can safely consume its pending initial state once both dimensions are
     /// finite and strictly positive. Collapsing or expanding into zero/insufficient bounds is
     /// what produced startup `Invalid view geometry` faults.
+    ///
+    /// Reads the raw stored size rather than `CGRect.width`/`.height`, which standardize a
+    /// negative size and report it as positive — a raw-negative provisional frame must be
+    /// rejected, not silently accepted.
     static func isLayoutReady(_ bounds: CGRect) -> Bool {
-        bounds.width.isFinite
-            && bounds.height.isFinite
-            && bounds.width > 0
-            && bounds.height > 0
+        let width = bounds.size.width
+        let height = bounds.size.height
+        return width.isFinite
+            && height.isFinite
+            && width > 0
+            && height > 0
+    }
+
+    /// Whether `totalHeight` can seat the requested panes at their declared minimum thickness,
+    /// including the divider when the inspector is presented.
+    ///
+    /// A merely positive, finite height is not sufficient readiness: an early provisional AppKit
+    /// layout pass can report a positive-but-too-short height. Latching the initial layout there
+    /// seats the panes at their minima and blocks the later, correctly-sized pass from applying
+    /// the ideal ratio.
+    static func canSeatRequestedMinima(
+        totalHeight: CGFloat,
+        dividerThickness: CGFloat,
+        inspectorPresented: Bool,
+        primaryMinimumHeight: CGFloat,
+        inspectorMinimumHeight: CGFloat
+    )
+        -> Bool
+    {
+        guard totalHeight.isFinite,
+              dividerThickness.isFinite,
+              primaryMinimumHeight.isFinite,
+              inspectorMinimumHeight.isFinite,
+              totalHeight > 0,
+              dividerThickness >= 0,
+              primaryMinimumHeight >= 0,
+              inspectorMinimumHeight >= 0 else
+        {
+            return false
+        }
+
+        let inspectorHeight = inspectorPresented ? inspectorMinimumHeight : 0
+        let divider = inspectorPresented ? dividerThickness : 0
+        return totalHeight >= primaryMinimumHeight + inspectorHeight + divider
+    }
+
+    /// Ideal height for the top (request list) pane on a fresh layout, placing `requestListRatio`
+    /// of the available height above the divider while honoring both minima. Returns `nil` when
+    /// the split is too short to seat both panes, telling the caller to defer to AppKit
+    /// constraints instead of forcing a position that would drive a pane negative.
+    static func idealPrimaryHeight(
+        totalHeight: CGFloat,
+        dividerThickness: CGFloat,
+        requestListRatio: CGFloat,
+        primaryMinimumHeight: CGFloat,
+        inspectorMinimumHeight: CGFloat
+    )
+        -> CGFloat?
+    {
+        guard totalHeight.isFinite,
+              dividerThickness.isFinite,
+              requestListRatio.isFinite,
+              primaryMinimumHeight.isFinite,
+              inspectorMinimumHeight.isFinite,
+              totalHeight > 0,
+              dividerThickness >= 0,
+              (0 ... 1).contains(requestListRatio),
+              primaryMinimumHeight >= 0,
+              inspectorMinimumHeight >= 0 else
+        {
+            return nil
+        }
+
+        let available = totalHeight - dividerThickness
+        let lowerBound = primaryMinimumHeight
+        let upperBound = available - inspectorMinimumHeight
+        guard upperBound >= lowerBound else {
+            return nil
+        }
+
+        let target = available * requestListRatio
+        return min(max(target, lowerBound), upperBound)
     }
 }
 
@@ -181,6 +266,8 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
     // MARK: Internal
 
     var onInspectorVisibilityChanged: ((Bool) -> Void)?
+    private(set) var hasAutosavedFrames = false
+    private(set) var defaultDividerApplicationCount = 0
 
     var isInspectorPresented: Bool {
         inspectorItem.map { !$0.isCollapsed } ?? false
@@ -188,20 +275,30 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        guard pendingInitialVisibility != nil else {
-            return
-        }
-        guard NativeBottomInspectorSplitSizing.isLayoutReady(splitView.bounds) else {
+        let bounds = splitView.bounds
+        guard NativeBottomInspectorSplitSizing.isLayoutReady(bounds) else {
             // Bounds are still zero/insufficient. Retain the requested state and wait for a
             // valid layout pass rather than collapsing/expanding into negative geometry.
             return
         }
-        guard let pendingInitialVisibility else {
-            return
+
+        if let pendingInitialVisibility {
+            guard NativeBottomInspectorSplitSizing.canSeatRequestedMinima(
+                totalHeight: bounds.height,
+                dividerThickness: splitView.dividerThickness,
+                inspectorPresented: pendingInitialVisibility,
+                primaryMinimumHeight: primaryMinimumHeight,
+                inspectorMinimumHeight: inspectorMinimumHeight
+            ) else {
+                return
+            }
+
+            self.pendingInitialVisibility = nil
+            setInspectorPresented(pendingInitialVisibility, animated: false)
+            isApplyingInitialState = false
         }
-        self.pendingInitialVisibility = nil
-        setInspectorPresented(pendingInitialVisibility, animated: false)
-        isApplyingInitialState = false
+
+        applyDefaultDividerIfNeeded(totalHeight: bounds.height)
     }
 
     func configure(
@@ -215,6 +312,11 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         splitView.isVertical = false
         splitView.dividerStyle = .thin
 
+        let autosave = NSSplitView.AutosaveName(autosaveName)
+        hasAutosavedFrames = UserDefaults.standard.object(
+            forKey: "NSSplitView Subview Frames \(autosave)"
+        ) != nil
+
         let primaryItem = NSSplitViewItem(viewController: primaryController)
         primaryItem.minimumThickness = primaryMinimumHeight
         primaryItem.canCollapse = false
@@ -227,12 +329,22 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         inspectorItem.isSpringLoaded = true
         inspectorItem.holdingPriority = .defaultHigh
 
+        if !hasAutosavedFrames {
+            primaryItem.preferredThicknessFraction = NativeBottomInspectorSplitSizing
+                .defaultRequestListRatio
+            inspectorItem.preferredThicknessFraction = 1
+                - NativeBottomInspectorSplitSizing.defaultRequestListRatio
+        }
+
         addSplitViewItem(primaryItem)
         addSplitViewItem(inspectorItem)
 
         // AppKit restores divider position only after both items belong to the split controller.
-        splitView.autosaveName = NSSplitView.AutosaveName(autosaveName)
+        splitView.autosaveName = autosave
+        self.primaryItem = primaryItem
         self.inspectorItem = inspectorItem
+        self.primaryMinimumHeight = primaryMinimumHeight
+        self.inspectorMinimumHeight = inspectorMinimumHeight
         requestedInspectorVisibility = isInspectorPresented
         pendingInitialVisibility = isInspectorPresented
         observeCollapseState(of: inspectorItem)
@@ -256,13 +368,51 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         }
     }
 
+    func updateMinimumHeights(primary: CGFloat, inspector: CGFloat) {
+        primaryMinimumHeight = primary
+        inspectorMinimumHeight = inspector
+        primaryItem?.minimumThickness = primary
+        inspectorItem?.minimumThickness = inspector
+    }
+
     // MARK: Private
 
+    private weak var primaryItem: NSSplitViewItem?
     private weak var inspectorItem: NSSplitViewItem?
     private var collapseObservation: NSKeyValueObservation?
+    private var primaryMinimumHeight: CGFloat = 0
+    private var inspectorMinimumHeight: CGFloat = 0
     private var requestedInspectorVisibility = false
     private var pendingInitialVisibility: Bool?
+    private var didApplyDefaultDivider = false
     private var isApplyingInitialState = true
+
+    private func applyDefaultDividerIfNeeded(totalHeight: CGFloat) {
+        guard !hasAutosavedFrames,
+              !didApplyDefaultDivider,
+              isInspectorPresented,
+              NativeBottomInspectorSplitSizing.canSeatRequestedMinima(
+                  totalHeight: totalHeight,
+                  dividerThickness: splitView.dividerThickness,
+                  inspectorPresented: true,
+                  primaryMinimumHeight: primaryMinimumHeight,
+                  inspectorMinimumHeight: inspectorMinimumHeight
+              ),
+              let primaryHeight = NativeBottomInspectorSplitSizing.idealPrimaryHeight(
+                  totalHeight: totalHeight,
+                  dividerThickness: splitView.dividerThickness,
+                  requestListRatio: NativeBottomInspectorSplitSizing.defaultRequestListRatio,
+                  primaryMinimumHeight: primaryMinimumHeight,
+                  inspectorMinimumHeight: inspectorMinimumHeight
+              ) else
+        {
+            return
+        }
+
+        splitView.setPosition(primaryHeight, ofDividerAt: 0)
+        didApplyDefaultDivider = true
+        defaultDividerApplicationCount += 1
+    }
 
     private func observeCollapseState(of item: NSSplitViewItem) {
         collapseObservation = item.observe(\.isCollapsed, options: [.new]) { [weak self] _, _ in

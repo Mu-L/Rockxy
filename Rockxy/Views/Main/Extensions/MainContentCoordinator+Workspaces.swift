@@ -111,10 +111,13 @@ extension MainContentCoordinator {
             allPinnedTransactions.contains { $0.id == id }
         case let .savedTransaction(id):
             allSavedTransactions.contains { $0.id == id }
+        case let .noteTransaction(id):
+            allNotesTransactions.contains { $0.id == id }
         case .allApps,
              .allDomains,
              .allPinned,
-             .allSaved:
+             .allSaved,
+             .allNotes:
             true
         case .filter,
              .ruleGroup,

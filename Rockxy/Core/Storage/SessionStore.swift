@@ -146,11 +146,12 @@ actor SessionStore {
         return nil
     }
 
-    // MARK: - Load Pinned & Saved
+    // MARK: - Load Library Transactions
 
+    /// Loads every transaction retained by Library: pinned, saved, or carrying a user note.
     func loadPinnedAndSavedTransactions() throws -> [HTTPTransaction] {
         let query = Self.transactions
-            .filter(Self.txIsPinned == 1 || Self.txIsSaved == 1)
+            .filter(Self.txIsPinned == 1 || Self.txIsSaved == 1 || Self.txComment != nil)
             .order(Self.txTimestamp.desc)
 
         var results: [HTTPTransaction] = []
