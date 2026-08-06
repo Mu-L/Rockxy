@@ -187,13 +187,15 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("accessibilityLabel(String(localized: \"Send Message\"))"))
         #expect(components.contains("String(localized: \"Copy\")"))
         #expect(components.contains("String(localized: \"Review & Retry\")"))
-        #expect(components.contains("ViewThatFits(in: .horizontal)"))
-        #expect(components.contains(".fixedSize(horizontal: true, vertical: false)"))
+        // The generic response footer is two quiet affordances only: a Copy control and one ellipsis
+        // overflow menu. Controls keep accessibility labels/help. Card/identity chrome removal and the
+        // plain right-aligned user bubble are asserted in detail by ContextDockPresentationTests.
+        #expect(!components.contains("ViewThatFits(in: .horizontal)"))
         #expect(components.contains("compactAction("))
+        #expect(components.contains("Image(systemName: \"ellipsis\")"))
         #expect(components.contains(".accessibilityLabel(title)"))
         #expect(components.contains(".help(title)"))
-        #expect(!components.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9)"))
-        #expect(components.contains("AssistantQueryRow"))
+        #expect(components.contains("struct AssistantResponseContainer"))
         #expect(components.contains("AssistantMarkdownText"))
         #expect(components.contains("inlineOnlyPreservingWhitespace"))
         #expect(source.contains("AssistantMarkdownText("))
