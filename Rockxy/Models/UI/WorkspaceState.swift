@@ -53,6 +53,7 @@ final class WorkspaceState: Identifiable {
     var allowsAutomaticInspectorReveal: Bool
     var debugAssistantState: DebugAssistantState = .idle
     var modelInvestigationState: ModelInvestigationState = .idle
+    var debugAssistantProductHelpState: DebugAssistantProductHelpState = .idle
     var debugAssistantMessages: [DebugAssistantMessage] = []
     var debugAssistantDraft = ""
     var debugAssistantConversationID = UUID()
@@ -125,6 +126,7 @@ final class WorkspaceState: Identifiable {
         selectedTransactionIDs.removeAll()
         debugAssistantState = .idle
         modelInvestigationState = .idle
+        debugAssistantProductHelpState = .idle
         debugAssistantMessages.removeAll()
         debugAssistantDraft = ""
         debugAssistantConversationID = UUID()

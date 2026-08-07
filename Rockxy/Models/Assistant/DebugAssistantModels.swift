@@ -124,13 +124,15 @@ struct DebugAssistantMessage: Identifiable, Equatable {
         role: DebugAssistantMessageRole,
         text: String,
         investigation: InvestigationResult? = nil,
-        modelResult: ModelInvestigationResult? = nil
+        modelResult: ModelInvestigationResult? = nil,
+        productHandoff: AssistantProductHandoff? = nil
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.investigation = investigation
         self.modelResult = modelResult
+        self.productHandoff = productHandoff
     }
 
     // MARK: Internal
@@ -140,6 +142,9 @@ struct DebugAssistantMessage: Identifiable, Equatable {
     let text: String
     let investigation: InvestigationResult?
     let modelResult: ModelInvestigationResult?
+    /// At most one source-backed native window a product-help answer may offer to open. Navigation
+    /// only — never an executed workflow. Always nil on traffic-investigation messages.
+    let productHandoff: AssistantProductHandoff?
 
     var searchableText: String {
         var fragments = [text]
@@ -175,19 +180,28 @@ struct DebugAssistantMessage: Identifiable, Equatable {
         )
     }
 
-    static func assistant(_ text: String) -> DebugAssistantMessage {
-        DebugAssistantMessage(role: .assistant, text: text)
+    static func assistant(
+        _ text: String,
+        handoff: AssistantProductHandoff? = nil
+    )
+        -> DebugAssistantMessage
+    {
+        DebugAssistantMessage(role: .assistant, text: text, productHandoff: handoff)
     }
 
     static func assistant(
         _ result: ModelInvestigationResult,
-        investigation: InvestigationResult? = nil
-    ) -> DebugAssistantMessage {
+        investigation: InvestigationResult? = nil,
+        handoff: AssistantProductHandoff? = nil
+    )
+        -> DebugAssistantMessage
+    {
         DebugAssistantMessage(
             role: .assistant,
             text: result.text,
             investigation: investigation,
-            modelResult: result
+            modelResult: result,
+            productHandoff: handoff
         )
     }
 }
@@ -363,6 +377,26 @@ enum DebugAssistantState: Equatable {
     case investigating(runID: UUID, recipe: DebugAssistantRecipe)
     case result(InvestigationResult)
     case failed(message: String)
+}
+
+// MARK: - DebugAssistantProductHelpState
+
+/// Streaming lifecycle for a no-selection product/workflow question. It is fully independent from
+/// traffic investigation: it never carries an `InvestigationResult`, never builds Review Data, and
+/// the conversation stays context-free (`debugAssistantConversationContext == nil`) throughout.
+enum DebugAssistantProductHelpState: Equatable {
+    case idle
+    case streaming(
+        runID: UUID,
+        provider: AssistantProviderKind,
+        executionLocation: AssistantExecutionLocation,
+        model: String,
+        endpointHost: String,
+        text: String
+    )
+    /// Carries the original question and matched handoff so recovery can re-run without a stale
+    /// investigation retry and can still offer the source-backed navigation.
+    case failed(message: String, question: String, handoff: AssistantProductHandoff?)
 }
 
 // MARK: - InvestigationTransactionSnapshot

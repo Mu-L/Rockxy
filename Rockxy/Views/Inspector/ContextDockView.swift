@@ -152,6 +152,7 @@ private struct AIAssistantDockView: View {
     private static let transcriptBottomID = "debug-assistant-transcript-bottom"
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.openWindow) private var openWindow
     @FocusState private var isComposerFocused: Bool
     @State private var isConversationSwitcherPresented = false
     @State private var conversationSearch = ""
@@ -296,6 +297,9 @@ private struct AIAssistantDockView: View {
         if case .streaming = coordinator.activeWorkspace.modelInvestigationState {
             return true
         }
+        if case .streaming = coordinator.activeWorkspace.debugAssistantProductHelpState {
+            return true
+        }
         return false
     }
 
@@ -308,6 +312,15 @@ private struct AIAssistantDockView: View {
 
     private var streamingText: String {
         guard case let .streaming(_, _, _, _, _, text) = coordinator.activeWorkspace.modelInvestigationState else {
+            return ""
+        }
+        return text
+    }
+
+    private var productHelpStreamingText: String {
+        guard case let .streaming(_, _, _, _, _, text) = coordinator.activeWorkspace
+            .debugAssistantProductHelpState else
+        {
             return ""
         }
         return text
@@ -502,6 +515,9 @@ private struct AIAssistantDockView: View {
             .onChange(of: streamingText) {
                 scrollToBottom(proxy, animated: false)
             }
+            .onChange(of: productHelpStreamingText) {
+                scrollToBottom(proxy, animated: false)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
@@ -564,7 +580,7 @@ private struct AIAssistantDockView: View {
     @ViewBuilder private var activeAssistantTurn: some View {
         switch coordinator.activeWorkspace.debugAssistantState {
         case .idle:
-            modelAssistantTurn
+            productHelpTurn
         case let .result(result):
             currentResultTurn(result)
         case let .investigating(_, recipe):
@@ -640,6 +656,57 @@ private struct AIAssistantDockView: View {
                             onOpenSettings()
                         }
                         .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The active turn for a context-free product/workflow question. It renders the streaming or
+    /// failed state; when idle it defers to `modelAssistantTurn` so selected-traffic flows are
+    /// unchanged. It never shows Scope/Findings/Observed frames or Review Data.
+    @ViewBuilder private var productHelpTurn: some View {
+        switch coordinator.activeWorkspace.debugAssistantProductHelpState {
+        case .idle:
+            modelAssistantTurn
+        case let .streaming(_, _, _, model, _, text):
+            assistantBubble {
+                HStack(spacing: 7) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(text.isEmpty
+                        ? String(localized: "Generating with \(model)")
+                        : String(localized: "Responding with \(model)"))
+                        .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
+                    Spacer(minLength: 0)
+                    Button(String(localized: "Stop")) {
+                        coordinator.cancelDebugAssistantProductHelp()
+                    }
+                    .controlSize(.mini)
+                }
+                if !text.isEmpty {
+                    AssistantStreamingText(source: text)
+                }
+            }
+        case let .failed(message, _, handoff):
+            assistantBubble {
+                Label(
+                    String(localized: "I couldn’t complete the response."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(assistantFont(appMetrics.secondaryFontSize, weight: .semibold))
+                .foregroundStyle(.red)
+                Text(message)
+                    .font(assistantFont(appMetrics.secondaryFontSize))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(String(localized: "Try Again")) {
+                        coordinator.retryDebugAssistantProductHelp()
+                    }
+                    .controlSize(.small)
+                    if let handoff {
+                        productHandoffButton(handoff)
                     }
                 }
             }
@@ -906,6 +973,10 @@ private struct AIAssistantDockView: View {
                         blockedToolCallWarning(modelResult.blockedToolCallCount)
                     }
 
+                    if let handoff = message.productHandoff {
+                        productHandoffButton(handoff)
+                    }
+
                     assistantResponseActions(
                         text: message.text,
                         investigation: nil,
@@ -982,6 +1053,21 @@ private struct AIAssistantDockView: View {
             .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The single, optional product-help handoff: one small native text button that opens the exact
+    /// validated native window. Navigation only — it never runs a workflow, and no icon, card,
+    /// badge, or colored surface is added to the response container.
+    private func productHandoffButton(_ handoff: AssistantProductHandoff) -> some View {
+        Button(handoff.actionTitle) {
+            openWindow(id: handoff.windowID)
+        }
+        .buttonStyle(.link)
+        .controlSize(.small)
+        .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(handoff.accessibilityLabel)
+        .help(handoff.accessibilityHint)
     }
 
     @ViewBuilder
