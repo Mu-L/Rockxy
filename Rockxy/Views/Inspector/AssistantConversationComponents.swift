@@ -11,33 +11,28 @@ enum AssistantClipboard {
     }
 }
 
-// MARK: - AssistantResponseCard
+// MARK: - AssistantResponseContainer
 
-struct AssistantResponseCard<Content: View>: View {
-    // MARK: Internal
-
+/// The shared assistant-turn wrapper: one coherent neutral rounded response component. It provides a
+/// subtle background, a hairline separator border, and compact padding so every assistant payload
+/// reads as a single self-contained response — never an assistant logo, icon, or identity row.
+struct AssistantResponseContainer<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "waveform.badge.magnifyingglass")
-                    .foregroundStyle(.secondary)
-                Text(String(localized: "Rockxy Assistant"))
-                    .font(.system(size: metrics.metadataFontSize, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-            }
             content
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "AI Assistant Response"))
     }
-
-    // MARK: Private
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
 // MARK: - AssistantProgressRow
@@ -121,33 +116,36 @@ struct AssistantConversationContextMismatchBanner: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
-// MARK: - AssistantQueryRow
+// MARK: - AssistantUserMessageBubble
 
-/// A user prompt rendered as a compact, full-width investigation query event — a labelled row that
-/// reads as part of the inspector's evidence trail, not a trailing chat bubble aligned to one side.
-struct AssistantQueryRow: View {
+/// A user prompt rendered as a compact, right-aligned chat bubble — the request side of the
+/// conversation. Native control colors and a constrained width keep it visually distinct from the
+/// assistant's full-width rounded response container while staying dense enough for the inspector column.
+struct AssistantUserMessageBubble: View {
     // MARK: Internal
 
     let text: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Image(systemName: "text.magnifyingglass")
-                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+        HStack(spacing: 0) {
+            Spacer(minLength: 44)
             Text(text)
-                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                .font(.system(size: metrics.primaryFontSize))
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                }
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Investigation query: \(text)"))
+        .accessibilityLabel(String(localized: "You: \(text)"))
     }
 
     // MARK: Private
@@ -157,7 +155,11 @@ struct AssistantQueryRow: View {
 
 // MARK: - AssistantResponseActionBar
 
-struct AssistantResponseActionBar: View {
+/// The generic assistant-response footer: at most two quiet affordances — a standard Copy control
+/// and one ellipsis overflow menu. No workflow button ever appears in the response body; follow-up,
+/// reveal, retry, and any caller-supplied handoffs live only inside the overflow menu, revealed on
+/// intent. Each control keeps an accessibility label and help for discoverability.
+struct AssistantResponseActionBar<OverflowItems: View>: View {
     // MARK: Internal
 
     let canCopy: Bool
@@ -167,42 +169,14 @@ struct AssistantResponseActionBar: View {
     let onFollowUp: () -> Void
     let onRevealRequest: () -> Void
     let onRetry: () -> Void
+    @ViewBuilder let overflowItems: OverflowItems
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                action(String(localized: "Copy"), systemImage: "doc.on.doc", action: onCopy)
-                    .disabled(!canCopy)
-                action(
-                    String(localized: "Follow Up"),
-                    systemImage: "arrowshape.turn.up.left",
-                    action: onFollowUp
-                )
-                if canRevealRequest {
-                    action(String(localized: "Reveal Request"), systemImage: "scope", action: onRevealRequest)
-                }
-                Spacer(minLength: 0)
-                if canRetry {
-                    action(String(localized: "Review & Retry"), systemImage: "arrow.clockwise", action: onRetry)
-                }
-            }
-
-            HStack(spacing: 12) {
-                compactAction(String(localized: "Copy"), systemImage: "doc.on.doc", action: onCopy)
-                    .disabled(!canCopy)
-                compactAction(
-                    String(localized: "Follow Up"),
-                    systemImage: "arrowshape.turn.up.left",
-                    action: onFollowUp
-                )
-                if canRevealRequest {
-                    compactAction(String(localized: "Reveal Request"), systemImage: "scope", action: onRevealRequest)
-                }
-                Spacer(minLength: 0)
-                if canRetry {
-                    compactAction(String(localized: "Review & Retry"), systemImage: "arrow.clockwise", action: onRetry)
-                }
-            }
+        HStack(spacing: 12) {
+            compactAction(String(localized: "Copy"), systemImage: "doc.on.doc", action: onCopy)
+                .disabled(!canCopy)
+            overflowMenu
+            Spacer(minLength: 0)
         }
         .font(.system(size: metrics.metadataFontSize))
         .foregroundStyle(.secondary)
@@ -213,21 +187,33 @@ struct AssistantResponseActionBar: View {
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 
-    private func action(
-        _ title: String,
-        systemImage: String,
-        action: @escaping () -> Void
-    )
-        -> some View
-    {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+    private var overflowMenu: some View {
+        Menu {
+            overflowItems
+            Button(action: onFollowUp) {
+                Label(String(localized: "Follow Up"), systemImage: "arrowshape.turn.up.left")
+            }
+            if canRevealRequest {
+                Button(action: onRevealRequest) {
+                    Label(String(localized: "Reveal Request"), systemImage: "scope")
+                }
+            }
+            if canRetry {
+                Button(action: onRetry) {
+                    Label(String(localized: "Review & Retry"), systemImage: "arrow.clockwise")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: metrics.controlFontSize))
+                .frame(minWidth: 18, minHeight: 18)
         }
-        .buttonStyle(.borderless)
-        .controlSize(.mini)
-        .help(title)
+        .font(.system(size: metrics.controlFontSize))
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel(String(localized: "More actions"))
+        .help(String(localized: "More actions"))
     }
 
     private func compactAction(
@@ -245,6 +231,29 @@ struct AssistantResponseActionBar: View {
         .controlSize(.mini)
         .accessibilityLabel(title)
         .help(title)
+    }
+}
+
+extension AssistantResponseActionBar where OverflowItems == EmptyView {
+    init(
+        canCopy: Bool,
+        canRevealRequest: Bool,
+        canRetry: Bool,
+        onCopy: @escaping () -> Void,
+        onFollowUp: @escaping () -> Void,
+        onRevealRequest: @escaping () -> Void,
+        onRetry: @escaping () -> Void
+    ) {
+        self.init(
+            canCopy: canCopy,
+            canRevealRequest: canRevealRequest,
+            canRetry: canRetry,
+            onCopy: onCopy,
+            onFollowUp: onFollowUp,
+            onRevealRequest: onRevealRequest,
+            onRetry: onRetry,
+            overflowItems: { EmptyView() }
+        )
     }
 }
 

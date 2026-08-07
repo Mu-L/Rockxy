@@ -91,23 +91,30 @@ struct DebugAssistantEngine {
                 scopeSummary: scopeSummary(selectedCount: selected.count, requestCount: scope.count),
                 summary: tunnelWasEstablished
                     ? String(localized: "This CONNECT request established a proxy tunnel to \(connectTarget(primary)).")
-                    : String(localized: "This CONNECT request asked the proxy to open a tunnel to \(connectTarget(primary))."),
+                    :
+                    String(
+                        localized: "This CONNECT request asked the proxy to open a tunnel to \(connectTarget(primary))."
+                    ),
                 evidence: evidence,
                 nextStep: tunnelWasEstablished
                     ? String(
                         localized: "No CONNECT failure is shown. Inspect the HTTPS requests inside this tunnel only if the app still behaved unexpectedly."
                     )
-                    : String(localized: "Inspect the captured status and transport state to determine why the tunnel was not established.")
+                    :
+                    String(
+                        localized: "Inspect the captured status and transport state to determine why the tunnel was not established."
+                    )
             )
         }
 
-        let outcome: String
-        if let status = primary.statusCode {
-            outcome = primary.isSuccessful
-                ? String(localized: "The captured response was HTTP \(status), so Rockxy shows a completed request.")
-                : String(localized: "The captured response was HTTP \(status).")
+        let outcome = if let status = primary.statusCode {
+            if primary.isSuccessful {
+                String(localized: "The captured response was HTTP \(status), so Rockxy shows a completed request.")
+            } else {
+                String(localized: "The captured response was HTTP \(status).")
+            }
         } else {
-            outcome = String(localized: "Rockxy did not capture a completed response for this request.")
+            String(localized: "Rockxy did not capture a completed response for this request.")
         }
 
         return InvestigationResult(
@@ -120,8 +127,14 @@ struct DebugAssistantEngine {
             ),
             evidence: evidence,
             nextStep: primary.isSuccessful
-                ? String(localized: "No failure is proven by this exchange. Open Details only if you want to inspect headers, timing, or payloads.")
-                : String(localized: "Open Details to inspect the response, timing, and nearby requests before drawing a conclusion.")
+                ?
+                String(
+                    localized: "No failure is proven by this exchange. Open Details only if you want to inspect headers, timing, or payloads."
+                )
+                :
+                String(
+                    localized: "Open Details to inspect the response, timing, and nearby requests before drawing a conclusion."
+                )
         )
     }
 
@@ -553,16 +566,25 @@ struct DebugAssistantEngine {
                 localized: "No CONNECT failure is shown. Inspect the tunneled HTTPS requests only if the app still behaved unexpectedly."
             )
         }
-        return switch primary.statusCode {
+        switch primary.statusCode {
+        case 401:
+            return primary.requestHeader(named: "Authorization") != nil
+                ? String(localized: "Refresh or replace the credential, then retry the request.")
+                : String(localized: "Add the required authentication credential, then retry the request.")
+        case 403:
+            return String(
+                localized: "Check that the credential has permission for this endpoint, then retry the request."
+            )
         case 429:
-            String(localized: "Open an editable replay draft and verify it before sending.")
-        case 401,
-             403:
-            String(localized: "Compare authentication evidence with a successful request.")
+            return primary.responseHeader(named: "Retry-After") != nil
+                ? String(localized: "Wait for the server-specified Retry-After delay, then retry the request once.")
+                : String(localized: "Wait briefly, then retry the request once.")
         case let status? where status >= 500:
-            String(localized: "Capture one retry and compare server timing and response evidence.")
+            return String(
+                localized: "Retry once. If it fails again, compare the server response with a successful request."
+            )
         default:
-            String(localized: "Reveal the strongest evidence and verify it against a fresh capture.")
+            return String(localized: "Open the request details and check the highlighted evidence.")
         }
     }
 

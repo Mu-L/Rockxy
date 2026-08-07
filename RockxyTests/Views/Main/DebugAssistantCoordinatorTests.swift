@@ -9,9 +9,9 @@ import Testing
 struct DebugAssistantCoordinatorTests {
     // MARK: Internal
 
-    @Test("A message without selected traffic remains conversational and explains the next step")
-    func messageWithoutTraffic() {
-        let coordinator = MainContentCoordinator()
+    @Test("A message without selected traffic answers product help and stays context-free")
+    func messageWithoutTraffic() throws {
+        let coordinator = MainContentCoordinator(assistantSettingsProvider: { AppSettings() })
         coordinator.activeWorkspace.debugAssistantDraft = "Can you help me debug this?"
 
         coordinator.sendDebugAssistantMessage()
@@ -19,10 +19,128 @@ struct DebugAssistantCoordinatorTests {
         #expect(coordinator.activeWorkspace.debugAssistantDraft.isEmpty)
         #expect(coordinator.activeWorkspace.debugAssistantMessages.count == 2)
         #expect(coordinator.activeWorkspace.debugAssistantMessages.first?.role == .user)
-        #expect(coordinator.activeWorkspace.debugAssistantMessages.last?.role == .assistant)
-        #expect(coordinator.activeWorkspace.debugAssistantMessages.last?.text
-            .contains("Select one or more requests") == true)
+        let reply = try #require(coordinator.activeWorkspace.debugAssistantMessages.last)
+        #expect(reply.role == .assistant)
+        #expect(reply.investigation == nil)
+        #expect(!reply.text.isEmpty)
+        #expect(coordinator.activeWorkspace.debugAssistantConversationContext == nil)
         #expect(coordinator.activeWorkspace.debugAssistantConversations.count == 1)
+    }
+
+    @Test("A recognized product question answers from the catalog and offers one direct-open handoff")
+    func recognizedProductQuestionOffersHandoff() throws {
+        let coordinator = MainContentCoordinator(assistantSettingsProvider: { AppSettings() })
+        coordinator.activeWorkspace.debugAssistantDraft = "How do I set up my Node app to capture traffic?"
+
+        coordinator.sendDebugAssistantMessage()
+
+        #expect(coordinator.activeWorkspace.debugAssistantMessages.count == 2)
+        let reply = try #require(coordinator.activeWorkspace.debugAssistantMessages.last)
+        #expect(reply.role == .assistant)
+        #expect(reply.investigation == nil)
+        #expect(reply.productHandoff == .developerSetup)
+        #expect(reply.productHandoff?.windowID == "developerSetupHub")
+        #expect(coordinator.activeWorkspace.debugAssistantConversationContext == nil)
+    }
+
+    @Test("An unknown product question falls back honestly with no handoff")
+    func unknownProductQuestionHasNoHandoff() throws {
+        let coordinator = MainContentCoordinator(assistantSettingsProvider: { AppSettings() })
+        coordinator.activeWorkspace.debugAssistantDraft = "What is the airspeed velocity of a swallow?"
+
+        coordinator.sendDebugAssistantMessage()
+
+        let reply = try #require(coordinator.activeWorkspace.debugAssistantMessages.last)
+        #expect(reply.role == .assistant)
+        #expect(reply.productHandoff == nil)
+        #expect(reply.investigation == nil)
+    }
+
+    @Test("Product help streams through the configured model with no traffic and completes context-free")
+    func productHelpStreamsWithoutTraffic() async throws {
+        let recorder = FixtureAssistantRuntimeRecorder()
+        let runtime = FixtureAssistantRuntime(recorder: recorder, includeToolCall: true)
+        let configuration = AssistantProviderConfiguration(
+            kind: .openAICompatible,
+            baseURL: "http://127.0.0.1:1234/v1",
+            model: "fixture-model"
+        )
+        let coordinator = MainContentCoordinator(
+            assistantRuntime: runtime,
+            assistantSettingsProvider: { makeSettings(configuration: configuration) }
+        )
+        coordinator.activeWorkspace.debugAssistantDraft = "How does Map Local work?"
+
+        coordinator.sendDebugAssistantMessage()
+        try await waitUntil {
+            coordinator.activeWorkspace.debugAssistantMessages.count == 2
+        }
+
+        let reply = try #require(coordinator.activeWorkspace.debugAssistantMessages.last)
+        #expect(reply.role == .assistant)
+        #expect(reply.investigation == nil)
+        #expect(reply.modelResult?.blockedToolCallCount == 1)
+        #expect(reply.productHandoff == .mapLocal)
+        #expect(coordinator.activeWorkspace.debugAssistantConversationContext == nil)
+        #expect(coordinator.activeWorkspace.debugAssistantReviewPack == nil)
+        #expect(coordinator.activeWorkspace.debugAssistantProductHelpState == .idle)
+
+        let request = try #require(await recorder.request)
+        #expect(!request.reviewedContentPreview.contains("api.example.com"))
+        #expect(request.instructions.contains("No captured network traffic"))
+        #expect(request.instructions.contains("Rockxy"))
+    }
+
+    @Test("A stale product-help completion cannot land in a new conversation")
+    func staleProductHelpCompletionRejected() async throws {
+        let configuration = AssistantProviderConfiguration(
+            kind: .openAICompatible,
+            baseURL: "http://127.0.0.1:1234/v1",
+            model: "fixture-model"
+        )
+        let coordinator = MainContentCoordinator(
+            assistantRuntime: DelayedFixtureAssistantRuntime(),
+            assistantSettingsProvider: { makeSettings(configuration: configuration) }
+        )
+        coordinator.activeWorkspace.debugAssistantDraft = "How does the block list work?"
+
+        coordinator.sendDebugAssistantMessage()
+        guard case .streaming = coordinator.activeWorkspace.debugAssistantProductHelpState else {
+            Issue.record("Expected active product-help stream")
+            return
+        }
+
+        coordinator.newDebugAssistantConversation()
+        try await Task.sleep(nanoseconds: 80_000_000)
+
+        #expect(coordinator.activeWorkspace.debugAssistantMessages.isEmpty)
+        #expect(coordinator.activeWorkspace.debugAssistantProductHelpState == .idle)
+    }
+
+    @Test("A context-free conversation followed by a selection starts a normal investigation")
+    func contextFreeThenSelectionInvestigates() async throws {
+        let coordinator = MainContentCoordinator(assistantSettingsProvider: { AppSettings() })
+        coordinator.activeWorkspace.debugAssistantDraft = "How do I get started?"
+        coordinator.sendDebugAssistantMessage()
+        #expect(coordinator.activeWorkspace.debugAssistantConversationContext == nil)
+        #expect(!coordinator.debugAssistantConversationHasContextMismatch())
+
+        let transaction = TestFixtures.makeTransaction(statusCode: 500)
+        coordinator.transactions = [transaction]
+        coordinator.selectedTransactionIDs = [transaction.id]
+        coordinator.selectTransaction(transaction)
+        #expect(!coordinator.debugAssistantConversationHasContextMismatch())
+
+        coordinator.activeWorkspace.debugAssistantDraft = "Why did this fail?"
+        coordinator.sendDebugAssistantMessage()
+        try await waitUntil {
+            if case .result = coordinator.activeWorkspace.debugAssistantState {
+                return true
+            }
+            return false
+        }
+        #expect(coordinator.activeWorkspace.debugAssistantMessages.last?.investigation != nil)
+        #expect(coordinator.activeWorkspace.debugAssistantConversationContext?.primaryTransactionID == transaction.id)
     }
 
     @Test("Request context menu opens Assistant with the clicked row as primary and preserves selected scope")

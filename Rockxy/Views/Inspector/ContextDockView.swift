@@ -152,6 +152,7 @@ private struct AIAssistantDockView: View {
     private static let transcriptBottomID = "debug-assistant-transcript-bottom"
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.openWindow) private var openWindow
     @FocusState private var isComposerFocused: Bool
     @State private var isConversationSwitcherPresented = false
     @State private var conversationSearch = ""
@@ -296,6 +297,9 @@ private struct AIAssistantDockView: View {
         if case .streaming = coordinator.activeWorkspace.modelInvestigationState {
             return true
         }
+        if case .streaming = coordinator.activeWorkspace.debugAssistantProductHelpState {
+            return true
+        }
         return false
     }
 
@@ -308,6 +312,15 @@ private struct AIAssistantDockView: View {
 
     private var streamingText: String {
         guard case let .streaming(_, _, _, _, _, text) = coordinator.activeWorkspace.modelInvestigationState else {
+            return ""
+        }
+        return text
+    }
+
+    private var productHelpStreamingText: String {
+        guard case let .streaming(_, _, _, _, _, text) = coordinator.activeWorkspace
+            .debugAssistantProductHelpState else
+        {
             return ""
         }
         return text
@@ -502,74 +515,72 @@ private struct AIAssistantDockView: View {
             .onChange(of: streamingText) {
                 scrollToBottom(proxy, animated: false)
             }
+            .onChange(of: productHelpStreamingText) {
+                scrollToBottom(proxy, animated: false)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
     }
 
-    private var emptyConversationView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: primaryTransaction == nil ? "bubble.left" : "sparkles")
-                .font(assistantFont(appMetrics.primaryFontSize + 8, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            Text(primaryTransaction == nil
-                ? String(localized: "Investigate captured traffic")
-                : String(localized: "Start an investigation"))
-                .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
-
-            if primaryTransaction == nil {
-                Text(String(localized: "Select a request to investigate, or type a question below."))
-                    .font(assistantFont(appMetrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            } else {
-                suggestionGrid
-            }
+    @ViewBuilder private var emptyConversationView: some View {
+        if primaryTransaction == nil {
+            noSelectionEmptyState
+        } else {
+            investigationLauncher
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 18)
+    }
+
+    /// The no-selection empty state: a restrained native prompt telling the user to select traffic.
+    /// It intentionally shows no recipe cards — there is nothing to investigate yet.
+    private var noSelectionEmptyState: some View {
+        VStack(spacing: 6) {
+            Text(String(localized: "Investigate captured traffic"))
+                .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
+            Text(String(localized: "Select a request to investigate, or type a question below."))
+                .font(assistantFont(appMetrics.secondaryFontSize))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         .frame(maxWidth: .infinity)
     }
 
-    /// Compact horizontal suggestion cards in a two-column grid — the original GPT-style recipe
-    /// launcher. Each card shows an icon + title only; the full `recipe.detail` stays in the tooltip
-    /// rather than crowding the card.
-    private var suggestionGrid: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible(), spacing: 6),
-                GridItem(.flexible(), spacing: 6),
-            ],
-            spacing: 6
-        ) {
-            ForEach(DebugAssistantRecipe.allCases) { recipe in
-                Button {
-                    coordinator.startDebugAssistant(recipe)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: recipe.systemImage)
-                            .foregroundStyle(.secondary)
-                        Text(recipe.title)
-                            .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    /// The selected-traffic launcher: a centered sparkles hero, a "Start an investigation" title, and
+    /// every `DebugAssistantRecipe` as a native bordered button in a two-column grid (the fifth card
+    /// sits alone on the left). Each card is fully clickable, shows the recipe's SF Symbol and short
+    /// title, and surfaces the longer `recipe.detail` only as help.
+    private var investigationLauncher: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(assistantFont(appMetrics.primaryFontSize + 12))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            Text(String(localized: "Start an investigation"))
+                .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 6),
+                    GridItem(.flexible(), spacing: 6),
+                ],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                ForEach(DebugAssistantRecipe.allCases) { recipe in
+                    suggestionCard(recipe)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(isBusy)
-                .help(recipe.detail)
             }
         }
-        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private var activeAssistantTurn: some View {
         switch coordinator.activeWorkspace.debugAssistantState {
         case .idle:
-            modelAssistantTurn
+            productHelpTurn
         case let .result(result):
             currentResultTurn(result)
         case let .investigating(_, recipe):
@@ -651,27 +662,59 @@ private struct AIAssistantDockView: View {
         }
     }
 
-    private var promptComposer: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if primaryTransaction != nil,
-               !isBusy,
-               !conversationContextMismatch,
-               conversationIsEmpty
-            {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(DebugAssistantRecipe.allCases.prefix(2)) { recipe in
-                            Button(recipe.title) {
-                                coordinator.startDebugAssistant(recipe)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                            .font(assistantFont(appMetrics.metadataFontSize))
-                        }
+    /// The active turn for a context-free product/workflow question. It renders the streaming or
+    /// failed state; when idle it defers to `modelAssistantTurn` so selected-traffic flows are
+    /// unchanged. It never shows Scope/Findings/Observed frames or Review Data.
+    @ViewBuilder private var productHelpTurn: some View {
+        switch coordinator.activeWorkspace.debugAssistantProductHelpState {
+        case .idle:
+            modelAssistantTurn
+        case let .streaming(_, _, _, model, _, text):
+            assistantBubble {
+                HStack(spacing: 7) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(text.isEmpty
+                        ? String(localized: "Generating with \(model)")
+                        : String(localized: "Responding with \(model)"))
+                        .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
+                    Spacer(minLength: 0)
+                    Button(String(localized: "Stop")) {
+                        coordinator.cancelDebugAssistantProductHelp()
+                    }
+                    .controlSize(.mini)
+                }
+                if !text.isEmpty {
+                    AssistantStreamingText(source: text)
+                }
+            }
+        case let .failed(message, _, handoff):
+            assistantBubble {
+                Label(
+                    String(localized: "I couldn’t complete the response."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(assistantFont(appMetrics.secondaryFontSize, weight: .semibold))
+                .foregroundStyle(.red)
+                Text(message)
+                    .font(assistantFont(appMetrics.secondaryFontSize))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(String(localized: "Try Again")) {
+                        coordinator.retryDebugAssistantProductHelp()
+                    }
+                    .controlSize(.small)
+                    if let handoff {
+                        productHandoffButton(handoff)
                     }
                 }
             }
+        }
+    }
 
+    private var promptComposer: some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(
                     primaryTransaction == nil
@@ -780,6 +823,26 @@ private struct AIAssistantDockView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Color.clear)
+    }
+
+    private func suggestionCard(_ recipe: DebugAssistantRecipe) -> some View {
+        Button {
+            coordinator.startDebugAssistant(recipe)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: recipe.systemImage)
+                Text(recipe.title)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(isBusy)
+        .help(recipe.detail)
+        .accessibilityLabel(recipe.title)
     }
 
     @ViewBuilder
@@ -894,7 +957,7 @@ private struct AIAssistantDockView: View {
     private func conversationMessage(_ message: DebugAssistantMessage) -> some View {
         switch message.role {
         case .user:
-            AssistantQueryRow(text: message.text)
+            AssistantUserMessageBubble(text: message.text)
         case .assistant:
             if message.investigation != nil {
                 investigationReport(message)
@@ -906,14 +969,19 @@ private struct AIAssistantDockView: View {
                             : message.text
                     )
 
-                    if let modelResult = message.modelResult {
-                        modelAttribution(modelResult)
+                    if let modelResult = message.modelResult, modelResult.blockedToolCallCount > 0 {
+                        blockedToolCallWarning(modelResult.blockedToolCallCount)
+                    }
+
+                    if let handoff = message.productHandoff {
+                        productHandoffButton(handoff)
                     }
 
                     assistantResponseActions(
                         text: message.text,
                         investigation: nil,
-                        canRetryModel: message.modelResult != nil
+                        canRetryModel: message.modelResult != nil,
+                        modelResult: message.modelResult
                     )
                 }
             }
@@ -921,13 +989,14 @@ private struct AIAssistantDockView: View {
     }
 
     private func assistantBubble(@ViewBuilder content: () -> some View) -> some View {
-        AssistantResponseCard(content: content)
+        AssistantResponseContainer(content: content)
     }
 
     private func assistantResponseActions(
         text: String,
         investigation: InvestigationResult?,
-        canRetryModel: Bool
+        canRetryModel: Bool,
+        modelResult: ModelInvestigationResult?
     )
         -> some View
     {
@@ -940,12 +1009,7 @@ private struct AIAssistantDockView: View {
                 AssistantClipboard.copy(text)
             },
             onFollowUp: {
-                coordinator.prepareDebugAssistantFollowUp(for: investigation)
-                isComposerFocused = false
-                Task { @MainActor in
-                    await Task.yield()
-                    isComposerFocused = true
-                }
+                startFollowUp(for: investigation)
             },
             onRevealRequest: {
                 if let requestID {
@@ -956,55 +1020,89 @@ private struct AIAssistantDockView: View {
                 if canRetryModel, investigation.map(isCurrentResult) == true {
                     coordinator.prepareDebugAssistantReview()
                 }
+            },
+            overflowItems: {
+                if let modelResult {
+                    modelProvenanceMenuItems(modelResult)
+                }
             }
         )
+    }
+
+    /// The completed model reply keeps the answer as its surface: standard provenance never renders
+    /// inline. Provider, model, endpoint host, and token usage stay accessible only as plain,
+    /// icon-free rows in the footer's overflow menu, revealed on intent.
+    @ViewBuilder
+    private func modelProvenanceMenuItems(_ modelResult: ModelInvestigationResult) -> some View {
+        Button("\(modelResult.provider.title) · \(modelResult.model)") {}
+            .disabled(true)
+        Button(modelResult.endpointHost) {}
+            .disabled(true)
+        if let usage = modelResult.usage {
+            Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens")) {}
+                .disabled(true)
+        }
+        Divider()
+    }
+
+    /// A blocked-tool-call safety warning stays visible on the reply, rendered as concise plain text
+    /// without a decorative hand icon so the answer remains the surface.
+    private func blockedToolCallWarning(_ count: Int) -> some View {
+        Text(String(localized: "Rockxy blocked \(count) model action request(s)."))
+            .font(assistantFont(appMetrics.metadataFontSize))
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The single, optional product-help handoff: one small native text button that opens the exact
+    /// validated native window. Navigation only — it never runs a workflow, and no icon, card,
+    /// badge, or colored surface is added to the response container.
+    private func productHandoffButton(_ handoff: AssistantProductHandoff) -> some View {
+        Button(handoff.actionTitle) {
+            openWindow(id: handoff.windowID)
+        }
+        .buttonStyle(.link)
+        .controlSize(.small)
+        .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel(handoff.accessibilityLabel)
+        .help(handoff.accessibilityHint)
     }
 
     @ViewBuilder
     private func investigationReport(_ message: DebugAssistantMessage) -> some View {
         if let result = message.investigation {
-            InvestigationReportView(
-                message: message,
-                isCurrentResult: isCurrentResult(result),
-                showsContinueWithModel: isCurrentResult(result)
-                    && coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
-                    && configuredModelIsAvailable,
-                isPreparingReview: coordinator.activeWorkspace.isPreparingDebugAssistantReview,
-                onReveal: coordinator.revealDebugAssistantEvidence,
-                onContinueWithModel: { coordinator.prepareDebugAssistantReview() },
-                onHandoff: { handoff, target in
-                    coordinator.performUserInitiatedDebugAssistantHandoff(handoff, result: target)
-                },
-                onPrepareReplay: { resultPendingReplay = $0 }
-            ) {
-                if let modelResult = message.modelResult {
-                    modelAttribution(modelResult)
-                }
-                assistantResponseActions(
-                    text: message.text,
-                    investigation: result,
-                    canRetryModel: message.modelResult != nil
+            let requestID = result.selectedTransactionID
+            let canRetry = message.modelResult != nil && isCurrentResult(result)
+            assistantBubble {
+                InvestigationReportView(
+                    message: message,
+                    isCurrentResult: isCurrentResult(result),
+                    showsContinueWithModel: isCurrentResult(result)
+                        && coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
+                        && configuredModelIsAvailable,
+                    isPreparingReview: coordinator.activeWorkspace.isPreparingDebugAssistantReview,
+                    canRevealRequest: true,
+                    canRetry: canRetry,
+                    onReveal: coordinator.revealDebugAssistantEvidence,
+                    onContinueWithModel: { coordinator.prepareDebugAssistantReview() },
+                    onHandoff: { handoff, target in
+                        coordinator.performUserInitiatedDebugAssistantHandoff(handoff, result: target)
+                    },
+                    onPrepareReplay: { resultPendingReplay = $0 },
+                    onCopy: { AssistantClipboard.copy(message.text) },
+                    onFollowUp: { startFollowUp(for: result) },
+                    onRevealRequest: {
+                        coordinator.revealDebugAssistantRequest(id: requestID)
+                    },
+                    onRetry: {
+                        if canRetry {
+                            coordinator.prepareDebugAssistantReview()
+                        }
+                    }
                 )
             }
-        }
-    }
-
-    private func modelAttribution(_ result: ModelInvestigationResult) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if result.blockedToolCallCount > 0 {
-                Label(
-                    String(localized: "Rockxy blocked \(result.blockedToolCallCount) model action request(s)."),
-                    systemImage: "hand.raised.fill"
-                )
-                .font(assistantFont(appMetrics.metadataFontSize))
-                .foregroundStyle(.orange)
-            }
-            modelSourceLabel(
-                provider: result.provider.title,
-                model: result.model,
-                endpointHost: result.endpointHost,
-                usage: result.usage
-            )
         }
     }
 
@@ -1100,6 +1198,15 @@ private struct AIAssistantDockView: View {
                 }
                 .controlSize(.small)
             }
+        }
+    }
+
+    private func startFollowUp(for investigation: InvestigationResult?) {
+        coordinator.prepareDebugAssistantFollowUp(for: investigation)
+        isComposerFocused = false
+        Task { @MainActor in
+            await Task.yield()
+            isComposerFocused = true
         }
     }
 

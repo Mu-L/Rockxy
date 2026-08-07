@@ -92,49 +92,300 @@ struct InvestigationResultPresentationTests {
 
 // MARK: - ContextDockInvestigationReportTests
 
-/// Source contract for the recipe-first, evidence-grounded Investigate surface (GitHub #214/#217):
-/// completed turns render as a labelled full-width investigation report, user prompts are compact
-/// query rows, and the deprecated trailing chat bubble is gone.
+/// Source contract for the conversation surface: assistant replies are enclosed by one coherent
+/// neutral rounded `AssistantResponseContainer` (subtle background, hairline border, no assistant
+/// identity/icon); the completed investigation uses editorial typography with bold text-only
+/// "Summary" and "Next step" headings above a collapsed "Details" disclosure; user prompts stay
+/// compact right-aligned bubbles; and every workflow capability survives only behind a Copy control
+/// plus one ellipsis overflow menu.
 struct ContextDockInvestigationReportTests {
     // MARK: Internal
 
-    @Test("Investigate renders a native investigation report, not a chat transcript bubble")
-    func investigateRendersLabeledReport() throws {
+    @Test("Investigation response uses editorial Summary/Next step headings and collapses evidence")
+    func investigateRendersAnswerFirstResponse() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
         let report = try readProjectFile("Rockxy/Views/Inspector/InvestigationEvidenceViews.swift")
 
-        // User prompts are compact full-width query rows; the trailing chat bubble is removed.
-        #expect(!dock.contains("AssistantUserMessageBubble"))
-        #expect(dock.contains("AssistantQueryRow(text: message.text)"))
+        // User prompts render as compact right-aligned chat bubbles (the request side).
+        #expect(dock.contains("AssistantUserMessageBubble(text: message.text)"))
+        #expect(!dock.contains("AssistantQueryRow"))
 
-        // Completed investigation turns route through the full-width report surface.
+        // Assistant turns share the one coherent rounded response container; the report nests inside
+        // it. The wrapper is the shared card, never a duplicate identity card type.
+        #expect(dock.contains("AssistantResponseContainer(content: content)"))
+        #expect(!dock.contains("AssistantResponseCard"))
+        #expect(dock.contains("assistantBubble {\n                InvestigationReportView("))
         #expect(dock.contains("InvestigationReportView("))
 
-        // Every contracted section is visibly labelled; Summary uses InvestigationResult.summary.
-        #expect(report.contains("String(localized: \"Scope\")"))
+        // The answer/body sits below a bold text-only "Summary" heading. Local answer is
+        // result.summary; a differing model answer is the primary answer rendered as Markdown —
+        // never re-shown under a "Model Analysis" section.
+        #expect(report.contains("Text(result.summary)"))
+        #expect(report.contains("usesModelAnswer(result)"))
+        #expect(report.contains("AssistantMarkdownText(source: message.text)"))
+        #expect(report.contains("message.text != result.summary"))
+        #expect(!report.contains("Model Analysis"))
+
+        // Editorial text-only section headings for Summary and Next step (bold, no SF Symbol).
         #expect(report.contains("String(localized: \"Summary\")"))
-        #expect(report.contains("reportBody(result.summary)"))
+        #expect(report.contains("String(localized: \"Next step\")"))
+        #expect(!report.contains("String(localized: \"Proposed Actions\")"))
+        #expect(!report.contains("InvestigationFindingsDisclosure"))
+        #expect(!report.contains("InvestigationReportHeader"))
+
+        // result.nextStep renders below the "Next step" heading when nonempty — no lightbulb, no
+        // "Try this next" copy, no pill or mini card.
+        #expect(report.contains("result.nextStep"))
+        #expect(report.contains("private func nextStep("))
+        #expect(!report.contains("String(localized: \"Try this next\")"))
+        #expect(!report.contains("lightbulb"))
+
+        // Summary and Next step read as three bounded editorial frames: one shared, reusable,
+        // text-only section-frame component wraps each, and the Details disclosure wears the same
+        // frame chrome. The chrome is a restrained native hairline — a small rounded rectangle with
+        // a 0.5 separator-color stroke, compact padding, and no fill tint, icon, badge, shadow, or
+        // material. Frames are editorial grouping only, never a dashboard/robot surface.
+        #expect(report.contains("struct InvestigationSectionFrame<Content: View>: View"))
+        #expect(report.contains("InvestigationSectionFrame(title: String(localized: \"Summary\")) {"))
+        #expect(report.contains("InvestigationSectionFrame(title: String(localized: \"Next step\")) {"))
+        #expect(report.contains("func investigationSectionFrameStyle() -> some View"))
+        #expect(report.contains(".investigationSectionFrameStyle()"))
+        #expect(report
+            .contains(
+                "RoundedRectangle(cornerRadius: 6)\n                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)"
+            ))
+        // The section frame carries no tint, shadow, material, or status color — the reusable
+        // component takes only a text title plus content (no systemImage parameter or call site).
+        #expect(report.contains("let title: String\n    @ViewBuilder let content: Content"))
+        #expect(!report.contains("InvestigationSectionFrame(title: String(localized: \"Summary\"), systemImage:"))
+        #expect(!report.contains(".fill(Color("))
+        #expect(!report.contains(".shadow("))
+        #expect(!report.contains(".ultraThinMaterial"))
+        #expect(!report.contains("RoundedRectangle(cornerRadius: 6)\n                    .fill"))
+
+        // Technical material collapses behind one quiet "Details" disclosure, collapsed by default,
+        // that still carries scope, grouped findings, unknowns, and local/model attribution + count.
+        #expect(report.contains("String(localized: \"Details\")"))
+        #expect(!report.contains("String(localized: \"Why this answer\")"))
+        #expect(report.contains("DisclosureGroup(isExpanded: $isEvidenceExpanded)"))
+        #expect(report.contains("@State private var isEvidenceExpanded = false"))
+        #expect(report.contains("String(localized: \"Scope\")"))
         #expect(report.contains("String(localized: \"Findings\")"))
         #expect(report.contains("String(localized: \"Unknowns\")"))
-        #expect(report.contains("String(localized: \"Next Step\")"))
-        #expect(report.contains("String(localized: \"Proposed Actions\")"))
+        #expect(report.contains("InvestigationUnknownsView("))
+        #expect(report.contains("scopeTransactionIDs.count) requests"))
 
-        // Findings stay grouped (observed/derived/inferred) behind a native disclosure.
-        #expect(report.contains("DisclosureGroup"))
-        #expect(report.contains("InvestigationFindingsDisclosure"))
+        // Detail chrome is simplified: text-only section headings (no SF Symbol argument on
+        // InvestigationReportSection) and no group-level accessibility override on the disclosure.
+        #expect(report.contains("InvestigationReportSection(title: String(localized: \"Scope\")) {"))
+        #expect(report.contains("InvestigationReportSection(title: String(localized: \"Findings\")) {"))
+        #expect(!report.contains("systemImage: \"scope\""))
+        #expect(!report.contains("systemImage: \"list.bullet\""))
+        #expect(!report.contains(".accessibilityLabel(String(localized: \"Why this answer, evidence and scope\"))"))
+        #expect(!report.contains(".accessibilityHint(String(localized: \"Shows evidence and request scope\"))"))
 
-        // Review Data / Continue With Model and the existing handoffs remain wired.
-        #expect(report.contains("Continue With Model"))
+        // Model provenance lives inside the collapsed disclosure through attributionLabel — plain text
+        // (no decorative cpu icon) carrying provider + model + scoped request count, with endpoint host
+        // and token usage tucked into a quiet native menu.
+        #expect(report.contains("attributionLabel(result)"))
+        #expect(report.contains("modelAttributionLabel(modelResult, requestCount:"))
+        #expect(report.contains("modelResult.provider.title"))
+        #expect(report.contains("modelResult.model"))
+        #expect(report.contains("modelResult.endpointHost"))
+        #expect(report.contains("usage.inputTokens"))
+        #expect(report.contains("usage.outputTokens"))
+        #expect(report.contains(".menuStyle(.borderlessButton)"))
+        #expect(!report.contains("Label(summary, systemImage: \"cpu\")"))
+        #expect(!report.contains("systemImage: \"checkmark.seal\""))
+
+        // The completed non-investigation model reply no longer renders modelAttribution(modelResult)
+        // inline below the answer: standard provenance is removed from the visible body and the
+        // modelAttribution helper (with its cpu/hand icons) is gone entirely.
+        #expect(!dock.contains("modelAttribution(modelResult)"))
+        #expect(!dock.contains("private func modelAttribution("))
+        #expect(!dock.contains("hand.raised"))
+
+        // Provider, model, endpoint host, and token usage stay accessible only as plain, icon-free
+        // rows wired into the response footer's overflow menu through modelProvenanceMenuItems.
+        #expect(dock.contains("overflowItems:"))
+        #expect(dock.contains("modelProvenanceMenuItems(modelResult)"))
+        #expect(dock.contains("modelResult.provider.title"))
+        #expect(dock.contains("modelResult.model"))
+        #expect(dock.contains("modelResult.endpointHost"))
+        #expect(dock.contains("usage.inputTokens"))
+        #expect(dock.contains("usage.outputTokens"))
+
+        // The blocked-tool-call safety warning stays visible on the reply as concise plain text.
+        #expect(dock.contains("blockedToolCallWarning"))
+
+        // No workflow button is visible in the response body: no bordered/primary handoff button and
+        // no in-body actions menu. Every handoff lives only in the footer overflow menu.
+        #expect(!report.contains("primaryHandoffButton("))
+        #expect(!report.contains("secondaryActionsMenu("))
+        #expect(!report.contains(".buttonStyle(.bordered)"))
+        #expect(!report.contains(".buttonStyle(.borderedProminent)"))
+        #expect(report.contains("handoffMenuItems(result)"))
+        #expect(report.contains("recommendedHandoffs(for: result.recipe)"))
+        #expect(report.contains("performHandoff("))
+
+        // Model escalation copy still calls the existing review callback and preparing state.
+        #expect(report.contains("String(localized: \"Ask Configured Model\")"))
+        #expect(!report.contains("Continue With Model"))
+        #expect(report.contains("onContinueWithModel()"))
+        #expect(report.contains("String(localized: \"Preparing redacted preview…\")"))
+
+        // The existing handoff / replay callbacks remain wired.
         #expect(report.contains("onHandoff"))
         #expect(report.contains("onPrepareReplay"))
     }
 
-    @Test("Unknowns section is always present with a truthful empty state")
-    func unknownsHasTruthfulEmptyState() throws {
+    @Test("Expanded Details separates Scope, Findings, finding kinds, Unknowns, and provenance")
+    func investigationDetailsUseDistinctBlocksAndDividers() throws {
+        let report = try readProjectFile("Rockxy/Views/Inspector/InvestigationEvidenceViews.swift")
+
+        // Major block titles (Scope / Findings / Unknowns) and the Details disclosure label share the
+        // Summary / Next step title scale: secondaryFontSize semibold in primary text color — no
+        // longer the smaller, secondary metadata scale that made the hierarchy read flat.
+        #expect(report
+            .contains(
+                ".font(.system(size: metrics.secondaryFontSize, weight: .semibold))\n                .foregroundStyle(.primary)"
+            ))
+        #expect(!report
+            .contains("Text(title)\n                .font(.system(size: metrics.metadataFontSize, weight: .semibold))"))
+        #expect(report
+            .contains(
+                "Text(String(localized: \"Unknowns\"))\n"
+                    + "                    .font(.system(size: metrics.secondaryFontSize, weight: .semibold))\n"
+                    + "                    .foregroundStyle(.primary)"
+            ))
+
+        // Scope and Findings are distinct major blocks, each with its own vertical padding and a real
+        // native Divider between them (no icons, dots, badges, or nested cards).
+        #expect(report.contains("private func scopeSection("))
+        #expect(report
+            .contains(
+                "scopeSection(result)\n                    .padding(.vertical, 8)\n\n                Divider()"
+            ))
+        #expect(report.contains("findingsSection(result)\n                    .padding(.vertical, 8)"))
+
+        // Scope body stays selectable/readable at a legible app metric.
+        #expect(report
+            .contains(
+                ".font(.system(size: metrics.secondaryFontSize))\n                .foregroundStyle(.secondary)\n                .textSelection(.enabled)"
+            ))
+
+        // Finding-kind subgroups (Observed / Derived / Inferred) are explicit headings at a legible
+        // secondary scale and are separated by Dividers when more than one kind is present.
+        #expect(report
+            .contains(
+                "Text(group.kind.title)\n                .font(.system(size: metrics.secondaryFontSize, weight: .medium))"
+            ))
+        #expect(report.contains("ForEach(Array(findingGroups.enumerated()), id: \\.element.id)"))
+        #expect(report.contains("if index > 0 {\n                            Divider()"))
+
+        // Evidence titles are no smaller than secondaryFontSize; evidence detail may stay metadata.
+        #expect(report
+            .contains(
+                "Text(evidence.title)\n                    .font(.system(size: metrics.secondaryFontSize, weight: .medium))"
+            ))
+        #expect(report
+            .contains("Text(evidence.detail)\n                        .font(.system(size: metrics.metadataFontSize))"))
+
+        // Unknowns, when present, are a peer block separated from Findings by a Divider (no empty
+        // state); provenance stays at the bottom behind its own Divider.
+        #expect(report
+            .contains(
+                "if !unknowns.isEmpty {\n                    Divider()\n                    InvestigationUnknownsView(unknowns: unknowns, onReveal: onReveal)"
+            ))
+        #expect(report.contains("Divider()\n\n                attributionLabel(result)"))
+
+        // Reveal behavior, disabled semantics, help, and accessibility labels for evidence stay intact.
+        #expect(report.contains(".disabled(evidence.sourceTransactionID == nil)"))
+        #expect(report.contains("String(localized: \"Reveal the request behind this finding\")"))
+        #expect(report.contains("\\(evidence.kind.title) finding: \\(evidence.title)"))
+    }
+
+    @Test("Ellipsis overflow menu adopts configurable control typography, not mini footer sizing")
+    func overflowMenuUsesControlFontMetric() throws {
+        let components = try readProjectFile("Rockxy/Views/Inspector/AssistantConversationComponents.swift")
+
+        // Isolate the overflow menu helper so the compact Copy control's sizing is not asserted here.
+        let start = try #require(components.range(of: "private var overflowMenu: some View {"))
+        let after = components[start.lowerBound...]
+        let end = try #require(after.range(of: "private func compactAction("))
+        let overflow = String(after[..<end.lowerBound])
+
+        // Still a native Menu carrying every caller-supplied item and built-in action + callback.
+        #expect(overflow.contains("Menu {"))
+        #expect(overflow.contains("overflowItems"))
+        #expect(overflow.contains("Button(action: onFollowUp)"))
+        #expect(overflow.contains("Label(String(localized: \"Follow Up\"), systemImage:"))
+        #expect(overflow.contains("Button(action: onRevealRequest)"))
+        #expect(overflow.contains("Label(String(localized: \"Reveal Request\")"))
+        #expect(overflow.contains("Button(action: onRetry)"))
+        #expect(overflow.contains("Label(String(localized: \"Review & Retry\")"))
+
+        // The Menu and its ellipsis glyph use the app-wide configurable control font metric so items
+        // no longer inherit the footer's metadata scale.
+        #expect(overflow.contains(".font(.system(size: metrics.controlFontSize))"))
+        #expect(overflow
+            .contains("Image(systemName: \"ellipsis\")\n                .font(.system(size: metrics.controlFontSize))"))
+
+        // The overflow Menu no longer forces .mini sizing; it stays compact via frame + fixedSize.
+        #expect(!overflow.contains(".controlSize(.mini)"))
+        #expect(overflow.contains(".fixedSize()"))
+        #expect(overflow.contains(".frame(minWidth: 18, minHeight: 18)"))
+
+        // Accessibility and help are preserved on the overflow control.
+        #expect(overflow.contains(".accessibilityLabel(String(localized: \"More actions\"))"))
+        #expect(overflow.contains(".help(String(localized: \"More actions\"))"))
+
+        // The compact Copy control keeps its .mini sizing (asserted outside the overflow helper).
+        let copyStart = try #require(components.range(of: "private func compactAction("))
+        let copy = String(components[copyStart.lowerBound...])
+        #expect(copy.contains(".controlSize(.mini)"))
+    }
+
+    @Test("User bubble stays a soft right-aligned bubble; the assistant response is a coherent card")
+    func userBubbleAndAssistantResponseCardAreDistinct() throws {
+        let components = try readProjectFile("Rockxy/Views/Inspector/AssistantConversationComponents.swift")
+
+        // Request side: a compact, right-aligned, width-constrained bubble with a native control
+        // surface, selectable text, and a correct "You:" accessibility label. No avatar or identity.
+        #expect(components.contains("struct AssistantUserMessageBubble"))
+        #expect(!components.contains("struct AssistantQueryRow"))
+        #expect(components.contains(".frame(maxWidth: .infinity, alignment: .trailing)"))
+        #expect(components.contains("Spacer(minLength: 44)"))
+        #expect(components.contains(".textSelection(.enabled)"))
+        #expect(components.contains("String(localized: \"You: \\(text)\")"))
+
+        // Response side: one coherent neutral rounded card — subtle background, hairline separator
+        // border, compact padding. No assistant logo/icon/identity row and no duplicate card type.
+        #expect(components.contains("struct AssistantResponseContainer"))
+        #expect(!components.contains("struct AssistantResponseCard"))
+        #expect(components.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9)"))
+        #expect(components
+            .contains(
+                "RoundedRectangle(cornerRadius: 9)\n                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)"
+            ))
+        #expect(!components.contains("String(localized: \"Rockxy Assistant\")"))
+        #expect(!components.contains("String(localized: \"AI Assistant Response\")"))
+        #expect(!components.contains("waveform.badge.magnifyingglass"))
+
+        // Response footer: exactly two quiet affordances — a Copy control and one ellipsis overflow
+        // menu. Follow Up is a menu item only, never a visible icon button in the body.
+        #expect(components.contains("struct AssistantResponseActionBar"))
+        #expect(components.contains("Image(systemName: \"ellipsis\")"))
+        #expect(components.contains("String(localized: \"Copy\")"))
+        #expect(components.contains("Label(String(localized: \"Follow Up\"), systemImage:"))
+    }
+
+    @Test("Unknowns render only when non-empty and never show a verbose empty state")
+    func unknownsRenderOnlyWhenPresent() throws {
         let report = try readProjectFile("Rockxy/Views/Inspector/InvestigationEvidenceViews.swift")
         #expect(report.contains("struct InvestigationUnknownsView"))
-        #expect(report.contains("if unknowns.isEmpty"))
-        #expect(report.contains("No open questions"))
+        #expect(report.contains("if !unknowns.isEmpty"))
+        #expect(!report.contains("No open questions"))
     }
 
     @Test("Evidence without a source request cannot pretend to navigate")
@@ -143,26 +394,74 @@ struct ContextDockInvestigationReportTests {
         #expect(report.contains(".disabled(evidence.sourceTransactionID == nil)"))
     }
 
-    @Test("Empty-state entry point uses compact horizontal suggestion cards in a two-column grid")
-    func emptyStateUsesSuggestionGrid() throws {
+    @Test("Empty launcher shows a sparkles hero and every recipe as a two-column card grid")
+    func emptyStateUsesRecipeCardLauncher() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
-        // Suggestions are a compact two-column grid of bordered cards, not a single-column list.
-        #expect(dock.contains("suggestionGrid"))
+        let coordinator = try readProjectFile(
+            "Rockxy/Views/Main/Extensions/MainContentCoordinator+DebugAssistant.swift"
+        )
+
+        // The empty state splits by selection: a restrained native prompt when nothing is selected,
+        // the recipe-card launcher when a request is selected.
+        #expect(dock.contains("if primaryTransaction == nil"))
+        #expect(dock.contains("noSelectionEmptyState"))
+        #expect(dock.contains("investigationLauncher"))
+
+        // No selection: a restrained native empty state telling the user to select traffic. No cards.
+        #expect(dock.contains("Investigate captured traffic"))
+        #expect(dock.contains("Select a request to investigate, or type a question below."))
+        #expect(!dock.contains("How can I help with this traffic?"))
+
+        // Selected traffic: a centered sparkles hero above the "Start an investigation" title.
+        #expect(dock.contains("Image(systemName: \"sparkles\")"))
+        #expect(dock.contains("String(localized: \"Start an investigation\")"))
+
+        // A two-column grid rendering every recipe in existing allCases order (last card alone left).
         #expect(dock.contains("LazyVGrid"))
-        #expect(!dock.contains("recipeList"))
-        // Exactly two flexible columns.
-        #expect(dock.components(separatedBy: "GridItem(.flexible()").count - 1 == 2)
-        // Compact bordered cards, small control size.
+        #expect(dock.contains("GridItem(.flexible(), spacing: 6)"))
+        #expect(dock.contains("ForEach(DebugAssistantRecipe.allCases)"))
+        #expect(dock.contains("suggestionCard(recipe)"))
+
+        // No workflow-taxonomy clusters, "More suggestions" disclosure, or adaptive grid remain.
+        #expect(!dock.contains("struct AssistantSuggestionCluster"))
+        #expect(!dock.contains("suggestionClusters"))
+        #expect(!dock.contains("String(localized: \"More suggestions\")"))
+        #expect(!dock.contains("isMoreSuggestionsExpanded"))
+        #expect(!dock.contains("GridItem(.adaptive("))
+
+        // The prior flat text-only launcher (link button rendering recipe.prompt) is gone.
+        #expect(!dock.contains("suggestionLauncher"))
+        #expect(!dock.contains("primaryRecipes"))
+        #expect(!dock.contains("private func suggestionButton("))
+        #expect(!dock.contains(".buttonStyle(.link)"))
+        #expect(!dock.contains("Text(recipe.prompt)"))
+
+        // Each card: exactly one meaningful SF Symbol plus the short recipe.title (2-line max), a
+        // native bordered/small button at HStack spacing 6, recipe.detail only as help, busy-disabled.
+        // The prior custom .plain style, controlBackgroundColor surface, and rounded hairline overlay
+        // are gone — the reference is the native bordered-button treatment, not a custom approximation.
+        #expect(dock.contains("private func suggestionCard("))
+        #expect(dock.contains("Image(systemName: recipe.systemImage)"))
+        #expect(dock.contains("Text(recipe.title)"))
+        #expect(dock.contains(".lineLimit(2)"))
+        #expect(dock.contains("HStack(spacing: 6)"))
         #expect(dock.contains(".buttonStyle(.bordered)"))
         #expect(dock.contains(".controlSize(.small)"))
-        // Titles stay recipe-driven, the full detail stays in help, and titles may wrap to 2 lines.
-        #expect(dock.contains("DebugAssistantRecipe.allCases"))
+        #expect(!dock.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8)"))
+        #expect(!dock.contains("RoundedRectangle(cornerRadius: 8)"))
         #expect(dock.contains(".help(recipe.detail)"))
-        #expect(dock.contains(".lineLimit(2)"))
-        #expect(dock.contains("Investigate captured traffic"))
-        #expect(dock.contains("Start an investigation"))
-        #expect(!dock.contains("What should I check?"))
-        #expect(!dock.contains("Ask about captured traffic"))
+        #expect(dock.contains(".disabled(isBusy)"))
+
+        // No duplicate composer suggestion strip: exactly one prebuilt suggestion surface remains.
+        #expect(!dock.contains("DebugAssistantRecipe.allCases.prefix(2)"))
+
+        // Typed prompts still reach the matching recipe by routing through suggestedRecipe(for:).
+        #expect(coordinator.contains("DebugAssistantRecipe.suggestedRecipe(for: prompt)"))
+
+        // The grid renders all recipes exactly once, in existing order — no intent dropped/duplicated.
+        #expect(DebugAssistantRecipe.allCases.count == 5)
+        #expect(DebugAssistantRecipe.allCases.first == .explainRequest)
+        #expect(DebugAssistantRecipe.allCases.last == .prepareBugReport)
     }
 
     @Test("Mode switcher shows Details / AI Assistant, not Context / Investigate")
