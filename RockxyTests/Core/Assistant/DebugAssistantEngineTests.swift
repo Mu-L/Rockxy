@@ -102,6 +102,114 @@ struct DebugAssistantEngineTests {
         #expect(result.evidence.contains { $0.kind == .inferred })
     }
 
+    @Test("A 401 with a captured credential points the user at refreshing it, never exposing the value")
+    func failureNextStep401WithAuthorization() throws {
+        let transaction = makeTransaction(
+            statusCode: 401,
+            requestHeaders: [HTTPHeader(name: "Authorization", value: "Bearer synthetic-secret")]
+        )
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result.nextStep == "Refresh or replace the credential, then retry the request.")
+        #expect(!result.nextStep.contains("synthetic-secret"))
+    }
+
+    @Test("A 401 without a captured credential asks the user to add one")
+    func failureNextStep401WithoutAuthorization() throws {
+        let transaction = makeTransaction(statusCode: 401)
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result.nextStep == "Add the required authentication credential, then retry the request.")
+    }
+
+    @Test("A 403 next step is framed as a permission check, not a comparison")
+    func failureNextStep403() throws {
+        let transaction = makeTransaction(statusCode: 403)
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result
+            .nextStep == "Check that the credential has permission for this endpoint, then retry the request.")
+    }
+
+    @Test("A 429 with Retry-After tells the user to wait for the server delay without leaking the value")
+    func failureNextStep429WithRetryAfter() throws {
+        let transaction = makeTransaction(
+            statusCode: 429,
+            responseHeaders: [HTTPHeader(name: "Retry-After", value: "20")]
+        )
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result.nextStep == "Wait for the server-specified Retry-After delay, then retry the request once.")
+        #expect(!result.nextStep.contains("20"))
+    }
+
+    @Test("A 429 without Retry-After tells the user to wait briefly then retry once")
+    func failureNextStep429WithoutRetryAfter() throws {
+        let transaction = makeTransaction(statusCode: 429)
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result.nextStep == "Wait briefly, then retry the request once.")
+    }
+
+    @Test("A 5xx next step is a single retry with a fallback comparison")
+    func failureNextStep5xx() throws {
+        let transaction = makeTransaction(statusCode: 503)
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result
+            .nextStep == "Retry once. If it fails again, compare the server response with a successful request.")
+    }
+
+    @Test("A non-auth, non-rate-limit failure falls back to opening request details")
+    func failureNextStepFallback() throws {
+        let transaction = makeTransaction(statusCode: 404)
+        let snapshot = InvestigationTransactionSnapshot(transaction: transaction)
+
+        let result = try DebugAssistantEngine().investigate(
+            recipe: .explainFailure,
+            selected: [snapshot],
+            session: [snapshot]
+        )
+
+        #expect(result.nextStep == "Open the request details and check the highlighted evidence.")
+    }
+
     // MARK: Private
 
     private func makeTransaction(

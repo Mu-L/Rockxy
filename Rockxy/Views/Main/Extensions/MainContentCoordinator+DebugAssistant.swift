@@ -25,17 +25,10 @@ extension MainContentCoordinator {
         }
         workspace.debugAssistantDraft = ""
         guard !debugAssistantSelectedTransactions().isEmpty else {
-            if workspace.debugAssistantMessages.isEmpty {
-                workspace.debugAssistantConversationTitle = debugAssistantConversationTitle(from: prompt)
-                workspace.debugAssistantConversationUpdatedAt = Date()
-            }
-            workspace.debugAssistantMessages.append(.user(prompt))
-            workspace.debugAssistantMessages.append(.assistant(
-                String(
-                    localized: "I can help investigate captured traffic. Select one or more requests, then ask me what failed, what changed, or what to try next."
-                )
-            ))
-            syncCurrentDebugAssistantConversation(workspace)
+            // No selected traffic: answer the Rockxy product/workflow question. The conversation
+            // stays context-free and renders as a normal plain assistant response — never a fake
+            // traffic investigation.
+            sendDebugAssistantProductHelp(prompt: prompt)
             return
         }
         startDebugAssistant(DebugAssistantRecipe.suggestedRecipe(for: prompt), prompt: prompt)
@@ -101,6 +94,7 @@ extension MainContentCoordinator {
         } ?? .idle
         workspace.modelInvestigationState = conversation.messages.compactMap(\.modelResult).last
             .map(ModelInvestigationState.completed) ?? .idle
+        workspace.debugAssistantProductHelpState = .idle
         resetDebugAssistantReviewState(workspace)
         workspace.debugAssistantTrafficScope = AssistantTrustPolicy.defaultTrafficScope
     }
@@ -202,6 +196,7 @@ extension MainContentCoordinator {
                 ? debugAssistantAvailableRelatedTransactionCount()
                 : 0)
         workspace.modelInvestigationState = .idle
+        workspace.debugAssistantProductHelpState = .idle
         workspace.debugAssistantState = .investigating(runID: runID, recipe: recipe)
 
         let worker = Task.detached(priority: .userInitiated) {
@@ -861,6 +856,7 @@ extension MainContentCoordinator {
         cancelDebugAssistantTask(for: workspace.id)
         workspace.debugAssistantState = .idle
         workspace.modelInvestigationState = .idle
+        workspace.debugAssistantProductHelpState = .idle
         resetDebugAssistantReviewState(workspace)
         workspace.debugAssistantTrafficScope = AssistantTrustPolicy.defaultTrafficScope
     }
@@ -1061,6 +1057,7 @@ extension MainContentCoordinator {
         cancelDebugAssistantTask(for: workspace.id)
         workspace.debugAssistantState = .idle
         workspace.modelInvestigationState = .idle
+        workspace.debugAssistantProductHelpState = .idle
         workspace.debugAssistantMessages.removeAll()
         workspace.debugAssistantDraft = ""
         workspace.debugAssistantConversationID = UUID()
@@ -1072,7 +1069,7 @@ extension MainContentCoordinator {
         workspace.debugAssistantTrafficScope = AssistantTrustPolicy.defaultTrafficScope
     }
 
-    private func syncCurrentDebugAssistantConversation(_ workspace: WorkspaceState) {
+    func syncCurrentDebugAssistantConversation(_ workspace: WorkspaceState) {
         guard !workspace.debugAssistantMessages.isEmpty else {
             return
         }
@@ -1102,7 +1099,7 @@ extension MainContentCoordinator {
         enforceDebugAssistantConversationCapacity(workspace)
     }
 
-    private func shouldAutomaticallyUseConfiguredModel(_ workspace: WorkspaceState) -> Bool {
+    func shouldAutomaticallyUseConfiguredModel(_ workspace: WorkspaceState) -> Bool {
         guard workspace.debugAssistantUsesConfiguredModel else {
             return false
         }
@@ -1111,7 +1108,7 @@ extension MainContentCoordinator {
             && settings.assistantProviderConfiguration?.isComplete == true
     }
 
-    private func debugAssistantConversationTitle(from prompt: String) -> String {
+    func debugAssistantConversationTitle(from prompt: String) -> String {
         let normalized = prompt
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)

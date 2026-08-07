@@ -14,7 +14,7 @@ struct InvestigationEvidenceGroupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(group.kind.title)
-                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                 .foregroundStyle(.secondary)
             ForEach(group.evidence) { evidence in
                 InvestigationEvidenceRow(evidence: evidence, onReveal: onReveal)
@@ -29,9 +29,8 @@ struct InvestigationEvidenceGroupView: View {
 
 // MARK: - InvestigationUnknownsView
 
-/// The dedicated "Unknowns" section surfaced from `.unknown` evidence — open questions the local
-/// investigation could not resolve from captured traffic alone. Always rendered so the report is
-/// honest about whether open questions remain, including a truthful empty state.
+/// Open questions the local investigation could not resolve from captured traffic alone. Rendered
+/// only when unknowns exist — the answer-first report never shows an empty "no open questions" state.
 struct InvestigationUnknownsView: View {
     // MARK: Internal
 
@@ -39,16 +38,11 @@ struct InvestigationUnknownsView: View {
     let onReveal: (InvestigationEvidence) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(String(localized: "Unknowns"), systemImage: "questionmark.circle")
-                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(.secondary)
-            if unknowns.isEmpty {
-                Text(String(localized: "No open questions — captured traffic answered this investigation."))
-                    .font(.system(size: metrics.metadataFontSize))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
+        if !unknowns.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(localized: "Unknowns"))
+                    .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
+                    .foregroundStyle(.primary)
                 ForEach(unknowns) { evidence in
                     InvestigationEvidenceRow(evidence: evidence, onReveal: onReveal)
                 }
@@ -63,8 +57,9 @@ struct InvestigationUnknownsView: View {
 
 // MARK: - InvestigationEvidenceRow
 
-/// A single finding row. When it is backed by a captured request, tapping reveals that request;
-/// the `scope` glyph keeps the reveal affordance discoverable.
+/// A single finding row, rendered as plain text. When it is backed by a captured request, tapping
+/// reveals that request; the row carries no colored dot or trailing scope glyph — the disabled state
+/// and help text convey whether it can navigate.
 struct InvestigationEvidenceRow: View {
     // MARK: Internal
 
@@ -75,30 +70,19 @@ struct InvestigationEvidenceRow: View {
         Button {
             onReveal(evidence)
         } label: {
-            HStack(alignment: .top, spacing: 6) {
-                Circle()
-                    .fill(evidenceColor)
-                    .frame(width: 6, height: 6)
-                    .padding(.top, 4)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(evidence.title)
-                        .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                    if !evidence.detail.isEmpty {
-                        Text(evidence.detail)
-                            .font(.system(size: metrics.metadataFontSize))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                Spacer(minLength: 0)
-                if evidence.sourceTransactionID != nil {
-                    Image(systemName: "scope")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(evidence.title)
+                    .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                if !evidence.detail.isEmpty {
+                    Text(evidence.detail)
                         .font(.system(size: metrics.metadataFontSize))
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -112,34 +96,24 @@ struct InvestigationEvidenceRow: View {
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var evidenceColor: Color {
-        switch evidence.kind {
-        case .observed: .blue
-        case .derived: .purple
-        case .inferred: .orange
-        case .unknown: .secondary
-        }
-    }
 }
 
 // MARK: - InvestigationReportSection
 
-/// A labelled native inspector section for the investigation report — a restrained secondary title
-/// with an SF Symbol above its content. Keeps every section header consistent and readable at large
-/// fonts without web-style uppercase dashboard headings.
+/// A text-only section for the collapsed evidence disclosure — a restrained secondary title above
+/// its content, with no SF Symbol. Keeps every technical label consistent and readable at large
+/// fonts without web-style dashboard chrome.
 struct InvestigationReportSection<Content: View>: View {
     // MARK: Internal
 
     let title: String
-    let systemImage: String
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
-                .foregroundStyle(.secondary)
+            Text(title)
+                .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
+                .foregroundStyle(.primary)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -150,257 +124,297 @@ struct InvestigationReportSection<Content: View>: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
-// MARK: - InvestigationReportHeader
+// MARK: - InvestigationSectionFrame
 
-/// Report title row: the recipe that produced the investigation plus honest local/model
-/// attribution and the number of requests in scope.
-struct InvestigationReportHeader: View {
+/// A small, text-only bounded section frame used for the visible "Summary" and "Next step" blocks
+/// of an investigation turn. It renders a bold text title above its content inside the shared
+/// restrained frame chrome (`investigationSectionFrameStyle`) — no icon, badge, tint, shadow,
+/// material, status color, action, or decorative header. Editorial grouping only.
+struct InvestigationSectionFrame<Content: View>: View {
     // MARK: Internal
 
-    let result: InvestigationResult
-    let hasModelResult: Bool
+    let title: String
+    @ViewBuilder let content: Content
 
     var body: some View {
-        HStack(spacing: 7) {
-            Image(systemName: result.recipe.systemImage)
-                .foregroundStyle(.secondary)
-            Text(result.recipe.title)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
                 .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            Label(attribution, systemImage: hasModelResult ? "cpu" : "checkmark.seal")
-                .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            content
         }
-        .accessibilityElement(children: .combine)
+        .investigationSectionFrameStyle()
     }
 
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var attribution: String {
-        hasModelResult
-            ? String(localized: "Model analysis · \(result.scopeTransactionIDs.count) requests")
-            : String(localized: "Local analysis · \(result.scopeTransactionIDs.count) requests")
-    }
 }
 
-// MARK: - InvestigationFindingsDisclosure
-
-/// The "Findings" section: grouped Observed / Derived / Inferred evidence, expanded by default so
-/// the report reads as a native inspector list rather than a hidden drawer.
-struct InvestigationFindingsDisclosure: View {
-    // MARK: Internal
-
-    let findingGroups: [InvestigationEvidenceGroup]
-    let findingCount: Int
-    let onReveal: (InvestigationEvidence) -> Void
-
-    var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(findingGroups) { group in
-                    InvestigationEvidenceGroupView(group: group, onReveal: onReveal)
-                }
-            }
-            .padding(.top, 4)
-        } label: {
-            HStack(spacing: 6) {
-                Label(String(localized: "Findings"), systemImage: "list.bullet")
-                    .font(.system(size: metrics.metadataFontSize, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Text(findingCount.formatted())
-                    .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityLabel(String(localized: "Findings, \(findingCount) total"))
+private extension View {
+    /// Restrained bounded frame shared by the Summary / Next step / Details sections: compact
+    /// padding, a small rounded rectangle, and a 0.5 separator-color hairline over a clear
+    /// background. No fill tint, icon, shadow, or material — the frame is purely editorial grouping.
+    func investigationSectionFrameStyle() -> some View {
+        padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
     }
-
-    // MARK: Private
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
-    @State private var isExpanded = true
 }
 
 // MARK: - InvestigationReportView
 
-/// The completed investigation turn, rendered as a full-width native report rather than a chat
-/// exchange. Presents Scope, Summary, optional Model Analysis, Findings, Unknowns, Next Step, and
-/// Proposed Actions. Evidence-level reveal and all handoffs are surfaced through injected closures
-/// so this stays a pure presentation surface; the caller supplies attribution + action-bar `footer`.
-struct InvestigationReportView<Footer: View>: View {
+/// A completed investigation turn, rendered with editorial typography: a bold text-only "Summary"
+/// heading above the answer, a "Next step" heading above `result.nextStep` when nonempty, then all
+/// technical evidence collapsed behind one quiet "Details" disclosure. No workflow button appears in the response body
+/// — every
+/// handoff, model escalation, follow-up, reveal, and retry is preserved inside the footer's single
+/// ellipsis overflow menu next to a standard Copy control. Evidence-level reveal and every workflow
+/// callback are injected as closures so this stays a pure presentation surface.
+struct InvestigationReportView: View {
     // MARK: Internal
 
     let message: DebugAssistantMessage
     let isCurrentResult: Bool
     let showsContinueWithModel: Bool
     let isPreparingReview: Bool
+    let canRevealRequest: Bool
+    let canRetry: Bool
     let onReveal: (InvestigationEvidence) -> Void
     let onContinueWithModel: () -> Void
     let onHandoff: (AssistantUserHandoff, InvestigationResult) -> Void
     let onPrepareReplay: (InvestigationResult) -> Void
-    @ViewBuilder let footer: Footer
+    let onCopy: () -> Void
+    let onFollowUp: () -> Void
+    let onRevealRequest: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         if let result = message.investigation {
-            VStack(alignment: .leading, spacing: 12) {
-                InvestigationReportHeader(result: result, hasModelResult: message.modelResult != nil)
-
-                InvestigationReportSection(title: String(localized: "Scope"), systemImage: "scope") {
-                    reportBody(result.scopeSummary)
-                        .accessibilityLabel(String(localized: "Investigation scope: \(result.scopeSummary)"))
+            VStack(alignment: .leading, spacing: 10) {
+                answer(result)
+                nextStep(result)
+                evidenceDisclosure(result)
+                if isPreparingReview {
+                    preparingReviewRow
                 }
-
-                InvestigationReportSection(title: String(localized: "Summary"), systemImage: "text.alignleft") {
-                    reportBody(result.summary)
-                        .textSelection(.enabled)
-                }
-
-                if message.modelResult != nil, !message.text.isEmpty, message.text != result.summary {
-                    InvestigationReportSection(title: String(localized: "Model Analysis"), systemImage: "cpu") {
-                        AssistantMarkdownText(source: message.text)
-                    }
-                }
-
-                findingsSection(result)
-
-                InvestigationUnknownsView(
-                    unknowns: InvestigationResultPresentation.unknowns(for: result.evidence),
-                    onReveal: onReveal
-                )
-
-                InvestigationReportSection(
-                    title: String(localized: "Next Step"),
-                    systemImage: "arrow.turn.down.right"
-                ) {
-                    reportBody(result.nextStep, weight: .medium)
-                        .accessibilityLabel(String(localized: "Next step: \(result.nextStep)"))
-                }
-
-                proposedActionsSection(result)
-
-                footer
+                responseFooter(result)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel(String(localized: "Investigation report"))
+            .accessibilityLabel(String(localized: "Investigation answer"))
         }
     }
 
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var isEvidenceExpanded = false
 
-    private var continueWithModelControl: some View {
+    private var preparingReviewRow: some View {
         HStack(spacing: 8) {
-            if isPreparingReview {
-                ProgressView()
-                    .controlSize(.small)
-                Text(String(localized: "Preparing redacted preview…"))
-                    .font(.system(size: metrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-            } else {
-                Button(action: onContinueWithModel) {
-                    Label(String(localized: "Continue With Model"), systemImage: "lock.shield")
-                }
-                .buttonStyle(.borderless)
+            ProgressView()
                 .controlSize(.small)
+            Text(String(localized: "Preparing redacted preview…"))
+                .font(.system(size: metrics.secondaryFontSize))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func answer(_ result: InvestigationResult) -> some View {
+        InvestigationSectionFrame(title: String(localized: "Summary")) {
+            if usesModelAnswer(result) {
+                AssistantMarkdownText(source: message.text)
+            } else {
+                Text(result.summary)
+                    .font(.system(size: metrics.primaryFontSize))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(String(localized: "Answer: \(result.summary)"))
             }
         }
     }
 
-    private func reportBody(_ text: String, weight: Font.Weight = .regular) -> some View {
-        Text(text)
-            .font(.system(size: metrics.secondaryFontSize, weight: weight))
-            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private func nextStep(_ result: InvestigationResult) -> some View {
+        if !result.nextStep.isEmpty {
+            InvestigationSectionFrame(title: String(localized: "Next step")) {
+                Text(result.nextStep)
+                    .font(.system(size: metrics.primaryFontSize))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func evidenceDisclosure(_ result: InvestigationResult) -> some View {
+        let unknowns = InvestigationResultPresentation.unknowns(for: result.evidence)
+        return DisclosureGroup(isExpanded: $isEvidenceExpanded) {
+            VStack(alignment: .leading, spacing: 0) {
+                scopeSection(result)
+                    .padding(.vertical, 8)
+
+                Divider()
+
+                findingsSection(result)
+                    .padding(.vertical, 8)
+
+                if !unknowns.isEmpty {
+                    Divider()
+                    InvestigationUnknownsView(unknowns: unknowns, onReveal: onReveal)
+                        .padding(.vertical, 8)
+                }
+
+                Divider()
+
+                attributionLabel(result)
+                    .padding(.vertical, 8)
+            }
+            .padding(.top, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(String(localized: "Details"))
+                .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+        .investigationSectionFrameStyle()
+    }
+
+    private func scopeSection(_ result: InvestigationResult) -> some View {
+        InvestigationReportSection(title: String(localized: "Scope")) {
+            Text(result.scopeSummary)
+                .font(.system(size: metrics.secondaryFontSize))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(String(localized: "Investigation scope: \(result.scopeSummary)"))
+        }
     }
 
     @ViewBuilder
     private func findingsSection(_ result: InvestigationResult) -> some View {
         let findingGroups = InvestigationResultPresentation.findingGroups(for: result.evidence)
-        if findingGroups.isEmpty {
-            InvestigationReportSection(title: String(localized: "Findings"), systemImage: "list.bullet") {
+        InvestigationReportSection(title: String(localized: "Findings")) {
+            if findingGroups.isEmpty {
                 Text(String(localized: "No concrete findings from the captured traffic."))
                     .font(.system(size: metrics.metadataFontSize))
                     .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(findingGroups.enumerated()), id: \.element.id) { index, group in
+                        if index > 0 {
+                            Divider()
+                        }
+                        InvestigationEvidenceGroupView(group: group, onReveal: onReveal)
+                    }
+                }
             }
-        } else {
-            InvestigationFindingsDisclosure(
-                findingGroups: findingGroups,
-                findingCount: InvestigationResultPresentation.findingCount(for: result.evidence),
-                onReveal: onReveal
-            )
         }
     }
 
     @ViewBuilder
-    private func proposedActionsSection(_ result: InvestigationResult) -> some View {
-        let handoffs = AssistantTrustPolicy.recommendedHandoffs(for: result.recipe)
-        InvestigationReportSection(
-            title: String(localized: "Proposed Actions"),
-            systemImage: "wrench.and.screwdriver"
-        ) {
-            VStack(alignment: .leading, spacing: 6) {
-                if showsContinueWithModel {
-                    continueWithModelControl
-                }
-                if handoffs.isEmpty {
-                    if !showsContinueWithModel {
-                        Text(String(localized: "No follow-up workflow is recommended for this investigation."))
-                            .font(.system(size: metrics.metadataFontSize))
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    handoffButtons(result, handoffs: handoffs)
-                }
-            }
+    private func attributionLabel(_ result: InvestigationResult) -> some View {
+        if let modelResult = message.modelResult {
+            modelAttributionLabel(modelResult, requestCount: result.scopeTransactionIDs.count)
+        } else {
+            let text = String(localized: "Local analysis · \(result.scopeTransactionIDs.count) requests")
+            Text(text)
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(text)
         }
     }
 
-    private func handoffButtons(
-        _ result: InvestigationResult,
-        handoffs: [AssistantUserHandoff]
+    /// Exact model provenance for an investigation answer, kept inside the collapsed "Details"
+    /// disclosure instead of a second always-visible report section: provider, model, and scoped
+    /// request count in a plain text label (no decorative icon), with endpoint host and token usage
+    /// tucked into a quiet native menu so the surface stays a single restrained line.
+    private func modelAttributionLabel(
+        _ modelResult: ModelInvestigationResult,
+        requestCount: Int
     )
         -> some View
     {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-                ForEach(handoffs) { handoff in
-                    handoffButton(handoff, result: result)
-                }
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(handoffs) { handoff in
-                    handoffButton(handoff, result: result)
-                }
-            }
-        }
-    }
-
-    private func handoffButton(
-        _ handoff: AssistantUserHandoff,
-        result: InvestigationResult
-    )
-        -> some View
-    {
-        Button {
-            if handoff == .prepareReplay {
-                onPrepareReplay(result)
-            } else {
-                onHandoff(handoff, result)
+        let summary = String(
+            localized: "\(modelResult.provider.title) · \(modelResult.model) · \(requestCount) requests"
+        )
+        return Menu {
+            Button(modelResult.endpointHost) {}
+                .disabled(true)
+            if let usage = modelResult.usage {
+                Divider()
+                Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens")) {}
+                    .disabled(true)
             }
         } label: {
-            Label(handoff.title, systemImage: handoff.systemImage)
+            Text(summary)
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .disabled(!isCurrentResult)
-        .help(isCurrentResult
-            ? handoff.title
-            : String(localized: "Reselect the original request to reopen this action"))
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .controlSize(.mini)
+        .help("\(modelResult.provider.title) · \(modelResult.model) · \(modelResult.endpointHost)")
+        .accessibilityLabel(summary)
+    }
+
+    private func responseFooter(_ result: InvestigationResult) -> some View {
+        AssistantResponseActionBar(
+            canCopy: !message.text.isEmpty,
+            canRevealRequest: canRevealRequest,
+            canRetry: canRetry,
+            onCopy: onCopy,
+            onFollowUp: onFollowUp,
+            onRevealRequest: onRevealRequest,
+            onRetry: onRetry,
+            overflowItems: { handoffMenuItems(result) }
+        )
+    }
+
+    /// Every workflow handoff and the configured-model escalation, rendered only as items in the
+    /// footer's overflow menu — never as a visible button in the response body. Standard SF Symbols
+    /// are acceptable here because they appear only after intentional disclosure.
+    @ViewBuilder
+    private func handoffMenuItems(_ result: InvestigationResult) -> some View {
+        let handoffs = AssistantTrustPolicy.recommendedHandoffs(for: result.recipe)
+        if showsContinueWithModel {
+            Button {
+                onContinueWithModel()
+            } label: {
+                Label(String(localized: "Ask Configured Model"), systemImage: "lock.shield")
+            }
+        }
+        ForEach(handoffs) { handoff in
+            Button {
+                performHandoff(handoff, result: result)
+            } label: {
+                Label(handoff.title, systemImage: handoff.systemImage)
+            }
+            .disabled(!isCurrentResult)
+        }
+        if showsContinueWithModel || !handoffs.isEmpty {
+            Divider()
+        }
+    }
+
+    private func usesModelAnswer(_ result: InvestigationResult) -> Bool {
+        message.modelResult != nil && !message.text.isEmpty && message.text != result.summary
+    }
+
+    private func performHandoff(
+        _ handoff: AssistantUserHandoff,
+        result: InvestigationResult
+    ) {
+        if handoff == .prepareReplay {
+            onPrepareReplay(result)
+        } else {
+            onHandoff(handoff, result)
+        }
     }
 }
