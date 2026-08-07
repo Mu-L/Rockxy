@@ -6,34 +6,28 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.33.0 (build 50)</title>
-      <pubDate>Tue, 04 Aug 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-08-04T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.34.0 (build 51)</title>
+      <pubDate>Fri, 07 Aug 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-08-07T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.33.0/Rockxy-0.33.0-50.dmg"
-        sparkle:version="50"
-        sparkle:shortVersionString="0.33.0"
-        sparkle:edSignature="tEv9owKa5iK5VdBdUEnuxeLKksI2dGc8Gonw2iLxPWEmfKiLTqZu9i+8/dlBtKpSA7URUz8t/geOK8gghdFLDA=="
-        length="34038077"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.34.0/Rockxy-0.34.0-51.dmg"
+        sparkle:version="51"
+        sparkle:shortVersionString="0.34.0"
+        sparkle:edSignature="gWYq0Ui4VLYkVZ5u39HFqdfAcBpol4TJvqWipgQGyEc7ZZ5VLJtj6Zi4jaBv0bJ9HYvNmQ4EjFM7YTchfM+3CQ=="
+        length="34121247"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.33.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.34.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
-  <li>Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.</li>
-  <li>New empty-state guidance explains why no requests are visible and provides relevant recovery actions.</li>
-</ul>
-<h3>Fixed</h3>
-<ul>
-  <li>Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.</li>
+  <li>Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.</li>
+  <li>Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.</li>
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.</li>
-  <li>Request and response inspectors remain readable when resizing the workspace or bottom panel.</li>
-  <li>Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.</li>
-  <li>Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.</li>
+  <li>Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.</li>
+  <li>Workspace questions report current request, error, and saved-item counts without attaching captured request content.</li>
 </ul>
       ]]></description>
     </item>

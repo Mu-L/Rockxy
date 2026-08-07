@@ -61,23 +61,17 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.33.0** — 2026-08-04
+**v0.34.0** — 2026-08-07
 
 ### Added
 
-- Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.
-- New empty-state guidance explains why no requests are visible and provides relevant recovery actions.
-
-### Fixed
-
-- Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.
+- Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.
+- Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.
 
 ### Changed
 
-- Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.
-- Request and response inspectors remain readable when resizing the workspace or bottom panel.
-- Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.
-- Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.
+- Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.
+- Workspace questions report current request, error, and saved-item counts without attaching captured request content.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->

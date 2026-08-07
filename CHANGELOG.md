@@ -33,6 +33,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.34.0] - 2026-08-07
+
+### Added
+
+- Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.
+- Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.
+
+### Changed
+
+- Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.
+- Workspace questions report current request, error, and saved-item counts without attaching captured request content.
+
 ## [0.33.0] - 2026-08-04
 
 ### Added
