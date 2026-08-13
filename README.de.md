@@ -131,7 +131,7 @@ W&auml;hlen Sie eine oder mehrere erfasste Anfragen und fragen Sie, was passiert
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Lassen Sie Claude Desktop oder Cursor &uuml;ber einen lokalen MCP-Server Ihren erfassten Traffic lesen. Fragen Sie "warum hat das 500 ergeben?", statt Header in den Chat zu kleben. Lokal, redaction-aware und Open Source.
+Lassen Sie Claude Desktop oder Cursor Ihren erfassten Traffic &uuml;ber zehn schreibgesch&uuml;tzte Tools im lokalen MCP-Server von Rockxy inspizieren. Fragen Sie "warum hat das 500 ergeben?", statt Header in den Chat zu kleben. Die Implementierung ist Open Source, Token-authentifiziert und h&auml;lt die Maskierung sensibler Daten standardm&auml;&szlig;ig aktiviert.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -209,11 +209,11 @@ F&uuml;gen Sie auf jedem Host Header hinzu, entfernen oder ersetzen Sie sie, ohn
 
 ### Custom Request- und Response-Header
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-&Uuml;berschreiben Sie Header pro Host mit voller Kontrolle &uuml;ber beide Phasen. Injizieren Sie Auth-Token in ausgehende Anfragen, entfernen Sie Set-Cookie in Antworten oder fixieren Sie einen User-Agent &mdash; gespeichert als benannte Regeln, die jederzeit umschaltbar sind.
+Bef&ouml;rdern Sie jeden Request- oder Response-Header zu einer erstklassigen Spalte in der Traffic-Tabelle. Halten Sie Request- und Response-Quellen getrennt, speichern Sie die Header, die Sie interessieren, und scannen Sie dann Request-IDs, Trace-IDs, Cache-Status oder eigene Metadaten, ohne jeden Inspektor zu &ouml;ffnen.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Netzwerkbedingungen
 
@@ -233,9 +233,9 @@ Bauen Sie jede erfasste HTTP-Anfrage neu auf &mdash; &auml;ndern Sie Method, URL
 
 ### Vergleichen
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Stapeln Sie zwei erfasste Antworten nebeneinander und finden Sie jedes Feld, das gekippt ist &mdash; Status, Header, JSON-Schl&uuml;ssel, Body-Bytes. Fangen Sie stille API-Regressionen, nicht-deterministische LLM-Ausgaben und Prompt-Drift, ohne etwas in ein Drittanbieter-Diff-Tool zu pipen. Side-by-side-Diff hebt Unterschiede hervor; ein tiefer JSON-Vergleich ignoriert die Reihenfolge von Schl&uuml;sseln.
+Stapeln Sie zwei erfasste Transaktionen oder eingef&uuml;gte Payloads nebeneinander und finden Sie jedes Feld, das gekippt ist &mdash; Status, Header, JSON-Schl&uuml;ssel oder Body-Bytes. Fangen Sie stille API-Regressionen, nicht-deterministische LLM-Ausgaben und Prompt-Drift, ohne etwas in ein Drittanbieter-Diff-Tool zu pipen.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -259,7 +259,7 @@ Speichern Sie Sessions, importieren/exportieren Sie HAR f&uuml;r den Tool-&Uuml;
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Rockxy Multi-Tab-Workspaces mit unabh&auml;ngig gefilterten Ansichten derselben Live-Capture" width="820" />
 
-Halten Sie unabh&auml;ngige Untersuchungsansichten derselben Live-Capture nebeneinander. Jeder Tab besitzt Filter, Sortierung, Auswahl, Sidebar-Scope und Inspektor-Zustand, teilt aber Proxy und erfasste Transaktionen.
+Halten Sie unabh&auml;ngige Untersuchungsansichten derselben Live-Capture nebeneinander &mdash; ein Tab f&uuml;r Staging-Traffic, einer f&uuml;r Produktion und einer f&uuml;r einen iOS-Ger&auml;te-Flow. Jeder Tab besitzt eigene Filter, Sortierung, Auswahl, Sidebar-Scope und Inspektor-Zustand, teilt aber Proxy und erfasste Transaktionen.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -277,19 +277,19 @@ Rockxy bietet protokollbewusste KI-, Web3-RPC- und x402-Inspektion im normalen H
 
 ### KI-Traffic-Inspektion
 
-Machen Sie Modell-Traffic im normalen Capture-Workflow leichter debugbar. KI-Anfragen erkennen, ausgew&auml;hlte Modellaufrufe inspizieren, Streaming-Antworten diagnostizieren, Prompt/Output-Verhalten vergleichen und Tool-Call-Ketten verstehen, ohne sensible Payloads in einen anderen Dienst zu kopieren.
+Rockxy erkennt erkannte KI-Anfragen im normalen Capture-Workflow. Inspizieren Sie ausgew&auml;hlte Modellaufrufe, Streaming-Status, Usage-Felder falls vorhanden, Warnungen, Retrieval-Hints und Tool-Call-Zusammenfassungen, ohne sensible Payloads in einen anderen Dienst zu kopieren.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC-Inspektion
 
-Inspizieren Sie EVM- und Solana-artigen HTTP-JSON-RPC-Traffic mit Provider Host, Request ID, Methode, Batch-Zusammenfassung, Fehler, Chain, Transaktion, Payload und Debug-Intent, ohne Rockxy zu Wallet oder Block Explorer zu machen.
+Rockxy verwandelt Netzwerkaufrufe der Blockchain-&Auml;ra in lesbare Debugging-Evidence. Inspizieren Sie EVM- und Solana-artigen HTTP-JSON-RPC-Traffic mit Provider Host, Request ID, Methode, Batch-Zusammenfassung, Fehler, Chain, Transaktion, Payload und Debug-Intent, ohne Rockxy zu Wallet oder Block Explorer zu machen.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402-Payment-Flow-Hinweise
 
-Verstehen Sie payment-gated HTTP-Flows auf Netzwerkebene. Payment-required Responses hervorheben, den Retry-Pfad verfolgen und Debugging-Evidence lokal sowie redaction-aware halten.
+Rockxy hebt payment-required und retry-orientierte Hinweise hervor, sodass payment-gated HTTP-Flows von der Netzwerkebene aus verst&auml;ndlich sind, w&auml;hrend die Debugging-Evidence lokal und redaction-aware bleibt.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -301,7 +301,7 @@ Die folgenden Abschnitte beschreiben die &ouml;ffentliche Richtung, nicht aktuel
 
 Rockxy kann KI- und Web3-Traffic heute labeln und inspizieren. Tieferes Rule Matching nach Modell, Tool Call, JSON-RPC-Methode, Chain, Transaction Hash oder Batch Subcall bleibt zuk&uuml;nftige Arbeit; aktuelle Traffic-Modifikation matcht URL, HTTP-Methode und Header.
 
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
 
 ### Redigierte Evidence-Bundles `Demn&auml;chst`
 
@@ -315,7 +315,7 @@ Senden Sie eine erfasste Session mit einem Klick an einen Kollegen. Annotieren S
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100 % natives macOS. Kein Electron. Keine Web-Views. SwiftUI + AppKit + SwiftNIO.
+> Native macOS-App-Shell &mdash; kein Electron. SwiftUI + AppKit + SwiftNIO, wobei WebKit nur f&uuml;r die HTML-Body-Vorschau verwendet wird.
 
 ## Schnellstart
 
@@ -329,6 +329,8 @@ In Xcode bauen und ausf&uuml;hren. Das Willkommensfenster f&uuml;hrt durch die R
 
 **Voraussetzungen:** macOS 14.0+, Xcode 16+, Swift 5.9
 
+Wenn Sie Rockxy nach der Installation mit einem lokalen MCP-Client verbinden m&ouml;chten, siehe den [MCP-Integrationsguide](docs/features/mcp.mdx).
+
 ## Rockxy vs. Alternativen
 
 |  | **Rockxy** | **Proxyman** | **Charles Proxy** |
@@ -336,11 +338,15 @@ In Xcode bauen und ausf&uuml;hren. Das Willkommensfenster f&uuml;hrt durch die R
 | **Projektmodell** | AGPL-3.0 Open-Source-Projekt | Propriet&auml;re kommerzielle App | Propriet&auml;re kommerzielle App |
 | **Quellcode** | &Ouml;ffentlich, &uuml;berpr&uuml;fbar, forkbar | Geschlossener Quellcode | Geschlossener Quellcode |
 | **Aus Source bauen** | Kostenlos mit Xcode aus diesem Repo | Nicht aus &ouml;ffentlichem Source verf&uuml;gbar | Nicht aus &ouml;ffentlichem Source verf&uuml;gbar |
-| **Native macOS-Basis** | Swift + SwiftNIO + SwiftUI/AppKit | Native kommerzielle macOS-App | Plattform&uuml;bergreifende kommerzielle App |
+| **Native macOS-Basis** | Swift + SwiftNIO + SwiftUI/AppKit | Native macOS-App mit geschlossenem Quellcode | Plattform&uuml;bergreifende App mit geschlossenem Quellcode |
 | **Local-first Capture** | Lokaler Proxy, Zertifikate, Helper und Capture-Daten bleiben auf Ihrem Mac | Desktop-Proxy-App | Desktop-Proxy-App |
-| **Developer-Setup-Workflow** | Integrierter Developer Setup Hub f&uuml;r Runtimes, Clients, Ger&auml;te, Frameworks und Umgebungen | Produktspezifische Setup-Guides | Produktspezifische Setup-Guides |
-| **MCP/local automation bridge** | Integriert, Token-authentifiziert, standardm&auml;&szlig;ig maskiert | In gepr&uuml;ften &ouml;ffentlichen Docs nicht beansprucht | In gepr&uuml;ften &ouml;ffentlichen Docs nicht beansprucht |
-| **Offener Beitragsweg** | &Ouml;ffentliche Issues, Discussions, Roadmap und PRs | Herstellerkontrolliertes Produkt | Herstellerkontrolliertes Produkt |
+| **Developer-Setup-Workflow** | Integrierter Developer Setup Hub f&uuml;r Runtimes, Clients, Ger&auml;te, Frameworks und Umgebungen | Integriertes automatisches Setup plus Plattform- und Runtime-Guides | Plattformspezifische Setup-Guides |
+| **Externer Proxy + PAC-Routing** | HTTP/HTTPS-Upstream-Proxy, PAC-Autokonfiguration und Bypass-Regeln | Kommerzieller Upstream-Proxy und PAC-Unterst&uuml;tzung | Kommerzielle Upstream-Proxy-Konfiguration |
+| **MCP-Integration** | [Integriertes lokales MCP](docs/features/mcp.mdx): 10 schreibgesch&uuml;tzte Tools f&uuml;r Traffic, Status, Zertifikate, Regelinspektion und cURL-Export; Token-authentifiziert; Maskierung standardm&auml;&szlig;ig aktiv | Integriertes lokales MCP: Traffic-Inspektion plus Regel-, Session-, Zertifikat-, Setup- und App-Steuerungs-Tools; nur localhost; Token-Authentifizierung pro Session; Maskierung sensibler Daten | Keine First-Party-MCP-Integration in der am 2026-08-13 gepr&uuml;ften [offiziellen Dokumentation](https://www.charlesproxy.com/documentation/) gefunden |
+| **Nativer AI Assistant** | Integriert f&uuml;r Traffic-Analyse ausgew&auml;hlter und mehrerer Anfragen in Rockxy | Unbekannt | Unbekannt |
+| **Offener Beitragsweg** | &Ouml;ffentlicher Quellcode, Issues, Discussions, Roadmap und PRs | &Ouml;ffentlicher Issue-Tracker; Anwendungsquellcode und Releases sind herstellerkontrolliert | Herstellerdokumentation und -support; Anwendungsquellcode und Releases sind herstellerkontrolliert |
+
+Die oben genannten Wettbewerberf&auml;higkeiten wurden am 2026-08-13 anhand offizieller Produktdokumentation verifiziert und k&ouml;nnen sich nach der Ver&ouml;ffentlichung &auml;ndern.
 
 Auf der Roadmap: tiefere protokollbewusste Regeln, sicherere redigierte Evidence-Bundles, st&auml;rkere Replay- und Vergleichs-Workflows, breitere Developer-Setup-Guides und fortlaufende HTTP/2- und HTTP/3-Forschung.
 
@@ -390,14 +396,14 @@ Einsteigerfreundliche Issues sind mit [`good first issue`](https://github.com/Ro
 
 ## Sponsoren und Partner
 
-Rockxy wird von unabh&auml;ngigen Entwicklern gebaut und gewartet. Sponsoring finanziert die kontinuierliche Entwicklung, Sicherheits&uuml;berpr&uuml;fungen und neue Funktionen.
+Rockxy wird unabh&auml;ngig gewartet. Sponsoring hilft, die kontinuierliche Entwicklung, Release-Infrastruktur, Dokumentation und Sicherheitsarbeit zu finanzieren.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
     <img src="https://img.shields.io/badge/Support_on_Open_Collective-7FADF2?style=for-the-badge&logo=opencollective&logoColor=white" alt="Open Collective" />
   </a>
   <a href="https://github.com/sponsors/LocNguyenHuu">
-    <img src="https://img.shields.io/badge/Rockxy_sponsern-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Rockxy sponsern" />
+    <img src="https://img.shields.io/badge/Sponsor_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Rockxy sponsern" />
   </a>
 </p>
 

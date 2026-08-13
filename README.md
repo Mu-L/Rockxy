@@ -131,7 +131,7 @@ Select one or more captured requests and ask what happened, what failed, what ch
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Let Claude Desktop or Cursor read your captured traffic through a local MCP server. Ask "why did this 500?" instead of pasting headers into chat. Local, redaction-aware, and open source.
+Let Claude Desktop or Cursor inspect captured traffic through ten read-only tools in Rockxy's local MCP server. Ask "why did this 500?" instead of pasting headers into chat. The implementation is open source, token-authenticated, and keeps sensitive-data redaction enabled by default.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -209,11 +209,11 @@ Add, remove, or replace headers on any host without redeploying. Test CORS, auth
 
 ### Custom Request & Response Headers
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Override headers per host with full control over both phases. Inject auth tokens on outgoing requests, strip Set-Cookie on responses, or pin a custom User-Agent — saved as named rules you can toggle anytime.
+Promote any request or response header into a first-class traffic-table column. Keep request and response sources separate, save the headers you care about, then scan request IDs, trace IDs, cache state, or custom metadata without opening each inspector.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Network Conditions
 
@@ -233,9 +233,9 @@ Rebuild any captured HTTP request — change method, URL, headers, query params,
 
 ### Compare
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Stack two captured responses side-by-side and spot every field that flipped — status, headers, JSON keys, body bytes. Catch silent API regressions, non-deterministic LLM outputs, and prompt drift without piping anything into a third-party diff tool. Side-by-side diff highlights what changed; deep JSON compare ignores key ordering.
+Stack two captured transactions or pasted payloads side-by-side and spot every field that flipped — status, headers, JSON keys, or body bytes. Catch silent API regressions, non-deterministic LLM outputs, and prompt drift without piping anything into a third-party diff tool.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -315,7 +315,7 @@ Send a captured session to a teammate with one click. Annotate failing requests 
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% native macOS. No Electron. No web views. SwiftUI + AppKit + SwiftNIO.
+> Native macOS app shell — no Electron. SwiftUI + AppKit + SwiftNIO, with WebKit used only for HTML body preview.
 
 ## Quick Start
 
@@ -338,12 +338,15 @@ If you want to connect Rockxy to a local MCP client after installation, see the 
 | **Project model** | AGPL-3.0 open-source project | Proprietary commercial app | Proprietary commercial app |
 | **Source code** | Public, auditable, forkable | Closed source | Closed source |
 | **Build from source** | Free with Xcode from this repo | Not available from public source | Not available from public source |
-| **Native macOS foundation** | Swift + SwiftNIO + SwiftUI/AppKit | Native macOS commercial app | Cross-platform commercial app |
+| **Native macOS foundation** | Swift + SwiftNIO + SwiftUI/AppKit | Closed-source native macOS app | Closed-source cross-platform app |
 | **Local-first capture** | Local proxy, certificates, helper, and capture data stay on your Mac | Desktop proxy app | Desktop proxy app |
-| **Developer setup workflow** | Built-in Developer Setup Hub for runtimes, clients, devices, frameworks, and environments | Product-specific setup guidance | Product-specific setup guidance |
-| **External proxy + PAC routing** | HTTP/HTTPS upstream proxy, PAC auto-configuration, and bypass rules | Mature commercial proxy tooling | Mature commercial proxy tooling |
-| **MCP/local automation bridge** | Built in, token-authenticated, redaction by default | Not claimed in public docs reviewed | Not claimed in public docs reviewed |
-| **Open contribution path** | Public issues, discussions, roadmap, and PRs | Vendor-controlled product | Vendor-controlled product |
+| **Developer setup workflow** | Built-in Developer Setup Hub for runtimes, clients, devices, frameworks, and environments | Built-in automatic setup plus platform and runtime guides | Platform-specific setup guides |
+| **External proxy + PAC routing** | HTTP/HTTPS upstream proxy, PAC auto-configuration, and bypass rules | Commercial upstream proxy and PAC support | Commercial upstream proxy configuration |
+| **MCP integration** | [Built-in local MCP](docs/features/mcp.mdx): 10 read-only tools for traffic, status, certificates, rule inspection, and cURL export; token-authenticated; redaction on by default | Built-in local MCP: traffic inspection plus rule, session, certificate, setup, and app-control tools; localhost-only; per-session token authentication; sensitive-data redaction | No first-party MCP integration found in the [official documentation](https://www.charlesproxy.com/documentation/) reviewed on 2026-08-13 |
+| **Native AI Assistant** | Built in for selected-request and multi-request traffic analysis inside Rockxy | Unknown | Unknown |
+| **Open contribution path** | Public source, issues, discussions, roadmap, and PRs | Public issue tracker; application source and releases are vendor-controlled | Vendor documentation and support; application source and releases are vendor-controlled |
+
+Competitor capabilities above were verified against official product documentation on 2026-08-13 and may change after publication.
 
 On the roadmap: deeper protocol-aware rules, safer redacted evidence bundles, stronger replay and comparison workflows, broader Developer Setup guidance, and continued HTTP/2 and HTTP/3 research.
 

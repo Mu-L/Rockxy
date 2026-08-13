@@ -131,7 +131,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-让 Claude Desktop 或 Cursor 通过本地 MCP 服务器读取你捕获的流量。直接问 "为什么这条请求 500 了?",不用再把 header 粘进聊天框。本地、脱敏感知、开源。
+让 Claude Desktop 或 Cursor 通过 Rockxy 本地 MCP 服务器中的十个只读工具检查捕获的流量。直接问 "为什么这条请求 500 了?",不用再把 header 粘进聊天框。该实现开源、基于 token 认证,并默认保持敏感数据脱敏开启。
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -209,11 +209,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### 自定义请求与响应 Header
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-按主机覆盖 header,对两端 phase 都有完整控制。给出站请求注入 auth token,从响应中剥掉 Set-Cookie,或固定一个自定义 User-Agent — 保存为命名规则,随时切换。
+把任意请求或响应 header 提升为流量表格中的一等列。保持请求与响应来源分离,保存你关心的 header,然后无需打开每个 inspector 即可扫视 request ID、trace ID、cache 状态或自定义元数据。
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### 网络条件
 
@@ -233,9 +233,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### 比较
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-把两条捕获响应并排叠放,捕捉每一个翻转的字段 — status、header、JSON 键、body 字节。识别静默的 API 回归、不确定的 LLM 输出和 prompt drift,不用把任何东西塞进第三方 diff 工具。并排 diff 突出差异;深度 JSON 比较忽略键顺序。
+把两条捕获 transaction 或粘贴的 payload 并排叠放,捕捉每一个翻转的字段 — status、header、JSON 键或 body 字节。识别静默的 API 回归、不确定的 LLM 输出和 prompt drift,不用把任何东西塞进第三方 diff 工具。
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -301,7 +301,7 @@ Rockxy 突出 payment-required 与 retry 提示，让 payment-gated HTTP 流程�
 
 Rockxy 现在可以标记并检查 AI 与 Web3 流量。按 model、tool call、JSON-RPC method、chain、transaction hash 或 batch subcall 深度匹配规则仍属于未来工作；当前流量修改工具仍按 URL、HTTP method 和 header 匹配。
 
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
 
 ### 脱敏证据包 `即将推出`
 
@@ -315,7 +315,7 @@ Rockxy 现在可以标记并检查 AI 与 Web3 流量。按 model、tool call、
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% 原生 macOS。没有 Electron。没有 Web 视图。SwiftUI + AppKit + SwiftNIO。
+> 原生 macOS 应用外壳 — 没有 Electron。SwiftUI + AppKit + SwiftNIO,WebKit 仅用于 HTML body 预览。
 
 ## 快速开始
 
@@ -329,18 +329,24 @@ open Rockxy.xcodeproj
 
 **系统要求：** macOS 14.0+、Xcode 16+、Swift 5.9
 
+如果你想在安装后将 Rockxy 连接到本地 MCP 客户端,请参阅 [MCP 集成指南](docs/features/mcp.mdx)。
+
 ## Rockxy vs. 其他方案
 
 |  | **Rockxy** | **Proxyman** | **Charles Proxy** |
 |---|---|---|---|
 | **项目模式** | AGPL-3.0 开源项目 | 专有商业应用 | 专有商业应用 |
 | **源代码** | 公开、可审计、可 fork | 闭源 | 闭源 |
-| **从源码构建** | 可使用 Xcode 从本仓库免费构建 | 没有公开源码可供构建 | 没有公开源码可供构建 |
-| **原生 macOS 基础** | Swift + SwiftNIO + SwiftUI/AppKit | 原生 macOS 商业应用 | 跨平台商业应用 |
+| **从源码构建** | 可使用 Xcode 从本仓库免费构建 | 无公开源码可供构建 | 无公开源码可供构建 |
+| **原生 macOS 基础** | Swift + SwiftNIO + SwiftUI/AppKit | 闭源原生 macOS 应用 | 闭源跨平台应用 |
 | **Local-first 捕获** | 本地代理、证书、helper 和捕获数据保留在你的 Mac 上 | 桌面代理应用 | 桌面代理应用 |
-| **开发者设置流程** | 内置 Developer Setup Hub，覆盖 runtime、client、device、framework 和 environment | 产品专属设置指南 | 产品专属设置指南 |
-| **MCP/local automation bridge** | 内置，token 认证，默认脱敏 | 已检查的公开文档中未声明 | 已检查的公开文档中未声明 |
-| **开放贡献路径** | 公开 issues、discussions、roadmap 和 PR | 厂商控制的产品 | 厂商控制的产品 |
+| **开发者设置流程** | 内置 Developer Setup Hub，覆盖 runtime、client、device、framework 和 environment | 内置自动设置外加平台与运行时指南 | 平台专属设置指南 |
+| **外部代理 + PAC 路由** | HTTP/HTTPS 上游代理、PAC 自动配置和 bypass 规则 | 商业上游代理和 PAC 支持 | 商业上游代理配置 |
+| **MCP 集成** | [内置本地 MCP](docs/features/mcp.mdx)：10 个只读工具，用于流量、状态、证书、规则检查和 cURL 导出；token 认证；默认开启脱敏 | 内置本地 MCP：流量检查外加规则、会话、证书、设置和应用控制工具；仅限 localhost；每会话 token 认证；敏感数据脱敏 | 在 2026-08-13 审阅的[官方文档](https://www.charlesproxy.com/documentation/)中未发现第一方 MCP 集成 |
+| **原生 AI Assistant** | 内置，用于在 Rockxy 内进行选中请求与多请求流量分析 | 未知 | 未知 |
+| **开放贡献路径** | 公开源码、issues、discussions、roadmap 和 PR | 公开 issue 跟踪器；应用源码与发布由厂商控制 | 厂商文档与支持；应用源码与发布由厂商控制 |
+
+以上竞品能力已于 2026-08-13 对照官方产品文档核实,发布后可能变化。
 
 路线图方向：更深入的协议感知规则、更安全的脱敏证据包、更强的重放与比较工作流、更广泛的 Developer Setup 指南，以及持续研究 HTTP/2 与 HTTP/3。
 
@@ -372,7 +378,7 @@ Rockxy 的公开路线图以调试工作流为中心，不承诺固定日期。�
 - [AI Assistant](docs/features/ai-assistant.mdx) — 使用本地分析或经过明确 Review Data 的配置模型调查选中流量
 - [筛选与搜索](docs/core-features/filters-and-search.mdx) — 使用侧边栏范围、Focus Sets、Noise Control、toolbar filter 和搜索
 - [AI 与 Web3 检查](docs/features/ai-web3-inspection.mdx) — 检查已识别的模型 API、JSON-RPC 和 x402 风格流量
-- [MCP 集成](docs/features/mcp.mdx) — MCP 配置与使用指南
+- [MCP 集成](docs/features/mcp.mdx) — 将 Rockxy 连接到本地 MCP 客户端
 - [架构](docs/development/architecture.mdx) — 代理引擎、Actor 模型、数据流
 - [安全模型](docs/development/security.mdx) — 信任边界、XPC 验证、证书管理
 - [设计决策](docs/development/design-decisions.mdx) — 为什么选择 SwiftNIO、NSTableView、Actors
@@ -390,14 +396,14 @@ Rockxy 的公开路线图以调试工作流为中心，不承诺固定日期。�
 
 ## 赞助商与合作伙伴
 
-Rockxy 由独立开发者构建和维护。赞助资金用于持续开发、安全审计和新功能。
+Rockxy 由独立维护。赞助有助于资助持续开发、发布基础设施、文档和安全工作。
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
     <img src="https://img.shields.io/badge/Support_on_Open_Collective-7FADF2?style=for-the-badge&logo=opencollective&logoColor=white" alt="Open Collective" />
   </a>
   <a href="https://github.com/sponsors/LocNguyenHuu">
-    <img src="https://img.shields.io/badge/赞助_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="赞助 Rockxy" />
+    <img src="https://img.shields.io/badge/Sponsor_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="赞助 Rockxy" />
   </a>
 </p>
 
@@ -427,7 +433,7 @@ Rockxy 由 [Open Source Collective](https://docs.oscollective.org/) 提供财务
 
 ## 星标历史
 
-<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=bottom-right">
+<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&legend=top-left" />

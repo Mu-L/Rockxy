@@ -131,7 +131,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Claude Desktop や Cursor にローカル MCP サーバー経由でキャプチャしたトラフィックを読み込ませます。ヘッダーをチャットに貼る代わりに「なぜこれが 500 になった?」と直接聞けます。ローカル、redaction-aware、そしてオープンソースです。
+Claude Desktop や Cursor に、Rockxy のローカル MCP サーバーの 10 個の読み取り専用ツール経由でキャプチャしたトラフィックを検査させます。ヘッダーをチャットに貼る代わりに「なぜこれが 500 になった?」と直接聞けます。実装はオープンソースで、トークン認証を行い、機微データの redaction をデフォルトで有効に保ちます。
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -209,11 +209,11 @@ Python、Node.js、Go、Rust、cURL、Docker、ブラウザ向けのプロキシ
 
 ### カスタム要求/応答ヘッダー
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-ホスト単位で、両方のフェーズを完全に制御しながら header を上書きできます。送信要求に認証トークンを注入し、応答から Set-Cookie を取り除き、カスタム User-Agent を固定 — いつでも切り替えできる名前付きルールとして保存できます。
+任意の要求または応答ヘッダーを、トラフィックテーブルの第一級の列に昇格させます。要求と応答のソースを分けたまま、気になるヘッダーを保存し、各インスペクタを開かずに request ID、trace ID、cache 状態、独自メタデータをスキャンできます。
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### ネットワーク条件
 
@@ -233,9 +233,9 @@ Python、Node.js、Go、Rust、cURL、Docker、ブラウザ向けのプロキシ
 
 ### 比較
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-キャプチャ済みの 2 つの応答を並べて比較し、反転したすべてのフィールドを見つけます — status、header、JSON キー、body バイト。サードパーティの diff ツールにデータを送ることなく、静かな API リグレッション、非決定的な LLM 出力、プロンプトドリフトを捉えます。Side-by-side diff は差分を強調表示し、深い JSON 比較はキー順序を無視します。
+キャプチャ済みの 2 つの transaction または貼り付けた payload を並べて比較し、反転したすべてのフィールドを見つけます — status、header、JSON キー、body バイト。サードパーティの diff ツールに何も送ることなく、静かな API リグレッション、非決定的な LLM 出力、プロンプトドリフトを捉えます。
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -259,7 +259,7 @@ Python、Node.js、Go、Rust、cURL、Docker、ブラウザ向けのプロキシ
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="同じ live capture を独立して filter した view を並べる Rockxy multi-tab workspace" width="820" />
 
-同じ live capture に対する独立した調査 view を並べます。各 tab は独自の filter、sort、selection、sidebar scope、inspector state を持ちながら、proxy と capture transaction を共有します。
+同じ live capture に対する独立した調査 view を並べます — 1 つの tab は staging トラフィック、1 つは production、1 つは iOS デバイスのフロー用。各 tab は独自の filter、sort、selection、sidebar scope、inspector state を持ちながら、proxy と capture transaction を共有します。
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -277,19 +277,19 @@ Rockxy は通常の HTTP debugging workflow 内で AI、Web3 RPC、x402 の prot
 
 ### AI トラフィック検査
 
-通常の capture ワークフローの中で model traffic をデバッグしやすくします。AI request を検出し、選択した model call を検査し、streaming response を診断し、prompt/output の挙動を比較し、sensitive payload を別サービスへ貼り付けずに tool-call chain を理解します。
+Rockxy は通常の capture ワークフローの中で、認識した AI request を検出します。選択した model call、streaming state、存在する場合の usage フィールド、warning、retrieval hint、tool-call summary を、sensitive payload を別サービスへ貼り付けずに検査できます。
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC 検査
 
-EVM と Solana-style HTTP JSON-RPC traffic を provider host、request ID、method、batch summary、error、chain、transaction、payload、debug-intent detail とともに inspect し、Rockxy を wallet や block explorer にはしません。
+Rockxy はブロックチェーン時代のネットワーク呼び出しを読みやすいデバッグ証拠に変えます。EVM と Solana-style HTTP JSON-RPC traffic を provider host、request ID、method、batch summary、error、chain、transaction、payload、debug-intent detail とともに inspect し、Rockxy を wallet や block explorer にはしません。
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402 Payment Flow Hints
 
-payment-gated HTTP flow をネットワーク層から理解します。payment-required response を強調し、retry path を追跡し、debugging evidence を local-first かつ redaction-aware に保ちます。
+Rockxy は payment-required と retry 指向のヒントを強調し、payment-gated HTTP flow をネットワーク層から理解できるようにします。その間、debugging evidence はローカルかつ redaction-aware のままです。
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -301,7 +301,7 @@ payment-gated HTTP flow をネットワーク層から理解します。payment-
 
 Rockxy は現在 AI/Web3 traffic を label・inspect できます。model、tool call、JSON-RPC method、chain、transaction hash、batch subcall による深い rule matching は今後の取り組みで、現在の traffic modification tool は URL、HTTP method、header で match します。
 
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
 
 ### Redacted Evidence Bundles `近日公開`
 
@@ -315,7 +315,7 @@ secret を漏らさずに、bug repro に必要な事実を共有します。sel
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% ネイティブ macOS。Electron なし。Web ビューなし。SwiftUI + AppKit + SwiftNIO。
+> ネイティブ macOS アプリシェル — Electron なし。SwiftUI + AppKit + SwiftNIO、WebKit は HTML body プレビューにのみ使用。
 
 ## クイックスタート
 
@@ -329,6 +329,8 @@ Xcode でビルドして実行。ウェルカムウィンドウがルート CA �
 
 **要件：** macOS 14.0+、Xcode 16+、Swift 5.9
 
+インストール後に Rockxy をローカル MCP クライアントへ接続したい場合は、[MCP 連携ガイド](docs/features/mcp.mdx)を参照してください。
+
 ## Rockxy vs. 他のツール
 
 |  | **Rockxy** | **Proxyman** | **Charles Proxy** |
@@ -336,11 +338,15 @@ Xcode でビルドして実行。ウェルカムウィンドウがルート CA �
 | **プロジェクトモデル** | AGPL-3.0 オープンソースプロジェクト | プロプライエタリな商用アプリ | プロプライエタリな商用アプリ |
 | **ソースコード** | 公開、監査可能、fork 可能 | クローズドソース | クローズドソース |
 | **ソースからのビルド** | このリポジトリから Xcode で無料ビルド | 公開ソースからは利用不可 | 公開ソースからは利用不可 |
-| **ネイティブ macOS 基盤** | Swift + SwiftNIO + SwiftUI/AppKit | ネイティブ macOS 商用アプリ | クロスプラットフォーム商用アプリ |
+| **ネイティブ macOS 基盤** | Swift + SwiftNIO + SwiftUI/AppKit | クローズドソースのネイティブ macOS アプリ | クローズドソースのクロスプラットフォームアプリ |
 | **Local-first キャプチャ** | ローカルプロキシ、証明書、ヘルパー、キャプチャデータは Mac 上に保持 | デスクトッププロキシアプリ | デスクトッププロキシアプリ |
-| **開発者セットアップワークフロー** | runtime、client、device、framework、environment 向けの Developer Setup Hub を内蔵 | 製品固有のセットアップガイド | 製品固有のセットアップガイド |
-| **MCP/local automation bridge** | 内蔵、トークン認証、デフォルトでマスキング | 確認した公開ドキュメントでは未記載 | 確認した公開ドキュメントでは未記載 |
-| **オープンな貢献経路** | 公開 issues、discussions、roadmap、PR | ベンダー管理の製品 | ベンダー管理の製品 |
+| **開発者セットアップワークフロー** | runtime、client、device、framework、environment 向けの Developer Setup Hub を内蔵 | 内蔵の自動セットアップに加えプラットフォーム/ランタイム別ガイド | プラットフォーム固有のセットアップガイド |
+| **外部プロキシ + PAC ルーティング** | HTTP/HTTPS アップストリームプロキシ、PAC 自動設定、bypass ルール | 商用アップストリームプロキシと PAC サポート | 商用アップストリームプロキシ設定 |
+| **MCP 連携** | [内蔵ローカル MCP](docs/features/mcp.mdx)：トラフィック、ステータス、証明書、ルール検査、cURL エクスポート向けの 10 個の読み取り専用ツール；トークン認証；redaction デフォルト有効 | 内蔵ローカル MCP：トラフィック検査に加えルール、セッション、証明書、セットアップ、アプリ制御ツール；localhost のみ；セッションごとのトークン認証；機微データ redaction | 2026-08-13 に確認した[公式ドキュメント](https://www.charlesproxy.com/documentation/)ではファーストパーティの MCP 連携は見つかりませんでした |
+| **ネイティブ AI Assistant** | Rockxy 内で選択 request・複数 request のトラフィック分析向けに内蔵 | 不明 | 不明 |
+| **オープンな貢献経路** | 公開ソース、issues、discussions、roadmap、PR | 公開 issue トラッカー；アプリのソースとリリースはベンダー管理 | ベンダーのドキュメントとサポート；アプリのソースとリリースはベンダー管理 |
+
+上記の競合機能は 2026-08-13 に公式製品ドキュメントと照合して確認しており、公開後に変更される可能性があります。
 
 ロードマップの方向性: より深い protocol-aware rules、安全な redacted evidence bundle、強化された replay/comparison workflow、幅広い Developer Setup guide、HTTP/2・HTTP/3 の継続研究。
 
@@ -390,14 +396,14 @@ Rockxy の公開ロードマップはワークフロー指向で、固定日程�
 
 ## スポンサーとパートナー
 
-Rockxy は独立した開発者によって構築・メンテナンスされています。スポンサーシップは継続的な開発、セキュリティ監査、新機能の資金となります。
+Rockxy は独立してメンテナンスされています。スポンサーシップは継続的な開発、リリースインフラ、ドキュメント、セキュリティ作業の資金を支えます。
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
     <img src="https://img.shields.io/badge/Support_on_Open_Collective-7FADF2?style=for-the-badge&logo=opencollective&logoColor=white" alt="Open Collective" />
   </a>
   <a href="https://github.com/sponsors/LocNguyenHuu">
-    <img src="https://img.shields.io/badge/Rockxy_をスポンサー-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Rockxy をスポンサー" />
+    <img src="https://img.shields.io/badge/Sponsor_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Rockxy をスポンサー" />
   </a>
 </p>
 
@@ -427,7 +433,7 @@ Rockxy は [Open Source Collective](https://docs.oscollective.org/) による財
 
 ## スター履歴
 
-<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=bottom-right">
+<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&legend=top-left" />

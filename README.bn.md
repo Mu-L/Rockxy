@@ -35,7 +35,7 @@
 <p align="center">
   একটি নেটিভ সুইফট অ্যাপের মাধ্যমে HTTP/HTTPS/WebSocket/GraphQL ট্র্যাফিককে আটকান, পরিদর্শন করুন এবং সংশোধন করুন আপনি পরিদর্শন, নির্মাণ এবং বিশ্বাস করতে পারেন।<br>
   এপিআই, মোবাইল, এমসিপি-সহায়তা, এআই, এবং ব্লকচেইন-যুগের ডিবাগিং ওয়ার্কফ্লোগুলির জন্য তৈরি করা হয়েছে রকক্সি বিকশিত হওয়ার সাথে সাথে।<br>
-  একটি স্থানীয়-প্রথম, AGPL-3.0 এর বিকল্প <a href="#rockxy-vs-alternatives">প্রক্সিম্যান এবং চার্লস প্রক্সি</a>.
+  <a href="#rockxy-বনাম-বিকল্প">Proxyman এবং Charles Proxy</a>-এর একটি local-first, AGPL-3.0 বিকল্প।
 </p>
 
 <p align="center">
@@ -79,10 +79,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## বর্তমান শাখা হাইলাইট
 
-- AI Assistant এখন Review Data-র পর local analysis বা Ollama/provider model দেয়; sidebar-এ Focus Sets ও Noise Control আছে; workspace native split view ব্যবহার করে; এবং AI/Web3/x402 inspection বর্তমান behavior।
+- AI Assistant এখন এক বা একাধিক নির্বাচিত request-কে বিল্ট-ইন লোকাল অ্যানালাইসিস বা ঐচ্ছিক কনফিগার করা Ollama/provider model দিয়ে তদন্ত করে, স্পষ্ট Review Data নিশ্চিতকরণ, সীমিত redaction, streaming response, evidence reveal এবং ব্যবহারকারী-সূচিত handoff সহ।
+- নেটিভ sidebar-এ এখন app/domain/path scope-এর জন্য পুনঃব্যবহারযোগ্য Focus Sets এবং workspace-স্তরের Noise Control আছে যা capture না থামিয়ে মিলে যাওয়া domain বা path লুকিয়ে রাখে।
+- প্রধান workspace এখন Context Dock ও নিচের inspector-এর জন্য নেটিভ উল্লম্ব ও অনুভূমিক split view ব্যবহার করে, পূর্ণ-উচ্চতার divider, সমন্বিত toolbar/footer separator এবং স্বয়ংক্রিয় লেআউট রিসাইজিং বজায় রেখে।
 - আপস্ট্রিম প্রক্সিতে এখন PAC URL রাউটিং সহ বিনামূল্যে/কোর স্বয়ংক্রিয় প্রক্সি কনফিগারেশন অন্তর্ভুক্ত রয়েছে `DIRECT`, HTTP, এবং HTTPS রুট বিদ্যমান SOCKS5 এবং প্রমাণীকরণ নীতি সীমানা সংরক্ষণ করার সময়।
 - রপ্তানি কর্মপ্রবাহ এখন OpenAPI YAML/HTML এবং নির্বাচিত-ট্র্যাফিক সংক্ষিপ্ত প্রকাশনাকে রিডাকশন-সচেতন পেলোড বিল্ডিং সহ কভার করে।
 - পরিদর্শক সরঞ্জামগুলিতে এখন JSONPath/কী/মান ফিল্টারিং এবং JWT-এর মতো নির্বাচিত পেলোড পাঠ্যের জন্য দ্রুত পূর্বরূপ অন্তর্ভুক্ত রয়েছে।
+- AI ও Web3 ট্র্যাফিক পরিদর্শন এখন স্বীকৃত মডেল কল, JSON-RPC ট্র্যাফিক এবং x402-স্টাইল পেমেন্ট হিন্টের জন্য প্রোটোকল লেবেল, inspector ট্যাব এবং ডিবাগ সারাংশ যোগ করে।
 - Node.js বিকাশকারী সেটআপ এখন বৈধকরণের সময় নির্বাচিত ক্লায়েন্টকে মিরর করে এবং একটি পূর্ণাঙ্গ লোকালহোস্ট নমুনা গাইড রয়েছে।
 - ডেভেলপার সেটআপ হাব এখন রানটাইম, ব্রাউজার, ক্লায়েন্ট, ডিভাইস, ফ্রেমওয়ার্ক এবং টার্গেট-নির্দিষ্ট স্নিপেট, বৈধতা পর্যবেক্ষক এবং সৎ গাইড সামগ্রী সহ পরিবেশ কভার করে।
 - WebSocket binary-frame inspection এখন capture hot path-এ decoder work না যোগ করে সীমিত, on-demand Protobuf wire-format heuristic দেয়।
@@ -128,7 +131,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-ক্লাউড ডেস্কটপ বা কার্সরকে স্থানীয় MCP সার্ভারের মাধ্যমে আপনার ক্যাপচার করা ট্র্যাফিক পড়তে দিন। জিজ্ঞাসা করুন "কেন এই 500?" চ্যাটে হেডার আটকানোর পরিবর্তে। স্থানীয়, সংশোধন-সচেতন, এবং ওপেন সোর্স।
+Claude Desktop বা Cursor-কে Rockxy-এর লোকাল MCP সার্ভারের দশটি রিড-অনলি টুলের মাধ্যমে আপনার ক্যাপচার করা ট্র্যাফিক পরিদর্শন করতে দিন। চ্যাটে হেডার পেস্ট করার পরিবর্তে জিজ্ঞাসা করুন "কেন এই 500?"। বাস্তবায়নটি ওপেন সোর্স, token-প্রমাণিত এবং সংবেদনশীল ডেটা redaction ডিফল্টভাবে চালু রাখে।
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -206,11 +209,11 @@ Python, Node.js, Go, Rust, cURL, Docker এবং ব্রাউজারগু
 
 ### কাস্টম অনুরোধ এবং প্রতিক্রিয়া শিরোনাম
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-উভয় পর্যায়ে সম্পূর্ণ নিয়ন্ত্রণ সহ হোস্ট প্রতি হেডার ওভাররাইড করুন। বহির্গামী অনুরোধে প্রমাণীকরণ টোকেন ইনজেক্ট করুন, প্রতিক্রিয়াগুলিতে সেট-কুকি স্ট্রিপ করুন বা একটি কাস্টম ব্যবহারকারী-এজেন্ট পিন করুন — নামযুক্ত নিয়ম হিসাবে সংরক্ষিত আপনি যে কোনও সময় টগল করতে পারেন৷
+যেকোনো request বা response হেডারকে ট্র্যাফিক টেবিলের একটি প্রথম-শ্রেণির কলামে উন্নীত করুন। request ও response উৎস আলাদা রাখুন, আপনার পছন্দের হেডার সংরক্ষণ করুন, তারপর প্রতিটি inspector না খুলেই request ID, trace ID, cache অবস্থা বা কাস্টম মেটাডেটা স্ক্যান করুন।
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### নেটওয়ার্ক শর্তাবলী
 
@@ -224,15 +227,15 @@ Python, Node.js, Go, Rust, cURL, Docker এবং ব্রাউজারগু
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-কোনো ক্যাপচার করা HTTP অনুরোধ পুনর্নির্মাণ করুন — পদ্ধতি, URL, শিরোনাম, ক্যোয়ারী প্যারাম, বা বডি পরিবর্তন করুন — এবং Rockxy না রেখেই পুনরায় পাঠান। পোস্টম্যান, অনিদ্রা, বা কার্ল কপি-পেস্ট লুপ নেই। LLM প্রম্পট, অস্পষ্ট প্রমাণীকরণের সীমানাগুলির উপর পুনরাবৃত্তি করুন বা OpenAI, Anthropic, এবং Cohere এন্ডপয়েন্টের জন্য সেকেন্ডের মধ্যে একটি ব্যর্থ কেস পুনরুত্পাদন করুন।
+কোনো ক্যাপচার করা HTTP অনুরোধ পুনর্নির্মাণ করুন — পদ্ধতি, URL, শিরোনাম, ক্যোয়ারী প্যারাম, বা বডি পরিবর্তন করুন — এবং Rockxy না রেখেই পুনরায় পাঠান। Postman, Insomnia বা curl-এর কপি-পেস্ট লুপ নেই। LLM প্রম্পটে পুনরাবৃত্তি করুন, প্রমাণীকরণের সীমানা fuzz করুন বা OpenAI, Anthropic এবং Cohere এন্ডপয়েন্টের জন্য সেকেন্ডের মধ্যে একটি ব্যর্থ কেস পুনরুত্পাদন করুন।
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### তুলনা করুন
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-দুটি ক্যাপচার করা প্রতিক্রিয়া পাশাপাশি স্ট্যাক করুন এবং ফ্লিপ করা প্রতিটি ক্ষেত্র চিহ্নিত করুন — স্ট্যাটাস, হেডার, JSON কী, বডি বাইট। নীরব API রিগ্রেশন, নন-ডিটারমিনিস্টিক এলএলএম আউটপুট এবং তৃতীয় পক্ষের ডিফ টুলে কিছু পাইপ না করে প্রম্পট ড্রিফ্ট ধরুন। সাইড বাই সাইড ডিফ হাইলাইট করে কি পরিবর্তন হয়েছে; গভীর JSON তুলনা কী ক্রম উপেক্ষা করে।
+দুটি ক্যাপচার করা লেনদেন বা পেস্ট করা payload পাশাপাশি স্ট্যাক করুন এবং পরিবর্তিত প্রতিটি ক্ষেত্র চিহ্নিত করুন — স্ট্যাটাস, হেডার, JSON কী বা বডি বাইট। তৃতীয় পক্ষের diff টুলে কিছু না পাঠিয়ে নীরব API রিগ্রেশন, নন-ডিটারমিনিস্টিক LLM আউটপুট এবং prompt drift ধরুন।
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -256,7 +259,7 @@ Python, Node.js, Go, Rust, cURL, Docker এবং ব্রাউজারগু
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Rockxy মাল্টি-ট্যাব ওয়ার্কস্পেস একই লাইভ ক্যাপচারের স্বাধীনভাবে ফিল্টার করা ভিউ দেখাচ্ছে" width="820" />
 
-একই লাইভ ক্যাপচারের স্বাধীন তদন্ত ভিউ পাশাপাশি রাখুন। প্রতিটি ট্যাবের নিজস্ব ফিল্টার, সাজানো, নির্বাচন, সাইডবার স্কোপ এবং পরিদর্শক অবস্থা থাকে, কিন্তু প্রক্সি ও ক্যাপচার করা লেনদেন শেয়ার করে।
+একই লাইভ ক্যাপচারের স্বাধীন তদন্ত ভিউ পাশাপাশি রাখুন — একটি ট্যাব staging ট্র্যাফিকের জন্য, একটি production-এর জন্য এবং একটি iOS ডিভাইস ফ্লোর জন্য। প্রতিটি ট্যাবের নিজস্ব ফিল্টার, সাজানো, নির্বাচন, সাইডবার স্কোপ এবং পরিদর্শক অবস্থা থাকে, কিন্তু প্রক্সি ও ক্যাপচার করা লেনদেন শেয়ার করে।
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -274,19 +277,19 @@ Rockxy সাধারণ HTTP debugging workflow-এর মধ্যে protoco
 
 ### এআই ট্রাফিক পরিদর্শন
 
-সাধারণ ক্যাপচার ওয়ার্কফ্লোতে মডেল ট্রাফিক ডিবাগ করা সহজ করুন। এআই অনুরোধগুলি সনাক্ত করুন, নির্বাচিত মডেল কলগুলি পরিদর্শন করুন, স্ট্রিমিং প্রতিক্রিয়াগুলি নির্ণয় করুন, প্রম্পট/আউটপুট আচরণের তুলনা করুন এবং সংবেদনশীল পেলোডগুলিকে অন্য পরিষেবাতে পেস্ট না করে টুল-কল চেইনগুলি বোঝুন।
+Rockxy সাধারণ ক্যাপচার ওয়ার্কফ্লোর মধ্যে স্বীকৃত AI অনুরোধ সনাক্ত করে। নির্বাচিত মডেল কল, streaming অবস্থা, উপস্থিত থাকলে usage ফিল্ড, সতর্কতা, retrieval hints এবং tool-call সারাংশ সংবেদনশীল payload অন্য পরিষেবাতে পেস্ট না করে পরিদর্শন করুন।
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC পরিদর্শন
 
-EVM ও Solana-style HTTP JSON-RPC traffic provider host, request ID, method, batch summary, error, chain, transaction, payload ও debug-intent detailসহ inspect করুন, Rockxy-কে wallet বা block explorer না বানিয়ে।
+Rockxy ব্লকচেইন-যুগের নেটওয়ার্ক কলকে পাঠযোগ্য ডিবাগিং প্রমাণে রূপান্তরিত করে। EVM ও Solana-style HTTP JSON-RPC traffic provider host, request ID, method, batch summary, error, chain, transaction, payload ও debug-intent detailসহ inspect করুন, Rockxy-কে wallet বা block explorer না বানিয়ে।
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402 পেমেন্ট ফ্লো হিন্ট
 
-নেটওয়ার্ক লেয়ার থেকে পেমেন্ট-গেটেড HTTP ফ্লো বুঝুন। অর্থপ্রদান-প্রয়োজনীয় প্রতিক্রিয়াগুলি হাইলাইট করুন, পুনরায় চেষ্টা করার পথ অনুসরণ করুন এবং ডিবাগিং প্রমাণ স্থানীয় এবং সংশোধন-সচেতন রাখুন।
+Rockxy payment-required ও retry-ভিত্তিক হিন্ট হাইলাইট করে যাতে payment-gated HTTP ফ্লো নেটওয়ার্ক লেয়ার থেকে বোঝা যায়, যখন ডিবাগিং প্রমাণ লোকাল ও redaction-aware থাকে।
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -294,17 +297,17 @@ EVM ও Solana-style HTTP JSON-RPC traffic provider host, request ID, method, ba
 
 পরবর্তী বিভাগগুলো বর্তমান আচরণ নয়, প্রকাশ্য দিকনির্দেশ বর্ণনা করে।
 
+### প্রোটোকল-সচেতন নিয়ম
+
+Rockxy আজ AI ও Web3 ট্র্যাফিক লেবেল ও পরিদর্শন করতে পারে। model, tool call, JSON-RPC method, chain, transaction hash বা batch subcall অনুসারে গভীর নিয়ম মিলানো এখনও ভবিষ্যতের কাজ; বর্তমান ট্র্যাফিক পরিবর্তন টুলগুলো এখনও URL, HTTP method ও হেডার মিলায়।
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### রিডাক্টেড এভিডেন্স বান্ডেল `শীঘ্রই আসছে`
 
 গোপনীয়তা ফাঁস না করে একটি বাগ পুনরুত্পাদন করার জন্য প্রয়োজনীয় তথ্যগুলি ভাগ করুন৷ প্রোটোকল সারাংশ, রিডাকশন প্রিভিউ এবং সোর্স-ব্যাকড কনটেক্সট সহ নির্বাচিত ট্র্যাফিক প্যাকেজ করুন একজন সতীর্থ অডিট করতে পারে।
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### প্রোটোকল-সচেতন নিয়ম
-
-AI এবং Web3 মেটাডেটা ব্যবহার করুন যেখানে Rockxy ইতিমধ্যেই কাজ করে: ফিল্টার, ব্যাজ, ঐচ্ছিক কলাম, তুলনা, নিয়ম, বিকাশকারী সেটআপ এবং স্থানীয় MCP সারাংশ।
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### টিম শেয়ারিং এবং সহযোগিতা `শীঘ্রই আসছে`
 
@@ -312,7 +315,7 @@ AI এবং Web3 মেটাডেটা ব্যবহার করুন �
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% নেটিভ macOS। ইলেক্ট্রন নেই। কোনো ওয়েব ভিউ নেই। SwiftUI + AppKit + SwiftNIO।
+> নেটিভ macOS অ্যাপ শেল — কোনো Electron নেই। SwiftUI + AppKit + SwiftNIO, HTML বডি প্রিভিউয়ের জন্য শুধু WebKit ব্যবহৃত হয়।
 
 ## দ্রুত শুরু
 
@@ -328,19 +331,22 @@ open Rockxy.xcodeproj
 
 আপনি যদি ইনস্টলেশনের পরে স্থানীয় MCP ক্লায়েন্টের সাথে Rockxy সংযোগ করতে চান, দেখুন [MCP ইন্টিগ্রেশন গাইড](docs/features/mcp.mdx).
 
-## রকক্সি বনাম বিকল্প
+## Rockxy বনাম বিকল্প
 
 |    | **Rockxy** | **Proxyman** | **Charles Proxy** |
 |---|---|---|---|
 | **প্রকল্পের মডেল** | AGPL-3.0 ওপেন সোর্স প্রকল্প | মালিকানাধীন বাণিজ্যিক অ্যাপ | মালিকানাধীন বাণিজ্যিক অ্যাপ |
 | **সোর্স কোড** | পাবলিক, নিরীক্ষণযোগ্য, কাঁটাচামচযোগ্য | বন্ধ উৎস | বন্ধ উৎস |
 | **উৎস থেকে তৈরি করুন** | এই রেপো থেকে Xcode সহ বিনামূল্যে | পাবলিক সোর্স থেকে পাওয়া যায় না | পাবলিক সোর্স থেকে পাওয়া যায় না |
-| **নেটিভ ম্যাকোস ফাউন্ডেশন** | Swift + SwiftNIO + SwiftUI/AppKit | নেটিভ macOS বাণিজ্যিক অ্যাপ | ক্রস-প্ল্যাটফর্ম বাণিজ্যিক অ্যাপ |
+| **নেটিভ ম্যাকোস ফাউন্ডেশন** | Swift + SwiftNIO + SwiftUI/AppKit | বন্ধ-উৎস নেটিভ macOS অ্যাপ | বন্ধ-উৎস ক্রস-প্ল্যাটফর্ম অ্যাপ |
 | **স্থানীয়-প্রথম ক্যাপচার** | স্থানীয় প্রক্সি, সার্টিফিকেট, হেল্পার এবং ক্যাপচার ডেটা আপনার Mac এ থাকে | ডেস্কটপ প্রক্সি অ্যাপ | ডেস্কটপ প্রক্সি অ্যাপ |
-| **ডেভেলপার সেটআপ ওয়ার্কফ্লো** | রানটাইম, ক্লায়েন্ট, ডিভাইস, ফ্রেমওয়ার্ক এবং পরিবেশের জন্য অন্তর্নির্মিত বিকাশকারী সেটআপ হাব | পণ্য-নির্দিষ্ট সেটআপ নির্দেশিকা | পণ্য-নির্দিষ্ট সেটআপ নির্দেশিকা |
-| **বাহ্যিক প্রক্সি + PAC রাউটিং** | HTTP/HTTPS আপস্ট্রিম প্রক্সি, PAC অটো-কনফিগারেশন, এবং বাইপাস নিয়ম | পরিণত বাণিজ্যিক প্রক্সি টুলিং | পরিণত বাণিজ্যিক প্রক্সি টুলিং |
-| **MCP/স্থানীয় অটোমেশন সেতু** | অন্তর্নির্মিত, টোকেন-প্রমাণিত, ডিফল্টরূপে সংশোধন | পর্যালোচনা করা পাবলিক ডক্সে দাবি করা হয়নি | পর্যালোচনা করা পাবলিক ডক্সে দাবি করা হয়নি |
-| **অবদানের পথ খোলা** | জনসাধারণের সমস্যা, আলোচনা, রোডম্যাপ এবং জনসংযোগ | বিক্রেতা-নিয়ন্ত্রিত পণ্য | বিক্রেতা-নিয়ন্ত্রিত পণ্য |
+| **ডেভেলপার সেটআপ ওয়ার্কফ্লো** | রানটাইম, ক্লায়েন্ট, ডিভাইস, ফ্রেমওয়ার্ক এবং পরিবেশের জন্য অন্তর্নির্মিত বিকাশকারী সেটআপ হাব | অন্তর্নির্মিত স্বয়ংক্রিয় সেটআপ এবং প্ল্যাটফর্ম ও রানটাইম গাইড | প্ল্যাটফর্ম-নির্দিষ্ট সেটআপ গাইড |
+| **বাহ্যিক প্রক্সি + PAC রাউটিং** | HTTP/HTTPS আপস্ট্রিম প্রক্সি, PAC অটো-কনফিগারেশন, এবং বাইপাস নিয়ম | বাণিজ্যিক আপস্ট্রিম প্রক্সি ও PAC সমর্থন | বাণিজ্যিক আপস্ট্রিম প্রক্সি কনফিগারেশন |
+| **MCP ইন্টিগ্রেশন** | [অন্তর্নির্মিত লোকাল MCP](docs/features/mcp.mdx): ট্র্যাফিক, স্ট্যাটাস, সার্টিফিকেট, নিয়ম পরিদর্শন ও cURL এক্সপোর্টের জন্য ১০টি রিড-অনলি টুল; token-প্রমাণিত; redaction ডিফল্টভাবে চালু | অন্তর্নির্মিত লোকাল MCP: ট্র্যাফিক পরিদর্শন এবং নিয়ম, সেশন, সার্টিফিকেট, সেটআপ ও অ্যাপ-নিয়ন্ত্রণ টুল; শুধু localhost; প্রতি সেশনে token প্রমাণীকরণ; সংবেদনশীল ডেটা redaction | 2026-08-13-এ পর্যালোচিত [অফিসিয়াল ডকুমেন্টেশনে](https://www.charlesproxy.com/documentation/) কোনো ফার্স্ট-পার্টি MCP ইন্টিগ্রেশন পাওয়া যায়নি |
+| **নেটিভ AI Assistant** | Rockxy-এর ভিতরে নির্বাচিত-request ও মাল্টি-request ট্র্যাফিক বিশ্লেষণের জন্য অন্তর্নির্মিত | অজানা | অজানা |
+| **অবদানের পথ খোলা** | পাবলিক সোর্স, issues, আলোচনা, রোডম্যাপ এবং PR | পাবলিক issue ট্র্যাকার; অ্যাপ্লিকেশন সোর্স ও রিলিজ বিক্রেতা-নিয়ন্ত্রিত | বিক্রেতার ডকুমেন্টেশন ও সমর্থন; অ্যাপ্লিকেশন সোর্স ও রিলিজ বিক্রেতা-নিয়ন্ত্রিত |
+
+উপরের প্রতিযোগীদের সক্ষমতাগুলি 2026-08-13-এ অফিসিয়াল পণ্য ডকুমেন্টেশনের বিপরীতে যাচাই করা হয়েছে এবং প্রকাশের পরে পরিবর্তিত হতে পারে।
 
 রোডম্যাপে: আরও গভীর protocol-aware rules, নিরাপদ redacted evidence bundle, শক্তিশালী replay ও comparison workflow, বিস্তৃত Developer Setup guide এবং HTTP/2 ও HTTP/3 নিয়ে চলমান গবেষণা।
 
@@ -390,7 +396,7 @@ Rockxy এর পাবলিক রোডম্যাপ ওয়ার্ক�
 
 ## স্পনসর এবং অংশীদার
 
-Rockxy স্বাধীন ডেভেলপারদের দ্বারা নির্মিত এবং রক্ষণাবেক্ষণ করা হয়। স্পনসরশিপ তহবিল অব্যাহত উন্নয়ন, নিরাপত্তা অডিট, এবং নতুন বৈশিষ্ট্য.
+Rockxy স্বাধীনভাবে রক্ষণাবেক্ষণ করা হয়। স্পনসরশিপ অব্যাহত উন্নয়ন, রিলিজ অবকাঠামো, ডকুমেন্টেশন এবং নিরাপত্তা কাজের অর্থায়নে সহায়তা করে।
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -438,5 +444,5 @@ Rockxy আর্থিকভাবে [Open Source Collective](https://docs.osco
 ---
 
 <p align="center">
-  <sub>দ্বারা তৈরি <a href="https://github.com/LocNguyenHuu">স্টিফেন</a>. Swift, SwiftNIO, SwiftUI, এবং AppKit দিয়ে তৈরি।</sub>
+  <sub>দ্বারা তৈরি <a href="https://github.com/LocNguyenHuu">Stephen</a>. Swift, SwiftNIO, SwiftUI, এবং AppKit দিয়ে তৈরি।</sub>
 </p>
