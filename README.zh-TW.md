@@ -35,7 +35,7 @@
 <p align="center">
   使用您可以檢查、建置和信任的本機 Swift 應用程式攔截、檢查和修改 HTTP/HTTPS/WebSocket/GraphQL 流量。<br>
   隨著 Rockxy 的發展，專為 API、行動、MCP 輔助、人工智慧和區塊鏈時代調試工作流程而建置。<br>
-  本地優先的 AGPL-3.0 替代品 <a href="#rockxy-vs-alternatives">代理人和查爾斯·代理人</a>.
+  <a href="#rockxy-與替代品">Proxyman 和 Charles Proxy</a> 的 local-first、AGPL-3.0 替代方案。
 </p>
 
 <p align="center">
@@ -76,10 +76,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## 目前分行亮點
 
-- AI Assistant 現在於 Review Data 後提供本機分析或 Ollama/provider model；sidebar 包含 Focus Sets 與 Noise Control；workspace 使用原生 split view；AI/Web3/x402 inspection 也已是目前 behavior。
+- AI Assistant 現在可透過內建本機分析或選用的 Ollama/provider model 調查一個或多個已選 request，並提供明確的 Review Data 確認、有限度的 redaction、串流回應、evidence reveal 以及使用者主動觸發的 handoff。
+- 原生 sidebar 現在提供可重複使用的 Focus Sets，用於 app/domain/path scope，並提供 workspace 層級的 Noise Control，在不停止 capture 的情況下隱藏相符的 domain 或 path。
+- 主 workspace 現在為 Context Dock 與底部 inspector 使用原生垂直與水平 split view，保留全高度分隔線、協調的 toolbar/footer separator，並自動調整 layout。
 - 上游代理現在包括免費/核心自動代理設定和 PAC URL 路由 `DIRECT` 、HTTP 和 HTTPS 路由，同時保留現有的 SOCKS5 和驗證原則邊界。
 - 匯出工作流程現在涵蓋 OpenAPI YAML/HTML 和選定流量 Gist 發布以及編輯感知有效負載建置。
 - 檢查器工具現在包括 JSONPath/鍵/值過濾以及所選負載文字（例如 JWT）的快速預覽。
+- AI 與 Web3 流量檢查現在為已識別的 model call、JSON-RPC 流量與 x402 風格付款提示新增協定標籤、inspector 分頁與除錯摘要。
 - Node.js 開發人員設定現在會在驗證期間鏡像所選用戶端，並具有更完整的本機主機範例指南。
 - 開發人員設定中心現在涵蓋執行時間、瀏覽器、用戶端、裝置、框架和環境，以及特定於目標的程式碼片段、驗證觀察程式和誠實的指南內容。
 - WebSocket binary-frame inspection 現在提供有限度、隨選的 Protobuf wire-format heuristic，不會把 decoder work 加入 capture hot path。
@@ -125,7 +128,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-讓 Claude Desktop 或 Cursor 透過本地 MCP 伺服器讀取捕獲的流量。問「為什麼要做這個500？」而不是將標題貼到聊天中。本地、編輯感知且開源。
+讓 Claude Desktop 或 Cursor 透過 Rockxy 本機 MCP 伺服器中的十個唯讀工具檢查已捕獲的流量。直接問「為什麼這個 500？」而不是把 header 貼進聊天。此實作為開源、以 token 驗證，並預設保持敏感資料 redaction 開啟。
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -203,11 +206,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### 自訂請求和回應標頭
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-覆蓋每個主機的標頭，並完全控制兩個階段。在傳出請求中註入身份驗證令牌，在回應中刪除 Set-Cookie，或固定自訂使用者代理程式 - 儲存為您可以隨時切換的命名規則。
+把任意 request 或 response header 提升為流量表格中的一等欄位。保持 request 與 response 來源分離，儲存你關心的 header，然後無需開啟每個 inspector 即可掃視 request ID、trace ID、cache 狀態或自訂 metadata。
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### 網路狀況
 
@@ -221,15 +224,15 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-重建任何捕獲的 HTTP 請求 - 更改方法、URL、標頭、查詢參數或正文 - 並在不離開 Rockxy 的情況下重新發送。沒有郵差、失眠或捲曲複製貼上循環。迭代 LLM 提示、模糊身份驗證邊界，或在幾秒鐘內重現 OpenAI、Anthropic 和 Cohere 端點的失敗案例。
+重建任何捕獲的 HTTP 請求 - 更改 method、URL、header、query 參數或 body - 並在不離開 Rockxy 的情況下重新發送。無需 Postman、Insomnia 或 curl 的複製貼上循環。迭代 LLM prompt、模糊 auth 邊界，或在幾秒鐘內重現 OpenAI、Anthropic 和 Cohere 端點的失敗案例。
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### 比較
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-將兩個捕獲的回應並排堆疊，並發現每個翻轉的欄位 - 狀態、標頭、JSON 鍵、正文字節。擷取靜默 API 迴歸、非確定性 LLM 輸出和提示漂移，而無需將任何內容傳輸到第三方 diff 工具中。並排差異突出顯示了發生的變化；深度 JSON 比較忽略鍵排序。
+將兩個捕獲的 transaction 或貼上的 payload 並排堆疊，找出每個翻轉的欄位 - 狀態、header、JSON key 或 body 位元組。捕捉靜默的 API 迴歸、非確定性的 LLM 輸出和 prompt drift，而無需將任何內容送入第三方 diff 工具。
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -253,7 +256,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Rockxy 多分頁工作區顯示同一即時 capture 的獨立 filter view" width="820" />
 
-在同一個即時 capture 上並排保留獨立調查 view。每個分頁擁有自己的 filter、sorting、selection、sidebar scope 與 inspector state，同時共用 proxy 和已 capture transaction。
+在同一個即時 capture 上並排保留獨立調查 view — 一個分頁用於 staging 流量，一個用於 production，一個用於 iOS 裝置流程。每個分頁擁有自己的 filter、sorting、selection、sidebar scope 與 inspector state，同時共用 proxy 和已 capture transaction。
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -271,19 +274,19 @@ Rockxy 已在一般 HTTP debugging workflow 中提供協定感知的 AI、Web3 R
 
 ### AI 流量檢查
 
-使模型流量在正常擷取工作流程中更容易調試。偵測 AI 請求、檢查選定的模型呼叫、診斷流回應、比較提示/輸出行為以及了解工具呼叫鏈，而無需將敏感負載貼到其他服務中。
+Rockxy 在一般 capture workflow 中偵測已識別的 AI 請求。檢查選定的 model call、串流狀態、可用時的 usage 欄位、警告、retrieval hint 與 tool-call 摘要，而無需將敏感 payload 貼到其他服務。
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC 檢查
 
-檢查 EVM 與 Solana-style HTTP JSON-RPC 流量，包括 provider host、request ID、method、batch summary、error、chain、transaction、payload 和 debug-intent detail，而不會把 Rockxy 變成 wallet 或 block explorer。
+Rockxy 將區塊鏈時代的網路呼叫變成可讀的除錯證據。檢查 EVM 與 Solana-style HTTP JSON-RPC 流量，包括 provider host、request ID、method、batch summary、error、chain、transaction、payload 和 debug-intent detail，而不會把 Rockxy 變成 wallet 或 block explorer。
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402 支付流程提示
 
-了解來自網路層的支付門控 HTTP 流。突出顯示需要付款的回應，遵循重試路徑，並將調試證據保留在本地並具有編輯意識。
+Rockxy 突顯 payment-required 與 retry 導向的提示，讓 payment-gated HTTP 流程可從網路層理解，同時除錯證據維持在本機且 redaction-aware。
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -291,17 +294,17 @@ Rockxy 已在一般 HTTP debugging workflow 中提供協定感知的 AI、Web3 R
 
 以下章節描述公開方向，而不是目前行為。
 
+### 協定感知規則
+
+Rockxy 現在已可標記並檢查 AI 與 Web3 流量。按 model、tool call、JSON-RPC method、chain、transaction hash 或 batch subcall 進行更深入的規則比對仍屬未來工作；目前的流量修改工具仍以 URL、HTTP method 和 header 進行比對。
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### 已編輯的證據包 `即將推出`
 
 分享重現錯誤所需的事實而不洩露秘密。將選定的流量與協議摘要、編輯預覽和團隊成員可以審核的來源支援的上下文打包在一起。
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### 協定感知規則
-
-使用 Rockxy 已經可用的 AI 和 Web3 元資料：過濾器、徽章、可選列、比較、規則、開發人員設定和本機 MCP 摘要。
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### 團隊共享與協作 `即將推出`
 
@@ -309,7 +312,7 @@ Rockxy 已在一般 HTTP debugging workflow 中提供協定感知的 AI、Web3 R
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% 原生 macOS。沒有電子。沒有網頁瀏覽量。 SwiftUI + AppKit + SwiftNIO。
+> 原生 macOS 應用程式外殼 — 沒有 Electron。SwiftUI + AppKit + SwiftNIO，WebKit 僅用於 HTML body 預覽。
 
 ## 快速入門
 
@@ -329,15 +332,18 @@ open Rockxy.xcodeproj
 
 |    | **Rockxy** | **Proxyman** | **Charles Proxy** |
 |---|---|---|---|
-| **專案模型** | AGPL-3.0開源項目 | 專有商業應用程式 | 專有商業應用程式 |
+| **專案模型** | AGPL-3.0 開源專案 | 專有商業應用程式 | 專有商業應用程式 |
 | **原始碼** | 公開、可審計、可分叉 | 閉源 | 閉源 |
-| **從原始碼構建** | 免費使用此儲存庫中的 Xcode | 無法從公共來源獲得 | 無法從公共來源獲得 |
-| **原生 macOS 基礎** | Swift + SwiftNIO + SwiftUI/AppKit | 原生 macOS 商業應用 | 跨平台商業應用 |
+| **從原始碼構建** | 免費使用此儲存庫中的 Xcode | 無法從公開原始碼取得 | 無法從公開原始碼取得 |
+| **原生 macOS 基礎** | Swift + SwiftNIO + SwiftUI/AppKit | 閉源原生 macOS 應用程式 | 閉源跨平台應用程式 |
 | **本地優先捕獲** | 本機代理程式、憑證、幫助程式和擷取資料保留在您的 Mac 上 | 桌面代理應用程式 | 桌面代理應用程式 |
-| **開發人員設定工作流程** | 適用於運行時、客戶端、設備、框架和環境的內建開發人員設定中心 | 產品特定設定指南 | 產品特定設定指南 |
-| **外部代理+PAC路由** | HTTP/HTTPS 上游代理、PAC 自動設定和繞過規則 | 成熟的商業代理工具 | 成熟的商業代理工具 |
-| **MCP/本地自動化橋** | 內建、令牌驗證、預設密文 | 未在已審查的公共文件中聲明 | 未在已審查的公共文件中聲明 |
-| **開放貢獻路徑** | 公共議題、討論、路線圖和 PR | 供應商控制的產品 | 供應商控制的產品 |
+| **開發人員設定工作流程** | 適用於運行時、客戶端、設備、框架和環境的內建開發人員設定中心 | 內建自動設定以及平台與執行時指南 | 平台特定設定指南 |
+| **外部代理+PAC路由** | HTTP/HTTPS 上游代理、PAC 自動設定和繞過規則 | 商業上游代理與 PAC 支援 | 商業上游代理設定 |
+| **MCP 整合** | [內建本機 MCP](docs/features/mcp.mdx)：10 個唯讀工具，用於流量、狀態、憑證、規則檢查與 cURL 匯出；以 token 驗證；預設開啟 redaction | 內建本機 MCP：流量檢查以及規則、session、憑證、設定與 app 控制工具；僅限 localhost；每個 session 的 token 驗證；敏感資料 redaction | 在 2026-08-13 審閱的[官方文件](https://www.charlesproxy.com/documentation/)中未發現第一方 MCP 整合 |
+| **原生 AI Assistant** | 內建，用於在 Rockxy 內進行選定 request 與多 request 流量分析 | 未知 | 未知 |
+| **開放貢獻路徑** | 公開原始碼、issues、discussions、roadmap 和 PR | 公開 issue 追蹤器；應用程式原始碼與發布由供應商控制 | 供應商文件與支援；應用程式原始碼與發布由供應商控制 |
+
+以上競品能力已於 2026-08-13 對照官方產品文件核實，發布後可能變更。
 
 路線圖方向：更深入的協定感知規則、更安全的編輯證據包、更強的 replay 與 comparison workflow、更廣泛的 Developer Setup 指南，以及持續研究 HTTP/2 和 HTTP/3。
 
@@ -387,7 +393,7 @@ Rockxy 的公共路線圖以工作流程為導向且無日期限制。它專注�
 
 ## 贊助商及合作夥伴
 
-Rockxy 由獨立開發人員建造和維護。贊助資金用於持續開發、安全審計和新功能。
+Rockxy 由獨立維護。贊助有助於資助持續開發、發布基礎設施、文件和安全工作。
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -435,5 +441,5 @@ Rockxy 由 [Open Source Collective](https://docs.oscollective.org/) 提供財務
 ---
 
 <p align="center">
-  <sub>製造者： <a href="https://github.com/LocNguyenHuu">史蒂芬</a>。使用 Swift、SwiftNIO、SwiftUI 和 AppKit 建置。</sub>
+  <sub>製造者： <a href="https://github.com/LocNguyenHuu">Stephen</a>。使用 Swift、SwiftNIO、SwiftUI 和 AppKit 建置。</sub>
 </p>

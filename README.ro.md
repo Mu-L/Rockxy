@@ -35,7 +35,7 @@
 <p align="center">
   Interceptați, inspectați și modificați traficul HTTP/HTTPS/WebSocket/GraphQL cu o aplicație Swift nativă în care puteți inspecta, crea și aveți încredere.<br>
   Creat pentru fluxurile de lucru de depanare API, mobile, asistate de MCP, AI și blockchain pe măsură ce Rockxy evoluează.<br>
-  O alternativă la AGPL-3.0, pe primul loc local <a href="#rockxy-vs-alternatives">Proxyman și Charles Proxy</a>.
+  O alternativă local-first, AGPL-3.0 la <a href="#rockxy-vs-alternative">Proxyman și Charles Proxy</a>.
 </p>
 
 <p align="center">
@@ -76,10 +76,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Repere actuale ale filialei
 
-- AI Assistant oferă analiză locală sau cu Ollama/provider după Review Data; sidebarul include Focus Sets și Noise Control; workspace-ul folosește split view native; iar inspecția AI/Web3/x402 este comportament actual.
+- AI Assistant investighează acum unul sau mai multe requesturi selectate cu analiză locală încorporată sau un model Ollama/provider configurat opțional, cu confirmare Review Data explicită, redactare limitată, răspunsuri streaming, evidence reveal și handoff-uri inițiate de utilizator.
+- Sidebarul nativ include acum Focus Sets reutilizabile pentru scope-uri app/domain/path plus Noise Control la nivel de workspace care ascunde domain-urile sau path-urile care se potrivesc fără a opri capture.
+- Workspace-ul principal folosește acum split view native verticale și orizontale pentru Context Dock și inspectorul de jos, păstrând separatoare de înălțime completă, separatoare toolbar/footer coordonate și redimensionare automată a layoutului.
 - Upstream Proxy include acum Configurarea automată proxy gratuită/core cu rutare URL PAC pentru `DIRECT`, HTTP și HTTPS, păstrând în același timp limitele existente SOCKS5 și politicile de autentificare.
 - Fluxurile de lucru de export acoperă acum OpenAPI YAML/HTML și publicarea Gist cu trafic selectat cu crearea de încărcătură utilă care ține cont de redactare.
 - Instrumentele Inspector includ acum filtrarea JSONPath/cheie/valoare și previzualizări rapide pentru textul de încărcare utilă selectat, cum ar fi JWT.
+- Inspecția traficului AI și Web3 adaugă acum etichete de protocol, file de inspector și rezumate de depanare pentru apeluri de model recunoscute, trafic JSON-RPC și indicii de plată în stil x402.
 - Configurarea dezvoltatorului Node.js reflectă acum clientul selectat în timpul validării și are un ghid de probă localhost mai complet.
 - Centrul de configurare pentru dezvoltatori acoperă acum timpii de execuție, browsere, clienți, dispozitive, cadre și medii cu fragmente specifice țintei, observatori de validare și conținut de ghid sincer.
 - Inspecția frame-urilor binare WebSocket include acum heuristic Protobuf wire-format limitate și la cerere, fără a adăuga decoder work în capture hot path.
@@ -125,7 +128,7 @@ Selectați unul sau mai multe requesturi capturate și întrebați ce s-a întâ
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Lăsați Claude Desktop sau Cursor să vă citească traficul capturat printr-un server MCP local. Întrebați „de ce au făcut acest 500?” în loc să lipiți anteturi în chat. Local, conștient de redactare și sursă deschisă.
+Lăsați Claude Desktop sau Cursor să vă inspecteze traficul capturat prin zece instrumente doar-citire din serverul MCP local al Rockxy. Întrebați „de ce a returnat acest 500?” în loc să lipiți anteturi în chat. Implementarea este open source, autentificată prin token și păstrează redactarea datelor sensibile activată în mod implicit.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -203,11 +206,11 @@ Adăugați, eliminați sau înlocuiți anteturi pe orice gazdă fără redistrib
 
 ### Anteturi personalizate de solicitare și răspuns
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Ignorați anteturile pentru fiecare gazdă cu control deplin asupra ambelor faze. Injectați jetoane de autentificare la cererile trimise, eliminați Set-Cookie pe răspunsuri sau fixați un User-Agent personalizat - salvat ca reguli numite pe care le puteți comuta oricând.
+Promovați orice antet de cerere sau răspuns la o coloană de primă clasă în tabelul de trafic. Păstrați sursele de cerere și răspuns separate, salvați anteturile care vă interesează, apoi parcurgeți request ID-uri, trace ID-uri, starea cache-ului sau metadate personalizate fără a deschide fiecare inspector.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Condiții de rețea
 
@@ -221,15 +224,15 @@ Accelerează la 3G, EDGE, LTE, WiFi sau o întârziere personalizată. Laptopul 
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-Reconstruiți orice solicitare HTTP capturată - schimbați metoda, adresa URL, anteturile, parametrii de interogare sau corpul - și retrimiteți fără a părăsi Rockxy. Fără poștaș, insomnie sau buclă curl copy-paste. Repetați solicitările LLM, fuzz limitele de auth sau reproduceți un caz eșuat pentru punctele finale OpenAI, Anthropic și Cohere în câteva secunde.
+Reconstruiți orice solicitare HTTP capturată - schimbați metoda, adresa URL, anteturile, parametrii de interogare sau corpul - și retrimiteți fără a părăsi Rockxy. Fără bucla de copy-paste către Postman, Insomnia sau curl. Repetați solicitările LLM, fuzz limitele de auth sau reproduceți un caz eșuat pentru punctele finale OpenAI, Anthropic și Cohere în câteva secunde.
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### Comparați
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Stivuiți două răspunsuri capturate unul lângă altul și identificați fiecare câmp care s-a răsturnat — stare, anteturi, chei JSON, octeți de corp. Obțineți regresii API silențioase, ieșiri LLM nedeterministe și deriva promptă fără a introduce nimic într-un instrument de diferențiere terță parte. Diferența side-by-side evidențiază ceea ce s-a schimbat; compararea JSON profundă ignoră ordonarea cheilor.
+Stivuiți două tranzacții capturate sau payload-uri lipite unul lângă altul și identificați fiecare câmp care s-a schimbat — stare, anteturi, chei JSON sau octeți de corp. Obțineți regresii API silențioase, ieșiri LLM nedeterministe și prompt drift fără a introduce nimic într-un instrument de diferențiere terță parte.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -253,7 +256,7 @@ Salvați sesiuni, importați/exportați HAR pentru transferul între instrumente
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Spații de lucru multi-tab Rockxy cu vizualizări filtrate independent ale aceleiași capturi live" width="820" />
 
-Păstrați alăturate vizualizări independente de investigație ale aceleiași capturi live. Fiecare filă își păstrează filtrele, sortarea, selecția, scope-ul sidebarului și starea inspectorului, partajând proxy-ul și tranzacțiile capturate.
+Păstrați alăturate vizualizări independente de investigație ale aceleiași capturi live — o filă pentru traficul de staging, una pentru producție și una pentru un flux de dispozitiv iOS. Fiecare filă își păstrează propriile filtre, sortare, selecție, scope-ul sidebarului și starea inspectorului, partajând proxy-ul și tranzacțiile capturate.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -271,19 +274,19 @@ Rockxy oferă inspecție conștientă de protocol pentru AI, Web3 RPC și x402 �
 
 ### Inspecția de trafic AI
 
-Faceți traficul modelului mai ușor de depanat în cadrul fluxului de lucru normal de captare. Detectați solicitările AI, inspectați apelurile model selectate, diagnosticați răspunsurile în flux, comparați comportamentul prompt/ieșire și înțelegeți lanțurile de apeluri de instrumente fără a lipi încărcături utile sensibile într-un alt serviciu.
+Rockxy detectează solicitările AI recunoscute în cadrul fluxului de lucru normal de captare. Inspectați apelurile de model selectate, starea de streaming, câmpurile usage când sunt prezente, avertismentele, retrieval hints și rezumatele tool-call fără a lipi payload-uri sensibile într-un alt serviciu.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Inspecție Web3/RPC
 
-Transformați apelurile de rețea din era blockchain în dovezi de depanare lizibile. Inspectați traficul JSON-RPC și Solana RPC, grupați apelurile asociate în fluxuri, explicați erorile RPC obișnuite și reluați cererile selectate fără a deveni un portofel sau un explorator de blocuri.
+Rockxy transformă apelurile de rețea din era blockchain în dovezi de depanare lizibile. Inspectați traficul HTTP JSON-RPC în stil EVM și Solana cu provider host, request ID, method, batch summary, error, chain, transaction, payload și debug-intent, fără a transforma Rockxy într-un portofel sau explorator de blocuri.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### Indicii pentru fluxul de plăți x402
 
-Înțelegeți fluxurile HTTP bazate pe plăți din stratul de rețea. Evidențiați răspunsurile necesare pentru plată, urmați calea de reîncercare și păstrați dovezile de depanare locale și conștiente de redactare.
+Rockxy evidențiază indiciile payment-required și orientate spre retry, astfel încât fluxurile HTTP payment-gated să fie inteligibile de la nivelul de rețea, în timp ce dovezile de depanare rămân locale și redaction-aware.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -291,17 +294,17 @@ Transformați apelurile de rețea din era blockchain în dovezi de depanare lizi
 
 Secțiunile următoare descriu direcția publică, nu comportamentul actual.
 
+### Reguli care țin cont de protocol
+
+Rockxy poate deja eticheta și inspecta traficul AI și Web3 astăzi. Potrivirea mai profundă a regulilor după model, tool call, metodă JSON-RPC, chain, transaction hash sau batch subcall rămâne lucru viitor; instrumentele actuale de modificare a traficului încă potrivesc URL, metoda HTTP și anteturile.
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### Pachete de dovezi redacționate `În curând`
 
 Împărtășiți faptele necesare pentru a reproduce o eroare fără a scurge secrete. Împachetați traficul selectat cu rezumate de protocol, previzualizări de redactare și context susținut de sursă pe care un coechipier poate audita.
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### Reguli care țin cont de protocol
-
-Folosiți metadatele AI și Web3 acolo unde funcționează deja Rockxy: filtre, insigne, coloane opționale, comparații, reguli, Configurare pentru dezvoltatori și rezumate MCP locale.
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### Partajarea în echipă și colaborare `În curând`
 
@@ -309,7 +312,7 @@ Trimiteți o sesiune capturată unui coechipier cu un singur clic. Adnotați cer
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% macOS nativ. Fara electron. Fără vizualizări web. SwiftUI + AppKit + SwiftNIO.
+> Shell de aplicație macOS nativ — fără Electron. SwiftUI + AppKit + SwiftNIO, cu WebKit folosit doar pentru previzualizarea corpului HTML.
 
 ## Pornire rapidă
 
@@ -332,12 +335,15 @@ Dacă doriți să conectați Rockxy la un client MCP local după instalare, cons
 | **Model de proiect** | Proiect open-source AGPL-3.0 | Aplicație comercială proprietară | Aplicație comercială proprietară |
 | **Cod sursă** | Public, auditabil, forkable | Sursă închisă | Sursă închisă |
 | **Construiți din sursă** | Gratuit cu Xcode din acest depozit | Nu este disponibil din sursa publică | Nu este disponibil din sursa publică |
-| **Fundație nativă macOS** | Swift + SwiftNIO + SwiftUI/AppKit | Aplicație comercială nativă macOS | Aplicație comercială multiplatformă |
-| **Captură locală mai întâi** | Proxy-ul local, certificatele, ajutorul și datele de captare rămân pe Mac | Aplicație proxy desktop | Aplicație proxy desktop |
-| **Flux de lucru pentru configurarea dezvoltatorului** | Hub de configurare pentru dezvoltatori încorporat pentru runtime, clienți, dispozitive, cadre și medii | Ghid de configurare specific produsului | Ghid de configurare specific produsului |
-| **Proxy extern + rutare PAC** | Proxy în amonte HTTP/HTTPS, auto-configurare PAC și reguli de ocolire | Instrumente proxy comerciale mature | Instrumente proxy comerciale mature |
-| **MCP/punte de automatizare locală** | Încorporat, autentificat prin simbol, redactare în mod implicit | Nu este revendicat în documentele publice revizuite | Nu este revendicat în documentele publice revizuite |
-| **Deschideți calea de contribuție** | Probleme publice, discuții, foaie de parcurs și PR-uri | Produs controlat de furnizor | Produs controlat de furnizor |
+| **Fundație nativă macOS** | Swift + SwiftNIO + SwiftUI/AppKit | Aplicație macOS nativă cu sursă închisă | Aplicație multiplatformă cu sursă închisă |
+| **Captură locală mai întâi** | Proxy-ul local, certificatele, helperul și datele de captare rămân pe Mac | Aplicație proxy desktop | Aplicație proxy desktop |
+| **Flux de lucru pentru configurarea dezvoltatorului** | Hub de configurare pentru dezvoltatori încorporat pentru runtime, clienți, dispozitive, cadre și medii | Configurare automată încorporată plus ghiduri de platformă și runtime | Ghiduri de configurare specifice platformei |
+| **Proxy extern + rutare PAC** | Proxy în amonte HTTP/HTTPS, auto-configurare PAC și reguli de ocolire | Proxy comercial în amonte și suport PAC | Configurare comercială proxy în amonte |
+| **Integrare MCP** | [MCP local încorporat](docs/features/mcp.mdx): 10 instrumente doar-citire pentru trafic, stare, certificate, inspecția regulilor și export cURL; autentificat prin token; redactare activată implicit | MCP local încorporat: inspecția traficului plus instrumente pentru reguli, sesiune, certificate, configurare și control al aplicației; doar localhost; autentificare prin token per sesiune; redactarea datelor sensibile | Nicio integrare MCP first-party găsită în [documentația oficială](https://www.charlesproxy.com/documentation/) verificată la 2026-08-13 |
+| **AI Assistant nativ** | Încorporat pentru analiza traficului pentru cerere selectată și multi-cerere în Rockxy | Necunoscut | Necunoscut |
+| **Cale de contribuție deschisă** | Sursă publică, issues, discuții, foaie de parcurs și PR-uri | Tracker public de issue-uri; sursa aplicației și lansările sunt controlate de furnizor | Documentație și suport ale furnizorului; sursa aplicației și lansările sunt controlate de furnizor |
+
+Capacitățile concurenților de mai sus au fost verificate față de documentația oficială a produsului la 2026-08-13 și se pot schimba după publicare.
 
 Pe roadmap: reguli protocol-aware mai profunde, bundle-uri de dovezi redactate mai sigure, workflow-uri replay și comparison mai puternice, ghiduri Developer Setup mai ample și cercetare continuă pentru HTTP/2 și HTTP/3.
 
@@ -387,7 +393,7 @@ Primele numere bune sunt etichetate [`good first issue`](https://github.com/Rock
 
 ## Sponsori și parteneri
 
-Rockxy este construit și întreținut de dezvoltatori independenți. Sponsorizările finanțează dezvoltarea continuă, audituri de securitate și funcții noi.
+Rockxy este întreținut în mod independent. Sponsorizările ajută la finanțarea dezvoltării continue, a infrastructurii de lansare, a documentației și a activității de securitate.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -435,5 +441,5 @@ Rockxy este găzduit fiscal de [Open Source Collective](https://docs.oscollectiv
 ---
 
 <p align="center">
-  <sub>Realizat de <a href="https://github.com/LocNguyenHuu">Ştefan</a>. Construit cu Swift, SwiftNIO, SwiftUI și AppKit.</sub>
+  <sub>Realizat de <a href="https://github.com/LocNguyenHuu">Stephen</a>. Construit cu Swift, SwiftNIO, SwiftUI și AppKit.</sub>
 </p>

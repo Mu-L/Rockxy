@@ -128,7 +128,7 @@ Chọn một hoặc nhiều request đã capture rồi hỏi chuyện gì xảy 
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Để Claude Desktop hoặc Cursor đọc traffic đã bắt qua một MCP server local. Hỏi "tại sao request này 500?" thay vì dán headers vào chat. Local, redaction-aware, và mã nguồn mở.
+Để Claude Desktop hoặc Cursor inspect traffic đã bắt qua mười read-only tool trong MCP server local của Rockxy. Hỏi "tại sao request này 500?" thay vì dán headers vào chat. Bản triển khai là mã nguồn mở, xác thực bằng token, và mặc định giữ redaction dữ liệu nhạy cảm luôn bật.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -206,11 +206,11 @@ Thêm, gỡ hoặc thay header trên bất kỳ host nào mà không cần redep
 
 ### Custom Request & Response Headers
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Override header theo từng host với toàn quyền điều khiển cả hai phase. Inject auth token vào request đi ra, gỡ Set-Cookie ở response, hoặc pin một User-Agent tuỳ chỉnh — lưu lại dưới dạng named rule có thể bật/tắt bất cứ lúc nào.
+Đưa bất kỳ request hoặc response header nào lên thành cột hạng nhất trong bảng traffic. Giữ nguồn request và response tách biệt, lưu các header bạn quan tâm, rồi quét request ID, trace ID, trạng thái cache hoặc metadata tuỳ chỉnh mà không cần mở từng inspector.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Network Conditions
 
@@ -230,9 +230,9 @@ Dựng lại bất kỳ request HTTP đã bắt — đổi method, URL, header, 
 
 ### So Sánh
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Xếp hai response đã bắt cạnh nhau và bắt được mọi trường đã đổi — status, headers, JSON keys, body bytes. Bắt được regression API âm thầm, output LLM không deterministic và prompt drift mà không cần đẩy dữ liệu sang công cụ diff bên thứ ba. Side-by-side diff highlight phần đã đổi; deep JSON compare bỏ qua thứ tự key.
+Xếp hai transaction đã bắt hoặc payload được dán cạnh nhau và bắt được mọi trường đã đổi — status, headers, JSON keys hoặc body bytes. Bắt được regression API âm thầm, output LLM không deterministic và prompt drift mà không cần đẩy bất cứ thứ gì sang công cụ diff bên thứ ba.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -298,7 +298,7 @@ Các mục sau mô tả định hướng công khai, không phải behavior hi�
 
 Rockxy có thể label và inspect AI cùng Web3 traffic ngay hôm nay. Rule matching sâu hơn theo model, tool call, JSON-RPC method, chain, transaction hash hoặc batch subcall vẫn là công việc tương lai; các công cụ sửa traffic hiện tại vẫn match URL, HTTP method và header.
 
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
 
 ### Redacted Evidence Bundles `Sắp Ra Mắt`
 
@@ -312,7 +312,7 @@ Gửi một session đã bắt cho đồng đội chỉ với một cú click. A
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% native macOS. Không Electron. Không web view. SwiftUI + AppKit + SwiftNIO.
+> Vỏ ứng dụng macOS native — không Electron. SwiftUI + AppKit + SwiftNIO, với WebKit chỉ dùng cho preview body HTML.
 
 ## Bắt Đầu Nhanh
 
@@ -326,6 +326,8 @@ Build và chạy trong Xcode. Cửa sổ Welcome sẽ hướng dẫn bạn cài 
 
 **Yêu cầu:** macOS 14.0+, Xcode 16+, Swift 5.9
 
+Nếu bạn muốn kết nối Rockxy với một local MCP client sau khi cài đặt, xem [hướng dẫn tích hợp MCP](docs/features/mcp.mdx).
+
 ## Rockxy vs. Các Giải Pháp Khác
 
 |  | **Rockxy** | **Proxyman** | **Charles Proxy** |
@@ -333,11 +335,15 @@ Build và chạy trong Xcode. Cửa sổ Welcome sẽ hướng dẫn bạn cài 
 | **Mô hình dự án** | Dự án mã nguồn mở AGPL-3.0 | Ứng dụng thương mại độc quyền | Ứng dụng thương mại độc quyền |
 | **Mã nguồn** | Công khai, có thể kiểm tra, có thể fork | Mã nguồn đóng | Mã nguồn đóng |
 | **Build từ mã nguồn** | Miễn phí với Xcode từ repo này | Không có mã nguồn công khai để build | Không có mã nguồn công khai để build |
-| **Nền tảng macOS native** | Swift + SwiftNIO + SwiftUI/AppKit | Ứng dụng macOS thương mại native | Ứng dụng thương mại đa nền tảng |
-| **Capture local-first** | Proxy, chứng chỉ, helper và dữ liệu capture ở trên máy Mac của bạn | Ứng dụng proxy desktop | Ứng dụng proxy desktop |
-| **Workflow thiết lập developer** | Developer Setup Hub tích hợp cho runtime, client, device, framework và environment | Hướng dẫn thiết lập theo sản phẩm | Hướng dẫn thiết lập theo sản phẩm |
-| **MCP/local automation bridge** | Tích hợp sẵn, xác thực bằng token, mặc định che giấu dữ liệu nhạy cảm | Chưa được nêu trong tài liệu công khai đã kiểm tra | Chưa được nêu trong tài liệu công khai đã kiểm tra |
-| **Đường đóng góp mở** | Issues, discussions, roadmap và PR công khai | Sản phẩm do vendor kiểm soát | Sản phẩm do vendor kiểm soát |
+| **Nền tảng macOS native** | Swift + SwiftNIO + SwiftUI/AppKit | Ứng dụng macOS native mã nguồn đóng | Ứng dụng đa nền tảng mã nguồn đóng |
+| **Capture local-first** | Proxy local, chứng chỉ, helper và dữ liệu capture ở trên máy Mac của bạn | Ứng dụng proxy desktop | Ứng dụng proxy desktop |
+| **Workflow thiết lập developer** | Developer Setup Hub tích hợp cho runtime, client, device, framework và environment | Thiết lập tự động tích hợp cùng hướng dẫn theo nền tảng và runtime | Hướng dẫn thiết lập theo nền tảng |
+| **External proxy + PAC routing** | Upstream proxy HTTP/HTTPS, PAC auto-configuration và bypass rule | Upstream proxy thương mại và hỗ trợ PAC | Cấu hình upstream proxy thương mại |
+| **Tích hợp MCP** | [MCP local tích hợp](docs/features/mcp.mdx): 10 read-only tool cho traffic, status, chứng chỉ, kiểm tra rule và export cURL; xác thực bằng token; redaction bật mặc định | MCP local tích hợp: inspect traffic cùng các tool rule, session, chứng chỉ, setup và app-control; chỉ localhost; xác thực token theo từng session; redaction dữ liệu nhạy cảm | Không tìm thấy tích hợp MCP first-party trong [tài liệu chính thức](https://www.charlesproxy.com/documentation/) đã xem xét ngày 2026-08-13 |
+| **AI Assistant native** | Tích hợp sẵn để phân tích traffic cho request được chọn và nhiều request trong Rockxy | Không rõ | Không rõ |
+| **Đường đóng góp mở** | Mã nguồn công khai, issues, discussions, roadmap và PR | Issue tracker công khai; mã nguồn ứng dụng và các bản phát hành do vendor kiểm soát | Tài liệu và hỗ trợ của vendor; mã nguồn ứng dụng và các bản phát hành do vendor kiểm soát |
+
+Các khả năng của đối thủ ở trên đã được kiểm chứng với tài liệu sản phẩm chính thức vào ngày 2026-08-13 và có thể thay đổi sau khi công bố.
 
 Trên lộ trình: protocol-aware rules sâu hơn, redacted evidence bundle an toàn hơn, workflow replay và comparison mạnh hơn, hướng dẫn Developer Setup rộng hơn, cùng việc tiếp tục nghiên cứu HTTP/2 và HTTP/3.
 
@@ -387,14 +393,14 @@ Các issue dành cho người mới được gắn nhãn [`good first issue`](ht
 
 ## Nhà Tài Trợ & Đối Tác
 
-Rockxy được xây dựng và duy trì bởi các developer độc lập. Tài trợ giúp trang trải phát triển liên tục, kiểm tra bảo mật, và các tính năng mới.
+Rockxy được duy trì độc lập. Tài trợ giúp trang trải phát triển liên tục, hạ tầng phát hành, tài liệu và công việc bảo mật.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
     <img src="https://img.shields.io/badge/Support_on_Open_Collective-7FADF2?style=for-the-badge&logo=opencollective&logoColor=white" alt="Hỗ trợ Rockxy trên Open Collective" />
   </a>
   <a href="https://github.com/sponsors/LocNguyenHuu">
-    <img src="https://img.shields.io/badge/Tài_trợ_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Tài trợ Rockxy" />
+    <img src="https://img.shields.io/badge/Sponsor_Rockxy-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Tài trợ Rockxy" />
   </a>
 </p>
 
@@ -424,7 +430,7 @@ Rockxy được bảo trợ tài chính bởi [Open Source Collective](https://d
 
 ## Lịch Sử Stars
 
-<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=bottom-right">
+<a href="https://www.star-history.com/?repos=RockxyApp%2FRockxy&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=RockxyApp/Rockxy&type=date&legend=top-left" />

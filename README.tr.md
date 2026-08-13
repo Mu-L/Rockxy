@@ -35,7 +35,7 @@
 <p align="center">
   Denetleyebileceğiniz, oluşturabileceğiniz ve güvenebileceğiniz yerel bir Swift uygulamasıyla HTTP/HTTPS/WebSocket/GraphQL trafiğini engelleyin, inceleyin ve değiştirin.<br>
   Rockxy geliştikçe API, mobil, MCP destekli, yapay zeka ve blockchain çağı hata ayıklama iş akışları için tasarlandı.<br>
-  Yerel öncelikli AGPL-3.0 alternatifi <a href="#rockxy-vs-alternatives">Vekil ve Charles Vekil</a>.
+  <a href="#rockxy-ve-alternatifler">Proxyman ve Charles Proxy</a>'ye yerel öncelikli, AGPL-3.0 bir alternatif.
 </p>
 
 <p align="center">
@@ -76,10 +76,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Güncel Şubenin Öne Çıkan Noktaları
 
-- AI Assistant Review Data sonrasında local analysis veya Ollama/provider model sunar; sidebar Focus Sets ve Noise Control içerir; workspace native split view kullanır; AI/Web3/x402 inspection artık mevcut behavior'dır.
+- AI Assistant artık seçilen bir veya daha fazla request'i yerleşik yerel analiz veya isteğe bağlı yapılandırılmış Ollama/provider model ile inceler; açık Review Data onayı, sınırlı redaction, streaming yanıtlar, evidence reveal ve kullanıcı tarafından başlatılan handoff sunar.
+- Yerel sidebar artık app/domain/path scope için yeniden kullanılabilir Focus Sets ile capture'ı durdurmadan eşleşen domain veya path'leri gizleyen workspace kapsamlı Noise Control içerir.
+- Ana workspace artık Context Dock ve alt inspector için yerel dikey ve yatay split view kullanır; tam yükseklikte ayırıcıları, uyumlu toolbar/footer separator'larını ve otomatik düzen yeniden boyutlandırmayı korur.
 - Upstream Proxy artık PAC URL yönlendirmeli ücretsiz/çekirdek Otomatik Proxy Yapılandırmasını içeriyor `DIRECT` Mevcut SOCKS5 ve kimlik doğrulama ilkesi sınırlarını korurken , HTTP ve HTTPS yönlendirmelerini destekler.
 - Dışa aktarma iş akışları artık OpenAPI YAML/HTML'yi ve redaksiyona duyarlı yük oluşturma özelliğiyle seçili trafik Gist yayınlamayı kapsıyor.
 - Denetçi araçları artık JSONPath/anahtar/değer filtrelemeyi ve JWT'ler gibi seçilen yük metni için hızlı önizlemeleri içeriyor.
+- AI ve Web3 trafik incelemesi artık tanınan model çağrıları, JSON-RPC trafiği ve x402 tarzı ödeme ipuçları için protokol etiketleri, inspector sekmeleri ve hata ayıklama özetleri ekliyor.
 - Node.js Geliştirici Kurulumu artık doğrulama sırasında seçilen istemciyi yansıtıyor ve daha kapsamlı bir localhost örnek kılavuzuna sahip.
 - Geliştirici Kurulum Merkezi artık hedefe özel snippet'ler, doğrulama izleyicileri ve dürüst kılavuz içeriğiyle çalışma zamanlarını, tarayıcıları, istemcileri, cihazları, çerçeveleri ve ortamları kapsıyor.
 - WebSocket binary-frame inspection artık capture hot path'e decoder work eklemeden sınırlı, on-demand Protobuf wire-format heuristic sunuyor.
@@ -125,7 +128,7 @@ Bir veya daha fazla capture edilmiş request seçin ve ne olduğunu, neyin başa
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Claude Desktop veya Cursor'un yakalanan trafiğinizi yerel bir MCP sunucusu üzerinden okumasına izin verin. "Bunu neden 500 yaptı?" diye sorun. başlıkları sohbete yapıştırmak yerine. Yerel, redaksiyona duyarlı ve açık kaynak.
+Claude Desktop veya Cursor'un yakalanan trafiğinizi Rockxy'nin yerel MCP sunucusundaki on salt okunur araçla incelemesine izin verin. Başlıkları sohbete yapıştırmak yerine "Bunu neden 500 yaptı?" diye sorun. Uygulama açık kaynaktır, token ile kimlik doğrular ve hassas veri redaction'ını varsayılan olarak açık tutar.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -203,11 +206,11 @@ Yeniden konuşlandırmaya gerek kalmadan herhangi bir ana makinedeki başlıklar
 
 ### Özel İstek ve Yanıt Başlıkları
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Her iki aşama üzerinde de tam kontrole sahip olarak ana bilgisayar başına başlıkları geçersiz kılın. Giden isteklere kimlik doğrulama belirteçleri ekleyin, yanıtlardaki Set-Cookie'yi kaldırın veya özel bir Kullanıcı Aracısını sabitleyin; istediğiniz zaman değiştirebileceğiniz adlandırılmış kurallar olarak kaydedilir.
+Herhangi bir istek veya yanıt başlığını trafik tablosunda birinci sınıf bir sütuna yükseltin. İstek ve yanıt kaynaklarını ayrı tutun, önemsediğiniz başlıkları kaydedin, ardından her inspector'ı açmadan request ID'leri, trace ID'leri, önbellek durumunu veya özel meta verileri tarayın.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Ağ Koşulları
 
@@ -221,15 +224,15 @@ Her iki aşama üzerinde de tam kontrole sahip olarak ana bilgisayar başına ba
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-Yakalanan herhangi bir HTTP isteğini yeniden oluşturun (yöntemi, URL'yi, başlıkları, sorgu parametrelerini veya gövdeyi değiştirin) ve Rockxy'den ayrılmadan yeniden gönderin. Postacı, Uykusuzluk veya kıvırma kopyala-yapıştır döngüsü yok. LLM istemlerini yineleyin, kimlik doğrulama sınırlarını kesin veya OpenAI, Anthropic ve Cohere uç noktaları için saniyeler içinde başarısız bir durumu yeniden oluşturun.
+Yakalanan herhangi bir HTTP isteğini yeniden oluşturun (yöntemi, URL'yi, başlıkları, sorgu parametrelerini veya gövdeyi değiştirin) ve Rockxy'den ayrılmadan yeniden gönderin. Postman, Insomnia veya curl kopyala-yapıştır döngüsü yok. LLM istemlerini yineleyin, kimlik doğrulama sınırlarını fuzz'layın veya OpenAI, Anthropic ve Cohere uç noktaları için saniyeler içinde başarısız bir durumu yeniden oluşturun.
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### Karşılaştır
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Yakalanan iki yanıtı yan yana yığınlayın ve ters çevrilen her alanı (durum, başlıklar, JSON anahtarları, gövde baytları) tespit edin. Sessiz API regresyonlarını, deterministik olmayan LLM çıktılarını yakalayın ve üçüncü taraf bir fark aracına herhangi bir şey aktarmadan anında sapmayı yakalayın. Yan yana farklar nelerin değiştiğini vurguluyor; derin JSON karşılaştırması anahtar sıralamasını yok sayar.
+Yakalanan iki transaction'ı veya yapıştırılan payload'ı yan yana yığın ve değişen her alanı (durum, başlıklar, JSON anahtarları veya gövde baytları) tespit edin. Üçüncü taraf bir fark aracına hiçbir şey aktarmadan sessiz API regresyonlarını, deterministik olmayan LLM çıktılarını ve prompt drift'i yakalayın.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -253,7 +256,7 @@ Oturumları kaydedin, araçlar arası geçiş için HAR'ı içe/dışa aktarın,
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Aynı live capture'ın bağımsız filtrelenmiş görünümlerini gösteren Rockxy çok sekmeli çalışma alanları" width="820" />
 
-Aynı live capture'a ait bağımsız inceleme görünümlerini yan yana tutun. Her sekme kendi filtrelerini, sıralamasını, seçimini, sidebar scope'unu ve inspector durumunu korurken proxy ve yakalanan transaction'ları paylaşır.
+Aynı live capture'a ait bağımsız inceleme görünümlerini yan yana tutun — bir sekme staging trafiği, biri production, biri iOS cihaz akışı için. Her sekme kendi filtrelerini, sıralamasını, seçimini, sidebar scope'unu ve inspector durumunu korurken proxy ve yakalanan transaction'ları paylaşır.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -271,19 +274,19 @@ Rockxy normal HTTP debugging workflow içinde AI, Web3 RPC ve x402 için protoco
 
 ### Yapay Zeka Trafik Denetimi
 
-Normal yakalama iş akışında model trafiğinde hata ayıklamayı kolaylaştırın. Hassas verileri başka bir hizmete yapıştırmadan yapay zeka isteklerini tespit edin, seçilen model çağrılarını inceleyin, akış yanıtlarını teşhis edin, bilgi istemi/çıktı davranışını karşılaştırın ve araç çağrısı zincirlerini anlayın.
+Rockxy normal yakalama iş akışı içinde tanınan AI isteklerini algılar. Seçilen model çağrılarını, streaming durumunu, mevcut olduğunda usage alanlarını, uyarıları, retrieval hint'lerini ve tool-call özetlerini hassas payload'ları başka bir hizmete yapıştırmadan inceleyin.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC Denetimi
 
-Blockchain çağındaki ağ çağrılarını okunabilir hata ayıklama kanıtlarına dönüştürün. JSON-RPC ve Solana RPC trafiğini inceleyin, ilgili çağrıları akışlar halinde gruplandırın, yaygın RPC hatalarını açıklayın ve bir cüzdan veya blok gezgini olmadan seçilen istekleri yeniden yürütün.
+Rockxy blockchain çağındaki ağ çağrılarını okunabilir hata ayıklama kanıtına dönüştürür. EVM ve Solana tarzı HTTP JSON-RPC trafiğini provider host, request ID, method, batch summary, error, chain, transaction, payload ve debug-intent detayıyla inceleyin; Rockxy'yi bir cüzdana veya blok gezginine dönüştürmeden.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402 Ödeme Akışı İpuçları
 
-Ağ katmanından ödeme kapılı HTTP akışlarını anlayın. Ödemenin gerekli olduğu yanıtları vurgulayın, yeniden deneme yolunu izleyin ve hata ayıklama kanıtlarını yerel ve redaksiyona uygun halde tutun.
+Rockxy, payment-required ve retry odaklı ipuçlarını vurgular; böylece payment-gated HTTP akışları ağ katmanından anlaşılır olurken hata ayıklama kanıtı yerel ve redaction-aware kalır.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -291,17 +294,17 @@ Ağ katmanından ödeme kapılı HTTP akışlarını anlayın. Ödemenin gerekli
 
 Aşağıdaki bölümler mevcut davranışı değil, kamuya açık yönü açıklar.
 
+### Protokole Duyarlı Kurallar
+
+Rockxy bugün AI ve Web3 trafiğini etiketleyip inceleyebilir. Model, tool call, JSON-RPC method, chain, transaction hash veya batch subcall'a göre daha derin kural eşleştirme gelecekteki bir çalışmadır; mevcut trafik değiştirme araçları hâlâ URL, HTTP method ve header ile eşleşir.
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### Düzeltilmiş Kanıt Paketleri `Yakında`
 
 Sırları sızdırmadan bir hatayı yeniden oluşturmak için gereken gerçekleri paylaşın. Seçilen trafiği protokol özetleri, redaksiyon önizlemeleri ve bir ekip arkadaşının denetleyebileceği kaynak destekli bağlamla paketleyin.
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### Protokole Duyarlı Kurallar
-
-Rockxy'nin halihazırda çalıştığı yerlerde AI ve Web3 meta verilerini kullanın: filtreler, rozetler, isteğe bağlı sütunlar, karşılaştırma, kurallar, Geliştirici Kurulumu ve yerel MCP özetleri.
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### Ekip Paylaşımı ve İşbirliği `Yakında`
 
@@ -309,7 +312,7 @@ Yakalanan bir oturumu tek tıklamayla bir ekip arkadaşınıza gönderin. Başar
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> %100 yerel macOS. Elektron yok. Web görünümü yok. SwiftUI + AppKit + SwiftNIO.
+> Yerel macOS uygulama kabuğu — Electron yok. SwiftUI + AppKit + SwiftNIO, WebKit yalnızca HTML gövde önizlemesi için kullanılır.
 
 ## Hızlı Başlangıç
 
@@ -332,12 +335,15 @@ Rockxy'yi kurulumdan sonra yerel bir MCP istemcisine bağlamak istiyorsanız, bk
 | **Proje modeli** | AGPL-3.0 açık kaynak projesi | Tescilli ticari uygulama | Tescilli ticari uygulama |
 | **Kaynak kodu** | Herkese açık, denetlenebilir, çatallanabilir | Kapalı kaynak | Kapalı kaynak |
 | **Kaynaktan derle** | Bu depodan Xcode ile ücretsiz | Herkese açık kaynakta mevcut değil | Herkese açık kaynakta mevcut değil |
-| **Yerel macOS temeli** | Swift + SwiftNIO + SwiftUI/AppKit | Yerel macOS ticari uygulaması | Platformlar arası ticari uygulama |
+| **Yerel macOS temeli** | Swift + SwiftNIO + SwiftUI/AppKit | Kapalı kaynak yerel macOS uygulaması | Kapalı kaynak platformlar arası uygulama |
 | **Yerel öncelikli yakalama** | Yerel proxy, sertifikalar, yardımcı ve yakalama verileri Mac'inizde kalır | Masaüstü proxy uygulaması | Masaüstü proxy uygulaması |
-| **Geliştirici kurulumu iş akışı** | Çalışma zamanları, istemciler, cihazlar, çerçeveler ve ortamlar için yerleşik Geliştirici Kurulum Merkezi | Ürüne özel kurulum kılavuzu | Ürüne özel kurulum kılavuzu |
-| **Harici proxy + PAC yönlendirme** | HTTP/HTTPS yukarı akış proxy'si, PAC otomatik yapılandırması ve kuralları atlama | Olgun ticari proxy araçları | Olgun ticari proxy araçları |
-| **MCP/yerel otomasyon köprüsü** | Yerleşik, belirteç kimlik doğrulamalı, varsayılan olarak redaksiyon | İncelenen herkese açık belgelerde hak talebinde bulunulmadı | İncelenen herkese açık belgelerde hak talebinde bulunulmadı |
-| **Katkı yolunu aç** | Kamuya açık konular, tartışmalar, yol haritası ve halkla ilişkiler | Satıcı kontrollü ürün | Satıcı kontrollü ürün |
+| **Geliştirici kurulumu iş akışı** | Çalışma zamanları, istemciler, cihazlar, çerçeveler ve ortamlar için yerleşik Geliştirici Kurulum Merkezi | Yerleşik otomatik kurulum ile platform ve çalışma zamanı kılavuzları | Platforma özel kurulum kılavuzları |
+| **Harici proxy + PAC yönlendirme** | HTTP/HTTPS yukarı akış proxy'si, PAC otomatik yapılandırması ve bypass kuralları | Ticari yukarı akış proxy'si ve PAC desteği | Ticari yukarı akış proxy yapılandırması |
+| **MCP entegrasyonu** | [Yerleşik yerel MCP](docs/features/mcp.mdx): trafik, durum, sertifikalar, kural incelemesi ve cURL dışa aktarma için 10 salt okunur araç; token ile kimlik doğrulama; redaction varsayılan olarak açık | Yerleşik yerel MCP: trafik incelemesiyle birlikte kural, oturum, sertifika, kurulum ve uygulama kontrol araçları; yalnızca localhost; oturum başına token kimlik doğrulaması; hassas veri redaction | 2026-08-13'te incelenen [resmi belgelerde](https://www.charlesproxy.com/documentation/) birinci taraf MCP entegrasyonu bulunamadı |
+| **Yerel AI Assistant** | Rockxy içinde seçili istek ve çoklu istek trafik analizi için yerleşik | Bilinmiyor | Bilinmiyor |
+| **Açık katkı yolu** | Herkese açık kaynak, issue'lar, tartışmalar, yol haritası ve PR'lar | Herkese açık issue izleyici; uygulama kaynağı ve sürümler satıcı tarafından kontrol edilir | Satıcı belgeleri ve desteği; uygulama kaynağı ve sürümler satıcı tarafından kontrol edilir |
+
+Yukarıdaki rakip yetenekleri 2026-08-13'te resmi ürün belgeleriyle karşılaştırılarak doğrulanmıştır ve yayınlandıktan sonra değişebilir.
 
 Yol haritasında: daha derin protocol-aware rules, daha güvenli redacted evidence bundle, güçlü replay/comparison workflow, daha kapsamlı Developer Setup rehberleri ve devam eden HTTP/2/HTTP/3 araştırması.
 
@@ -387,7 +393,7 @@ Bkz. **[KATKIDA BULUNAN.md](CONTRIBUTING.md)** kurulum talimatları, kod stili v
 
 ## Sponsorlar ve Ortaklar
 
-Rockxy bağımsız geliştiriciler tarafından oluşturulmuş ve bakımı yapılmıştır. Sponsorluklar sürekli geliştirmeyi, güvenlik denetimlerini ve yeni özellikleri finanse eder.
+Rockxy bağımsız olarak sürdürülmektedir. Sponsorluklar sürekli geliştirmeyi, sürüm altyapısını, dokümantasyonu ve güvenlik çalışmalarını finanse etmeye yardımcı olur.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">

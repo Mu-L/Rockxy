@@ -37,7 +37,7 @@
 <p align="center">
   يمكنك اعتراض حركة مرور HTTP/HTTPS/WebSocket/GraphQL وفحصها وتعديلها باستخدام تطبيق Swift أصلي يمكنك فحصه وإنشاؤه والوثوق به.<br>
   تم تصميمه لسير عمل تصحيح الأخطاء في عصر API والهواتف المحمولة وMCP والذكاء الاصطناعي وعصر blockchain مع تطور Rockxy.<br>
-  بديل محلي أول، AGPL-3.0 لـ <a href="#rockxy-vs-alternatives">بروكسيمان وتشارلز بروكسي</a>.
+  بديل local-first بترخيص AGPL-3.0 لـ <a href="#rockxy-مقابل-البدائل">Proxyman و Charles Proxy</a>.
 </p>
 
 <p align="center">
@@ -78,10 +78,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## أبرز الفروع الحالية
 
-- يوفر AI Assistant تحليلًا محليًا أو عبر نموذج Ollama/provider بعد Review Data؛ ويضيف الشريط الجانبي Focus Sets وNoise Control؛ وتستخدم مساحة العمل split views أصلية؛ كما أصبح فحص AI/Web3 وx402 سلوكًا حاليًا.
+- يحقق AI Assistant الآن في طلب واحد أو أكثر من الطلبات المحددة باستخدام تحليل محلي مدمج أو نموذج Ollama/provider مُعد اختياريًا، مع تأكيد Review Data صريح، وتنقيح محدود، واستجابات بث، وكشف الأدلة، وعمليات handoff يبدأها المستخدم.
+- يتضمن الشريط الجانبي الأصلي الآن Focus Sets قابلة لإعادة الاستخدام لنطاقات app/domain/path بالإضافة إلى Noise Control على مستوى مساحة العمل يخفي النطاقات أو المسارات المطابقة دون إيقاف الالتقاط.
+- تستخدم مساحة العمل الرئيسية الآن split views أصلية عمودية وأفقية لـ Context Dock والمفتش السفلي، مع الحفاظ على فواصل بكامل الارتفاع، وفواصل toolbar/footer منسقة، وإعادة تحجيم تلقائية للتخطيط.
 - يشتمل Upstream Proxy الآن على تكوين الوكيل التلقائي المجاني/الأساسي مع توجيه عنوان URL لـ PAC `DIRECT` وHTTP وHTTPS مع الحفاظ على SOCKS5 وحدود سياسة المصادقة الحالية.
 - تغطي مسارات عمل التصدير الآن OpenAPI YAML/HTML ونشر Gist لحركة المرور المحددة مع إنشاء حمولة قابلة للتنقيح.
 - تتضمن أدوات المفتش الآن تصفية JSONPath/المفتاح/القيمة ومعاينات سريعة لنص الحمولة النافعة المحدد مثل JWTs.
+- يضيف فحص حركة AI وWeb3 الآن تسميات البروتوكول وعلامات تبويب المفتش وملخصات التصحيح لاستدعاءات النماذج المعترف بها وحركة JSON-RPC وتلميحات الدفع بأسلوب x402.
 - يعكس إعداد مطور Node.js الآن العميل المحدد أثناء التحقق من الصحة ويحتوي على نموذج دليل أكمل للمضيف المحلي.
 - يغطي Developer Setup Hub الآن أوقات التشغيل والمتصفحات والعملاء والأجهزة والأطر والبيئات باستخدام مقتطفات خاصة بالهدف ومراقبي التحقق من الصحة ومحتوى الدليل الصادق.
 - يتضمن فحص WebSocket binary-frame الآن heuristic محدودة وعند الطلب لتنسيق Protobuf wire-format دون إضافة decoder work إلى capture hot path.
@@ -127,7 +130,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-اسمح لـ Claude Desktop أو Cursor بقراءة حركة المرور التي تم التقاطها من خلال خادم MCP محلي. اسأل "لماذا فعل هذا 500؟" بدلاً من لصق الرؤوس في الدردشة. محلية، واعية بالتنقيح، ومفتوحة المصدر.
+اسمح لـ Claude Desktop أو Cursor بفحص حركة المرور التي تم التقاطها عبر عشر أدوات للقراءة فقط في خادم MCP المحلي لـ Rockxy. اسأل "لماذا فعل هذا 500؟" بدلاً من لصق الرؤوس في الدردشة. التنفيذ مفتوح المصدر، ومصادق عليه بالرمز المميز، ويحافظ على تنقيح البيانات الحساسة مفعّلًا افتراضيًا.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -205,11 +208,11 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### رؤوس الطلبات والاستجابة المخصصة
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-تجاوز الرؤوس لكل مضيف مع التحكم الكامل في كلتا المرحلتين. أدخل رموز المصادقة المميزة في الطلبات الصادرة، أو قم بإزالة Set-Cookie من الاستجابات، أو قم بتثبيت وكيل مستخدم مخصص - يتم حفظه كقواعد مسماة يمكنك تبديلها في أي وقت.
+قم بترقية أي رأس طلب أو استجابة إلى عمود من الدرجة الأولى في جدول حركة المرور. أبقِ مصادر الطلب والاستجابة منفصلة، واحفظ الرؤوس التي تهمك، ثم تصفح request IDs وtrace IDs وحالة ذاكرة التخزين المؤقت أو البيانات الوصفية المخصصة دون فتح كل مفتش.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### ظروف الشبكة
 
@@ -223,15 +226,15 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-أعد بناء أي طلب HTTP تم التقاطه - قم بتغيير الطريقة أو عنوان URL أو الرؤوس أو معلمات الاستعلام أو النص - وأعد الإرسال دون مغادرة Rockxy. لا توجد حلقة ساعي البريد أو الأرق أو حلقة النسخ واللصق. قم بالتكرار على مطالبات LLM أو تشويش حدود المصادقة أو إعادة إنتاج حالة فاشلة لنقاط نهاية OpenAI وAnthropic وCohere في ثوانٍ.
+أعد بناء أي طلب HTTP تم التقاطه - قم بتغيير الطريقة أو عنوان URL أو الرؤوس أو معلمات الاستعلام أو النص - وأعد الإرسال دون مغادرة Rockxy. لا حلقة نسخ ولصق إلى Postman أو Insomnia أو curl. قم بالتكرار على مطالبات LLM أو تشويش حدود المصادقة أو إعادة إنتاج حالة فاشلة لنقاط نهاية OpenAI وAnthropic وCohere في ثوانٍ.
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### قارن
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-قم بتجميع استجابتين تم التقاطهما جنبًا إلى جنب وحدد كل حقل تم قلبه - الحالة، والرؤوس، ومفاتيح JSON، ووحدات البايت الأساسية. احصل على انحدارات واجهة برمجة التطبيقات الصامتة، ومخرجات LLM غير الحتمية، والانجراف السريع دون توصيل أي شيء إلى أداة فرق تابعة لجهة خارجية. يسلط الاختلاف جنبًا إلى جنب الضوء على ما تغير؛ تتجاهل مقارنة JSON العميقة ترتيب المفاتيح.
+قم بتجميع معاملتين تم التقاطهما أو حمولتين ملصقتين جنبًا إلى جنب وحدد كل حقل تغير - الحالة والرؤوس ومفاتيح JSON أو وحدات بايت النص. احصل على انحدارات واجهة برمجة التطبيقات الصامتة، ومخرجات LLM غير الحتمية، وانحراف المطالبات (prompt drift) دون توصيل أي شيء إلى أداة فرق تابعة لجهة خارجية.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -255,7 +258,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="تعرض مساحات عمل Rockxy متعددة علامات التبويب طرق عرض تمت تصفيتها بشكل مستقل لنفس الالتقاط المباشر" width="820" />
 
-احتفظ بعروض تحقيق مستقلة جنبًا إلى جنب لنفس الالتقاط المباشر. لكل علامة تبويب عوامل التصفية والفرز والتحديد ونطاق الشريط الجانبي وحالة المفتش الخاصة بها، مع مشاركة الوكيل والمعاملات الملتقطة.
+احتفظ بعروض تحقيق مستقلة جنبًا إلى جنب لنفس الالتقاط المباشر — علامة تبويب لحركة staging، وواحدة للإنتاج، وواحدة لتدفق جهاز iOS. لكل علامة تبويب عوامل التصفية والفرز والتحديد ونطاق الشريط الجانبي وحالة المفتش الخاصة بها، مع مشاركة الوكيل والمعاملات الملتقطة.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -273,19 +276,19 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ### فحص حركة الذكاء الاصطناعي
 
-اجعل حركة مرور النموذج أسهل في تصحيح الأخطاء داخل سير عمل الالتقاط العادي. اكتشف طلبات الذكاء الاصطناعي، وافحص مكالمات النماذج المحددة، وتشخيص استجابات البث، وقارن سلوك المطالبة/الإخراج، وفهم سلاسل استدعاء الأدوات دون لصق الحمولات الحساسة في خدمة أخرى.
+يكتشف Rockxy طلبات AI المعترف بها ضمن سير عمل الالتقاط العادي. افحص استدعاءات النماذج المحددة، وحالة البث، وحقول usage عند توفرها، والتحذيرات، وretrieval hints، وملخصات tool-call دون لصق حمولات حساسة في خدمة أخرى.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### فحص Web3/RPC
 
-تحويل مكالمات الشبكة في عصر blockchain إلى أدلة تصحيح قابلة للقراءة. افحص حركة مرور JSON-RPC وSolana RPC، وقم بتجميع الاستدعاءات ذات الصلة في التدفقات، وشرح أخطاء RPC الشائعة، وأعد تشغيل الطلبات المحددة دون أن تصبح محفظة أو مستكشف حظر.
+يحوّل Rockxy مكالمات الشبكة في عصر blockchain إلى أدلة تصحيح قابلة للقراءة. افحص حركة HTTP JSON-RPC بأسلوب EVM وSolana مع provider host وrequest ID وmethod وbatch summary وerror وchain وtransaction وpayload وdebug-intent، دون تحويل Rockxy إلى محفظة أو مستكشف كتل.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### تلميحات تدفق الدفع x402
 
-فهم تدفقات HTTP ذات بوابات الدفع من طبقة الشبكة. قم بتمييز الاستجابات المطلوبة للدفع، واتبع مسار إعادة المحاولة، واحتفظ بدليل تصحيح الأخطاء محليًا وقابلاً للتنقيح.
+يبرز Rockxy تلميحات payment-required والموجهة نحو إعادة المحاولة حتى تصبح تدفقات HTTP ذات بوابات الدفع مفهومة من طبقة الشبكة، بينما تبقى أدلة التصحيح محلية وقابلة للتنقيح.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -293,17 +296,17 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 تصف الأقسام التالية الاتجاه العام، وليس السلوك الحالي.
 
+### القواعد المدركة للبروتوكول
+
+يمكن لـ Rockxy اليوم بالفعل تسمية وفحص حركة AI وWeb3. تظل مطابقة القواعد الأعمق حسب model أو tool call أو طريقة JSON-RPC أو chain أو transaction hash أو batch subcall عملاً مستقبليًا؛ ولا تزال أدوات تعديل حركة المرور الحالية تطابق URL وطريقة HTTP والرؤوس.
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### حزم الأدلة المنقحة `قريبًا`
 
 شارك الحقائق اللازمة لإعادة إنتاج الخلل دون تسريب الأسرار. قم بتعبئة حركة المرور المحددة بملخصات البروتوكول ومعاينات التنقيح والسياق المدعوم بالمصدر الذي يمكن لزميل الفريق تدقيقه.
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### القواعد المدركة للبروتوكول
-
-استخدم بيانات تعريف AI وWeb3 حيث يعمل Rockxy بالفعل: المرشحات والشارات والأعمدة الاختيارية والمقارنة والقواعد وإعداد المطور وملخصات MCP المحلية.
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### مشاركة الفريق والتعاون `قريبًا`
 
@@ -311,7 +314,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> نظام التشغيل macOS الأصلي بنسبة 100%. لا إلكترون. لا توجد مشاهدات على شبكة الإنترنت. SwiftUI + AppKit + SwiftNIO.
+> غلاف تطبيق macOS أصلي — بلا Electron. SwiftUI + AppKit + SwiftNIO، مع استخدام WebKit فقط لمعاينة جسم HTML.
 
 ## بداية سريعة
 
@@ -334,12 +337,15 @@ open Rockxy.xcodeproj
 | **نموذج المشروع** | AGPL-3.0 مشروع مفتوح المصدر | التطبيق التجاري الخاص | التطبيق التجاري الخاص |
 | **كود المصدر** | عام، قابل للتدقيق، قابل للتشعب | مصدر مغلق | مصدر مغلق |
 | **البناء من المصدر** | مجانًا مع Xcode من هذا الريبو | غير متوفر من مصدر عام | غير متوفر من مصدر عام |
-| **أساس macOS الأصلي** | سويفت + SwiftNIO + SwiftUI/AppKit | تطبيق macOS التجاري الأصلي | تطبيق تجاري متعدد المنصات |
+| **أساس macOS الأصلي** | سويفت + SwiftNIO + SwiftUI/AppKit | تطبيق macOS أصلي مغلق المصدر | تطبيق متعدد المنصات مغلق المصدر |
 | **الالتقاط المحلي الأول** | يبقى الوكيل المحلي والشهادات والمساعد وبيانات الالتقاط على جهاز Mac الخاص بك | تطبيق وكيل سطح المكتب | تطبيق وكيل سطح المكتب |
-| **سير عمل إعداد المطور** | مركز إعداد المطور المدمج لأوقات التشغيل والعملاء والأجهزة والأطر والبيئات | إرشادات الإعداد الخاصة بالمنتج | إرشادات الإعداد الخاصة بالمنتج |
-| **الوكيل الخارجي + توجيه PAC** | وكيل HTTP/HTTPS الرئيسي، والتكوين التلقائي لـ PAC، وقواعد التجاوز | أدوات الوكيل التجارية الناضجة | أدوات الوكيل التجارية الناضجة |
-| **MCP/جسر الأتمتة المحلية** | مدمج، ومصادق عليه بالرمز، ويتم التنقيح بشكل افتراضي | لم تتم المطالبة بها في المستندات العامة التي تمت مراجعتها | لم تتم المطالبة بها في المستندات العامة التي تمت مراجعتها |
-| **فتح مسار المساهمة** | القضايا العامة والمناقشات وخارطة الطريق والعلاقات العامة | المنتج الذي يسيطر عليه البائع | المنتج الذي يسيطر عليه البائع |
+| **سير عمل إعداد المطور** | مركز إعداد المطور المدمج لأوقات التشغيل والعملاء والأجهزة والأطر والبيئات | إعداد تلقائي مدمج بالإضافة إلى أدلة المنصة ووقت التشغيل | أدلة إعداد خاصة بالمنصة |
+| **الوكيل الخارجي + توجيه PAC** | وكيل HTTP/HTTPS الرئيسي، والتكوين التلقائي لـ PAC، وقواعد التجاوز | وكيل رئيسي تجاري ودعم PAC | تكوين وكيل رئيسي تجاري |
+| **تكامل MCP** | [MCP محلي مدمج](docs/features/mcp.mdx): 10 أدوات للقراءة فقط لحركة المرور والحالة والشهادات وفحص القواعد وتصدير cURL؛ مصادق عليه بالرمز المميز؛ التنقيح مفعّل افتراضيًا | MCP محلي مدمج: فحص حركة المرور بالإضافة إلى أدوات القواعد والجلسات والشهادات والإعداد والتحكم في التطبيق؛ localhost فقط؛ مصادقة بالرمز المميز لكل جلسة؛ تنقيح البيانات الحساسة | لم يُعثر على تكامل MCP من الطرف الأول في [الوثائق الرسمية](https://www.charlesproxy.com/documentation/) التي تمت مراجعتها في 2026-08-13 |
+| **AI Assistant أصلي** | مدمج لتحليل حركة المرور للطلب المحدد والطلبات المتعددة داخل Rockxy | غير معروف | غير معروف |
+| **فتح مسار المساهمة** | مصدر عام، issues، مناقشات، خارطة طريق، وPRs | متعقب issue عام؛ مصدر التطبيق والإصدارات يتحكم فيهما البائع | وثائق ودعم البائع؛ مصدر التطبيق والإصدارات يتحكم فيهما البائع |
+
+تم التحقق من قدرات المنافسين أعلاه مقابل وثائق المنتج الرسمية في 2026-08-13 وقد تتغير بعد النشر.
 
 على خريطة الطريق: قواعد أعمق مدركة للبروتوكول، وحزم أدلة منقحة أكثر أمانًا، وسير عمل أقوى لإعادة التشغيل والمقارنة، وأدلة Developer Setup أوسع، وبحث مستمر في HTTP/2 وHTTP/3.
 
@@ -389,7 +395,7 @@ open Rockxy.xcodeproj
 
 ## الرعاة والشركاء
 
-تم إنشاء Rockxy وصيانته بواسطة مطورين مستقلين. تمول الرعاية التطوير المستمر وعمليات التدقيق الأمني ​​والميزات الجديدة.
+تتم صيانة Rockxy بشكل مستقل. تساعد الرعاية في تمويل التطوير المستمر، وبنية الإصدارات التحتية، والتوثيق، وأعمال الأمان.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -437,7 +443,7 @@ open Rockxy.xcodeproj
 ---
 
 <p align="center">
-  <sub>صنع بواسطة <a href="https://github.com/LocNguyenHuu">ستيفن</a>. تم تصميمه باستخدام Swift وSwiftNIO وSwiftUI وAppKit.</sub>
+  <sub>صنع بواسطة <a href="https://github.com/LocNguyenHuu">Stephen</a>. تم تصميمه باستخدام Swift وSwiftNIO وSwiftUI وAppKit.</sub>
 </p>
 
 </div>

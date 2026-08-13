@@ -35,7 +35,7 @@
 <p align="center">
   Onderschep, inspecteer en wijzig HTTP/HTTPS/WebSocket/GraphQL-verkeer met een native Swift-app die u kunt inspecteren, bouwen en vertrouwen.<br>
   Gebouwd voor API-, mobiele, MCP-ondersteunde, AI- en debugging-workflows uit het blockchain-tijdperk naarmate Rockxy evolueert.<br>
-  Een lokaal-eerst AGPL-3.0-alternatief voor <a href="#rockxy-vs-alternatives">Proxyman en Charles Proxy</a>.
+  Een local-first, AGPL-3.0-alternatief voor <a href="#rockxy-versus-alternatieven">Proxyman en Charles Proxy</a>.
 </p>
 
 <p align="center">
@@ -76,10 +76,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Hoogtepunten van de huidige vestiging
 
-- AI Assistant biedt lokale analyse of een Ollama/provider-model na Review Data; de sidebar heeft Focus Sets en Noise Control; de workspace gebruikt native split views; en AI/Web3/x402-inspectie is huidig gedrag.
+- AI Assistant onderzoekt nu een of meer geselecteerde requests met ingebouwde lokale analyse of een optioneel geconfigureerd Ollama/provider-model, met expliciete Review Data-bevestiging, begrensde redactie, streaming-antwoorden, evidence reveal en door de gebruiker gestarte handoffs.
+- De native sidebar heeft nu herbruikbare Focus Sets voor app/domain/path-scopes plus workspace-brede Noise Control die overeenkomende domains of paths verbergt zonder de capture te stoppen.
+- De hoofd-workspace gebruikt nu native verticale en horizontale split views voor de Context Dock en de onderste inspector, met volledige-hoogte dividers, afgestemde toolbar/footer-separators en automatische lay-outaanpassing.
 - Upstream Proxy bevat nu gratis/kern automatische proxyconfiguratie met PAC URL-routering voor `DIRECT`, HTTP- en HTTPS-routes terwijl de bestaande SOCKS5- en authenticatiebeleidsgrenzen behouden blijven.
 - Exportworkflows omvatten nu OpenAPI YAML/HTML en Gist-publicatie met geselecteerd verkeer met redactiebewuste payload-opbouw.
 - Inspector-tools omvatten nu JSONPath/key/value-filtering en snelle voorbeelden voor geselecteerde payload-tekst zoals JWT's.
+- AI- en Web3-verkeersinspectie voegt nu protocollabels, inspectortabbladen en debug-samenvattingen toe voor herkende modelaanroepen, JSON-RPC-verkeer en x402-achtige betalingshints.
 - Node.js Developer Setup weerspiegelt nu de geselecteerde client tijdens de validatie en heeft een volledigere localhost-voorbeeldgids.
 - Developer Setup Hub omvat nu runtimes, browsers, clients, apparaten, frameworks en omgevingen met doelspecifieke fragmenten, validatiewatchers en eerlijke gidsinhoud.
 - De inspectie van binaire WebSocket-frames bevat nu begrensde, on-demand Protobuf wire-format-heuristieken zonder decoder work aan het capture hot path toe te voegen.
@@ -125,7 +128,7 @@ Selecteer een of meer vastgelegde requests en vraag wat er gebeurde, wat mislukt
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Laat Claude Desktop of Cursor uw vastgelegde verkeer lezen via een lokale MCP-server. Vraag "waarom deed deze 500?" in plaats van headers in de chat te plakken. Lokaal, redactiebewust en open source.
+Laat Claude Desktop of Cursor uw vastgelegde verkeer inspecteren via tien alleen-lezen tools in de lokale MCP-server van Rockxy. Vraag "waarom deed deze 500?" in plaats van headers in de chat te plakken. De implementatie is open source, token-geauthenticeerd en houdt redactie van gevoelige gegevens standaard ingeschakeld.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -203,11 +206,11 @@ Voeg headers toe, verwijder of vervang ze op elke host zonder opnieuw te impleme
 
 ### Aangepaste verzoek- en antwoordheaders
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Overschrijf headers per host met volledige controle over beide fasen. Injecteer auth-tokens op uitgaande verzoeken, verwijder Set-Cookie op antwoorden of maak een aangepaste User-Agent vast – opgeslagen als benoemde regels die u op elk gewenst moment kunt wijzigen.
+Promoveer elke verzoek- of antwoordheader tot een eersteklas kolom in de verkeerstabel. Houd verzoek- en antwoordbronnen gescheiden, bewaar de headers die u belangrijk vindt en scan vervolgens request-ID's, trace-ID's, cachestatus of eigen metadata zonder elke inspector te openen.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Netwerkvoorwaarden
 
@@ -221,15 +224,15 @@ Geef gas naar 3G, EDGE, LTE, WiFi of een aangepaste vertraging. Je laptop beschi
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-Herbouw elk vastgelegd HTTP-verzoek (wijzig de methode, URL, headers, queryparameters of hoofdtekst) en verzend het opnieuw zonder Rockxy te verlaten. Geen postbode, slapeloosheid of curl-copy-paste-lus. Herhaal LLM-prompts, vervaag verificatiegrenzen of reproduceer binnen enkele seconden een falende case voor OpenAI-, Anthropic- en Cohere-eindpunten.
+Herbouw elk vastgelegd HTTP-verzoek (wijzig de methode, URL, headers, queryparameters of hoofdtekst) en verzend het opnieuw zonder Rockxy te verlaten. Geen kopieer-plak-lus naar Postman, Insomnia of curl. Herhaal LLM-prompts, fuzz verificatiegrenzen of reproduceer binnen enkele seconden een falende case voor OpenAI-, Anthropic- en Cohere-eindpunten.
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### Vergelijk
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Stapel twee vastgelegde reacties naast elkaar en ontdek elk veld dat omdraaide: status, headers, JSON-sleutels, bodybytes. Vang stille API-regressies, niet-deterministische LLM-uitvoer en prompt-drift op zonder iets in een diff-tool van derden te verwerken. Side-by-side diff benadrukt wat er is veranderd; diepe JSON-vergelijking negeert de sleutelvolgorde.
+Stapel twee vastgelegde transacties of geplakte payloads naast elkaar en ontdek elk veld dat is veranderd: status, headers, JSON-sleutels of bodybytes. Vang stille API-regressies, niet-deterministische LLM-uitvoer en prompt-drift op zonder iets in een diff-tool van derden te verwerken.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -253,7 +256,7 @@ Sla sessies op, import/exporteer HAR voor cross-tool overdracht, kopieer elk ver
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Rockxy multi-tab-workspaces met onafhankelijk gefilterde weergaven van dezelfde live capture" width="820" />
 
-Houd onafhankelijke onderzoeksweergaven van dezelfde live capture naast elkaar. Elk tabblad behoudt eigen filters, sortering, selectie, sidebar-scope en inspectorstatus, terwijl proxy en vastgelegde transacties worden gedeeld.
+Houd onafhankelijke onderzoeksweergaven van dezelfde live capture naast elkaar — één tabblad voor staging-verkeer, één voor productie en één voor een iOS-apparaatstroom. Elk tabblad behoudt eigen filters, sortering, selectie, sidebar-scope en inspectorstatus, terwijl proxy en vastgelegde transacties worden gedeeld.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -271,19 +274,19 @@ Rockxy biedt protocolbewuste inspectie voor AI, Web3 RPC en x402 binnen de norma
 
 ### AI Verkeersinspectie
 
-Maak het eenvoudiger om modelverkeer te debuggen binnen de normale vastlegworkflow. Detecteer AI-verzoeken, inspecteer geselecteerde modelaanroepen, diagnosticeer streamingreacties, vergelijk prompt-/uitvoergedrag en begrijp de ketens van toolaanroepen zonder gevoelige payloads in een andere service te plakken.
+Rockxy detecteert herkende AI-verzoeken binnen de normale capture-workflow. Inspecteer geselecteerde modelaanroepen, streaming-status, usage-velden indien aanwezig, waarschuwingen, retrieval hints en tool-call-samenvattingen zonder gevoelige payloads in een andere service te plakken.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC-inspectie
 
-Verander netwerkoproepen uit het blockchain-tijdperk in leesbaar bewijs voor foutopsporing. Inspecteer JSON-RPC- en Solana RPC-verkeer, groepeer gerelateerde oproepen in stromen, leg veelvoorkomende RPC-fouten uit en speel geselecteerde verzoeken opnieuw af zonder een portemonnee of blokverkenner te worden.
+Rockxy verandert netwerkoproepen uit het blockchain-tijdperk in leesbaar bewijs voor foutopsporing. Inspecteer EVM- en Solana-achtig HTTP JSON-RPC-verkeer met provider host, request ID, method, batch summary, error, chain, transaction, payload en debug-intent-detail, zonder Rockxy in een wallet of block explorer te veranderen.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### x402 Payment Flow Hints
 
-Begrijp betalingsgestuurde HTTP-stromen vanuit de netwerklaag. Markeer betalingsvereiste reacties, volg het pad voor nieuwe pogingen en houd het foutopsporingsbewijs lokaal en redactiebewust.
+Rockxy markeert payment-required en op retry gerichte hints, zodat payment-gated HTTP-stromen begrijpelijk zijn vanuit de netwerklaag, terwijl het debugbewijs lokaal en redaction-aware blijft.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -291,17 +294,17 @@ Begrijp betalingsgestuurde HTTP-stromen vanuit de netwerklaag. Markeer betalings
 
 De volgende secties beschrijven de openbare richting, niet het huidige gedrag.
 
+### Protocolbewuste regels
+
+Rockxy kan AI- en Web3-verkeer vandaag al labelen en inspecteren. Diepere regelmatching op model, tool call, JSON-RPC-method, chain, transaction hash of batch subcall blijft toekomstig werk; de huidige verkeerswijzigingstools matchen nog steeds URL, HTTP-method en headers.
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### Geredigeerde bewijsbundels `Binnenkort`
 
 Deel de feiten die nodig zijn om een bug te reproduceren zonder geheimen te lekken. Verpak geselecteerd verkeer met protocolsamenvattingen, redactievoorbeelden en broncontext die een teamgenoot kan controleren.
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### Protocolbewuste regels
-
-Gebruik AI- en Web3-metagegevens waar Rockxy al werkt: filters, badges, optionele kolommen, vergelijking, regels, ontwikkelaarsinstellingen en lokale MCP-samenvattingen.
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### Team delen en samenwerken `Binnenkort`
 
@@ -309,7 +312,7 @@ Stuur een vastgelegde sessie met één klik naar een teamgenoot. Annoteer falend
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% native macOS. Geen Elektron. Geen webweergaven. SwiftUI + AppKit + SwiftNIO.
+> Native macOS-app-shell — geen Electron. SwiftUI + AppKit + SwiftNIO, met WebKit alleen gebruikt voor HTML-body-preview.
 
 ## Snel beginnen
 
@@ -332,12 +335,15 @@ Als je Rockxy na de installatie met een lokale MCP-client wilt verbinden, zie da
 | **Projectmodel** | AGPL-3.0 open source-project | Eigen commerciële app | Eigen commerciële app |
 | **Broncode** | Openbaar, controleerbaar, forkeerbaar | Gesloten bron | Gesloten bron |
 | **Bouw vanuit de bron** | Gratis bij Xcode uit deze repository | Niet beschikbaar via openbare bron | Niet beschikbaar via openbare bron |
-| **Native macOS-basis** | Swift + SwiftNIO + SwiftUI/AppKit | Native commerciële macOS-app | Platformoverschrijdende commerciële app |
+| **Native macOS-basis** | Swift + SwiftNIO + SwiftUI/AppKit | Native macOS-app met gesloten bron | Platformoverschrijdende app met gesloten bron |
 | **Lokale eerste opname** | Lokale proxy, certificaten, helper en vastgelegde gegevens blijven op uw Mac | Desktop proxy-app | Desktop proxy-app |
-| **Werkstroom voor het instellen van ontwikkelaars** | Ingebouwde Developer Setup Hub voor runtimes, clients, apparaten, frameworks en omgevingen | Productspecifieke installatierichtlijnen | Productspecifieke installatierichtlijnen |
-| **Externe proxy + PAC-routering** | HTTP/HTTPS upstream-proxy, automatische PAC-configuratie en bypass-regels | Volwassen commerciële proxy-tooling | Volwassen commerciële proxy-tooling |
-| **MCP/lokale automatiseringsbrug** | Standaard ingebouwde, token-geauthenticeerde redactie | Niet geclaimd in openbare documenten die zijn beoordeeld | Niet geclaimd in openbare documenten die zijn beoordeeld |
-| **Open bijdragepad** | Publieke kwesties, discussies, routekaart en PR's | Leveranciergestuurd product | Leveranciergestuurd product |
+| **Werkstroom voor het instellen van ontwikkelaars** | Ingebouwde Developer Setup Hub voor runtimes, clients, apparaten, frameworks en omgevingen | Ingebouwde automatische installatie plus platform- en runtime-gidsen | Platformspecifieke installatiegidsen |
+| **Externe proxy + PAC-routering** | HTTP/HTTPS upstream-proxy, automatische PAC-configuratie en bypass-regels | Commerciële upstream-proxy en PAC-ondersteuning | Commerciële upstream-proxyconfiguratie |
+| **MCP-integratie** | [Ingebouwde lokale MCP](docs/features/mcp.mdx): 10 alleen-lezen tools voor verkeer, status, certificaten, regelinspectie en cURL-export; token-geauthenticeerd; redactie standaard aan | Ingebouwde lokale MCP: verkeersinspectie plus tools voor regels, sessie, certificaat, installatie en app-besturing; alleen localhost; token-authenticatie per sessie; redactie van gevoelige gegevens | Geen eigen MCP-integratie gevonden in de op 2026-08-13 beoordeelde [officiële documentatie](https://www.charlesproxy.com/documentation/) |
+| **Native AI Assistant** | Ingebouwd voor verkeersanalyse van geselecteerd verzoek en meerdere verzoeken binnen Rockxy | Onbekend | Onbekend |
+| **Open bijdragepad** | Openbare bron, issues, discussies, roadmap en PR's | Openbare issue-tracker; applicatiebron en releases worden beheerd door de leverancier | Documentatie en ondersteuning van de leverancier; applicatiebron en releases worden beheerd door de leverancier |
+
+De bovenstaande mogelijkheden van concurrenten zijn op 2026-08-13 geverifieerd aan de hand van officiële productdocumentatie en kunnen na publicatie veranderen.
 
 Op de routekaart: diepere protocolbewuste regels, veiligere geredigeerde bewijsbundels, sterkere replay- en vergelijkingsworkflows, bredere Developer Setup-gidsen en doorlopend onderzoek naar HTTP/2 en HTTP/3.
 
@@ -387,7 +393,7 @@ Goede eerste nummers zijn gelabeld [`good first issue`](https://github.com/Rockx
 
 ## Sponsoren & Partners
 
-Rockxy wordt gebouwd en onderhouden door onafhankelijke ontwikkelaars. Sponsoring financiert voortdurende ontwikkeling, beveiligingsaudits en nieuwe functies.
+Rockxy wordt onafhankelijk onderhouden. Sponsoring helpt de voortdurende ontwikkeling, release-infrastructuur, documentatie en beveiligingswerk te financieren.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -435,5 +441,5 @@ Rockxy wordt fiscaal gehost door [Open Source Collective](https://docs.oscollect
 ---
 
 <p align="center">
-  <sub>Gemaakt door <a href="https://github.com/LocNguyenHuu">Stefanus</a>. Gebouwd met Swift, SwiftNIO, SwiftUI en AppKit.</sub>
+  <sub>Gemaakt door <a href="https://github.com/LocNguyenHuu">Stephen</a>. Gebouwd met Swift, SwiftNIO, SwiftUI en AppKit.</sub>
 </p>

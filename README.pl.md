@@ -35,7 +35,7 @@
 <p align="center">
   Przechwytuj, sprawdzaj i modyfikuj ruch HTTP/HTTPS/WebSocket/GraphQL za pomocą natywnej aplikacji Swift, którą możesz sprawdzać, budować i której możesz ufać.<br>
   Stworzony z myślą o przepływach pracy związanych z API, urządzeniami mobilnymi, wspomaganymi MCP, sztuczną inteligencją i erą blockchain w miarę ewolucji Rockxy.<br>
-  Pierwsza lokalna alternatywa AGPL-3.0 dla <a href="#rockxy-vs-alternatives">Proxyman i Charles Proxy</a>.
+  Lokalna (local-first), oparta na AGPL-3.0 alternatywa dla <a href="#rockxy-kontra-alternatywy">Proxyman i Charles Proxy</a>.
 </p>
 
 <p align="center">
@@ -76,10 +76,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Aktualne najważniejsze wydarzenia w branży
 
-- AI Assistant oferuje local analysis lub model Ollama/provider po Review Data; sidebar zawiera Focus Sets i Noise Control; workspace używa natywnych split view; a inspekcja AI/Web3/x402 jest obecnym zachowaniem.
+- AI Assistant bada teraz jeden lub więcej wybranych requestów za pomocą wbudowanej analizy lokalnej lub opcjonalnego skonfigurowanego modelu Ollama/provider, z wyraźnym potwierdzeniem Review Data, ograniczoną redakcją, odpowiedziami strumieniowymi, evidence reveal i handoffami inicjowanymi przez użytkownika.
+- Natywny sidebar zawiera teraz wielokrotnego użytku Focus Sets dla scope app/domain/path oraz Noise Control w zakresie workspace, który ukrywa pasujące domeny lub ścieżki bez zatrzymywania capture.
+- Główny workspace używa teraz natywnych pionowych i poziomych split view dla Context Dock i dolnego inspektora, zachowując pełnowysokościowe dividery, spójne separatory toolbar/footer i automatyczną zmianę rozmiaru układu.
 - Upstream Proxy zawiera teraz bezpłatną/rdzeniową automatyczną konfigurację serwera proxy z routingiem adresów URL PAC dla `DIRECT`, HTTP i HTTPS, zachowując istniejące granice SOCKS5 i zasad uwierzytelniania.
 - Przepływy pracy eksportu obejmują teraz OpenAPI YAML/HTML i publikowanie Gist dla wybranego ruchu z tworzeniem ładunku uwzględniającego redakcję.
 - Narzędzia inspektora obejmują teraz filtrowanie ścieżki/klucza/wartości JSONPath i szybki podgląd wybranego tekstu ładunku, takiego jak JWT.
+- Inspekcja ruchu AI i Web3 dodaje teraz etykiety protokołu, karty inspektora i podsumowania debugowania dla rozpoznanych wywołań modeli, ruchu JSON-RPC i wskazówek płatności w stylu x402.
 - Konfiguracja programisty Node.js odzwierciedla teraz wybranego klienta podczas sprawdzania poprawności i zawiera pełniejszy przykładowy przewodnik po serwerze lokalnym.
 - Developer Setup Hub obejmuje teraz środowiska wykonawcze, przeglądarki, klientów, urządzenia, frameworki i środowiska z fragmentami specyficznymi dla celów docelowych, obserwatorami sprawdzającymi poprawność i rzetelną zawartością przewodników.
 - Inspekcja binarnych frame WebSocket obejmuje teraz ograniczone, uruchamiane na żądanie heuristic Protobuf wire-format bez dodawania decoder work do capture hot path.
@@ -125,7 +128,7 @@ Wybierz jeden lub więcej przechwyconych requestów i zapytaj, co się stało, c
 
 <img src="docs/images/features/DemoMCP.png" alt="Rockxy local MCP server exposing captured traffic to Claude Desktop and Cursor" width="820" />
 
-Pozwól Claude Desktop lub Cursorowi odczytać przechwycony ruch przez lokalny serwer MCP. Zapytaj „dlaczego ta 500?” zamiast wklejać nagłówki na czacie. Lokalne, uwzględniające redakcje i open source.
+Pozwól Claude Desktop lub Cursorowi sprawdzić przechwycony ruch za pomocą dziesięciu narzędzi tylko do odczytu w lokalnym serwerze MCP Rockxy. Zapytaj „dlaczego to zwróciło 500?” zamiast wklejać nagłówki na czacie. Implementacja jest open source, uwierzytelniana tokenem i domyślnie utrzymuje redakcję danych wrażliwych włączoną.
 
 `Claude Desktop` · `Cursor` · `Local stdio` · `Redaction` · `Open Source`
 
@@ -203,11 +206,11 @@ Dodaj, usuń lub zamień nagłówki na dowolnym hoście bez ponownego wdrażania
 
 ### Niestandardowe nagłówki żądań i odpowiedzi
 
-<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header rules injecting tokens and stripping cookies" width="820" />
+<img src="docs/images/features/DemoCustomRequestResponseHeader.png" alt="Rockxy custom request and response header columns with a saved X-Trace-ID response column" width="820" />
 
-Zastąp nagłówki na hosta z pełną kontrolą nad obiema fazami. Wstrzykuj tokeny uwierzytelniające do żądań wychodzących, usuwaj pliki cookie z odpowiedzi lub przypinaj niestandardowego klienta użytkownika — zapisanego jako nazwane reguły, które możesz przełączać w dowolnym momencie.
+Awansuj dowolny nagłówek żądania lub odpowiedzi do kolumny pierwszej klasy w tabeli ruchu. Trzymaj źródła żądań i odpowiedzi osobno, zapisz nagłówki, na których Ci zależy, a następnie przeglądaj request ID, trace ID, stan pamięci podręcznej lub własne metadane bez otwierania każdego inspektora.
 
-`Per-Host Override` · `Request Phase` · `Response Phase` · `Auth Token Inject` · `Cookie Strip` · `Named Rules`
+`Request Headers` · `Response Headers` · `Saved Columns` · `Trace IDs` · `Case-Insensitive Match` · `Live Table Update`
 
 ### Warunki sieciowe
 
@@ -221,15 +224,15 @@ Przejdź do 3G, EDGE, LTE, WiFi lub niestandardowego opóźnienia. Twój laptop 
 
 <img src="docs/images/features/DemoCompose.png" alt="Rockxy Compose editing and replaying a captured HTTP request without leaving the app" width="820" />
 
-Odbuduj dowolne przechwycone żądanie HTTP — zmień metodę, adres URL, nagłówki, parametry zapytania lub treść — i wyślij ponownie bez opuszczania Rockxy. Żadnego listonosza, bezsenności ani pętli kopiuj-wklej. Wykonuj iteracje zgodnie z monitami LLM, rozmyj granice uwierzytelniania lub odtwórz przypadek niepowodzenia dla punktów końcowych OpenAI, Anthropic i Cohere w ciągu kilku sekund.
+Odbuduj dowolne przechwycone żądanie HTTP — zmień metodę, adres URL, nagłówki, parametry zapytania lub treść — i wyślij ponownie bez opuszczania Rockxy. Bez pętli kopiuj-wklej do Postman, Insomnia czy curl. Iteruj prompty LLM, fuzzuj granice uwierzytelniania lub odtwórz przypadek niepowodzenia dla punktów końcowych OpenAI, Anthropic i Cohere w ciągu kilku sekund.
 
 `Edit Headers` · `Edit Body` · `Edit Query` · `Edit Method` · `LLM Prompt Iteration` · `Postman Alternative` · `OAuth Flow Debug` · `Webhook Replay`
 
 ### Porównaj
 
-<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two captured responses side-by-side with JSON, header, and body diff" width="820" />
+<img src="docs/images/features/DemoDiff.png" alt="Rockxy comparing two synthetic JSON payloads side-by-side in the local read-only diff workspace" width="820" />
 
-Ułóż dwie przechwycone odpowiedzi obok siebie i zlokalizuj każde pole, które uległo odwróceniu — status, nagłówki, klucze JSON, bajty treści. Przechwytuj ciche regresje API, niedeterministyczne wyniki LLM i natychmiastowy dryf bez przesyłania czegokolwiek do narzędzia różnicowego innej firmy. Porównanie obok siebie podkreśla to, co się zmieniło; głębokie porównanie JSON ignoruje kolejność kluczy.
+Ułóż dwie przechwycone transakcje lub wklejone payloady obok siebie i zlokalizuj każde pole, które się zmieniło — status, nagłówki, klucze JSON lub bajty treści. Wychwytuj ciche regresje API, niedeterministyczne wyniki LLM i prompt drift bez przesyłania czegokolwiek do narzędzia różnicowego innej firmy.
 
 `Diff Compare` · `Side-by-Side` · `JSON Diff` · `Header Diff` · `Body Diff` · `LLM Output Compare` · `Non-determinism` · `API Regression` · `Schema Drift`
 
@@ -253,7 +256,7 @@ Zapisuj sesje, importuj/eksportuj pliki HAR w celu przekazywania między narzęd
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Wielokartowe obszary robocze Rockxy z niezależnie filtrowanymi widokami tego samego przechwytywania na żywo" width="820" />
 
-Trzymaj obok siebie niezależne widoki dochodzenia dla tego samego przechwytywania na żywo. Każda karta zachowuje własne filtry, sortowanie, wybór, zakres sidebara i stan inspektora, współdzieląc proxy i przechwycone transakcje.
+Trzymaj obok siebie niezależne widoki dochodzenia dla tego samego przechwytywania na żywo — jedna karta dla ruchu staging, jedna dla produkcji i jedna dla przepływu urządzenia iOS. Każda karta zachowuje własne filtry, sortowanie, wybór, zakres sidebara i stan inspektora, współdzieląc proxy i przechwycone transakcje.
 
 `Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
 
@@ -271,19 +274,19 @@ Rockxy oferuje protocol-aware inspection dla AI, Web3 RPC i x402 w zwykłym work
 
 ### Inspekcja ruchu AI
 
-Ułatw debugowanie ruchu modelowego w ramach normalnego przepływu pracy przechwytywania. Wykrywaj żądania AI, sprawdzaj wywołania wybranych modeli, diagnozuj odpowiedzi przesyłane strumieniowo, porównuj zachowanie podpowiedzi/wyjść i zrozum łańcuchy wywołań narzędzi bez wklejania wrażliwych ładunków do innej usługi.
+Rockxy wykrywa rozpoznane żądania AI w ramach normalnego przepływu przechwytywania. Sprawdzaj wybrane wywołania modeli, stan streamingu, pola usage gdy są obecne, ostrzeżenia, retrieval hints i podsumowania tool-call bez wklejania wrażliwych payloadów do innej usługi.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Inspekcja Web3/RPC
 
-Sprawdzaj ruch HTTP JSON-RPC w stylu EVM i Solana z provider host, request ID, method, batch summary, error, chain, transaction, payload i debug intent, bez zmieniania Rockxy w wallet lub block explorer.
+Rockxy zamienia wywołania sieciowe ery blockchain w czytelne dowody debugowania. Sprawdzaj ruch HTTP JSON-RPC w stylu EVM i Solana z provider host, request ID, method, batch summary, error, chain, transaction, payload i debug intent, bez zmieniania Rockxy w wallet lub block explorer.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 
 ### Wskazówki przepływu płatności x402
 
-Zrozumienie przepływów HTTP bramkowanych płatnościami z warstwy sieciowej. Zaznacz odpowiedzi wymagające płatności, postępuj zgodnie ze ścieżką ponawiania próby i przechowuj dowody debugowania na poziomie lokalnym i uwzględniającym możliwość redakcji.
+Rockxy wyróżnia wskazówki payment-required i zorientowane na retry, dzięki czemu przepływy HTTP payment-gated są zrozumiałe z warstwy sieciowej, podczas gdy dowody debugowania pozostają lokalne i redaction-aware.
 
 `Payment Required` · `Retry Flow` · `Headers` · `Redaction` · `Local First`
 
@@ -291,17 +294,17 @@ Zrozumienie przepływów HTTP bramkowanych płatnościami z warstwy sieciowej. Z
 
 Poniższe sekcje opisują publiczny kierunek, a nie obecne zachowanie.
 
+### Reguły uwzględniające protokoły
+
+Rockxy może już dziś oznaczać i sprawdzać ruch AI i Web3. Głębsze dopasowanie reguł według modelu, tool call, metody JSON-RPC, chain, transaction hash lub batch subcall pozostaje przyszłą pracą; obecne narzędzia modyfikacji ruchu nadal dopasowują URL, metodę HTTP i nagłówki.
+
+`Smart Filters` · `Request Badges` · `Protocol Column` · `Inspector Tabs` · `Future Rule Metadata`
+
 ### Zredagowane pakiety dowodów `Wkrótce`
 
 Podziel się faktami niezbędnymi do odtworzenia błędu bez ujawniania tajemnic. Spakuj wybrany ruch za pomocą podsumowań protokołów, podglądów redakcji i kontekstu opartego na źródłach, który członek zespołu może sprawdzić.
 
 `Debug Bundles` · `Protocol Summary` · `Export Preview` · `Secret Redaction` · `Repro Context`
-
-### Reguły uwzględniające protokoły
-
-Korzystaj z metadanych AI i Web3 tam, gdzie Rockxy już działa: filtrów, odznak, opcjonalnych kolumn, porównań, reguł, konfiguracji programisty i lokalnych podsumowań MCP.
-
-`Smart Filters` · `Request Badges` · `Optional Columns` · `Rules` · `Compare` · `Local MCP`
 
 ### Udostępnianie i współpraca w zespole `Wkrótce`
 
@@ -309,7 +312,7 @@ Wyślij przechwyconą sesję do członka zespołu jednym kliknięciem. Dodawaj a
 
 `Shared Sessions` · `Team Workspaces` · `Inline Comments` · `Live Cursor` · `Cloud Sync` · `Pair Debug` · `SSO` · `Audit Log`
 
-> 100% natywny system MacOS. Żadnego elektronu. Brak widoków internetowych. SwiftUI + AppKit + SwiftNIO.
+> Natywna powłoka aplikacji macOS — bez Electron. SwiftUI + AppKit + SwiftNIO, z WebKit używanym tylko do podglądu treści HTML.
 
 ## Szybki start
 
@@ -332,12 +335,15 @@ Jeśli po instalacji chcesz połączyć Rockxy z lokalnym klientem MCP, zapoznaj
 | **Model projektu** | Projekt open source AGPL-3.0 | Zastrzeżona aplikacja komercyjna | Zastrzeżona aplikacja komercyjna |
 | **Kod źródłowy** | Publiczne, podlegające audytowi, możliwe do rozwidlenia | Zamknięte źródło | Zamknięte źródło |
 | **Kompiluj ze źródła** | Bezpłatnie z Xcode z tego repozytorium | Niedostępne ze źródła publicznego | Niedostępne ze źródła publicznego |
-| **Natywna podstawa systemu MacOS** | Swift + SwiftNIO + SwiftUI/AppKit | Natywna aplikacja komercyjna dla systemu macOS | Wieloplatformowa aplikacja komercyjna |
+| **Natywna podstawa systemu MacOS** | Swift + SwiftNIO + SwiftUI/AppKit | Natywna aplikacja macOS o zamkniętym źródle | Wieloplatformowa aplikacja o zamkniętym źródle |
 | **Przechwytywanie lokalne** | Lokalny serwer proxy, certyfikaty, pomocnik i dane przechwytywania pozostają na komputerze Mac | Aplikacja proxy na komputer stacjonarny | Aplikacja proxy na komputer stacjonarny |
-| **Proces konfiguracji programisty** | Wbudowane centrum konfiguracji programisty dla środowisk wykonawczych, klientów, urządzeń, frameworków i środowisk | Wskazówki dotyczące konfiguracji specyficzne dla produktu | Wskazówki dotyczące konfiguracji specyficzne dla produktu |
-| **Zewnętrzny serwer proxy + routing PAC** | Serwer proxy HTTP/HTTPS, automatyczna konfiguracja PAC i reguły omijania | Dojrzałe komercyjne narzędzia proxy | Dojrzałe komercyjne narzędzia proxy |
-| **Most MCP/lokalna automatyka** | Wbudowane, uwierzytelniane tokenem, domyślnie redakcja | Nie zgłoszono roszczeń w dokumentach publicznych, które zostały sprawdzone | Nie zgłoszono roszczeń w dokumentach publicznych, które zostały sprawdzone |
-| **Otwarta ścieżka wkładu** | Kwestie publiczne, dyskusje, plan działania i PR | Produkt kontrolowany przez sprzedawcę | Produkt kontrolowany przez sprzedawcę |
+| **Proces konfiguracji programisty** | Wbudowane centrum konfiguracji programisty dla środowisk wykonawczych, klientów, urządzeń, frameworków i środowisk | Wbudowana automatyczna konfiguracja oraz przewodniki dla platform i środowisk wykonawczych | Przewodniki konfiguracji specyficzne dla platformy |
+| **Zewnętrzny serwer proxy + routing PAC** | Serwer proxy HTTP/HTTPS, automatyczna konfiguracja PAC i reguły omijania | Komercyjny serwer proxy nadrzędny i obsługa PAC | Komercyjna konfiguracja serwera proxy nadrzędnego |
+| **Integracja MCP** | [Wbudowany lokalny MCP](docs/features/mcp.mdx): 10 narzędzi tylko do odczytu dla ruchu, statusu, certyfikatów, inspekcji reguł i eksportu cURL; uwierzytelnianie tokenem; redakcja domyślnie włączona | Wbudowany lokalny MCP: inspekcja ruchu oraz narzędzia reguł, sesji, certyfikatów, konfiguracji i sterowania aplikacją; tylko localhost; uwierzytelnianie tokenem na sesję; redakcja danych wrażliwych | Nie znaleziono integracji MCP producenta w [oficjalnej dokumentacji](https://www.charlesproxy.com/documentation/) sprawdzonej 2026-08-13 |
+| **Natywny AI Assistant** | Wbudowany do analizy ruchu dla wybranego żądania i wielu żądań w Rockxy | Nieznane | Nieznane |
+| **Otwarta ścieżka wkładu** | Publiczne źródło, issues, dyskusje, plan działania i PR-y | Publiczny tracker issue; źródło aplikacji i wydania są kontrolowane przez producenta | Dokumentacja i wsparcie producenta; źródło aplikacji i wydania są kontrolowane przez producenta |
+
+Powyższe możliwości konkurencji zostały zweryfikowane względem oficjalnej dokumentacji produktu w dniu 2026-08-13 i mogą ulec zmianie po publikacji.
 
 Plan działania: głębsze protocol-aware rules, bezpieczniejsze redacted evidence bundles, mocniejsze workflow replay i comparison, szersze przewodniki Developer Setup oraz dalsze badania HTTP/2 i HTTP/3.
 
@@ -369,7 +375,7 @@ Pełna dokumentacja dostępna na stronie [Dokumenty Rockxy'ego](docs/index.mdx):
 - [AI Assistant](docs/features/ai-assistant.mdx) — badaj wybrany ruch lokalnie lub z configured model po Review Data
 - [Filtry i wyszukiwanie](docs/core-features/filters-and-search.mdx) — scope sidebara, Focus Sets, Noise Control, filtry toolbar i wyszukiwanie
 - [Inspekcja AI i Web3](docs/features/ai-web3-inspection.mdx) — sprawdzaj rozpoznany ruch model API, JSON-RPC i x402
-- [Integracja MPK](docs/features/mcp.mdx) — połącz Rockxy z lokalnymi klientami MCP
+- [Integracja MCP](docs/features/mcp.mdx) — połącz Rockxy z lokalnymi klientami MCP
 - [Architektura](docs/development/architecture.mdx) — silnik proxy, model aktora, przepływ danych
 - [Model bezpieczeństwa](docs/development/security.mdx) — granice zaufania, walidacja XPC, zarządzanie certyfikatami
 - [Decyzje projektowe](docs/development/design-decisions.mdx) — dlaczego SwiftNIO, NSTableView, aktorzy
@@ -387,7 +393,7 @@ Dobre pierwsze wydania są oznaczone [`good first issue`](https://github.com/Roc
 
 ## Sponsorzy i partnerzy
 
-Rockxy jest tworzony i utrzymywany przez niezależnych programistów. Fundusze sponsorskie zapewniają ciągły rozwój, audyty bezpieczeństwa i nowe funkcje.
+Rockxy jest utrzymywany niezależnie. Sponsoring pomaga finansować ciągły rozwój, infrastrukturę wydań, dokumentację i prace nad bezpieczeństwem.
 
 <p align="center">
   <a href="https://opencollective.com/rockxy/donate">
@@ -435,5 +441,5 @@ Rockxy jest objęty obsługą fiskalną przez [Open Source Collective](https://d
 ---
 
 <p align="center">
-  <sub>Wykonane przez <a href="https://github.com/LocNguyenHuu">Stefana</a>. Zbudowany z Swift, SwiftNIO, SwiftUI i AppKit.</sub>
+  <sub>Wykonane przez <a href="https://github.com/LocNguyenHuu">Stephen</a>. Zbudowany z Swift, SwiftNIO, SwiftUI i AppKit.</sub>
 </p>
