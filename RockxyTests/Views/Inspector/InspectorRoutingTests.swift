@@ -430,18 +430,16 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
             appName: transaction.clientApp,
             appRuleEnabled: false
         )
 
-        #expect(prompt?.title == "HTTPS Response")
-        #expect(prompt?.primaryTitle == "Enable only this domain")
+        #expect(prompt?.host == "api.example.com")
         #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryTitle == "Enable all domains from \"Brave Browser Helper\"")
         #expect(prompt?.secondaryAction == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
+        #expect(prompt?.requiresCertificateSetup == false)
     }
 
     @Test("CONNECT tunnel still shows app SSL action when app cache is empty")
@@ -455,7 +453,6 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
             appName: transaction.clientApp,
@@ -463,7 +460,6 @@ struct InspectorRoutingTests {
         )
 
         #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryTitle == "Enable all domains from \"Google Chrome\"")
         #expect(prompt?.secondaryAction == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
@@ -477,15 +473,16 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: false,
             domainRuleEnabled: false,
             appName: nil,
             appRuleEnabled: false
         )
 
+        #expect(prompt?.host == "api.example.com")
         #expect(prompt?.primaryAction == .installCertificate)
         #expect(prompt?.secondaryAction == nil)
+        #expect(prompt?.requiresCertificateSetup == true)
     }
 
     // MARK: - Compression Helpers
@@ -618,21 +615,18 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: true,
             domainRuleEnabled: true,
             appName: nil,
             appRuleEnabled: false
         )
 
-        #expect(prompt?.message == "SSL Proxying is enabled for this HTTPS target. You can adjust the scope below.")
-        #expect(prompt?.primaryTitle == "Disable only this domain")
         #expect(prompt?.primaryAction == .disableDomain("api.example.com"))
         #expect(prompt?.secondaryAction == nil)
     }
 
-    @Test("CONNECT tunnel with app-wide SSL rule shows disable-all guidance")
-    func connectTunnelWithExistingAppRuleShowsDisableGuidance() {
+    @Test("CONNECT tunnel with known app-host rules shows disable guidance")
+    func connectTunnelWithExistingAppHostRulesShowsDisableGuidance() {
         let transaction = TestFixtures.makeTransaction(
             method: "CONNECT",
             url: "https://api.example.com:443",
@@ -642,38 +636,54 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
             appName: transaction.clientApp,
             appRuleEnabled: true
         )
 
-        #expect(prompt?.primaryTitle == "Enable only this domain")
         #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryTitle == "Disable all domains from \"Google Chrome\"")
         #expect(prompt?.secondaryAction == .disableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
-    @Test("CONNECT tunnel shows alternate message when SSL proxying is globally off")
-    func connectTunnelShowsSSLDisabledMessage() {
-        let transaction = TestFixtures.makeTransaction(
-            method: "CONNECT",
-            url: "https://api.example.com:443",
-            statusCode: 200
-        )
-        transaction.clientApp = "Brave Browser Helper"
-
-        let prompt = HTTPSInspectionPromptModel.make(
-            transaction: transaction,
-            sslProxyingEnabled: false,
-            canInterceptHTTPS: true,
-            domainRuleEnabled: false,
-            appName: transaction.clientApp,
-            appRuleEnabled: false
+    @Test("HTTPS prompt scope presentation exposes host and app-host state")
+    func httpsPromptScopePresentation() {
+        let host = HTTPSInspectionScopePresentation(action: .enableDomain("api.example.com"))
+        let appHosts = HTTPSInspectionScopePresentation(
+            action: .disableApp("Brave Browser Helper", fallbackDomain: "api.example.com")
         )
 
-        #expect(prompt?.message == "SSL Proxying is off. Enable it to see the encrypted content.")
+        #expect(host == HTTPSInspectionScopePresentation(kind: .host, value: "api.example.com", isEnabled: false))
+        #expect(host?.kind.title == "Host")
+        #expect(host?.actionTitle == "Decrypt")
+        #expect(host?.actionDescription == "Decrypt new HTTPS connections to api.example.com")
+        #expect(
+            HTTPSInspectionScopePresentation(action: .disableDomain("api.example.com"))?.actionDescription ==
+                "Stop decrypting new HTTPS connections to api.example.com"
+        )
+
+        #expect(
+            appHosts == HTTPSInspectionScopePresentation(
+                kind: .appHosts,
+                value: "Brave Browser Helper",
+                isEnabled: true
+            )
+        )
+        #expect(appHosts?.kind.title == "App Hosts")
+        #expect(appHosts?.kind.systemImage == "macwindow")
+        #expect(appHosts?.actionTitle == "Disable")
+        #expect(
+            appHosts?.actionDescription ==
+                "Stop decrypting new HTTPS connections to known hosts used by Brave Browser Helper"
+        )
+        #expect(
+            HTTPSInspectionScopePresentation(
+                action: .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com")
+            )?.actionDescription ==
+                "Decrypt new HTTPS connections to known hosts used by Brave Browser Helper"
+        )
+        #expect(HTTPSInspectionScopePresentation(action: .installCertificate) == nil)
+        #expect(HTTPSInspectionScopePresentation(action: .openSSLProxyingList) == nil)
     }
 
     @Test("Plain HTTP response does not show HTTPS prompt")
@@ -682,7 +692,6 @@ struct InspectorRoutingTests {
 
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: true,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
             appName: nil,
