@@ -1,4 +1,9 @@
 
+Rockxy packaging note: references below to a distribution "license" directory
+refer to the complete, uniquely named license files stored in this
+ThirdPartyLicenses directory and copied with this notice into app resources.
+The upstream notice text follows unchanged.
+
                             The SwiftASN1 Project
                             =====================
 

@@ -99,7 +99,7 @@ their pull request can be merged. When you open a PR, the `Rockxy CLA` check
 posts a comment asking each contributor to accept. Read the ICLA, then post this
 exact comment on the pull request:
 
-```
+```text
 I have read and agree to the Rockxy ICLA v2.0
 ```
 
@@ -119,7 +119,9 @@ license.
 If your employer or another organization owns or controls your Contribution,
 an authorized representative must also execute the
 [Corporate Contributor License Agreement](legal/cla/CCLA-v1.0.md). Contact
-`rockxyapp@gmail.com` before signing or submitting employer-owned work.
+`rockxyapp@gmail.com` before signing or submitting employer-owned work. This
+organizational authorization is reviewed manually; the automated `Rockxy CLA`
+check verifies individual ICLA coverage and does not replace an executed CCLA.
 
 Pull requests from contributors who have not signed the CLA will be blocked
 from merging.

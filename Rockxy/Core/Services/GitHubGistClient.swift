@@ -47,7 +47,10 @@ struct GitHubGistClient: Sendable {
     }
 
     func createGist(payload: GistPublishPayload, accessToken: String) async throws -> GistPublishResult {
-        var request = URLRequest(url: URL(string: "https://api.github.com/gists")!)
+        guard let endpoint = URL(string: "https://api.github.com/gists") else {
+            throw ClientError.invalidResponse
+        }
+        var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")

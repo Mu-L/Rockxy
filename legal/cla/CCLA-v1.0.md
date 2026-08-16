@@ -18,14 +18,14 @@ This agreement is between the legal entity identified in the signature block
 
 **Contribution**, **Rockxy Material**, and **Submission Date** have the meanings
 in the [Rockxy ICLA v2.0](ICLA-v2.0.md). This agreement covers Contributions
-owned or controlled by Entity or a controlled affiliate and intentionally
-submitted by people whom Entity has identified in writing as authorized
-contributors.
-**Controlled affiliate** means an entity that Entity controls through direct
-or indirect ownership of more than fifty percent of its voting interests.
-Entity will keep its privately retained authorized-contributor and
-controlled-affiliate schedule accurate and promptly notify the Project Owner
-when authorization or control changes.
+owned or controlled by Entity and intentionally submitted by people whom Entity
+has identified in writing as authorized contributors. It does not cover a
+parent, subsidiary, or other affiliate merely because of common ownership or
+voting control. Each affiliate whose Contributions are to be covered must
+execute its own CCLA or a written joinder accepted by the Project Owner that
+expressly grants the copyright and patent rights in those Contributions. Entity
+will keep its privately retained authorized-contributor schedule accurate and
+promptly notify the Project Owner when authorization changes.
 
 Each individual contributor must also accept the current Rockxy ICLA. An
 individual’s acceptance does not replace this agreement for rights owned or
@@ -51,9 +51,8 @@ non-exclusive, no-charge, royalty-free, irrevocable and transferable patent
 license, with the right to sublicense through multiple tiers, to make, have
 made, use, offer to sell, sell, import, and otherwise transfer each covered
 Contribution and its combination with the Rockxy Material to which it was
-submitted. This applies only to patent claims Entity or its controlled
-affiliates own or control that are necessarily infringed by the Contribution
-alone or by that combination.
+submitted. This applies only to patent claims Entity owns or controls that are
+necessarily infringed by the Contribution alone or by that combination.
 
 ## 5. Public source commitment
 
@@ -98,8 +97,8 @@ Nothing in this agreement grants rights to Rockxy names, logos, or trademarks.
 
 This agreement may be signed in counterparts and by an electronic-signature
 service. The Project Owner assigns the final executed copy a unique agreement
-ID and retains it privately with the authorized-contributor and
-controlled-affiliate schedule.
+ID and retains it privately with the authorized-contributor schedule and any
+accepted affiliate joinder.
 
 ### Entity
 

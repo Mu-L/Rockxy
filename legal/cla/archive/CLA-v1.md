@@ -1,5 +1,9 @@
 # Contributor License Agreement
 
+> **Archived and superseded.** This is the historical v1 agreement. New
+> contributors must not use the signing instructions below; follow the current
+> agreement process in [`../README.md`](../README.md).
+
 By submitting a contribution (pull request, patch, or other modification) to
 this project, you agree to the following terms:
 

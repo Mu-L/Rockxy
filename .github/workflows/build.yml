@@ -35,8 +35,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Install SwiftLint
         run: brew install swiftlint
+      - name: Test release metadata policy
+        run: python3 -m unittest discover -s releases/tests -p 'test_*.py'
       - name: Lint
         run: swiftlint lint --strict
 
@@ -46,6 +50,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Prepare CI developer config
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'
@@ -99,6 +105,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Prepare CI developer config
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'

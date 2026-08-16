@@ -324,6 +324,25 @@ class DigestTests(unittest.TestCase):
         parsed = lib.parse_expected_digest(f"{digest}  legal/cla/ICLA-v2.0.md\n")
         self.assertEqual(parsed, digest)
 
+    def test_noncanonical_digest_formats_fail_closed(self):
+        canonical = "a" * 64
+        self.assertTrue(lib.is_valid_sha256(canonical))
+        for value in (
+            "A" * 64,
+            "0x" + "a" * 62,
+            "+" + "a" * 63,
+            "-" + "a" * 63,
+            "a_" + "a" * 62,
+            "a" * 63,
+            "a" * 65,
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(lib.is_valid_sha256(value))
+
+    def test_legacy_v1_records_never_bootstrap_v2_acceptance(self):
+        ledger = lib.load_ledger('{"signedContributors": [{"githubUsername": "someone"}]}')
+        self.assertEqual(ledger, lib.new_ledger())
+
 
 if __name__ == "__main__":
     unittest.main()

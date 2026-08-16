@@ -171,7 +171,16 @@ class GitHubClient:
             return None, ""
         if status != 200 or not isinstance(data, dict):
             raise RuntimeError(f"failed to read {path}@{branch}: HTTP {status}")
-        content = base64.b64decode(data.get("content", "")).decode("utf-8")
+        encoded_content = data.get("content")
+        if data.get("encoding") != "base64" or not isinstance(encoded_content, str) or not encoded_content:
+            raise RuntimeError(
+                f"failed to read {path}@{branch}: GitHub did not return non-empty base64 content"
+            )
+        try:
+            compact_content = "".join(encoded_content.split())
+            content = base64.b64decode(compact_content, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as error:
+            raise RuntimeError(f"failed to decode {path}@{branch}") from error
         return data.get("sha"), content
 
     def put_file(self, path: str, branch: str, content: str, message: str, sha: str | None) -> int:

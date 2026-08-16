@@ -24,7 +24,7 @@ jobs:
       github.event_name == 'pull_request_target' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       (github.event.comment.body == 'I have read and agree to the Rockxy ICLA v2.0' ||
+       (contains(github.event.comment.body, 'I have read and agree to the Rockxy ICLA v2.0') ||
         (github.event.comment.body == 'recheck' &&
          github.event.comment.author_association == 'OWNER')))
     runs-on: ubuntu-latest
@@ -42,6 +42,17 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+
+      - name: Verify contributor-policy documents are present
+        run: |
+          test -s legal/cla/ICLA-v2.0.md
+          test -s legal/cla/ICLA-v2.0.sha256
+          test -s legal/cla/CCLA-v1.0.md
+          test -s legal/cla/CLA-PRIVACY.md
+          test -s legal/BINARY-EULA-v1.0.md
+
+      - name: Test contributor-license gate logic
+        run: python3 -m unittest discover -s .github/tools/tests -p 'test_*.py'
 
       - name: Evaluate Rockxy ICLA v2.0 gate
         env:

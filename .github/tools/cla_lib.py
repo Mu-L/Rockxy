@@ -53,13 +53,7 @@ class LedgerConflictError(RuntimeError):
 
 def is_valid_sha256(value: str) -> bool:
     """Return True only for a canonical lowercase 64-character hex digest."""
-    if not isinstance(value, str) or len(value) != 64:
-        return False
-    try:
-        int(value, 16)
-    except ValueError:
-        return False
-    return value == value.lower()
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
 def compute_sha256(data: bytes) -> str:
@@ -414,8 +408,8 @@ def load_ledger(text: str) -> dict:
         raise ValueError("ledger root is not an object")
     records = data.get("records")
     if records is None and isinstance(data.get("signedContributors"), list):
-        # Bootstrap store shape carried on the default branch; treat as empty.
-        records = [] if not data["signedContributors"] else data["signedContributors"]
+        # Legacy v1 entries never carry forward as ICLA v2.0 acceptance.
+        records = []
     if records is None:
         records = []
     if not isinstance(records, list):

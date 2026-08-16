@@ -45,6 +45,12 @@ LATEST_PROVENANCE_REQUIRED = {
     "sourceRelationship",
     "thirdPartyNoticesUrl",
     "thirdPartyNoticesSha256",
+    "termsUrl",
+    "termsVersion",
+    "termsSha256",
+    "privacyNoticeUrl",
+    "privacyNoticeVersion",
+    "privacyNoticeSha256",
 }
 
 CATALOG_PROVENANCE_REQUIRED = {
@@ -58,6 +64,12 @@ CATALOG_PROVENANCE_REQUIRED = {
     "source_relationship",
     "third_party_notices_url",
     "third_party_notices_sha256",
+    "terms_url",
+    "terms_version",
+    "terms_sha256",
+    "privacy_notice_url",
+    "privacy_notice_version",
+    "privacy_notice_sha256",
 }
 
 APPCAST_REQUIRED = {
@@ -151,8 +163,11 @@ def validate_distribution_provenance(
     required: set[str],
     *,
     snake_case: bool,
+    require_all: bool,
 ) -> None:
     if not any(key in data for key in required):
+        if require_all:
+            fail(f"{path} is missing required distribution provenance")
         return
     missing = sorted(key for key in required if data.get(key) in ("", None, False))
     if missing:
@@ -186,11 +201,28 @@ def validate_distribution_provenance(
     if f"{repo_url}/blob/{commit}/legal/BINARY-EULA-v1.0.md" != binary_license_url:
         fail(f"{path} Binary EULA URL must be pinned to the public source commit")
     notices_url = str(data[field("third_party_notices_url", "thirdPartyNoticesUrl")])
-    if not re.fullmatch(
-        r"https://github\.com/RockxyApp/Rockxy/releases/download/v[^/]+/THIRD_PARTY_NOTICES\.txt",
-        notices_url,
-    ):
+    release_tag = str(data[field("release_tag", "releaseTag")])
+    if not re.fullmatch(r"v[^/]+", release_tag):
+        fail(f"{path} release tag must be a canonical v-prefixed tag")
+    expected_notices_url = (
+        f"https://github.com/RockxyApp/Rockxy/releases/download/"
+        f"{release_tag}/THIRD_PARTY_NOTICES.txt"
+    )
+    if notices_url != expected_notices_url:
         fail(f"{path} third-party notices URL must point to the official release asset")
+
+    for name in ("terms", "privacy_notice"):
+        url = str(data[field(f"{name}_url", "termsUrl" if name == "terms" else "privacyNoticeUrl")])
+        version = str(
+            data[field(f"{name}_version", "termsVersion" if name == "terms" else "privacyNoticeVersion")]
+        )
+        digest = str(
+            data[field(f"{name}_sha256", "termsSha256" if name == "terms" else "privacyNoticeSha256")]
+        )
+        if not url.startswith("https://") or not version.strip():
+            fail(f"{path} {name} must have an HTTPS URL and immutable version")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            fail(f"{path} {name} digest must be a SHA-256 hex digest")
 
 
 def validate_catalog(path: Path) -> dict[str, Any]:
@@ -220,6 +252,7 @@ def validate_catalog(path: Path) -> dict[str, Any]:
             releases[0],
             CATALOG_PROVENANCE_REQUIRED,
             snake_case=True,
+            require_all=True,
         )
 
     seen: set[tuple[str, str]] = set()
@@ -349,10 +382,17 @@ def latest_release_object(data: dict[str, Any]) -> dict[str, Any]:
         "third_party_notices_url": data.get("third_party_notices_url") or data.get("thirdPartyNoticesUrl"),
         "third_party_notices_sha256": data.get("third_party_notices_sha256")
         or data.get("thirdPartyNoticesSha256"),
+        "release_tag": data.get("release_tag") or data.get("releaseTag"),
+        "terms_url": data.get("terms_url") or data.get("termsUrl"),
+        "terms_version": data.get("terms_version") or data.get("termsVersion"),
+        "terms_sha256": data.get("terms_sha256") or data.get("termsSha256"),
+        "privacy_notice_url": data.get("privacy_notice_url") or data.get("privacyNoticeUrl"),
+        "privacy_notice_version": data.get("privacy_notice_version") or data.get("privacyNoticeVersion"),
+        "privacy_notice_sha256": data.get("privacy_notice_sha256") or data.get("privacyNoticeSha256"),
     }
 
 
-def validate_latest(path: Path) -> dict[str, Any]:
+def validate_latest(path: Path, *, require_provenance: bool = False) -> dict[str, Any]:
     latest = load_json(path)
     ensure_public_safe(path, latest)
     validate_distribution_provenance(
@@ -360,6 +400,7 @@ def validate_latest(path: Path) -> dict[str, Any]:
         latest,
         LATEST_PROVENANCE_REQUIRED,
         snake_case=False,
+        require_all=require_provenance,
     )
     release = latest_release_object(latest)
     missing = sorted(key for key in CATALOG_REQUIRED if release.get(key) in ("", None))
@@ -378,7 +419,7 @@ def validate_latest(path: Path) -> dict[str, Any]:
     return release
 
 
-def validate_manifest(path: Path) -> dict[str, Any]:
+def validate_manifest(path: Path, *, require_provenance: bool = False) -> dict[str, Any]:
     manifest = load_json(path)
     ensure_public_safe(path, manifest)
     validate_distribution_provenance(
@@ -386,6 +427,7 @@ def validate_manifest(path: Path) -> dict[str, Any]:
         manifest,
         LATEST_PROVENANCE_REQUIRED,
         snake_case=False,
+        require_all=require_provenance,
     )
     release = latest_release_object(manifest)
     missing = sorted(key for key in CATALOG_REQUIRED if release.get(key) in ("", None))
@@ -461,7 +503,8 @@ def main() -> int:
     args = parser.parse_args()
 
     catalog = validate_catalog(args.catalog)
-    latest = validate_latest(args.latest)
+    require_provenance = int(catalog.get("schema_version", 1)) >= 2
+    latest = validate_latest(args.latest, require_provenance=require_provenance)
     appcast_releases = validate_appcast(args.appcast)
     newest_catalog = catalog["releases"][0]
 
@@ -482,7 +525,7 @@ def main() -> int:
                 fail(f"latest.json {key} does not match catalog.json")
 
     if args.manifest:
-        manifest = validate_manifest(args.manifest)
+        manifest = validate_manifest(args.manifest, require_provenance=require_provenance)
         if release_identity(manifest) != release_identity(newest_catalog):
             fail("public manifest does not match catalog.json")
         if int(catalog.get("schema_version", 1)) >= 2:

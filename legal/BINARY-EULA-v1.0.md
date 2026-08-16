@@ -170,6 +170,12 @@ This agreement, the terms at `https://rockxy.io/terms`, applicable checkout or
 order terms, the privacy notice, and incorporated third-party notices form the
 agreement for the Official Binary. If checkout or order terms conflict with
 this agreement, the more specific purchase term controls for that transaction.
+Beginning with releases that use provenance schema version 2, release metadata
+must identify immutable versions or SHA-256 digests of the Terms and Privacy
+Notice that applied when the release was published. For each paid transaction,
+Licensor will retain the exact checkout or order terms accepted for that
+transaction so the governing documents can be reconstructed after later website
+changes.
 If a provision is unenforceable, it will be limited to the minimum extent
 necessary and the remainder continues. Failure to enforce a provision is not a
 waiver.
