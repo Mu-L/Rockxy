@@ -13,7 +13,11 @@ Open the settings panel from the menu bar: **Rockxy → Settings** or press <kbd
 
 ## Settings Tabs
 
-Rockxy's settings window currently has these tabs: **General**, **Appearance**, **Privacy**, **AI Assistant**, **Tools**, **GitHub**, **Plugins**, **MCP**, and **Advanced**.
+The public AGPL source build has these tabs: **General**, **Appearance**,
+**Privacy**, **AI Assistant**, **Tools**, **GitHub**, **Plugins**, **MCP**, and
+**Advanced**. The official signed Rockxy distribution also includes
+**License**, which manages the optional Pro entitlement in the same installed
+app.
 
 ## General
 
@@ -81,7 +85,9 @@ For the full setup walkthrough, see [MCP Integration](/features/mcp).
 
 ## License
 
-The **License** tab is where you manage Rockxy Pro on a specific Mac.
+In the official signed distribution, the **License** tab is where you manage
+Rockxy Pro on a specific Mac. This tab and its downstream licensing
+implementation are not part of the public AGPL source edition.
 
 Depending on your current state, this tab can show:
 
@@ -143,7 +149,7 @@ The panel also shows the current version summary and the last-checked timestamp.
 
 Updates are delivered through Sparkle, served from the project's signed appcast, and verified against the embedded EdDSA public key. Releases that fail signature, notarization, or stapling checks are rejected before install — see [Security](/development/security) for the full release-pipeline contract.
 
-Rockxy release metadata also publishes a canonical UTC `release_date` for each signed installable build in `releases/catalog.json`. The appcast mirrors the latest release date in `rockxy:releaseDate` and Sparkle `pubDate`. Eligibility services can mirror the public catalog and choose the newest release whose `release_date` is within their allowed window; private entitlement and license-validation logic is not part of this repo.
+Rockxy release metadata also publishes a canonical UTC `release_date` for each signed installable build in `releases/catalog.json`. The appcast mirrors the latest release date in `rockxy:releaseDate` and Sparkle `pubDate`. Eligibility services can mirror the public catalog and choose the newest release whose `release_date` is within their allowed window. The official binary's entitlement and license-validation implementation is not part of this public source repository.
 
 ### Miscellaneous
 

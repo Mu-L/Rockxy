@@ -29,7 +29,7 @@
 </p>
 
 <p align="center">
-  <strong>The open-source, auditable debugging proxy for macOS.</strong>
+  <strong>The AGPL-licensed Community source edition of Rockxy for macOS.</strong>
 </p>
 
 <p align="center">
@@ -42,11 +42,23 @@
   <a href="https://github.com/RockxyApp/Rockxy/releases"><img src="https://img.shields.io/github/v/release/RockxyApp/Rockxy?label=release&color=blue" alt="Release" /></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-blue" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-5.9-orange" alt="Swift" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-green" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/source-AGPL--3.0--or--later-green" alt="Source license" /></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome" /></a>
   <a href="https://github.com/sponsors/LocNguyenHuu"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa" alt="Sponsor" /></a>
   <a href="https://opencollective.com/rockxy/donate"><img src="https://img.shields.io/badge/Open%20Collective-support%20Rockxy-7FADF2?logo=opencollective&logoColor=white" alt="Support Rockxy on Open Collective" /></a>
 </p>
+
+> [!IMPORTANT]
+> This repository contains the public Rockxy Community source edition under
+> AGPL-3.0-or-later. Builds made solely from this repository are AGPL builds.
+> Official signed Rockxy downloads are produced from a separate downstream
+> distribution, run in free Community mode by default, can unlock paid Pro
+> capabilities, and—when they include or present Binary EULA v1.0—are licensed
+> under that [Rockxy Binary EULA](legal/BINARY-EULA-v1.0.md). Earlier downloads
+> remain subject to the terms represented with their release.
+> This repository is not represented as the complete source tree used to build
+> the official DMG. See [LICENSING.md](LICENSING.md) for the artifact-by-artifact
+> licensing boundary.
 
 <p align="center">
   <a href="https://youtu.be/RvkQuwUjBaQ" title="Watch the Rockxy demo on YouTube">
@@ -319,6 +331,9 @@ Send a captured session to a teammate with one click. Annotate failing requests 
 
 ## Quick Start
 
+These commands build the public AGPL Community source edition. That build is
+not the same artifact as the official signed DMG published on GitHub Releases.
+
 ```bash
 git clone https://github.com/RockxyApp/Rockxy.git
 cd Rockxy
@@ -335,9 +350,9 @@ If you want to connect Rockxy to a local MCP client after installation, see the 
 
 |  | **Rockxy** | **Proxyman** | **Charles Proxy** |
 |---|---|---|---|
-| **Project model** | AGPL-3.0 open-source project | Proprietary commercial app | Proprietary commercial app |
-| **Source code** | Public, auditable, forkable | Closed source | Closed source |
-| **Build from source** | Free with Xcode from this repo | Not available from public source | Not available from public source |
+| **Project model** | Public Community source: AGPL-3.0-or-later; official DMG: separately licensed binary | Proprietary commercial app | Proprietary commercial app |
+| **Source code** | Community source is public; the official DMG also contains non-public downstream components | Closed source | Closed source |
+| **Build from source** | Build the AGPL Community source edition with Xcode; it is not the exact source tree of the official DMG | Not available from public source | Not available from public source |
 | **Native macOS foundation** | Swift + SwiftNIO + SwiftUI/AppKit | Closed-source native macOS app | Closed-source cross-platform app |
 | **Local-first capture** | Local proxy, certificates, helper, and capture data stay on your Mac | Desktop proxy app | Desktop proxy app |
 | **Developer setup workflow** | Built-in Developer Setup Hub for runtimes, clients, devices, frameworks, and environments | Built-in automatic setup plus platform and runtime guides | Platform-specific setup guides |
@@ -429,7 +444,13 @@ Rockxy is fiscally hosted by [Open Source Collective](https://docs.oscollective.
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE) — Copyright 2024–2026 Rockxy Contributors.
+The source in this public repository is available under the
+[GNU Affero General Public License v3.0 or later](LICENSE), except identified
+third-party material. Official signed DMG downloads that include or present
+Binary EULA v1.0 are governed by that
+[Rockxy Binary EULA](legal/BINARY-EULA-v1.0.md). See
+[LICENSING.md](LICENSING.md) for the complete artifact boundary and
+[COPYRIGHT.md](COPYRIGHT.md) for ownership and attribution information.
 
 ## Star History
 

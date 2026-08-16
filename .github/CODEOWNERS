@@ -1,0 +1,12 @@
+# Legal, licensing, contribution, and release-provenance policy requires the
+# Rockxy project owner's review.
+/CLA.md @LocNguyenHuu
+/CONTRIBUTING.md @LocNguyenHuu
+/COPYRIGHT.md @LocNguyenHuu
+/LICENSE @LocNguyenHuu
+/LICENSING.md @LocNguyenHuu
+/THIRD_PARTY_NOTICES.md @LocNguyenHuu
+/legal/ @LocNguyenHuu
+/signatures/ @LocNguyenHuu
+/.github/workflows/cla.yml @LocNguyenHuu
+/releases/ @LocNguyenHuu

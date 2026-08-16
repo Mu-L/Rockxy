@@ -205,7 +205,7 @@ struct CodableRequest: Codable {
     func toLiveModel() -> HTTPRequestData {
         HTTPRequestData(
             method: method,
-            url: URL(string: url) ?? URL(string: "about:blank")!, // swiftlint:disable:this force_unwrapping
+            url: URL(string: url) ?? URL(string: "about:blank")!,
             httpVersion: httpVersion,
             headers: headers.map { $0.toLiveModel() },
             body: BodyEncoding.decode(base64: bodyBase64, truncated: bodyTruncated),

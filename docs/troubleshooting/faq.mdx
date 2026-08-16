@@ -25,9 +25,21 @@ Use replay when you want a fast resend. Use a breakpoint when you need to pause 
 
 Use HAR for cross-tool sharing. Use Rockxy's native session format when you want to preserve Rockxy-specific context and fidelity.
 
-## What does the current open-source build include today?
+## What does the public source build include today?
 
-The current open-source build includes core capture, inspection, replay, rules, sessions, manual setup flows, runtime-oriented automatic setup, and the DefaultAppPolicy capacity caps documented in [Pro Features](/features/pro-features). React Native is currently manual/hybrid setup with a fetch probe, Android debug XML guidance, and Metro troubleshooting.
+The public AGPL Community source build includes core capture, inspection,
+replay, rules, sessions, manual setup flows, runtime-oriented automatic setup,
+and the DefaultAppPolicy capacity caps documented in
+[Pro Features](/features/pro-features). It does not contain the non-public
+downstream licensing and Pro implementation used to produce the official DMG.
+
+## Is the GitHub source the exact source for the official DMG?
+
+No. The public repository is the AGPL Community source edition. The official
+signed DMG is produced from a separate downstream distribution, runs in free
+Community mode by default, and can unlock Pro. The DMG is governed by the
+[Rockxy Binary EULA](https://github.com/RockxyApp/Rockxy/blob/main/legal/BINARY-EULA-v1.0.md). See
+[Licensing](https://github.com/RockxyApp/Rockxy/blob/main/LICENSING.md) for the complete distinction.
 
 ## What does a perpetual Rockxy Pro license mean?
 

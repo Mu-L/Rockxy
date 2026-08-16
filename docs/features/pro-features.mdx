@@ -1,69 +1,81 @@
 ---
-title: "Pro Features"
-description: "What the open-source Rockxy build includes today, the capacity limits applied by DefaultAppPolicy, and which Pro extensions are planned but not yet shipping in this binary."
+title: "Rockxy Community and Pro"
+description: "Understand the public AGPL Community source edition, free Community mode in the official app, and optional Pro capabilities."
 ---
 
-# Pro Features
+# Rockxy Community and Pro
 
-Rockxy is designed so that Pro ships inside the same app binary as Community. There is no separate download. The split is governed by `AppPolicy` (`Rockxy/Models/Settings/AppPolicy.swift`) — a `Sendable` protocol injected into `MainContentCoordinator.init(policy:)`. The open-source build always uses `DefaultAppPolicy`; a Pro build swaps in an unlimited variant of the same protocol. There is no `isPro` boolean to branch on, and the current open-source repo does not include a license UI, an upgrade screen, or a Pro policy implementation.
+Rockxy uses two related distribution artifacts:
 
-This page describes what the current build actually ships and what is planned but not yet wired up.
+- The **public Community source edition** is the source in the Rockxy GitHub
+  repository. It is available under AGPL-3.0-or-later and builds with
+  `DefaultAppPolicy`.
+- The **official signed Rockxy app** is built from a separate downstream
+  distribution. The same installed app runs in Community mode without a
+  purchase and unlocks Pro when an eligible license is active. The official
+  binary is governed by the [Rockxy Binary EULA](https://github.com/RockxyApp/Rockxy/blob/main/legal/BINARY-EULA-v1.0.md).
 
-## What the open-source build includes today
+The public repository is not the complete or exact source tree used to build
+the official DMG. See [Rockxy Licensing](https://github.com/RockxyApp/Rockxy/blob/main/LICENSING.md) for the
+artifact-by-artifact boundary.
 
-Everything below is available without any license:
+## Community source edition
 
-- HTTP, HTTPS, WebSocket, and GraphQL capture
-- Request replay and editing
-- Map Local, Map Remote, Block, Modify Headers, Network Conditions, Breakpoints
-- Compare workspace (Diff window)
-- Scripting (`scriptingList` + `scriptEditor` windows)
-- Sessions and HAR import / export
-- Developer Setup Hub manual setup and automatic setup for runtime targets
-- MCP server with read-only flow / rule / status tools
+The public source edition includes the complete local-first debugging baseline:
 
-## Capacity limits applied by DefaultAppPolicy
+- HTTP, HTTPS, WebSocket, and GraphQL capture;
+- request replay and editing;
+- Map Local, Map Remote, Block, Modify Headers, Network Conditions, and
+  Breakpoints;
+- Compare, scripting, sessions, and HAR import/export;
+- Developer Setup Hub guidance and supported one-shot setup workflows; and
+- the local read-only MCP server and bridge.
 
-These caps are hardcoded in `DefaultAppPolicy` and enforced by the rule, script, workspace, and history layers via the policy gates (`RulePolicyGate`, `ScriptPolicyGate`, etc.) bound at app startup:
+The source edition applies the capacity policy defined by `DefaultAppPolicy`,
+including limits for workspaces, favorites, rules, scripts, live history,
+Developer Setup profiles, and selected advanced workflows.
 
-| Area | DefaultAppPolicy cap |
+## Community mode in the official app
+
+The official signed app starts in Community mode and can be used without a
+purchase. Community mode is a runtime entitlement state inside that binary; it
+does not mean the complete official binary is published under the AGPL or built
+solely from the public repository.
+
+## Pro in the official app
+
+An eligible Pro license lifts supported capacity limits and enables paid
+workflow depth in the official app. The exact capabilities depend on the
+installed version and entitlement. The app shows the authoritative current
+state in **Rockxy → Settings → License** and at the action boundary for a paid
+workflow.
+
+Feature names in a roadmap or source-level flag are not proof that a complete
+workflow ships. Public documentation describes a Pro capability as available
+only when the official app contains its implementation and user-facing path.
+
+## Licensing summary
+
+| Item | Terms |
 | --- | --- |
-| Workspace tabs | 8 |
-| Domain favorites | 5 |
-| Active rules per tool | 10 |
-| Enabled scripts | 10 |
-| Live history retention | 1,000 entries |
-| Upstream proxy bypass entries | 3 |
-| Upstream SOCKS5 | disabled |
-| Upstream proxy authentication | disabled |
-| Protobuf schema upload | disabled |
-| Stored protobuf schemas | 0 |
+| Public Community source and builds made solely from it | AGPL-3.0-or-later |
+| Official signed app, including Community mode | Rockxy Binary EULA |
+| Pro entitlement | Binary EULA plus applicable purchase terms |
+| Third-party components | Their respective licenses |
 
-A Pro build would inject an `AppPolicy` implementation that lifts these limits and turns on the gated upstream-proxy and protobuf capabilities. The current open-source binary always reports the values above.
-
-## Planned Pro extensions (not in this build)
-
-The following items are part of the planned Pro layer but are **not** present in the current open-source source tree. Treat them as roadmap, not shipping features:
-
-- An **Advanced Diff** workspace built on top of the existing Compare flow (Compare History, pinned pairs, section summaries, additional action shortcuts).
-- Additional automation inside Developer Setup Hub for mobile targets (for example a guided React Native Android flow). Today every mobile / framework target with `automationSupport: .none` uses the Manual Setup window.
-- A **License** tab inside Settings, license activation/restore/deactivate flows, and license-state surfacing.
-
-When these ship, this page and `License Management` will be updated to describe the actual UI rather than the policy contract.
-
-## Related Pages
+## Related pages
 
 <CardGroup cols={2}>
-  <Card title="Request Diff" icon="code-compare" href="/features/diff">
-    The Compare workspace that ships in the open-source build today.
-  </Card>
-  <Card title="Developer Setup Hub" icon="screwdriver-wrench" href="/features/developer-setup-hub">
-    Runtime, client, device, and framework setup — automatic for runtimes, manual for everything else.
-  </Card>
   <Card title="License Management" icon="key" href="/features/license-management">
-    Planned licensing model. No license UI ships in the current build.
+    Activate, restore, validate, or deactivate Pro in the official app.
+  </Card>
+  <Card title="Building" icon="hammer" href="/development/building">
+    Build and test the public AGPL Community source edition.
   </Card>
   <Card title="Settings" icon="gear" href="/customization/settings">
-    Current settings tabs: General, Appearance, Privacy, Tools, GitHub, Plugins, MCP, Advanced.
+    See which settings belong to the public source build and official distribution.
+  </Card>
+  <Card title="Request Diff" icon="code-compare" href="/features/diff">
+    Use the Compare workflow available in the Community source edition.
   </Card>
 </CardGroup>

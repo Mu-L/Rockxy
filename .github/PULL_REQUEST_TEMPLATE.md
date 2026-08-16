@@ -20,6 +20,9 @@
 
 ## CLA
 
-This project requires a signed [Contributor License Agreement](CLA.md).
-If this is your first contribution, the CLA Assistant bot will comment on this PR
-with instructions. You must sign the CLA before your PR can be merged.
+This project requires acceptance of the
+[Individual Contributor License Agreement v2.0](legal/cla/ICLA-v2.0.md).
+The `Rockxy CLA` check will comment with the exact acceptance statement. You
+must accept that version before your PR can be merged. If an employer or
+another organization owns or controls the contribution, contact
+`rockxyapp@gmail.com` about the CCLA first.

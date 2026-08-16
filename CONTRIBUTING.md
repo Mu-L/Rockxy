@@ -63,6 +63,10 @@ Branch off `develop`:
 
 All pull requests must target the **`develop`** branch. One change per PR. Make sure tests pass and lint is clean. Link related issues.
 
+Rockxy merges accepted external pull requests with a merge commit so the exact
+reviewed contributor commit SHAs remain in project history. Squash and rebase
+merges are disabled; contributors do not need to change their normal PR flow.
+
 Before opening, check:
 
 - [ ] Tests added or updated
@@ -89,15 +93,39 @@ Open a [GitHub issue](https://github.com/RockxyApp/Rockxy/issues) with your macO
 
 ## Contributor License Agreement
 
-All contributors must sign the [Contributor License Agreement](CLA.md) before
-their pull request can be merged. When you open your first PR, the CLA Assistant
-bot will post a comment with instructions. Reply with the required phrase to
-sign. This is a one-time process — once signed, all your future PRs are
-automatically approved.
+All contributors must accept the current
+[Individual Contributor License Agreement v2.0](legal/cla/ICLA-v2.0.md) before
+their pull request can be merged. When you open a PR, the `Rockxy CLA` check
+posts a comment asking each contributor to accept. Read the ICLA, then post this
+exact comment on the pull request:
+
+```
+I have read and agree to the Rockxy ICLA v2.0
+```
+
+The `Rockxy CLA` status turns green once every contributor on the PR has
+accepted. Accepting the ICLA v2.0 covers the contributions in that pull request
+and your later Contributions while that version is in effect; a signature from a
+different, later pull request does not cover an earlier-opened one, and a later
+material agreement version requires new acceptance. Acceptance is recorded as an
+append-only-by-workflow evidence record on the dedicated `cla-signatures` branch.
+
+You retain copyright in your Contribution. The ICLA gives the Project Owner the
+rights needed to publish it in the AGPL Community source edition and to use it
+in separately licensed Rockxy distributions. Contributions incorporated into
+the public source edition remain available there under its public source
+license.
+
+If your employer or another organization owns or controls your Contribution,
+an authorized representative must also execute the
+[Corporate Contributor License Agreement](legal/cla/CCLA-v1.0.md). Contact
+`rockxyapp@gmail.com` before signing or submitting employer-owned work.
 
 Pull requests from contributors who have not signed the CLA will be blocked
 from merging.
 
 ## License
 
-Contributions are licensed under [GNU Affero General Public License v3.0](LICENSE).
+Contributions incorporated into this public source edition are available under
+[GNU Affero General Public License v3.0 or later](LICENSE), subject to the
+additional rights granted in the contributor agreement.
