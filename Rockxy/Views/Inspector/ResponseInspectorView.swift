@@ -66,7 +66,6 @@ struct ResponseInspectorView: View {
     private var httpsPromptModel: HTTPSInspectionPromptModel? {
         HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: SSLProxyingManager.shared.isEnabled,
             canInterceptHTTPS: coordinator.readiness.canInterceptHTTPS,
             domainRuleEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host),
             appName: normalizedClientAppName,
@@ -452,59 +451,8 @@ struct ResponseInspectorView: View {
     }
 
     private func encryptedHTTPSPrompt(_ prompt: HTTPSInspectionPromptModel) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 18) {
-                HStack(spacing: 10) {
-                    Image(systemName: "lock")
-                        .font(.system(size: max(24, metrics.primaryFontSize + 15), weight: .regular))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-
-                    Text(prompt.title)
-                        .font(.system(size: max(20, metrics.primaryFontSize + 11), weight: .regular))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                }
-
-                Text(prompt.message)
-                    .font(.system(size: max(metrics.primaryFontSize, metrics.controlFontSize), weight: .regular))
-                    .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
-
-                Button {
-                    handleHTTPSPromptAction(prompt.primaryAction)
-                } label: {
-                    Text(prompt.primaryTitle)
-                        .frame(minWidth: 220)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
-                if let secondaryTitle = prompt.secondaryTitle,
-                   let secondaryAction = prompt.secondaryAction
-                {
-                    Text(String(localized: "or"))
-                        .font(.system(size: metrics.controlFontSize, weight: .medium))
-                        .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-
-                    Button {
-                        handleHTTPSPromptAction(secondaryAction)
-                    } label: {
-                        Text(secondaryTitle)
-                            .multilineTextAlignment(.center)
-                            .frame(minWidth: 220)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        HTTPSInspectionPromptView(prompt: prompt, onAction: handleHTTPSPromptAction)
+            .id(transaction.id)
     }
 
     private func handleHTTPSPromptAction(_ action: HTTPSInspectionPromptAction) {
@@ -690,16 +638,16 @@ enum HTTPSInspectionPromptAction: Equatable {
 // MARK: - HTTPSInspectionPromptModel
 
 struct HTTPSInspectionPromptModel: Equatable {
-    let title: String
-    let message: String
-    let primaryTitle: String
+    let host: String
     let primaryAction: HTTPSInspectionPromptAction
-    let secondaryTitle: String?
     let secondaryAction: HTTPSInspectionPromptAction?
+
+    var requiresCertificateSetup: Bool {
+        primaryAction == .installCertificate
+    }
 
     static func make(
         transaction: HTTPTransaction,
-        sslProxyingEnabled: Bool,
         canInterceptHTTPS: Bool,
         domainRuleEnabled: Bool,
         appName: String?,
@@ -722,55 +670,30 @@ struct HTTPSInspectionPromptModel: Equatable {
 
         if !canInterceptHTTPS {
             return HTTPSInspectionPromptModel(
-                title: String(localized: "HTTPS Response"),
-                message: String(
-                    localized: "This HTTPS response is encrypted. Install and trust the certificate to see the content."
-                ),
-                primaryTitle: String(localized: "Install & Trust Certificate"),
+                host: host,
                 primaryAction: .installCertificate,
-                secondaryTitle: nil,
                 secondaryAction: nil
             )
         }
 
-        let domainTitle = domainRuleEnabled ?
-            String(localized: "Disable only this domain") :
-            String(localized: "Enable only this domain")
         let domainAction: HTTPSInspectionPromptAction = domainRuleEnabled ?
             .disableDomain(host) :
             .enableDomain(host)
 
-        let message: String
-        if domainRuleEnabled || appRuleEnabled {
-            message = String(
-                localized: "SSL Proxying is enabled for this HTTPS target. You can adjust the scope below."
-            )
-        } else if sslProxyingEnabled {
-            message = String(localized: "This HTTPS response is encrypted. Enable SSL Proxying to see the content.")
+        let appAction: HTTPSInspectionPromptAction? = if let appName {
+            if appRuleEnabled {
+                HTTPSInspectionPromptAction.disableApp(appName, fallbackDomain: host)
+            } else {
+                HTTPSInspectionPromptAction.enableApp(appName, fallbackDomain: host)
+            }
         } else {
-            message = String(localized: "SSL Proxying is off. Enable it to see the encrypted content.")
-        }
-
-        let appAction: (String?, HTTPSInspectionPromptAction?) = if let appName {
-            (
-                appRuleEnabled ?
-                    String(localized: "Disable all domains from \"\(appName)\"") :
-                    String(localized: "Enable all domains from \"\(appName)\""),
-                appRuleEnabled ?
-                    .disableApp(appName, fallbackDomain: host) :
-                    .enableApp(appName, fallbackDomain: host)
-            )
-        } else {
-            (nil, nil)
+            nil
         }
 
         return HTTPSInspectionPromptModel(
-            title: String(localized: "HTTPS Response"),
-            message: message,
-            primaryTitle: domainTitle,
+            host: host,
             primaryAction: domainAction,
-            secondaryTitle: appAction.0,
-            secondaryAction: appAction.1
+            secondaryAction: appAction
         )
     }
 }
