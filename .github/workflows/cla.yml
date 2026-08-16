@@ -26,7 +26,8 @@ jobs:
        github.event.issue.pull_request &&
        (contains(github.event.comment.body, 'I have read and agree to the Rockxy ICLA v2.0') ||
         (github.event.comment.body == 'recheck' &&
-         github.event.comment.author_association == 'OWNER')))
+         (github.event.comment.author_association == 'OWNER' ||
+          github.event.comment.author_association == 'MEMBER'))))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
