@@ -1,4 +1,42 @@
 {
+  "coveredPullRequests": [
+    {
+      "commits": [
+        {
+          "login": "LocNguyenHuu",
+          "sha": "08a885b8a91b07bd88e3620742c1fbc195cfe95f",
+          "userId": 9362970
+        },
+        {
+          "login": "LocNguyenHuu",
+          "sha": "6ef685db176ec220136e517667de636add79f90a",
+          "userId": 9362970
+        },
+        {
+          "login": "LocNguyenHuu",
+          "sha": "715016a8fa915eb823431ce4bd7036f978c182f8",
+          "userId": 9362970
+        },
+        {
+          "login": "LocNguyenHuu",
+          "sha": "7cd7523ca8e7653907f742167d7cc0334d35b779",
+          "userId": 9362970
+        },
+        {
+          "login": "LocNguyenHuu",
+          "sha": "dcf3274a1b4727af5c290434ed13c5751a4b2809",
+          "userId": 9362970
+        }
+      ],
+      "contributors": [],
+      "headSha": "715016a8fa915eb823431ce4bd7036f978c182f8",
+      "prId": 4288507005,
+      "prNodeId": "PR_kwDORxf6687_nWx9",
+      "prNumber": 254,
+      "pullCreatedAt": "2026-08-16T02:17:37Z",
+      "repositoryId": 1192753899
+    }
+  ],
   "iclaVersion": "2.0",
   "records": []
 }
