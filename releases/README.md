@@ -17,7 +17,8 @@ The provenance record intentionally distinguishes these artifacts:
   official release, and `third_party_notices_sha256` identifies those exact
   bytes; and
 - schema-version-2 records pin immutable versions and SHA-256 digests for the
-  Terms and Privacy Notice that applied when the release was published.
+  Terms and Privacy Notice that applied when the release was published. Each
+  version uses `YYYY-MM-DD` and a matching `rockxy.io/legal/archive/...` URL.
 
 `latest.json` uses camel-case aliases for these fields. `catalog.json` keeps
 older signed releases as historical schema-version-1 entries when the exact

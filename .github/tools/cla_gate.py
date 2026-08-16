@@ -181,7 +181,14 @@ class GitHubClient:
             content = base64.b64decode(compact_content, validate=True).decode("utf-8")
         except (ValueError, UnicodeDecodeError) as error:
             raise RuntimeError(f"failed to decode {path}@{branch}") from error
-        return data.get("sha"), content
+        blob_sha = data.get("sha")
+        if (
+            not isinstance(blob_sha, str)
+            or len(blob_sha) != 40
+            or any(character not in "0123456789abcdef" for character in blob_sha)
+        ):
+            raise RuntimeError(f"failed to read {path}@{branch}: invalid blob SHA")
+        return blob_sha, content
 
     def put_file(self, path: str, branch: str, content: str, message: str, sha: str | None) -> int:
         payload = {

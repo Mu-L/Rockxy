@@ -219,8 +219,12 @@ def validate_distribution_provenance(
         digest = str(
             data[field(f"{name}_sha256", "termsSha256" if name == "terms" else "privacyNoticeSha256")]
         )
-        if not url.startswith("https://") or not version.strip():
-            fail(f"{path} {name} must have an HTTPS URL and immutable version")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", version):
+            fail(f"{path} {name} version must use YYYY-MM-DD")
+        archive_name = "terms" if name == "terms" else "privacy"
+        expected_url = f"https://rockxy.io/legal/archive/{archive_name}/{version}"
+        if url != expected_url:
+            fail(f"{path} {name} URL must match its immutable archive version")
         if not re.fullmatch(r"[0-9a-f]{64}", digest):
             fail(f"{path} {name} digest must be a SHA-256 hex digest")
 

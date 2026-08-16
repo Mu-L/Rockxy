@@ -24,10 +24,11 @@ class GetFileTests(unittest.TestCase):
     def test_decodes_wrapped_base64_content(self):
         encoded = base64.b64encode(b'{"records": []}\n').decode("ascii")
         wrapped = f"{encoded[:8]}\n{encoded[8:]}\n"
-        client = StubClient((200, {"sha": "blob-sha", "encoding": "base64", "content": wrapped}))
+        blob_sha = "a" * 40
+        client = StubClient((200, {"sha": blob_sha, "encoding": "base64", "content": wrapped}))
         self.assertEqual(
             client.get_file("signatures/icla-v2.0.json", "cla-signatures"),
-            ("blob-sha", '{"records": []}\n'),
+            (blob_sha, '{"records": []}\n'),
         )
 
     def test_missing_file_is_the_only_empty_result(self):
@@ -43,6 +44,16 @@ class GetFileTests(unittest.TestCase):
             with self.subTest(data=data):
                 client = StubClient((200, data))
                 with self.assertRaisesRegex(RuntimeError, "failed to"):
+                    client.get_file("ledger", "cla-signatures")
+
+    def test_successful_response_requires_canonical_blob_sha(self):
+        encoded = base64.b64encode(b"payload").decode("ascii")
+        for sha in (None, "", 123, "a" * 39, "A" * 40, "g" * 40):
+            with self.subTest(sha=sha):
+                client = StubClient(
+                    (200, {"sha": sha, "encoding": "base64", "content": encoded})
+                )
+                with self.assertRaisesRegex(RuntimeError, "invalid blob SHA"):
                     client.get_file("ledger", "cla-signatures")
 
 

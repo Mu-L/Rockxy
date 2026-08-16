@@ -37,10 +37,10 @@ class ProvenanceTests(unittest.TestCase):
                 "v1.2.3/THIRD_PARTY_NOTICES.txt"
             ),
             "third_party_notices_sha256": "b" * 64,
-            "terms_url": "https://rockxy.io/legal/archive/terms-2026-08-14.html",
+            "terms_url": "https://rockxy.io/legal/archive/terms/2026-08-14",
             "terms_version": "2026-08-14",
             "terms_sha256": "c" * 64,
-            "privacy_notice_url": "https://rockxy.io/legal/archive/privacy-2026-08-14.html",
+            "privacy_notice_url": "https://rockxy.io/legal/archive/privacy/2026-08-14",
             "privacy_notice_version": "2026-08-14",
             "privacy_notice_sha256": "d" * 64,
         }
@@ -77,6 +77,25 @@ class ProvenanceTests(unittest.TestCase):
             snake_case=True,
             require_all=True,
         )
+
+    def test_mutable_or_mismatched_legal_document_reference_fails(self):
+        cases = (
+            ("terms_version", "current"),
+            ("terms_url", "https://rockxy.io/terms"),
+            ("privacy_notice_url", "https://rockxy.io/legal/archive/privacy/2026-08-13"),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                record = self.complete_record()
+                record[field] = value
+                with self.assertRaises(SystemExit):
+                    validator.validate_distribution_provenance(
+                        Path("catalog.json"),
+                        record,
+                        validator.CATALOG_PROVENANCE_REQUIRED,
+                        snake_case=True,
+                        require_all=True,
+                    )
 
 
 if __name__ == "__main__":
