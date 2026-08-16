@@ -17,7 +17,6 @@ struct HTTPResponseData: Sendable {
                 .map { ($0.name, $0.value) },
             uniquingKeysWith: { _, last in last }
         )
-        // swiftlint:disable:next force_unwrapping
         let localhostURL = URL(string: "https://localhost")!
         return HTTPCookie.cookies(
             withResponseHeaderFields: headerFields,

@@ -1,3 +1,5 @@
+// swiftlint:disable file_length
+
 @preconcurrency import AppKit
 import os
 

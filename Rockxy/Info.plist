@@ -27,7 +27,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string></string>
+	<string>Copyright 2024–2026 Nguyen Huu Loc (Stephen) and Rockxy Contributors</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Rockxy receives sessions from a nearby Rockxy iPhone only after you approve a matching pairing code.</string>
 	<key>RockxyBundledHelperVersion</key>

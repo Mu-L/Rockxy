@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+      - develop
   workflow_dispatch:
     inputs:
       channel:
@@ -33,9 +34,13 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Install SwiftLint
         run: brew install swiftlint
+      - name: Test release metadata policy
+        run: python3 -m unittest discover -s releases/tests -p 'test_*.py'
       - name: Lint
         run: swiftlint lint --strict
 
@@ -44,7 +49,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Prepare CI developer config
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'
@@ -88,13 +95,6 @@ jobs:
             PROVISIONING_PROFILE="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             test
-      - name: Upload test result bundle
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rockxy-test-results
-          path: build/test-results/Rockxy.xcresult
-          if-no-files-found: ignore
 
   build-universal:
     name: Build (Universal)
@@ -104,7 +104,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
       - name: Prepare CI developer config
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'
@@ -277,8 +279,3 @@ jobs:
           verify_helper_resources_in_app "build/arm64/Build/Products/Release/Rockxy.app" "arm64 app bundle"
           verify_helper_resources_in_app "build/x86_64/Build/Products/Release/Rockxy.app" "x86_64 app bundle"
           verify_helper_resources_in_app "artifacts/Rockxy.app" "universal app bundle"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rockxy-universal
-          path: artifacts/Rockxy-universal.zip
-          if-no-files-found: error

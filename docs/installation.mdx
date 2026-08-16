@@ -19,6 +19,12 @@ Rockxy is a native macOS application. Installation is straightforward, but HTTPS
 
 Download the latest `.dmg` from [GitHub Releases](https://github.com/RockxyApp/Rockxy/releases).
 
+The signed and notarized DMG is the official Rockxy binary distribution. It
+runs in Community mode without a purchase, can unlock Pro with an eligible
+license, and is governed by the [Rockxy Binary EULA](https://github.com/RockxyApp/Rockxy/blob/main/legal/BINARY-EULA-v1.0.md).
+It is built from a separate downstream distribution, not solely from the public
+source repository.
+
 Rockxy currently ships a universal macOS release package for both Apple Silicon and Intel Macs.
 
 If future releases add architecture-specific downloads, the release notes will call that out explicitly. If you are unsure which Mac you have, choose the standard release listed on GitHub.
@@ -82,6 +88,10 @@ For current builds, Rockxy derives these names from its bundle identity at runti
 ## Build from Source
 
 Requires Xcode 16+. Dependencies are managed through the Xcode project.
+
+This path builds the public Rockxy Community source edition under
+AGPL-3.0-or-later. It does not reproduce the exact official signed DMG and does
+not include its non-public downstream components or Pro activation layer.
 
 ```bash
 git clone https://github.com/RockxyApp/Rockxy.git

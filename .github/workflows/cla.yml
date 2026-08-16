@@ -1,29 +1,65 @@
-name: CLA Assistant
+name: Rockxy CLA
+
 on:
   issue_comment:
     types: [created]
   pull_request_target:
-    types: [opened, closed, synchronize]
+    types: [opened, reopened, synchronize]
 
+# Least privilege. contents:write is needed only to create/update the signature
+# ledger on the dedicated cla-signatures branch via the API; the workflow never
+# checks out or executes fork code.
 permissions:
-  actions: write
   contents: write
   pull-requests: write
   statuses: write
 
+concurrency:
+  group: rockxy-cla-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   cla:
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       (contains(github.event.comment.body, 'I have read and agree to the Rockxy ICLA v2.0') ||
+        (github.event.comment.body == 'recheck' &&
+         (github.event.comment.author_association == 'OWNER' ||
+          github.event.comment.author_association == 'MEMBER'))))
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: CLA Assistant
-        if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
-        uses: contributor-assistant/github-action@v2.6.1
+      - name: Confirm Project Owner legal identity is configured
+        env:
+          ROCKXY_LEGAL_IDENTITY_CONFIRMED: ${{ vars.ROCKXY_LEGAL_IDENTITY_CONFIRMED }}
+        run: test "$ROCKXY_LEGAL_IDENTITY_CONFIRMED" = "true"
+
+      # Trusted code only: check out the repository default branch at an
+      # immutable actions/checkout SHA. Never the pull request head.
+      - name: Checkout trusted default-branch gate code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Verify contributor-policy documents are present
+        run: |
+          test -s legal/cla/ICLA-v2.0.md
+          test -s legal/cla/ICLA-v2.0.sha256
+          test -s legal/cla/CCLA-v1.0.md
+          test -s legal/cla/CLA-PRIVACY.md
+          test -s legal/BINARY-EULA-v1.0.md
+
+      - name: Test contributor-license gate logic
+        run: python3 -m unittest discover -s .github/tools/tests -p 'test_*.py'
+
+      - name: Evaluate Rockxy ICLA v2.0 gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          path-to-signatures: 'signatures/cla.json'
-          path-to-document: 'https://github.com/RockxyApp/Rockxy/blob/main/CLA.md'
-          branch: 'main'
-          allowlist: 'bot*,dependabot[bot],renovate[bot],github-actions[bot]'
-          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
-          lock-pullrequest-aftermerge: true
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          ROCKXY_CLA_SIGNATURES_BRANCH: cla-signatures
+        run: python3 .github/tools/cla_gate.py

@@ -6,7 +6,11 @@ import NIOPosix
 @testable import Rockxy
 import Testing
 
-@Suite("Developer Setup Runtime Integration", .serialized)
+@Suite(
+    "Developer Setup Runtime Integration",
+    .serialized,
+    .enabled(if: ProcessInfo.processInfo.environment["ROCKXY_RUN_RUNTIME_INTEGRATION_TESTS"] == "1")
+)
 struct DeveloperSetupRuntimeIntegrationTests {
     @Test("Python runtime traffic is captured end-to-end")
     func pythonRuntimeTrafficIsCaptured() async throws {

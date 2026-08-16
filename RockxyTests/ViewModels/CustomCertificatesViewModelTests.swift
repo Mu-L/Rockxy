@@ -47,6 +47,17 @@ struct CustomCertificatesViewModelTests {
         )
         #expect(viewModel.rootStatus == .customUnavailable)
         #expect(viewModel.rootStatusText == "Custom Root Unavailable")
+
+        let activeGeneration = viewModel.beginRootRefresh()
+        #expect(
+            viewModel.applyDefaultRoot(
+                certificate: nil,
+                snapshot: emptySnapshot,
+                customRootAvailability: true,
+                generation: activeGeneration
+            )
+        )
+        #expect(viewModel.rootStatus == .customActive)
     }
 
     @Test("Preview and delete target the selected server certificate")

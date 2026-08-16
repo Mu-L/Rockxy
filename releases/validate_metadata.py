@@ -34,6 +34,44 @@ CATALOG_REQUIRED = {
     "minimum_system_version",
 }
 
+LATEST_PROVENANCE_REQUIRED = {
+    "binaryLicense",
+    "binaryLicenseUrl",
+    "communityModeAvailableWithoutPurchase",
+    "publicSourceEditionUrl",
+    "publicSourceEditionLicense",
+    "publicSourceCommit",
+    "publicSourceCommitUrl",
+    "sourceRelationship",
+    "thirdPartyNoticesUrl",
+    "thirdPartyNoticesSha256",
+    "termsUrl",
+    "termsVersion",
+    "termsSha256",
+    "privacyNoticeUrl",
+    "privacyNoticeVersion",
+    "privacyNoticeSha256",
+}
+
+CATALOG_PROVENANCE_REQUIRED = {
+    "binary_license",
+    "binary_license_url",
+    "community_mode_available_without_purchase",
+    "public_source_edition_url",
+    "public_source_edition_license",
+    "public_source_commit",
+    "public_source_commit_url",
+    "source_relationship",
+    "third_party_notices_url",
+    "third_party_notices_sha256",
+    "terms_url",
+    "terms_version",
+    "terms_sha256",
+    "privacy_notice_url",
+    "privacy_notice_version",
+    "privacy_notice_sha256",
+}
+
 APPCAST_REQUIRED = {
     "pubDate",
     "enclosure.url",
@@ -119,6 +157,78 @@ def ensure_public_safe(path: Path, value: Any) -> None:
         fail(f"{path} contains private release metadata token {match.group(0)!r}")
 
 
+def validate_distribution_provenance(
+    path: Path,
+    data: dict[str, Any],
+    required: set[str],
+    *,
+    snake_case: bool,
+    require_all: bool,
+) -> None:
+    if not any(key in data for key in required):
+        if require_all:
+            fail(f"{path} is missing required distribution provenance")
+        return
+    missing = sorted(key for key in required if data.get(key) in ("", None, False))
+    if missing:
+        fail(f"{path} has incomplete distribution provenance: {', '.join(missing)}")
+
+    def field(snake: str, camel: str) -> str:
+        return snake if snake_case else camel
+    if data[field("binary_license", "binaryLicense")] != "Rockxy Binary EULA v1.0":
+        fail(f"{path} must identify Rockxy Binary EULA v1.0")
+    if data[field("public_source_edition_license", "publicSourceEditionLicense")] != "AGPL-3.0-or-later":
+        fail(f"{path} must identify the public source edition as AGPL-3.0-or-later")
+    if data[field("source_relationship", "sourceRelationship")] != "separate-source-edition":
+        fail(f"{path} must identify the public source as a separate source edition")
+    if data[field("community_mode_available_without_purchase", "communityModeAvailableWithoutPurchase")] is not True:
+        fail(f"{path} must record that Community mode is available without purchase")
+
+    commit = str(data[field("public_source_commit", "publicSourceCommit")])
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        fail(f"{path} public source commit must be a full Git SHA")
+    notices_sha = str(data[field("third_party_notices_sha256", "thirdPartyNoticesSha256")])
+    if not re.fullmatch(r"[0-9a-f]{64}", notices_sha):
+        fail(f"{path} third-party notices digest must be a SHA-256 hex digest")
+
+    repo_url = str(data[field("public_source_edition_url", "publicSourceEditionUrl")])
+    if repo_url != "https://github.com/RockxyApp/Rockxy":
+        fail(f"{path} public source edition URL must point to RockxyApp/Rockxy")
+    commit_url = str(data[field("public_source_commit_url", "publicSourceCommitUrl")])
+    if commit_url != f"{repo_url}/tree/{commit}":
+        fail(f"{path} public source commit URL does not match its commit")
+    binary_license_url = str(data[field("binary_license_url", "binaryLicenseUrl")])
+    if f"{repo_url}/blob/{commit}/legal/BINARY-EULA-v1.0.md" != binary_license_url:
+        fail(f"{path} Binary EULA URL must be pinned to the public source commit")
+    notices_url = str(data[field("third_party_notices_url", "thirdPartyNoticesUrl")])
+    release_tag = str(data[field("release_tag", "releaseTag")])
+    if not re.fullmatch(r"v[^/]+", release_tag):
+        fail(f"{path} release tag must be a canonical v-prefixed tag")
+    expected_notices_url = (
+        f"https://github.com/RockxyApp/Rockxy/releases/download/"
+        f"{release_tag}/THIRD_PARTY_NOTICES.txt"
+    )
+    if notices_url != expected_notices_url:
+        fail(f"{path} third-party notices URL must point to the official release asset")
+
+    for name in ("terms", "privacy_notice"):
+        url = str(data[field(f"{name}_url", "termsUrl" if name == "terms" else "privacyNoticeUrl")])
+        version = str(
+            data[field(f"{name}_version", "termsVersion" if name == "terms" else "privacyNoticeVersion")]
+        )
+        digest = str(
+            data[field(f"{name}_sha256", "termsSha256" if name == "terms" else "privacyNoticeSha256")]
+        )
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", version):
+            fail(f"{path} {name} version must use YYYY-MM-DD")
+        archive_name = "terms" if name == "terms" else "privacy"
+        expected_url = f"https://rockxy.io/legal/archive/{archive_name}/{version}"
+        if url != expected_url:
+            fail(f"{path} {name} URL must match its immutable archive version")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            fail(f"{path} {name} digest must be a SHA-256 hex digest")
+
+
 def validate_catalog(path: Path) -> dict[str, Any]:
     catalog = load_json(path)
     ensure_public_safe(path, catalog)
@@ -136,6 +246,18 @@ def validate_catalog(path: Path) -> dict[str, Any]:
         fail(f"{path} must contain a non-empty releases array")
     if len(releases) < 2:
         fail(f"{path} must keep older signed releases discoverable")
+
+    schema_version = int(catalog["schema_version"])
+    if schema_version not in (1, 2):
+        fail(f"{path} has unsupported schema_version {schema_version}")
+    if schema_version >= 2:
+        validate_distribution_provenance(
+            path,
+            releases[0],
+            CATALOG_PROVENANCE_REQUIRED,
+            snake_case=True,
+            require_all=True,
+        )
 
     seen: set[tuple[str, str]] = set()
     previous: tuple[tuple[int, ...], int] | None = None
@@ -250,12 +372,40 @@ def latest_release_object(data: dict[str, Any]) -> dict[str, Any]:
         "sparkle_ed_signature": data.get("sparkle_ed_signature") or data.get("sparkleEdSignature"),
         "release_notes_url": data.get("release_notes_url") or data.get("releaseUrl"),
         "minimum_system_version": data.get("minimum_system_version") or data.get("minimumSystemVersion"),
+        "binary_license": data.get("binary_license") or data.get("binaryLicense"),
+        "binary_license_url": data.get("binary_license_url") or data.get("binaryLicenseUrl"),
+        "community_mode_available_without_purchase": data.get("community_mode_available_without_purchase")
+        if "community_mode_available_without_purchase" in data
+        else data.get("communityModeAvailableWithoutPurchase"),
+        "public_source_edition_url": data.get("public_source_edition_url") or data.get("publicSourceEditionUrl"),
+        "public_source_edition_license": data.get("public_source_edition_license")
+        or data.get("publicSourceEditionLicense"),
+        "public_source_commit": data.get("public_source_commit") or data.get("publicSourceCommit"),
+        "public_source_commit_url": data.get("public_source_commit_url") or data.get("publicSourceCommitUrl"),
+        "source_relationship": data.get("source_relationship") or data.get("sourceRelationship"),
+        "third_party_notices_url": data.get("third_party_notices_url") or data.get("thirdPartyNoticesUrl"),
+        "third_party_notices_sha256": data.get("third_party_notices_sha256")
+        or data.get("thirdPartyNoticesSha256"),
+        "release_tag": data.get("release_tag") or data.get("releaseTag"),
+        "terms_url": data.get("terms_url") or data.get("termsUrl"),
+        "terms_version": data.get("terms_version") or data.get("termsVersion"),
+        "terms_sha256": data.get("terms_sha256") or data.get("termsSha256"),
+        "privacy_notice_url": data.get("privacy_notice_url") or data.get("privacyNoticeUrl"),
+        "privacy_notice_version": data.get("privacy_notice_version") or data.get("privacyNoticeVersion"),
+        "privacy_notice_sha256": data.get("privacy_notice_sha256") or data.get("privacyNoticeSha256"),
     }
 
 
-def validate_latest(path: Path) -> dict[str, Any]:
+def validate_latest(path: Path, *, require_provenance: bool = False) -> dict[str, Any]:
     latest = load_json(path)
     ensure_public_safe(path, latest)
+    validate_distribution_provenance(
+        path,
+        latest,
+        LATEST_PROVENANCE_REQUIRED,
+        snake_case=False,
+        require_all=require_provenance,
+    )
     release = latest_release_object(latest)
     missing = sorted(key for key in CATALOG_REQUIRED if release.get(key) in ("", None))
     if missing:
@@ -273,9 +423,16 @@ def validate_latest(path: Path) -> dict[str, Any]:
     return release
 
 
-def validate_manifest(path: Path) -> dict[str, Any]:
+def validate_manifest(path: Path, *, require_provenance: bool = False) -> dict[str, Any]:
     manifest = load_json(path)
     ensure_public_safe(path, manifest)
+    validate_distribution_provenance(
+        path,
+        manifest,
+        LATEST_PROVENANCE_REQUIRED,
+        snake_case=False,
+        require_all=require_provenance,
+    )
     release = latest_release_object(manifest)
     missing = sorted(key for key in CATALOG_REQUIRED if release.get(key) in ("", None))
     if missing:
@@ -350,7 +507,8 @@ def main() -> int:
     args = parser.parse_args()
 
     catalog = validate_catalog(args.catalog)
-    latest = validate_latest(args.latest)
+    require_provenance = int(catalog.get("schema_version", 1)) >= 2
+    latest = validate_latest(args.latest, require_provenance=require_provenance)
     appcast_releases = validate_appcast(args.appcast)
     newest_catalog = catalog["releases"][0]
 
@@ -365,10 +523,19 @@ def main() -> int:
         if str(appcast_releases[0][key]) != str(newest_catalog[key]):
             fail(f"appcast.xml newest item {key} does not match catalog.json")
 
+    if int(catalog.get("schema_version", 1)) >= 2:
+        for key in CATALOG_PROVENANCE_REQUIRED:
+            if str(latest.get(key)) != str(newest_catalog.get(key)):
+                fail(f"latest.json {key} does not match catalog.json")
+
     if args.manifest:
-        manifest = validate_manifest(args.manifest)
+        manifest = validate_manifest(args.manifest, require_provenance=require_provenance)
         if release_identity(manifest) != release_identity(newest_catalog):
             fail("public manifest does not match catalog.json")
+        if int(catalog.get("schema_version", 1)) >= 2:
+            for key in CATALOG_PROVENANCE_REQUIRED:
+                if str(manifest.get(key)) != str(newest_catalog.get(key)):
+                    fail(f"public manifest {key} does not match catalog.json")
     if args.app:
         validate_app_bundle(args.app, newest_catalog)
     if args.build_settings:

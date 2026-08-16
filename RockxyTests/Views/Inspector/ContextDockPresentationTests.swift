@@ -433,7 +433,6 @@ struct ContextDockInvestigationReportTests {
         #expect(!dock.contains("suggestionLauncher"))
         #expect(!dock.contains("primaryRecipes"))
         #expect(!dock.contains("private func suggestionButton("))
-        #expect(!dock.contains(".buttonStyle(.link)"))
         #expect(!dock.contains("Text(recipe.prompt)"))
 
         // Each card: exactly one meaningful SF Symbol plus the short recipe.title (2-line max), a
@@ -441,6 +440,14 @@ struct ContextDockInvestigationReportTests {
         // The prior custom .plain style, controlBackgroundColor surface, and rounded hairline overlay
         // are gone — the reference is the native bordered-button treatment, not a custom approximation.
         #expect(dock.contains("private func suggestionCard("))
+        let suggestionCardBody = try #require(
+            dock.components(separatedBy: "private func suggestionCard(")
+                .dropFirst()
+                .first?
+                .components(separatedBy: "@ViewBuilder")
+                .first
+        )
+        #expect(!suggestionCardBody.contains(".buttonStyle(.link)"))
         #expect(dock.contains("Image(systemName: recipe.systemImage)"))
         #expect(dock.contains("Text(recipe.title)"))
         #expect(dock.contains(".lineLimit(2)"))

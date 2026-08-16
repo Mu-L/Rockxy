@@ -1363,20 +1363,24 @@ struct RockxyMenuCommands: Commands {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
         let homepage = ProjectLinks.repositoryURL
-        let credits = NSMutableAttributedString(string: String(localized: "Open source HTTP debugging for macOS.\n"))
+        let credits = NSMutableAttributedString(
+            string: String(localized: "The Rockxy Community source edition is licensed under AGPL-3.0-or-later.\n")
+        )
 
         if let homepage {
-            let linkText = String(localized: "View project on GitHub")
+            let linkText = String(localized: "View the public source and license on GitHub")
             let link = NSMutableAttributedString(string: linkText)
             link.addAttribute(.link, value: homepage, range: NSRange(location: 0, length: link.length))
             credits.append(link)
         }
-        credits
-            .append(
-                NSAttributedString(
-                    string: String(localized: "\n\nOpenAPI HTML export includes Swagger UI, licensed under Apache-2.0.")
-                )
-            )
+        let noticesURL = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "txt")
+            ?? Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "txt", subdirectory: "Legal")
+        if let noticesURL {
+            credits.append(NSAttributedString(string: "\n"))
+            let notices = NSMutableAttributedString(string: String(localized: "Third-Party Software Notices"))
+            notices.addAttribute(.link, value: noticesURL, range: NSRange(location: 0, length: notices.length))
+            credits.append(notices)
+        }
 
         var options: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: RockxyIdentity.current.displayName,

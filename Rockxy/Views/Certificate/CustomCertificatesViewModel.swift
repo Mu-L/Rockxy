@@ -151,14 +151,13 @@ final class CustomCertificatesViewModel {
 
     var rootStatus: RootTrustStatus {
         if hasCustomRoot {
-            switch customRootAvailability {
-            case true:
+            if customRootAvailability == true {
                 return .customActive
-            case false:
-                return .customUnavailable
-            case nil:
-                return .customVerifying
             }
+            if customRootAvailability == false {
+                return .customUnavailable
+            }
+            return .customVerifying
         }
         if defaultRootSnapshot?.isInstalledInKeychain == true,
            defaultRootSnapshot?.isSystemTrustValidated == true
