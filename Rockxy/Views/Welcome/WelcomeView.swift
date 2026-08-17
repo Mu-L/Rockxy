@@ -426,7 +426,9 @@ struct WelcomeView: View {
              .installedIncompatible:
             await viewModel.updateHelper()
         case .signingMismatch:
-            if case .identityMismatch = viewModel.helperSigningIssue {
+            if case .applicationMustReopen = viewModel.helperSigningIssue {
+                HelperRecoveryPresenter.requestRequiredReopen()
+            } else if case .identityMismatch = viewModel.helperSigningIssue {
                 await viewModel.reinstallHelper()
             }
         case .unreachable:

@@ -1,6 +1,104 @@
 import Foundation
 
 extension HelperManager {
+    enum HelperOperationError: LocalizedError, Equatable {
+        case applicationMustReopen
+        case appSignatureInvalid
+
+        var errorDescription: String? {
+            switch self {
+            case .applicationMustReopen:
+                HelperManager.applicationMustReopenMessage
+            case .appSignatureInvalid:
+                String(
+                    localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
+                )
+            }
+        }
+    }
+
+    /// Classify a probe-path `HelperConnectionError` into a normalized outcome.
+    /// Only maps the error cases that actually occur on the probe path
+    /// (`getProxy()` → `getHelperInfo()`).
+    nonisolated static func classifyProbeError(_ error: HelperConnectionError) -> ProbeOutcome {
+        switch error {
+        case .applicationMustReopen:
+            .applicationMustReopen
+        case let .appSignatureInvalid(detail):
+            .appSignatureInvalid(detail: detail)
+        case let .signingIdentityMismatch(app, helper):
+            .signingIdentityMismatch(appSigner: app, helperSigner: helper)
+        default:
+            .xpcFailure
+        }
+    }
+
+    /// Determine recovery action from a normalized probe outcome.
+    nonisolated static func decideRecovery(probe: ProbeOutcome) -> RecoveryAction {
+        switch probe {
+        case .applicationMustReopen:
+            .surfaceApplicationMustReopen
+        case let .appSignatureInvalid(detail):
+            .surfaceAppSignatureInvalid(detail: detail)
+        case let .signingIdentityMismatch(app, helper):
+            .surfaceSigningMismatch(appSigner: app, helperSigner: helper)
+        case .xpcFailure:
+            .surfaceUnreachable
+        }
+    }
+
+    /// Action label for the helper step in Welcome and Settings views.
+    /// Returns `nil` when no action button should be shown.
+    nonisolated static func helperActionLabel(
+        status: HelperStatus,
+        signingIssue: SigningIssue?
+    )
+        -> String?
+    {
+        switch status {
+        case .installedCompatible:
+            nil
+        case .installedOutdated,
+             .installedIncompatible:
+            String(localized: "Update")
+        case .notInstalled:
+            String(localized: "Install")
+        case .requiresApproval:
+            String(localized: "Open Settings")
+        case .unreachable:
+            String(localized: "Retry")
+        case .signingMismatch:
+            switch signingIssue {
+            case .applicationMustReopen:
+                String(localized: "Quit Rockxy")
+            case .appSignatureInvalid:
+                nil
+            case .identityMismatch:
+                String(localized: "Reinstall")
+            case nil:
+                nil
+            }
+        }
+    }
+
+    /// Warning reason text for the signing mismatch case in readiness warnings.
+    nonisolated static func signingMismatchWarningReason(issue: SigningIssue?) -> String {
+        switch issue {
+        case .applicationMustReopen:
+            String(localized: "Rockxy needs to be reopened before it can use the helper tool")
+        case .appSignatureInvalid:
+            String(
+                localized: "Rockxy could not verify this app copy \u{2014} install a fresh copy before using the helper tool"
+            )
+        case .identityMismatch:
+            String(
+                localized: "the installed helper does not match this copy of Rockxy \u{2014} reinstall it before continuing"
+            )
+        case nil:
+            String(localized: "the helper tool has a signing issue")
+        }
+    }
+
     enum ForceRemoveError: LocalizedError, Equatable {
         case commandFailed(exitCode: Int32, output: String)
         case commandTerminated(signal: Int32, output: String)

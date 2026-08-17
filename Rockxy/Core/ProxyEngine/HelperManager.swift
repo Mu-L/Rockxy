@@ -28,12 +28,14 @@ final class HelperManager {
 
     /// Identifies the specific signing issue when status is `.signingMismatch`.
     enum SigningIssue: Equatable {
+        case applicationMustReopen
         case appSignatureInvalid(detail: String)
         case identityMismatch(appSigner: String, helperSigner: String)
     }
 
     /// Normalized result from a helper info probe, scoped to the actual error surface.
     enum ProbeOutcome: Equatable {
+        case applicationMustReopen
         case appSignatureInvalid(detail: String)
         case signingIdentityMismatch(appSigner: String, helperSigner: String)
         case xpcFailure
@@ -41,6 +43,7 @@ final class HelperManager {
 
     /// Recovery action determined from a probe outcome.
     enum RecoveryAction: Equatable {
+        case surfaceApplicationMustReopen
         case surfaceAppSignatureInvalid(detail: String)
         case surfaceSigningMismatch(appSigner: String, helperSigner: String)
         case surfaceUnreachable
@@ -360,80 +363,6 @@ final class HelperManager {
         return helperApprovalMessage
     }
 
-    /// Classify a probe-path `HelperConnectionError` into a normalized outcome.
-    /// Only maps the error cases that actually occur on the probe path
-    /// (`getProxy()` → `getHelperInfo()`).
-    nonisolated static func classifyProbeError(_ error: HelperConnectionError) -> ProbeOutcome {
-        switch error {
-        case let .appSignatureInvalid(detail):
-            .appSignatureInvalid(detail: detail)
-        case let .signingIdentityMismatch(app, helper):
-            .signingIdentityMismatch(appSigner: app, helperSigner: helper)
-        default:
-            .xpcFailure
-        }
-    }
-
-    /// Determine recovery action from a normalized probe outcome.
-    nonisolated static func decideRecovery(probe: ProbeOutcome) -> RecoveryAction {
-        switch probe {
-        case let .appSignatureInvalid(detail):
-            .surfaceAppSignatureInvalid(detail: detail)
-        case let .signingIdentityMismatch(app, helper):
-            .surfaceSigningMismatch(appSigner: app, helperSigner: helper)
-        case .xpcFailure:
-            .surfaceUnreachable
-        }
-    }
-
-    /// Action label for the helper step in Welcome and Settings views.
-    /// Returns `nil` when no action button should be shown.
-    nonisolated static func helperActionLabel(
-        status: HelperStatus,
-        signingIssue: SigningIssue?
-    )
-        -> String?
-    {
-        switch status {
-        case .installedCompatible:
-            nil
-        case .installedOutdated,
-             .installedIncompatible:
-            String(localized: "Update")
-        case .notInstalled:
-            String(localized: "Install")
-        case .requiresApproval:
-            String(localized: "Open Settings")
-        case .unreachable:
-            String(localized: "Retry")
-        case .signingMismatch:
-            switch signingIssue {
-            case .appSignatureInvalid:
-                nil
-            case .identityMismatch:
-                String(localized: "Reinstall")
-            case nil:
-                nil
-            }
-        }
-    }
-
-    /// Warning reason text for the signing mismatch case in readiness warnings.
-    nonisolated static func signingMismatchWarningReason(issue: SigningIssue?) -> String {
-        switch issue {
-        case .appSignatureInvalid:
-            String(
-                localized: "this app build has an invalid code signature \u{2014} clean the build folder and rebuild"
-            )
-        case .identityMismatch:
-            String(
-                localized: "the installed helper was signed by a different Rockxy build \u{2014} reinstall it from the current build"
-            )
-        case nil:
-            String(localized: "the helper tool has a signing issue")
-        }
-    }
-
     /// Detect whether any helper state property changed, including `signingIssue`.
     nonisolated static func helperStateDidChange(
         previousStatus: HelperStatus, currentStatus: HelperStatus,
@@ -470,6 +399,7 @@ final class HelperManager {
                 previousSigningIssue: previousSigningIssue
             )
         }
+        try await ensureHelperMutationCanProceed()
         try await performInstall()
         if status != .requiresApproval {
             await performCheckStatus()
@@ -541,6 +471,7 @@ final class HelperManager {
 
         Self.logger.info("Updating helper tool")
         do {
+            try await ensureHelperMutationCanProceed()
             try await performUninstall()
             try? await Task.sleep(nanoseconds: 500_000_000)
             try await performInstall()
@@ -594,6 +525,7 @@ final class HelperManager {
             )
         }
         do {
+            try await ensureHelperMutationCanProceed()
             try await performUninstall()
             try await performInstall()
             if status != .requiresApproval {
@@ -630,6 +562,7 @@ final class HelperManager {
         }
 
         Self.logger.info("Force-resetting helper registration to recover from BTM desync")
+        try await ensureHelperMutationCanProceed()
         let service = SMAppService.daemon(plistName: Self.plistName)
 
         do {
@@ -683,6 +616,8 @@ final class HelperManager {
         }
 
         Self.logger.info("Hard force-removing helper. resetBackgroundItems=\(resetBackgroundItems)")
+
+        try await ensureHelperMutationCanProceed()
 
         do {
             try await HelperConnection.shared.uninstallHelper()
@@ -755,6 +690,9 @@ final class HelperManager {
         category: "HelperManager"
     )
     private static let plistName = RockxyIdentity.current.helperPlistName
+    nonisolated static let applicationMustReopenMessage = String(
+        localized: "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again."
+    )
     nonisolated static let bundledHelperBinaryRelativePath = "Contents/Library/HelperTools/RockxyHelperTool"
     nonisolated private static let helperApprovalMessage = String(
         localized: "Approve the helper tool in System Settings > Login Items to finish installation."
@@ -1176,6 +1114,9 @@ final class HelperManager {
             let action = Self.decideRecovery(probe: probe)
 
             switch action {
+            case .surfaceApplicationMustReopen:
+                setSigningMismatchState(.applicationMustReopen)
+
             case let .surfaceAppSignatureInvalid(detail):
                 setSigningMismatchState(.appSignatureInvalid(detail: detail))
 
@@ -1207,6 +1148,9 @@ final class HelperManager {
             let action = Self.decideRecovery(probe: probe)
 
             switch action {
+            case .surfaceApplicationMustReopen:
+                setSigningMismatchState(.applicationMustReopen)
+
             case let .surfaceAppSignatureInvalid(detail):
                 setSigningMismatchState(.appSignatureInvalid(detail: detail))
 
@@ -1241,13 +1185,12 @@ final class HelperManager {
         isReachable = false
         signingIssue = issue
         switch issue {
+        case .applicationMustReopen:
+            lastErrorMessage = Self.applicationMustReopenMessage
         case let .appSignatureInvalid(detail):
+            Self.logger.error("App signature validation failed: \(detail)")
             lastErrorMessage = String(
-                localized: """
-                This app build has an invalid code signature (\(detail)). \
-                Clean the build folder (Product \u{2192} Clean Build Folder) and rebuild, \
-                or use the release version of Rockxy.
-                """
+                localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
             )
         case let .identityMismatch(app, helper):
             lastErrorMessage = String(
@@ -1259,6 +1202,30 @@ final class HelperManager {
             )
         }
         status = .signingMismatch
+    }
+
+    /// Prevent destructive helper repair when the running process no longer matches
+    /// the app bundle on disk. The helper's caller validation is expected to reject
+    /// that process, so only reopening Rockxy can recover it safely.
+    private func ensureHelperMutationCanProceed() async throws {
+        HelperConnection.shared.invalidateSigningCache()
+        let result = await HelperConnection.shared.signingCache.evaluate()
+        switch result {
+        case let .runningCodeChanged(detail):
+            Self.logger.warning("Helper mutation blocked because running code changed: \(detail)")
+            setSigningMismatchState(.applicationMustReopen)
+            throw HelperOperationError.applicationMustReopen
+        case let .appSignatureInvalid(detail):
+            Self.logger.error("Helper mutation blocked because app signature is invalid: \(detail)")
+            setSigningMismatchState(.appSignatureInvalid(detail: detail))
+            throw HelperOperationError.appSignatureInvalid
+        case .healthy,
+             .signingIdentityMismatch,
+             .helperBinaryNotFound,
+             .certificateChainUnavailable,
+             .diagnosticError:
+            break
+        }
     }
 
     /// Evaluate helper compatibility based on protocol version and build number.

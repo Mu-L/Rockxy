@@ -5,6 +5,14 @@ import ServiceManagement
 enum HelperRecoveryPresenter {
     // MARK: Internal
 
+    static func requestRequiredReopen() {
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.requestQuitForRequiredReopen()
+        } else {
+            NSApp.terminate(nil)
+        }
+    }
+
     static func presentForceReset(stopCapture: (() -> Void)? = nil) {
         let confirmation = NSAlert()
         confirmation.alertStyle = .critical
@@ -77,6 +85,11 @@ enum HelperRecoveryPresenter {
         stopCapture: (() -> Void)?,
         canTryBackgroundItemsReset: Bool
     ) {
+        if error as? HelperManager.HelperOperationError == .applicationMustReopen {
+            presentRequiredReopen()
+            return
+        }
+
         let alert = NSAlert()
         alert.alertStyle = .critical
         alert.messageText = String(localized: "Helper reset failed")
@@ -101,6 +114,20 @@ enum HelperRecoveryPresenter {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(error.localizedDescription, forType: .string)
         }
+    }
+
+    private static func presentRequiredReopen() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Reopen Rockxy to continue")
+        alert.informativeText = HelperManager.applicationMustReopenMessage
+        alert.addButton(withTitle: String(localized: "Quit Rockxy"))
+        alert.addButton(withTitle: String(localized: "Not Now"))
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+        requestRequiredReopen()
     }
 
     private static func presentBackgroundItemsResetConfirmation(stopCapture: (() -> Void)?) {
