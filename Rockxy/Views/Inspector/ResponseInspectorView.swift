@@ -471,6 +471,8 @@ struct ResponseInspectorView: View {
             coordinator.installAndTrustCertificateFromInspector()
         case let .enableDomain(domain):
             coordinator.enableSSLProxyingFromInspector(for: domain)
+        case let .disableDomain(domain):
+            coordinator.disableSSLProxyingFromInspector(for: domain)
         case let .retryDomain(domain):
             coordinator.retrySSLProxyingFromInspector(for: domain)
         case let .enableApp(appName, fallbackDomain):
@@ -637,6 +639,7 @@ private enum ResponseSelectionIntent {
 enum HTTPSInspectionPromptAction: Equatable {
     case installCertificate
     case enableDomain(String)
+    case disableDomain(String)
     case retryDomain(String)
     case enableApp(String, fallbackDomain: String?)
     case openSSLProxyingList
@@ -730,7 +733,7 @@ enum HTTPSConnectionInsight: Equatable {
     var title: String {
         switch self {
         case .tunnelEstablished:
-            String(localized: "Tunnel Established")
+            String(localized: "Content Not Inspected")
         case .tlsInterceptionRejected:
             String(localized: "Decryption Was Declined")
         }
@@ -740,7 +743,7 @@ enum HTTPSConnectionInsight: Equatable {
         switch self {
         case .tunnelEstablished:
             String(
-                localized: "The CONNECT request succeeded. HTTPS content remains encrypted until decryption starts on a new connection."
+                localized: "This connection completed without inspecting HTTPS content."
             )
         case .tlsInterceptionRejected:
             String(
@@ -765,7 +768,7 @@ enum HTTPSConnectionInsight: Equatable {
     var nextStep: String {
         switch self {
         case .tunnelEstablished:
-            String(localized: "Decrypt this host, then repeat the request.")
+            String(localized: "Enable decryption below, then repeat the request.")
         case .tlsInterceptionRejected:
             String(
                 localized: "Retry decryption and repeat the request. If the app rejects it again, leave this host tunneled."

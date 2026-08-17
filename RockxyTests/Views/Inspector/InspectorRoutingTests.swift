@@ -440,10 +440,12 @@ struct InspectorRoutingTests {
         )
 
         #expect(prompt?.host == "api.example.com")
+        #expect(prompt?.hostScope?.control == .toggle(isOn: false))
         #expect(prompt?.hostScope?.action == .enableDomain("api.example.com"))
         #expect(prompt?.appScope?.action == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
         #expect(prompt?.requiresCertificateSetup == false)
         #expect(prompt?.insight == .tunnelEstablished(statusCode: 200))
+        #expect(prompt?.insight?.title == "Content Not Inspected")
     }
 
     @Test("CONNECT tunnel hides duplicate app action when only the current host is known")
@@ -511,6 +513,7 @@ struct InspectorRoutingTests {
 
         #expect(prompt?.insight == .tlsInterceptionRejected)
         #expect(prompt?.insight?.evidence.contains("Certificate pinning is possible") == true)
+        #expect(prompt?.hostScope?.control == .button)
         #expect(prompt?.hostScope?.action == .retryDomain("api.example.com"))
         #expect(prompt?.hostScope?.actionTitle == "Retry")
     }
@@ -655,8 +658,8 @@ struct InspectorRoutingTests {
         return HTTPTransaction(request: request, response: response, state: .completed)
     }
 
-    @Test("CONNECT tunnel with an existing host rule shows ready state instead of a disable action")
-    func connectTunnelWithExistingRuleShowsReadyState() {
+    @Test("CONNECT tunnel with an existing host rule exposes an on toggle and disable action")
+    func connectTunnelWithExistingRuleShowsEnabledToggle() {
         let transaction = TestFixtures.makeTransaction(
             method: "CONNECT",
             url: "https://api.example.com:443",
@@ -671,7 +674,8 @@ struct InspectorRoutingTests {
         )
 
         #expect(prompt?.hostScope?.state == .ready)
-        #expect(prompt?.hostScope?.action == nil)
+        #expect(prompt?.hostScope?.control == .toggle(isOn: true))
+        #expect(prompt?.hostScope?.action == .disableDomain("api.example.com"))
         #expect(prompt?.appScope == nil)
     }
 
@@ -696,9 +700,10 @@ struct InspectorRoutingTests {
         )
 
         #expect(prompt?.hostScope?.state == .ready)
-        #expect(prompt?.hostScope?.action == nil)
+        #expect(prompt?.hostScope?.action == .disableDomain("api.example.com"))
         #expect(prompt?.appScope?.state == .partial)
-        #expect(prompt?.appScope?.actionTitle == "Decrypt 3 More")
+        #expect(prompt?.appScope?.control == .button)
+        #expect(prompt?.appScope?.actionTitle == "Enable All")
         #expect(prompt?.appScope?.action == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
@@ -713,12 +718,14 @@ struct InspectorRoutingTests {
         )
 
         #expect(host.kind.title == "This Host")
-        #expect(host.actionTitle == "Decrypt Host")
-        #expect(host.actionDescription == "Decrypt new HTTPS connections to api.example.com")
+        #expect(host.control == .toggle(isOn: false))
+        #expect(host.actionTitle == nil)
+        #expect(host.actionDescription == "Turn on HTTPS decryption for new connections to api.example.com")
 
         #expect(appHosts?.kind.title == "Known App Hosts")
         #expect(appHosts?.kind.systemImage == "macwindow")
         #expect(appHosts?.state == .ready)
+        #expect(appHosts?.control == .status)
         #expect(appHosts?.action == nil)
         #expect(appHosts?.actionTitle == nil)
 
