@@ -25,6 +25,57 @@ enum ProxyDisplayState: Equatable {
             String(localized: "Stopped")
         }
     }
+
+    var captureTitle: String {
+        switch self {
+        case .starting:
+            String(localized: "Starting Capture")
+        case .running:
+            String(localized: "Capturing Traffic")
+        case .paused:
+            String(localized: "Capture Paused")
+        case .stopped:
+            String(localized: "Capture Stopped")
+        }
+    }
+
+    var captureDescription: String {
+        switch self {
+        case .starting:
+            String(localized: "Preparing the listener and system routing.")
+        case .running:
+            String(localized: "New traffic is being added to the active workspace.")
+        case .paused:
+            String(localized: "The listener stays available, but new traffic is not being added.")
+        case .stopped:
+            String(localized: "No new traffic is being captured.")
+        }
+    }
+
+    var captureSystemImage: String {
+        switch self {
+        case .starting:
+            "circle.dotted"
+        case .running:
+            "record.circle.fill"
+        case .paused:
+            "pause.circle.fill"
+        case .stopped:
+            "stop.circle"
+        }
+    }
+
+    var captureActionTitle: String {
+        switch self {
+        case .starting:
+            String(localized: "Starting…")
+        case .running,
+             .paused:
+            String(localized: "Stop Capture")
+        case .stopped:
+            String(localized: "Start Capture")
+        }
+    }
 }
 
 // MARK: - ProxyListenerSnapshot
@@ -210,7 +261,9 @@ final class MainContentCoordinator {
     var trafficSamples: [(timestamp: Date, upload: Int64, download: Int64)] = []
     var bandwidthTimer: Timer?
     var isProxyOverridden = false
-    var isAutoSelectEnabled = true
+    /// Opt-in live-tail mode. New visible traffic becomes the primary selection until the
+    /// user deliberately selects a row, at which point the mode yields immediately.
+    var isFollowingLiveTraffic = false
     nonisolated(unsafe) var evictionObserver: NSObjectProtocol?
 
     // MARK: - UI State — Engine Status

@@ -915,7 +915,7 @@ struct MapLocalEditorWindowView: View {
             .textFieldStyle(.roundedBorder)
             .frame(width: 84, height: toolMetrics.formControlHeight)
             .accessibilityLabel(String(localized: "HTTP response status code"))
-            Text(String(localized: "Applied to every response from this rule · Valid range: 100–599"))
+            Text(String(localized: "Applied to every response from this rule. Valid range: 100–599."))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
             Spacer()

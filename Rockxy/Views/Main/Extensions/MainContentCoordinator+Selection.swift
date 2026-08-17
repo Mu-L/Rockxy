@@ -13,6 +13,43 @@ extension MainContentCoordinator {
         selectedTransaction = transaction
     }
 
+    /// Enables or disables live-tail selection. Enabling immediately reveals the newest
+    /// request already visible in the active workspace so the control has an observable result
+    /// even before another capture batch arrives.
+    func setFollowingLiveTraffic(_ isEnabled: Bool) {
+        isFollowingLiveTraffic = isEnabled
+        guard isEnabled else {
+            return
+        }
+        selectLastFilteredTransaction()
+    }
+
+    func toggleFollowingLiveTraffic() {
+        setFollowingLiveTraffic(!isFollowingLiveTraffic)
+    }
+
+    /// Native table callbacks only reach this path for user-driven selection changes; the
+    /// representable suppresses callbacks while syncing coordinator-owned selection.
+    func userDidSelectTraffic() {
+        isFollowingLiveTraffic = false
+    }
+
+    /// Advances live-tail selection only when the newly accepted batch contributes a request
+    /// that survives the active workspace's scope and filters.
+    func followLatestVisibleTransaction(from batch: [HTTPTransaction]) {
+        guard isFollowingLiveTraffic, !batch.isEmpty else {
+            return
+        }
+        let candidateIDs = Set(batch.map(\.id))
+        guard let latest = filteredTransactions.reversed().first(where: {
+            candidateIDs.contains($0.id)
+        }) else {
+            return
+        }
+        selectedTransactionIDs = [latest.id]
+        selectTransaction(latest)
+    }
+
     func selectLogEntry(_ entry: LogEntry?) {
         selectedLogEntry = entry
     }

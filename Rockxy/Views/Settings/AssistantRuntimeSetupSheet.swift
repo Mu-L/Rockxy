@@ -274,10 +274,10 @@ struct AssistantRuntimeSetupSheet: View {
     private func downloadStatus(receivedBytes: Int64, totalBytes: Int64?) -> String {
         let received = ByteCountFormatter.string(fromByteCount: receivedBytes, countStyle: .file)
         guard let totalBytes, totalBytes > 0 else {
-            return String(localized: "Downloading official runtime · \(received)")
+            return String(localized: "Downloading official runtime: \(received)")
         }
         let total = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
-        return String(localized: "Downloading official runtime · \(received) of \(total)")
+        return String(localized: "Downloading official runtime: \(received) of \(total)")
     }
 }
 

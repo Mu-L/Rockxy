@@ -197,6 +197,18 @@ struct SSLProxyingManagerTests {
         #expect(!manager.isAutoPassthrough("other.com"))
     }
 
+    @Test("retrying interception clears only the requested auto passthrough host")
+    func retryInterceptionClearsRequestedHost() {
+        let manager = makeManager()
+        manager.markHostForPassthrough("API.example.com")
+        manager.markHostForPassthrough("other.com")
+
+        #expect(manager.retryInterception(for: "api.example.com"))
+        #expect(!manager.isAutoPassthrough("API.example.com"))
+        #expect(manager.isAutoPassthrough("other.com"))
+        #expect(!manager.retryInterception(for: "missing.example.com"))
+    }
+
     // MARK: - Bypass Domains
 
     @Test("shouldIntercept returns false for bypass domain")

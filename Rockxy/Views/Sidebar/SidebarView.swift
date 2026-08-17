@@ -310,7 +310,8 @@ struct SidebarView: View {
             } header: {
                 sidebarSectionHeader(
                     title: String(localized: "Focus Sets"),
-                    actionTitle: String(localized: "Add"),
+                    actionTitle: nil,
+                    actionSystemImage: "plus",
                     actionLabel: String(localized: "Create Focus Set"),
                     action: { editingFocusSet = coordinator.makeFocusSetFromCurrentScope() }
                 )
@@ -322,7 +323,8 @@ struct SidebarView: View {
             } header: {
                 sidebarSectionHeader(
                     title: String(localized: "Noise Control"),
-                    actionTitle: String(localized: "Configure"),
+                    actionTitle: nil,
+                    actionSystemImage: "slider.horizontal.3",
                     actionLabel: String(localized: "Configure Noise Control"),
                     action: { isMutedSourcesPresented = true }
                 )
@@ -358,7 +360,8 @@ struct SidebarView: View {
 
     private func sidebarSectionHeader(
         title: String,
-        actionTitle: String,
+        actionTitle: String?,
+        actionSystemImage: String?,
         actionLabel: String,
         action: @escaping () -> Void
     )
@@ -368,13 +371,17 @@ struct SidebarView: View {
             Text(title)
             Spacer(minLength: 8)
             Button(action: action) {
-                Label(actionTitle, systemImage: "plus")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption.weight(.medium))
+                if let actionSystemImage {
+                    Image(systemName: actionSystemImage)
+                        .frame(width: 18, height: 18)
+                } else if let actionTitle {
+                    Text(actionTitle)
+                        .font(.caption.weight(.medium))
+                }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.borderless)
             .controlSize(.small)
-            .foregroundStyle(.primary)
+            .foregroundStyle(.secondary)
             .help(actionLabel)
             .accessibilityLabel(actionLabel)
         }
@@ -405,8 +412,8 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .listRowBackground(isActive ? Color.accentColor.opacity(0.12) : Color.clear)
         .help(isActive
-            ? String(localized: "Clear \(signal.title) · \(signal.explanation)")
-            : String(localized: "Show \(signal.title) · \(signal.explanation)"))
+            ? String(localized: "Clear the \(signal.title) filter. \(signal.explanation)")
+            : String(localized: "Show \(signal.title) traffic. \(signal.explanation)"))
     }
 
     private var favoritesSection: some View {

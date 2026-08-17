@@ -18,6 +18,7 @@ struct FocusSetEditorSheet: View {
         self.onSave = onSave
         suggestions = FocusSetEditorSuggestions(transactions: transactions)
         _draft = State(initialValue: initialValue)
+        _usesSuggestedName = State(initialValue: isCreating && initialValue.name == initialValue.suggestedName)
     }
 
     // MARK: Internal
@@ -36,12 +37,25 @@ struct FocusSetEditorSheet: View {
             actionBar
         }
         .frame(width: 600, height: 570)
+        .onChange(of: draft.suggestedName) { _, suggestedName in
+            guard isCreating, usesSuggestedName else {
+                return
+            }
+            draft.name = suggestedName
+        }
+        .onChange(of: draft.name) { _, name in
+            guard isCreating, name != draft.suggestedName else {
+                return
+            }
+            usesSuggestedName = false
+        }
     }
 
     // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: FocusSet
+    @State private var usesSuggestedName: Bool
 
     private let suggestions: FocusSetEditorSuggestions
 

@@ -99,4 +99,11 @@ struct SidebarSearchFilterTests {
         #expect(SidebarSearchFilter.transactions([checkout, health], query: "safari").map(\.id) == [checkout.id])
         #expect(SidebarSearchFilter.transactions([checkout, health], query: "health").map(\.id) == [health.id])
     }
+
+    @Test("Focus Set search includes a meaningful derived legacy name")
+    func focusSetDerivedNameFiltering() {
+        let focus = FocusSet(name: "New Focus Set 1", excludedDomain: "exp.notion.so")
+
+        #expect(SidebarSearchFilter.focusSets([focus], query: "hide").map(\.id) == [focus.id])
+    }
 }

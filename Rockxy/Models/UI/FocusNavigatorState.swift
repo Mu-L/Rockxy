@@ -165,6 +165,43 @@ struct FocusSet: Identifiable, Codable, Equatable {
         [appName, domain, pathPrefix, excludedDomain, excludedPathPrefix].count { !$0.isEmpty }
     }
 
+    /// Keeps older automatically named Focus Sets useful without rewriting persisted user data.
+    /// Explicit names always win; only the app-generated placeholder is replaced in the sidebar.
+    var displayName: String {
+        usesGeneratedName ? suggestedName : name
+    }
+
+    /// A meaningful starting name for a Focus Set created from the current traffic scope.
+    var suggestedName: String {
+        if let includedScopeName {
+            return includedScopeName
+        }
+        if !excludedDomain.isEmpty {
+            return String(localized: "Hide \(excludedDomain)")
+        }
+        if !excludedPathPrefix.isEmpty {
+            return String(localized: "Hide \(excludedPathPrefix)")
+        }
+        return String(localized: "New Focus Set")
+    }
+
+    /// A collapsed-row summary for user-named sets. Expanded rows expose the same information
+    /// structurally, so the sidebar can hide this sentence instead of repeating every rule.
+    var scopeSummary: String {
+        let included = includedScopeName
+        let excluded = excludedScopeName
+        switch (included, excluded) {
+        case let (.some(included), .some(excluded)):
+            return String(localized: "\(included). Hide \(excluded).")
+        case let (.some(included), .none):
+            return included
+        case let (.none, .some(excluded)):
+            return String(localized: "Hide \(excluded)")
+        case (.none, .none):
+            return String(localized: "No conditions")
+        }
+    }
+
     var includedRules: [FocusSetRuleDescriptor] {
         var rules: [FocusSetRuleDescriptor] = []
         if !appName.isEmpty {
@@ -188,6 +225,104 @@ struct FocusSet: Identifiable, Codable, Equatable {
             rules.append(FocusSetRuleDescriptor(scope: .exclude, kind: .pathPrefix, pattern: excludedPathPrefix))
         }
         return rules
+    }
+
+    /// Rules that still add information after the row title has represented a complete scope.
+    /// For example, a title of “Google Chrome” should not expand into “Application Google Chrome”.
+    var sidebarIncludedRules: [FocusSetRuleDescriptor] {
+        titleRepresentsIncludedScope ? [] : includedRules
+    }
+
+    var sidebarExcludedRules: [FocusSetRuleDescriptor] {
+        titleRepresentsExcludedScope ? [] : excludedRules
+    }
+
+    var hasSidebarRuleDetails: Bool {
+        !sidebarIncludedRules.isEmpty || !sidebarExcludedRules.isEmpty
+    }
+
+    /// Summarizes only the conditions that are not already expressed by the row title.
+    var sidebarScopeSummary: String? {
+        let included = sidebarIncludedRules.isEmpty ? nil : includedScopeName
+        let excluded = sidebarExcludedRules.isEmpty ? nil : excludedScopeName
+        switch (included, excluded) {
+        case let (.some(included), .some(excluded)):
+            return String(localized: "\(included). Hide \(excluded).")
+        case let (.some(included), .none):
+            return included
+        case let (.none, .some(excluded)):
+            return String(localized: "Hide \(excluded)")
+        case (.none, .none):
+            return nil
+        }
+    }
+
+    // MARK: Private
+
+    private var titleRepresentsIncludedScope: Bool {
+        guard let includedScopeName else {
+            return false
+        }
+        return displayName == includedScopeName
+    }
+
+    private var titleRepresentsExcludedScope: Bool {
+        guard let excludedScopeName else {
+            return false
+        }
+        return displayName == String(localized: "Hide \(excludedScopeName)")
+    }
+
+    private var usesGeneratedName: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidates = [String(localized: "New Focus Set"), "New Focus Set"]
+        return candidates.contains { baseName in
+            if trimmed == baseName {
+                return true
+            }
+            let numberedPrefix = baseName + " "
+            guard trimmed.hasPrefix(numberedPrefix) else {
+                return false
+            }
+            let suffix = trimmed.dropFirst(numberedPrefix.count)
+            return !suffix.isEmpty && suffix.allSatisfy(\.isNumber)
+        }
+    }
+
+    private var includedScopeName: String? {
+        let target: String? = if !domain.isEmpty {
+            pathPrefix.isEmpty ? domain : domain + pathPrefix
+        } else if !pathPrefix.isEmpty {
+            pathPrefix
+        } else {
+            nil
+        }
+
+        switch (appName.isEmpty ? nil : appName, target) {
+        case let (.some(application), .some(target)):
+            return String(localized: "\(application) on \(target)")
+        case let (.some(application), .none):
+            return application
+        case let (.none, .some(target)):
+            return target
+        case (.none, .none):
+            return nil
+        }
+    }
+
+    private var excludedScopeName: String? {
+        switch (excludedDomain.isEmpty ? nil : excludedDomain,
+                excludedPathPrefix.isEmpty ? nil : excludedPathPrefix)
+        {
+        case let (.some(domain), .some(path)):
+            return String(localized: "\(domain) and paths under \(path)")
+        case let (.some(domain), .none):
+            return domain
+        case let (.none, .some(path)):
+            return String(localized: "paths under \(path)")
+        case (.none, .none):
+            return nil
+        }
     }
 }
 

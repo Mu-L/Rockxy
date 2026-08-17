@@ -214,15 +214,44 @@ final class SSLProxyingManager {
         Self.logger.info("Cleared all auto-passthrough hosts")
     }
 
+    /// Clears the protection fallback for one host so its next connection can retry TLS interception.
+    /// Returns `true` when a recent TLS rejection was present and cleared.
+    @discardableResult
+    nonisolated func retryInterception(for host: String) -> Bool {
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedHost.isEmpty else {
+            return false
+        }
+
+        passthroughLock.lock()
+        let matchingHost = autoPassthroughHosts.keys.first {
+            $0.caseInsensitiveCompare(normalizedHost) == .orderedSame
+        }
+        if let matchingHost {
+            autoPassthroughHosts.removeValue(forKey: matchingHost)
+        }
+        passthroughLock.unlock()
+
+        guard matchingHost != nil else {
+            return false
+        }
+
+        persistPassthroughHosts()
+        return true
+    }
+
     /// Thread-safe check for hosts that should skip interception due to recent TLS failure.
     nonisolated func isAutoPassthrough(_ host: String) -> Bool {
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         passthroughLock.lock()
         defer { passthroughLock.unlock() }
-        guard let timestamp = autoPassthroughHosts[host] else {
+        guard let matchingHost = autoPassthroughHosts.keys.first(where: {
+            $0.caseInsensitiveCompare(normalizedHost) == .orderedSame
+        }), let timestamp = autoPassthroughHosts[matchingHost] else {
             return false
         }
         if Date().timeIntervalSince(timestamp) > Self.passthroughTTLSeconds {
-            autoPassthroughHosts.removeValue(forKey: host)
+            autoPassthroughHosts.removeValue(forKey: matchingHost)
             return false
         }
         return true

@@ -87,7 +87,7 @@ struct CenterContentView: View {
                 isProxyOverridden: coordinator.isProxyOverridden,
                 isAllowListActive: allowListManager.isActive,
                 isNoCachingActive: isNoCachingEnabled,
-                isAutoSelectEnabled: coordinator.isAutoSelectEnabled,
+                isFollowingLiveTraffic: coordinator.isFollowingLiveTraffic,
                 isFilterBarVisible: coordinator.isFilterBarVisible,
                 activeFilterCount: activeFilterCount,
                 errorCount: coordinator.errorCount,
@@ -109,8 +109,8 @@ struct CenterContentView: View {
                     coordinator.isFilterBarVisible.toggle()
                     coordinator.recomputeFilteredTransactions()
                 },
-                onAutoSelect: {
-                    coordinator.isAutoSelectEnabled.toggle()
+                onFollowLive: {
+                    coordinator.toggleFollowingLiveTraffic()
                 },
                 onSwitchOffProxyOverride: {
                     coordinator.switchOffSystemProxyOverride()
@@ -136,7 +136,9 @@ struct CenterContentView: View {
     // MARK: Private
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        "workspaceBottomInspectorSplit.v1"
+        // v2 intentionally drops the tab-strip-height positions that v1 allowed. AppKit will
+        // establish the new 55/45 default once, then persist every user drag normally again.
+        "workspaceBottomInspectorSplit.v2"
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false
@@ -219,6 +221,7 @@ struct CenterContentView: View {
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
+                coordinator.userDidSelectTraffic()
                 coordinator.selectedTransactionIDs = ids
                 if let primaryID,
                    ids.contains(primaryID),

@@ -13,6 +13,10 @@ struct HTTPSInspectionPromptView: View {
             VStack(alignment: .leading, spacing: 10) {
                 header
 
+                if let insight = prompt.insight {
+                    connectionInsight(insight)
+                }
+
                 if prompt.requiresCertificateSetup {
                     certificateAction
                 } else {
@@ -29,6 +33,7 @@ struct HTTPSInspectionPromptView: View {
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var isInsightExpanded = false
 
     private var header: some View {
         HStack(spacing: 8) {
@@ -65,50 +70,158 @@ struct HTTPSInspectionPromptView: View {
 
     private var certificateAction: some View {
         Button(String(localized: "Install & Trust…")) {
-            onAction(prompt.primaryAction)
+            if let action = prompt.certificateAction {
+                onAction(action)
+            }
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.small)
         .accessibilityHint(String(localized: "Installs and trusts the Rockxy root certificate"))
     }
 
+    private func connectionInsight(_ insight: HTTPSConnectionInsight) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: insight.systemImage)
+                    .font(.system(size: metrics.controlFontSize, weight: .medium))
+                    .foregroundStyle(
+                        insight.isWarning ?
+                            Color(nsColor: .systemOrange) :
+                            Color(nsColor: .systemBlue)
+                    )
+                    .frame(width: 16)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(insight.title)
+                        .font(.system(size: metrics.controlFontSize, weight: .semibold))
+                    Text(insight.summary)
+                        .font(.system(size: metrics.metadataFontSize))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 6)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isInsightExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(isInsightExpanded ? String(localized: "Hide") : String(localized: "Details"))
+                        Image(systemName: isInsightExpanded ? "chevron.up" : "chevron.down")
+                    }
+                    .font(.system(size: metrics.metadataFontSize, weight: .medium))
+                }
+                .buttonStyle(.borderless)
+                .fixedSize()
+                .accessibilityHint(String(localized: "Shows the evidence and recommended next step"))
+            }
+
+            if isInsightExpanded {
+                VStack(alignment: .leading, spacing: 5) {
+                    insightDetail(label: String(localized: "Evidence"), text: insight.evidence)
+                    insightDetail(label: String(localized: "Next Step"), text: insight.nextStep)
+                }
+                .padding(.leading, 24)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(9)
+        .background(
+            insight.isWarning ?
+                Color(nsColor: .systemOrange).opacity(0.08) :
+                Color(nsColor: .controlBackgroundColor).opacity(0.7),
+            in: RoundedRectangle(cornerRadius: 7)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(
+                    insight.isWarning ?
+                        Color(nsColor: .systemOrange).opacity(0.25) :
+                        Color(nsColor: .separatorColor).opacity(0.55),
+                    lineWidth: 0.5
+                )
+        }
+    }
+
+    private func insightDetail(label: String, text: String) -> some View {
+        (Text("\(label): ").bold() + Text(text))
+            .font(.system(size: metrics.metadataFontSize))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private var scopeControls: some View {
         VStack(spacing: 0) {
             Divider()
-            scopeActionRow(action: prompt.primaryAction)
+            if let hostScope = prompt.hostScope {
+                scopeActionRow(scope: hostScope)
+            }
 
-            if let secondaryAction = prompt.secondaryAction {
+            if let appScope = prompt.appScope {
                 Divider()
                     .padding(.leading, 24)
-                scopeActionRow(action: secondaryAction)
+                scopeActionRow(scope: appScope)
             }
         }
     }
 
     @ViewBuilder
-    private func scopeActionRow(action: HTTPSInspectionPromptAction) -> some View {
-        if let scope = HTTPSInspectionScopePresentation(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: scope.kind.systemImage)
-                    .font(.system(size: metrics.controlFontSize))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                    .frame(width: 16)
-                    .accessibilityHidden(true)
+    private func scopeActionRow(scope: HTTPSInspectionScopePresentation) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: scope.kind.systemImage)
+                .font(.system(size: metrics.controlFontSize))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(width: 16)
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(scope.kind.title)
-                        .font(.system(size: metrics.controlFontSize, weight: .medium))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(scope.kind.title)
+                    .font(.system(size: metrics.controlFontSize, weight: .medium))
 
+                HStack(spacing: 5) {
                     Text(scope.value)
-                        .font(.system(size: metrics.metadataFontSize))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                        .help(scope.value)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button(scope.actionTitle) {
+                    if let statusDetail = scope.statusDetail {
+                        Text(statusDetail)
+                            .foregroundStyle(
+                                scope.state == .partial ?
+                                    Color(nsColor: .systemOrange) :
+                                    Color(nsColor: .secondaryLabelColor)
+                            )
+                    }
+                }
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .help(scope.helpText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            scopeTrailingControl(scope)
+        }
+        .padding(.horizontal, 4)
+        .frame(minHeight: 42)
+    }
+
+    @ViewBuilder
+    private func scopeTrailingControl(_ scope: HTTPSInspectionScopePresentation) -> some View {
+        if let action = scope.action, let actionTitle = scope.actionTitle {
+            if scope.kind == .host {
+                Button(actionTitle) {
+                    onAction(action)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .fixedSize()
+                .help(scope.actionDescription)
+                .accessibilityLabel(scope.actionDescription)
+                .accessibilityHint(String(localized: "The current captured response is unchanged"))
+            } else {
+                Button(actionTitle) {
                     onAction(action)
                 }
                 .buttonStyle(.bordered)
@@ -118,8 +231,12 @@ struct HTTPSInspectionPromptView: View {
                 .accessibilityLabel(scope.actionDescription)
                 .accessibilityHint(String(localized: "The current captured response is unchanged"))
             }
-            .padding(.horizontal, 4)
-            .frame(minHeight: 40)
+        } else {
+            Label(String(localized: "Ready"), systemImage: "checkmark.circle.fill")
+                .font(.system(size: metrics.metadataFontSize, weight: .medium))
+                .foregroundStyle(Color(nsColor: .systemGreen))
+                .fixedSize()
+                .accessibilityLabel(scope.actionDescription)
         }
     }
 }
@@ -127,14 +244,20 @@ struct HTTPSInspectionPromptView: View {
 // MARK: - HTTPSInspectionScopePresentation
 
 struct HTTPSInspectionScopePresentation: Equatable {
+    enum State: Equatable {
+        case available
+        case partial
+        case ready
+    }
+
     enum Kind: Equatable {
         case host
         case appHosts
 
         var title: String {
             switch self {
-            case .host: String(localized: "Host")
-            case .appHosts: String(localized: "App Hosts")
+            case .host: String(localized: "This Host")
+            case .appHosts: String(localized: "Known App Hosts")
             }
         }
 
@@ -148,44 +271,87 @@ struct HTTPSInspectionScopePresentation: Equatable {
 
     let kind: Kind
     let value: String
-    let isEnabled: Bool
+    let state: State
+    let statusDetail: String?
+    let action: HTTPSInspectionPromptAction?
+    let actionTitle: String?
+    let actionDescription: String
 
-    var actionTitle: String {
-        isEnabled ? String(localized: "Disable") : String(localized: "Decrypt")
+    var helpText: String {
+        [value, statusDetail].compactMap { $0 }.joined(separator: ", ")
     }
 
-    var actionDescription: String {
-        switch (kind, isEnabled) {
-        case (.host, false):
-            String(localized: "Decrypt new HTTPS connections to \(value)")
-        case (.host, true):
-            String(localized: "Stop decrypting new HTTPS connections to \(value)")
-        case (.appHosts, false):
-            String(localized: "Decrypt new HTTPS connections to known hosts used by \(value)")
-        case (.appHosts, true):
-            String(localized: "Stop decrypting new HTTPS connections to known hosts used by \(value)")
+    static func host(
+        value: String,
+        isReady: Bool,
+        requiresRetry: Bool = false
+    )
+        -> HTTPSInspectionScopePresentation
+    {
+        if requiresRetry {
+            return HTTPSInspectionScopePresentation(
+                kind: .host,
+                value: value,
+                state: .partial,
+                statusDetail: String(localized: "Protected tunnel active"),
+                action: .retryDomain(value),
+                actionTitle: String(localized: "Retry"),
+                actionDescription: String(localized: "Retry HTTPS decryption for \(value) on the next connection")
+            )
         }
+
+        return HTTPSInspectionScopePresentation(
+            kind: .host,
+            value: value,
+            state: isReady ? .ready : .available,
+            statusDetail: isReady ? String(localized: "New connections are ready") : nil,
+            action: isReady ? nil : .enableDomain(value),
+            actionTitle: isReady ? nil : String(localized: "Decrypt Host"),
+            actionDescription: isReady ?
+                String(localized: "HTTPS decryption is enabled for new connections to \(value)") :
+                String(localized: "Decrypt new HTTPS connections to \(value)")
+        )
     }
 
-    init(kind: Kind, value: String, isEnabled: Bool) {
-        self.kind = kind
-        self.value = value
-        self.isEnabled = isEnabled
-    }
-
-    init?(action: HTTPSInspectionPromptAction) {
-        switch action {
-        case let .enableDomain(host):
-            self.init(kind: .host, value: host, isEnabled: false)
-        case let .disableDomain(host):
-            self.init(kind: .host, value: host, isEnabled: true)
-        case let .enableApp(appName, _):
-            self.init(kind: .appHosts, value: appName, isEnabled: false)
-        case let .disableApp(appName, _):
-            self.init(kind: .appHosts, value: appName, isEnabled: true)
-        case .installCertificate,
-             .openSSLProxyingList:
+    static func appHosts(
+        name: String,
+        enabledHostCount: Int,
+        knownHostCount: Int,
+        fallbackDomain: String
+    )
+        -> HTTPSInspectionScopePresentation?
+    {
+        let total = max(knownHostCount, 1)
+        guard total > 1 else {
             return nil
         }
+
+        let enabled = min(max(enabledHostCount, 0), total)
+        let state: State = if enabled == total {
+            .ready
+        } else if enabled > 0 {
+            .partial
+        } else {
+            .available
+        }
+        let remaining = total - enabled
+
+        return HTTPSInspectionScopePresentation(
+            kind: .appHosts,
+            value: name,
+            state: state,
+            statusDetail: state == .ready ?
+                String(localized: "All \(total) known hosts are ready") :
+                String(localized: "\(enabled) of \(total) known hosts ready"),
+            action: state == .ready ? nil : .enableApp(name, fallbackDomain: fallbackDomain),
+            actionTitle: state == .ready ? nil : (
+                state == .partial ?
+                    String(localized: "Decrypt \(remaining) More") :
+                    String(localized: "Decrypt All")
+            ),
+            actionDescription: state == .ready ?
+                String(localized: "HTTPS decryption is enabled for all known hosts used by \(name)") :
+                String(localized: "Decrypt new HTTPS connections to \(remaining) known hosts used by \(name)")
+        )
     }
 }

@@ -1113,6 +1113,15 @@ extension RequestTableView {
             isUpdatingSelection = false
             lastSyncedSelectionIDs = ids
 
+            let isFollowingLiveTraffic = MainActor.assumeIsolated {
+                parent.mainCoordinator?.isFollowingLiveTraffic == true
+            }
+            if isFollowingLiveTraffic,
+               let newestSelectedRow = desired.last
+            {
+                tableView.scrollRowToVisible(newestSelectedRow)
+            }
+
             if let visibleOrigin,
                let scrollView = tableView.enclosingScrollView
             {

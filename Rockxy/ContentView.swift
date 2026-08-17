@@ -9,9 +9,12 @@ enum MainWindowLayoutMetrics {
     static let defaultHeight: CGFloat = 760
     static let minimumWidth: CGFloat = 960
     static let minimumHeight: CGFloat = 620
-    static let utilityPaneMinimumWidth: CGFloat = 300
-    static let utilityPaneIdealWidth: CGFloat = 380
-    static let utilityPaneMaximumWidth: CGFloat = 520
+    static let sidebarMinimumWidth: CGFloat = 300
+    static let sidebarIdealWidth: CGFloat = 380
+    static let sidebarMaximumWidth: CGFloat = 520
+    static let workspaceMinimumWidth: CGFloat = 320
+    static let contextDockMinimumWidth: CGFloat = 220
+    static let contextDockIdealWidth: CGFloat = 380
 }
 
 // MARK: - ContentView
@@ -40,13 +43,12 @@ struct ContentView: View {
             isSidebarPresented: $isSidebarPresented,
             isInspectorPresented: contextDockVisibility,
             autosaveName: Self.workspaceSplitAutosaveName,
-            sidebarMinimumWidth: MainWindowLayoutMetrics.utilityPaneMinimumWidth,
-            sidebarIdealWidth: MainWindowLayoutMetrics.utilityPaneIdealWidth,
-            sidebarMaximumWidth: MainWindowLayoutMetrics.utilityPaneMaximumWidth,
-            workspaceMinimumWidth: Self.minimumWorkspaceWidth,
-            inspectorMinimumWidth: MainWindowLayoutMetrics.utilityPaneMinimumWidth,
-            inspectorIdealWidth: MainWindowLayoutMetrics.utilityPaneIdealWidth,
-            inspectorMaximumWidth: MainWindowLayoutMetrics.utilityPaneMaximumWidth,
+            sidebarMinimumWidth: MainWindowLayoutMetrics.sidebarMinimumWidth,
+            sidebarIdealWidth: MainWindowLayoutMetrics.sidebarIdealWidth,
+            sidebarMaximumWidth: MainWindowLayoutMetrics.sidebarMaximumWidth,
+            workspaceMinimumWidth: MainWindowLayoutMetrics.workspaceMinimumWidth,
+            inspectorMinimumWidth: MainWindowLayoutMetrics.contextDockMinimumWidth,
+            inspectorIdealWidth: MainWindowLayoutMetrics.contextDockIdealWidth,
             toolbarConfiguration: NativeWorkspaceToolbarConfiguration(
                 coordinator: coordinator,
                 onOpenDeveloperHub: { openWindow(id: "developerSetupHub") }
@@ -223,7 +225,6 @@ struct ContentView: View {
     private let managesLifecycle: Bool
     private let representedWorkspaceID: UUID?
 
-    private static let minimumWorkspaceWidth: CGFloat = 600
     private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
         "nativeWorkspaceSplit.v1"
     )

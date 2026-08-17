@@ -432,18 +432,22 @@ struct InspectorRoutingTests {
             transaction: transaction,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
-            appName: transaction.clientApp,
-            appRuleEnabled: false
+            appScope: HTTPSInspectionAppScope(
+                name: "Brave Browser Helper",
+                knownHostCount: 3,
+                enabledHostCount: 0
+            )
         )
 
         #expect(prompt?.host == "api.example.com")
-        #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryAction == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
+        #expect(prompt?.hostScope?.action == .enableDomain("api.example.com"))
+        #expect(prompt?.appScope?.action == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
         #expect(prompt?.requiresCertificateSetup == false)
+        #expect(prompt?.insight == .tunnelEstablished(statusCode: 200))
     }
 
-    @Test("CONNECT tunnel still shows app SSL action when app cache is empty")
-    func connectTunnelShowsAppActionWithoutObservedDomains() {
+    @Test("CONNECT tunnel hides duplicate app action when only the current host is known")
+    func connectTunnelHidesDuplicateAppAction() {
         let transaction = TestFixtures.makeTransaction(
             method: "CONNECT",
             url: "https://api.example.com:443",
@@ -455,12 +459,15 @@ struct InspectorRoutingTests {
             transaction: transaction,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
-            appName: transaction.clientApp,
-            appRuleEnabled: false
+            appScope: HTTPSInspectionAppScope(
+                name: "Google Chrome",
+                knownHostCount: 1,
+                enabledHostCount: 0
+            )
         )
 
-        #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryAction == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
+        #expect(prompt?.hostScope?.action == .enableDomain("api.example.com"))
+        #expect(prompt?.appScope == nil)
     }
 
     @Test("CONNECT tunnel prefers certificate guidance when HTTPS interception is unavailable")
@@ -475,14 +482,57 @@ struct InspectorRoutingTests {
             transaction: transaction,
             canInterceptHTTPS: false,
             domainRuleEnabled: false,
-            appName: nil,
-            appRuleEnabled: false
+            appScope: nil
         )
 
         #expect(prompt?.host == "api.example.com")
-        #expect(prompt?.primaryAction == .installCertificate)
-        #expect(prompt?.secondaryAction == nil)
+        #expect(prompt?.certificateAction == .installCertificate)
+        #expect(prompt?.hostScope == nil)
+        #expect(prompt?.appScope == nil)
         #expect(prompt?.requiresCertificateSetup == true)
+        #expect(prompt?.insight == nil)
+    }
+
+    @Test("CONNECT tunnel reports TLS rejection evidence without claiming pinning as fact")
+    func connectTunnelShowsTLSRejectionInsight() {
+        let transaction = TestFixtures.makeTransaction(
+            method: "CONNECT",
+            url: "https://api.example.com:443",
+            statusCode: 200
+        )
+
+        let prompt = HTTPSInspectionPromptModel.make(
+            transaction: transaction,
+            canInterceptHTTPS: true,
+            domainRuleEnabled: true,
+            hasRecentTLSRejection: true,
+            appScope: nil
+        )
+
+        #expect(prompt?.insight == .tlsInterceptionRejected)
+        #expect(prompt?.insight?.evidence.contains("Certificate pinning is possible") == true)
+        #expect(prompt?.hostScope?.action == .retryDomain("api.example.com"))
+        #expect(prompt?.hostScope?.actionTitle == "Retry")
+    }
+
+    @Test("TLS failure transaction exposes the rejection insight directly")
+    func tlsFailureShowsRejectionInsight() {
+        let transaction = TestFixtures.makeTransaction(
+            method: "CONNECT",
+            url: "https://secure.example.com:443",
+            statusCode: 0
+        )
+        transaction.isTLSFailure = true
+
+        let prompt = HTTPSInspectionPromptModel.make(
+            transaction: transaction,
+            canInterceptHTTPS: true,
+            domainRuleEnabled: true,
+            appScope: nil
+        )
+
+        #expect(prompt?.insight == .tlsInterceptionRejected)
+        #expect(prompt?.hostScope?.action == .retryDomain("secure.example.com"))
     }
 
     // MARK: - Compression Helpers
@@ -605,8 +655,8 @@ struct InspectorRoutingTests {
         return HTTPTransaction(request: request, response: response, state: .completed)
     }
 
-    @Test("CONNECT tunnel with existing SSL rule shows disable guidance")
-    func connectTunnelWithExistingRuleShowsDisableGuidance() {
+    @Test("CONNECT tunnel with an existing host rule shows ready state instead of a disable action")
+    func connectTunnelWithExistingRuleShowsReadyState() {
         let transaction = TestFixtures.makeTransaction(
             method: "CONNECT",
             url: "https://api.example.com:443",
@@ -617,16 +667,16 @@ struct InspectorRoutingTests {
             transaction: transaction,
             canInterceptHTTPS: true,
             domainRuleEnabled: true,
-            appName: nil,
-            appRuleEnabled: false
+            appScope: nil
         )
 
-        #expect(prompt?.primaryAction == .disableDomain("api.example.com"))
-        #expect(prompt?.secondaryAction == nil)
+        #expect(prompt?.hostScope?.state == .ready)
+        #expect(prompt?.hostScope?.action == nil)
+        #expect(prompt?.appScope == nil)
     }
 
-    @Test("CONNECT tunnel with known app-host rules shows disable guidance")
-    func connectTunnelWithExistingAppHostRulesShowsDisableGuidance() {
+    @Test("CONNECT tunnel distinguishes partial app-host coverage from the current host")
+    func connectTunnelShowsPartialAppHostCoverage() {
         let transaction = TestFixtures.makeTransaction(
             method: "CONNECT",
             url: "https://api.example.com:443",
@@ -637,53 +687,48 @@ struct InspectorRoutingTests {
         let prompt = HTTPSInspectionPromptModel.make(
             transaction: transaction,
             canInterceptHTTPS: true,
-            domainRuleEnabled: false,
-            appName: transaction.clientApp,
-            appRuleEnabled: true
+            domainRuleEnabled: true,
+            appScope: HTTPSInspectionAppScope(
+                name: "Google Chrome",
+                knownHostCount: 4,
+                enabledHostCount: 1
+            )
         )
 
-        #expect(prompt?.primaryAction == .enableDomain("api.example.com"))
-        #expect(prompt?.secondaryAction == .disableApp("Google Chrome", fallbackDomain: "api.example.com"))
+        #expect(prompt?.hostScope?.state == .ready)
+        #expect(prompt?.hostScope?.action == nil)
+        #expect(prompt?.appScope?.state == .partial)
+        #expect(prompt?.appScope?.actionTitle == "Decrypt 3 More")
+        #expect(prompt?.appScope?.action == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
     @Test("HTTPS prompt scope presentation exposes host and app-host state")
     func httpsPromptScopePresentation() {
-        let host = HTTPSInspectionScopePresentation(action: .enableDomain("api.example.com"))
-        let appHosts = HTTPSInspectionScopePresentation(
-            action: .disableApp("Brave Browser Helper", fallbackDomain: "api.example.com")
+        let host = HTTPSInspectionScopePresentation.host(value: "api.example.com", isReady: false)
+        let appHosts = HTTPSInspectionScopePresentation.appHosts(
+            name: "Brave Browser Helper",
+            enabledHostCount: 2,
+            knownHostCount: 2,
+            fallbackDomain: "api.example.com"
         )
 
-        #expect(host == HTTPSInspectionScopePresentation(kind: .host, value: "api.example.com", isEnabled: false))
-        #expect(host?.kind.title == "Host")
-        #expect(host?.actionTitle == "Decrypt")
-        #expect(host?.actionDescription == "Decrypt new HTTPS connections to api.example.com")
-        #expect(
-            HTTPSInspectionScopePresentation(action: .disableDomain("api.example.com"))?.actionDescription ==
-                "Stop decrypting new HTTPS connections to api.example.com"
-        )
+        #expect(host.kind.title == "This Host")
+        #expect(host.actionTitle == "Decrypt Host")
+        #expect(host.actionDescription == "Decrypt new HTTPS connections to api.example.com")
 
-        #expect(
-            appHosts == HTTPSInspectionScopePresentation(
-                kind: .appHosts,
-                value: "Brave Browser Helper",
-                isEnabled: true
-            )
-        )
-        #expect(appHosts?.kind.title == "App Hosts")
+        #expect(appHosts?.kind.title == "Known App Hosts")
         #expect(appHosts?.kind.systemImage == "macwindow")
-        #expect(appHosts?.actionTitle == "Disable")
-        #expect(
-            appHosts?.actionDescription ==
-                "Stop decrypting new HTTPS connections to known hosts used by Brave Browser Helper"
+        #expect(appHosts?.state == .ready)
+        #expect(appHosts?.action == nil)
+        #expect(appHosts?.actionTitle == nil)
+
+        let duplicateScope = HTTPSInspectionScopePresentation.appHosts(
+            name: "curl",
+            enabledHostCount: 0,
+            knownHostCount: 1,
+            fallbackDomain: "api.example.com"
         )
-        #expect(
-            HTTPSInspectionScopePresentation(
-                action: .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com")
-            )?.actionDescription ==
-                "Decrypt new HTTPS connections to known hosts used by Brave Browser Helper"
-        )
-        #expect(HTTPSInspectionScopePresentation(action: .installCertificate) == nil)
-        #expect(HTTPSInspectionScopePresentation(action: .openSSLProxyingList) == nil)
+        #expect(duplicateScope == nil)
     }
 
     @Test("Plain HTTP response does not show HTTPS prompt")
@@ -694,8 +739,7 @@ struct InspectorRoutingTests {
             transaction: transaction,
             canInterceptHTTPS: true,
             domainRuleEnabled: false,
-            appName: nil,
-            appRuleEnabled: false
+            appScope: nil
         )
 
         #expect(prompt == nil)

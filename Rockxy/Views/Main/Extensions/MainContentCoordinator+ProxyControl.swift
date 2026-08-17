@@ -420,6 +420,7 @@ extension MainContentCoordinator {
         appendObservedDomainsByApp(from: filteredBatch)
 
         updateAllWorkspaces(with: filteredBatch)
+        followLatestVisibleTransaction(from: filteredBatch)
 
         headerColumnStore.updateDiscoveredHeaders(fromBatch: filteredBatch)
     }

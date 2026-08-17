@@ -73,6 +73,56 @@ struct HistoryRetentionTests {
         #expect(coordinator.observedDomainsByApp[String(localized: "Unknown")]?.count == 20)
     }
 
+    @Test("Follow Live selects the newest request that survives the active view")
+    @MainActor
+    func followLiveSelectsNewestVisibleRequest() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+        coordinator.filterCriteria.sidebarDomain = "visible.example.com"
+        coordinator.recomputeFilteredTransactions()
+        coordinator.setFollowingLiveTraffic(true)
+
+        let hidden = TestFixtures.makeTransaction(url: "https://hidden.example.com/first")
+        let firstVisible = TestFixtures.makeTransaction(url: "https://visible.example.com/one")
+        let latestVisible = TestFixtures.makeTransaction(url: "https://visible.example.com/two")
+        coordinator.processBatch(
+            [hidden, firstVisible, latestVisible],
+            generation: coordinator.sessionGeneration
+        )
+
+        #expect(coordinator.isFollowingLiveTraffic)
+        #expect(coordinator.selectedTransaction?.id == latestVisible.id)
+        #expect(coordinator.selectedTransactionIDs == [latestVisible.id])
+    }
+
+    @Test("Follow Live waits when a capture batch has no request in the active view")
+    @MainActor
+    func followLiveWaitsForVisibleRequest() {
+        let coordinator = MainContentCoordinator()
+        let existing = TestFixtures.makeTransaction(url: "https://visible.example.com/existing")
+        coordinator.transactions = [existing]
+        coordinator.filterCriteria.sidebarDomain = "visible.example.com"
+        coordinator.recomputeFilteredTransactions()
+        coordinator.setFollowingLiveTraffic(true)
+
+        let hidden = TestFixtures.makeTransaction(url: "https://hidden.example.com/new")
+        coordinator.processBatch([hidden], generation: coordinator.sessionGeneration)
+
+        #expect(coordinator.selectedTransaction?.id == existing.id)
+        #expect(coordinator.isFollowingLiveTraffic)
+    }
+
+    @Test("Manual table selection exits Follow Live")
+    @MainActor
+    func manualSelectionStopsFollowLive() {
+        let coordinator = MainContentCoordinator()
+        coordinator.setFollowingLiveTraffic(true)
+
+        coordinator.userDidSelectTraffic()
+
+        #expect(!coordinator.isFollowingLiveTraffic)
+    }
+
     @Test("Live buffer caps at policy limit during capture")
     @MainActor
     func bufferCapDuringCapture() {
