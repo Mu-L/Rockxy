@@ -723,7 +723,6 @@ struct InspectorRoutingTests {
         #expect(host.actionDescription == "Turn on HTTPS decryption for new connections to api.example.com")
 
         #expect(appHosts?.kind.title == "Known App Hosts")
-        #expect(appHosts?.kind.systemImage == "macwindow")
         #expect(appHosts?.state == .ready)
         #expect(appHosts?.control == .status)
         #expect(appHosts?.action == nil)

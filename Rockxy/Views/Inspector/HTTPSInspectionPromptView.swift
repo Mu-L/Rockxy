@@ -37,15 +37,13 @@ struct HTTPSInspectionPromptView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: prompt.requiresCertificateSetup ? "exclamationmark.lock.fill" : "lock.fill")
-                .font(.system(size: metrics.primaryFontSize, weight: .medium))
-                .foregroundStyle(
-                    prompt.requiresCertificateSetup
-                        ? Color(nsColor: .systemOrange)
-                        : Color(nsColor: .secondaryLabelColor)
-                )
-                .frame(width: 18)
-                .accessibilityHidden(true)
+            if prompt.requiresCertificateSetup {
+                Image(systemName: "exclamationmark.lock.fill")
+                    .font(.system(size: metrics.primaryFontSize, weight: .medium))
+                    .foregroundStyle(Color(nsColor: .systemOrange))
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
+            }
 
             Text(
                 prompt.requiresCertificateSetup
@@ -82,15 +80,13 @@ struct HTTPSInspectionPromptView: View {
     private func connectionInsight(_ insight: HTTPSConnectionInsight) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: insight.systemImage)
-                    .font(.system(size: metrics.controlFontSize, weight: .medium))
-                    .foregroundStyle(
-                        insight.isWarning ?
-                            Color(nsColor: .systemOrange) :
-                            Color(nsColor: .secondaryLabelColor)
-                    )
-                    .frame(width: 16)
-                    .accessibilityHidden(true)
+                if insight.isWarning {
+                    Image(systemName: insight.systemImage)
+                        .font(.system(size: metrics.controlFontSize, weight: .medium))
+                        .foregroundStyle(Color(nsColor: .systemOrange))
+                        .frame(width: 16)
+                        .accessibilityHidden(true)
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(insight.title)
@@ -124,12 +120,12 @@ struct HTTPSInspectionPromptView: View {
                     insightDetail(label: String(localized: "Evidence"), text: insight.evidence)
                     insightDetail(label: String(localized: "Next Step"), text: insight.nextStep)
                 }
-                .padding(.leading, 24)
+                .padding(.leading, insight.isWarning ? 24 : 0)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
+        .padding(.horizontal, insight.isWarning ? 8 : 0)
+        .padding(.vertical, insight.isWarning ? 7 : 0)
         .background(
             insight.isWarning ?
                 Color(nsColor: .systemOrange).opacity(0.08) :
@@ -187,12 +183,6 @@ struct HTTPSInspectionPromptView: View {
     @ViewBuilder
     private func scopeActionRow(scope: HTTPSInspectionScopePresentation) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: scope.kind.systemImage)
-                .font(.system(size: metrics.controlFontSize))
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                .frame(width: 16)
-                .accessibilityHidden(true)
-
             VStack(alignment: .leading, spacing: 1) {
                 Text(scope.value)
                     .font(.system(size: metrics.controlFontSize, weight: .medium))
@@ -284,13 +274,6 @@ struct HTTPSInspectionScopePresentation: Equatable {
             switch self {
             case .host: String(localized: "This Host")
             case .appHosts: String(localized: "Known App Hosts")
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .host: "network"
-            case .appHosts: "macwindow"
             }
         }
     }
