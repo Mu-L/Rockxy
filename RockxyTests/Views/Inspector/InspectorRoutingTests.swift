@@ -515,7 +515,7 @@ struct InspectorRoutingTests {
         #expect(prompt?.insight?.evidence.contains("Certificate pinning is possible") == true)
         #expect(prompt?.hostScope?.control == .button)
         #expect(prompt?.hostScope?.action == .retryDomain("api.example.com"))
-        #expect(prompt?.hostScope?.actionTitle == "Retry")
+        #expect(prompt?.hostScope?.controlTitle == "Retry")
     }
 
     @Test("TLS failure transaction exposes the rejection insight directly")
@@ -703,7 +703,7 @@ struct InspectorRoutingTests {
         #expect(prompt?.hostScope?.action == .disableDomain("api.example.com"))
         #expect(prompt?.appScope?.state == .partial)
         #expect(prompt?.appScope?.control == .button)
-        #expect(prompt?.appScope?.actionTitle == "Enable All")
+        #expect(prompt?.appScope?.controlTitle == "Enable All")
         #expect(prompt?.appScope?.action == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
@@ -719,7 +719,7 @@ struct InspectorRoutingTests {
 
         #expect(host.kind.title == "This Host")
         #expect(host.control == .toggle(isOn: false))
-        #expect(host.actionTitle == nil)
+        #expect(host.controlTitle == "Decrypt Host")
         #expect(host.actionDescription == "Turn on HTTPS decryption for new connections to api.example.com")
 
         #expect(appHosts?.kind.title == "Known App Hosts")
@@ -727,7 +727,7 @@ struct InspectorRoutingTests {
         #expect(appHosts?.state == .ready)
         #expect(appHosts?.control == .status)
         #expect(appHosts?.action == nil)
-        #expect(appHosts?.actionTitle == nil)
+        #expect(appHosts?.controlTitle == nil)
 
         let duplicateScope = HTTPSInspectionScopePresentation.appHosts(
             name: "curl",

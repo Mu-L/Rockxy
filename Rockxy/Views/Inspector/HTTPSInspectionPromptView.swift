@@ -220,7 +220,7 @@ struct HTTPSInspectionPromptView: View {
         switch scope.control {
         case let .toggle(isOn):
             Toggle(
-                "",
+                scope.controlTitle ?? String(localized: "Decrypt Host"),
                 isOn: Binding(
                     get: { isOn },
                     set: { _ in
@@ -230,17 +230,17 @@ struct HTTPSInspectionPromptView: View {
                     }
                 )
             )
-            .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.mini)
+            .font(.system(size: metrics.controlFontSize))
             .fixedSize()
             .help(scope.actionDescription)
-            .accessibilityLabel(scope.actionDescription)
+            .accessibilityLabel(scope.controlTitle ?? String(localized: "Decrypt Host"))
             .accessibilityHint(String(localized: "The current captured response is unchanged"))
 
         case .button:
-            if let action = scope.action, let actionTitle = scope.actionTitle {
-                Button(actionTitle) {
+            if let action = scope.action, let controlTitle = scope.controlTitle {
+                Button(controlTitle) {
                     onAction(action)
                 }
                 .buttonStyle(.bordered)
@@ -301,7 +301,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
     let statusDetail: String?
     let control: Control
     let action: HTTPSInspectionPromptAction?
-    let actionTitle: String?
+    let controlTitle: String?
     let actionDescription: String
 
     var helpText: String {
@@ -323,7 +323,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
                 statusDetail: String(localized: "Protected tunnel active"),
                 control: .button,
                 action: .retryDomain(value),
-                actionTitle: String(localized: "Retry"),
+                controlTitle: String(localized: "Retry"),
                 actionDescription: String(localized: "Retry HTTPS decryption for \(value) on the next connection")
             )
         }
@@ -337,7 +337,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
                 String(localized: "Off for new connections"),
             control: .toggle(isOn: isReady),
             action: isReady ? .disableDomain(value) : .enableDomain(value),
-            actionTitle: nil,
+            controlTitle: String(localized: "Decrypt Host"),
             actionDescription: isReady ?
                 String(localized: "Turn off HTTPS decryption for new connections to \(value)") :
                 String(localized: "Turn on HTTPS decryption for new connections to \(value)")
@@ -376,7 +376,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
                 String(localized: "\(enabled) of \(total) known hosts enabled"),
             control: state == .ready ? .status : .button,
             action: state == .ready ? nil : .enableApp(name, fallbackDomain: fallbackDomain),
-            actionTitle: state == .ready ? nil : String(localized: "Enable All"),
+            controlTitle: state == .ready ? nil : String(localized: "Enable All"),
             actionDescription: state == .ready ?
                 String(localized: "HTTPS decryption is enabled for all known hosts used by \(name)") :
                 String(localized: "Enable HTTPS decryption for \(remaining) more known hosts used by \(name)")
