@@ -137,7 +137,7 @@ struct CenterContentView: View {
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
         // v2 intentionally drops the tab-strip-height positions that v1 allowed. AppKit will
-        // establish the new 55/45 default once, then persist every user drag normally again.
+        // establish the balanced default once, then persist every user drag normally again.
         "workspaceBottomInspectorSplit.v2"
     )
 

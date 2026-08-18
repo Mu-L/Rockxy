@@ -57,7 +57,7 @@ struct NativeBottomInspectorSplitViewTests {
         #expect(controller.splitViewItems[1].minimumThickness == 232)
     }
 
-    @Test("Fresh bottom split gives the payload inspector forty-five percent")
+    @Test("Fresh bottom split gives the request list and payload inspector equal height")
     func freshLayoutUsesBalancedDefaultRatio() {
         let autosaveName = uniqueAutosaveName()
         removeSplitViewAutosaveDefaults(autosaveName)
@@ -80,9 +80,9 @@ struct NativeBottomInspectorSplitViewTests {
         )
 
         #expect(primaryHeight == expectedPrimaryHeight)
-        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.55) < 0.0001)
-        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.45) < 0.0001)
-        #expect(controller.splitViewItems[1].viewController.view.frame.height > 300)
+        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.50) < 0.0001)
+        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.50) < 0.0001)
+        #expect(controller.splitViewItems[1].viewController.view.frame.height > 340)
         #expect(controller.defaultDividerApplicationCount == 1)
         removeSplitViewAutosaveDefaults(autosaveName)
     }
