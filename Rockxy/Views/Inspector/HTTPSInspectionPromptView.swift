@@ -77,16 +77,43 @@ struct HTTPSInspectionPromptView: View {
         .accessibilityHint(String(localized: "Installs and trusts the Rockxy root certificate"))
     }
 
+    @ViewBuilder
     private func connectionInsight(_ insight: HTTPSConnectionInsight) -> some View {
+        if insight.isWarning {
+            warningInsight(insight)
+        } else {
+            standardInsight(insight)
+        }
+    }
+
+    private func standardInsight(_ insight: HTTPSConnectionInsight) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(insight.summary)
+                    .font(.system(size: metrics.metadataFontSize))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 6)
+
+                insightDetailsButton
+            }
+
+            if isInsightExpanded {
+                insightDetails(insight)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private func warningInsight(_ insight: HTTPSConnectionInsight) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
-                if insight.isWarning {
-                    Image(systemName: insight.systemImage)
-                        .font(.system(size: metrics.controlFontSize, weight: .medium))
-                        .foregroundStyle(Color(nsColor: .systemOrange))
-                        .frame(width: 16)
-                        .accessibilityHidden(true)
-                }
+                Image(systemName: insight.systemImage)
+                    .font(.system(size: metrics.controlFontSize, weight: .medium))
+                    .foregroundStyle(Color(nsColor: .systemOrange))
+                    .frame(width: 16)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(insight.title)
@@ -99,47 +126,45 @@ struct HTTPSInspectionPromptView: View {
 
                 Spacer(minLength: 6)
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.16)) {
-                        isInsightExpanded.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(isInsightExpanded ? String(localized: "Hide") : String(localized: "Details"))
-                        Image(systemName: isInsightExpanded ? "chevron.up" : "chevron.down")
-                    }
-                    .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                }
-                .buttonStyle(.borderless)
-                .fixedSize()
-                .accessibilityHint(String(localized: "Shows the evidence and recommended next step"))
+                insightDetailsButton
             }
 
             if isInsightExpanded {
-                VStack(alignment: .leading, spacing: 5) {
-                    insightDetail(label: String(localized: "Evidence"), text: insight.evidence)
-                    insightDetail(label: String(localized: "Next Step"), text: insight.nextStep)
-                }
-                .padding(.leading, insight.isWarning ? 24 : 0)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                insightDetails(insight)
+                    .padding(.leading, 24)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.horizontal, insight.isWarning ? 8 : 0)
-        .padding(.vertical, insight.isWarning ? 7 : 0)
-        .background(
-            insight.isWarning ?
-                Color(nsColor: .systemOrange).opacity(0.08) :
-                Color.clear,
-            in: RoundedRectangle(cornerRadius: 7)
-        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(Color(nsColor: .systemOrange).opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
         .overlay {
             RoundedRectangle(cornerRadius: 7)
-                .stroke(
-                    insight.isWarning ?
-                        Color(nsColor: .systemOrange).opacity(0.25) :
-                        Color.clear,
-                    lineWidth: 0.5
-                )
+                .stroke(Color(nsColor: .systemOrange).opacity(0.25), lineWidth: 0.5)
+        }
+    }
+
+    private var insightDetailsButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isInsightExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(isInsightExpanded ? String(localized: "Hide") : String(localized: "Details"))
+                Image(systemName: isInsightExpanded ? "chevron.up" : "chevron.down")
+            }
+            .font(.system(size: metrics.metadataFontSize, weight: .medium))
+        }
+        .buttonStyle(.borderless)
+        .fixedSize()
+        .accessibilityHint(String(localized: "Shows the evidence and recommended next step"))
+    }
+
+    private func insightDetails(_ insight: HTTPSConnectionInsight) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            insightDetail(label: String(localized: "Evidence"), text: insight.evidence)
+            insightDetail(label: String(localized: "Next Step"), text: insight.nextStep)
         }
     }
 
@@ -152,8 +177,8 @@ struct HTTPSInspectionPromptView: View {
 
     private var scopeControls: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Decrypt Future Connections"))
-                .font(.system(size: metrics.metadataFontSize, weight: .semibold))
+            Text(String(localized: "Decryption"))
+                .font(.system(size: metrics.metadataFontSize, weight: .medium))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
 
             VStack(spacing: 0) {
@@ -163,17 +188,11 @@ struct HTTPSInspectionPromptView: View {
 
                 if let appScope = prompt.appScope {
                     Divider()
-                        .padding(.leading, 28)
                     scopeActionRow(scope: appScope)
                 }
             }
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 7))
-            .overlay {
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5)
-            }
 
-            Text(String(localized: "Changes apply when the app opens a new connection. This response stays encrypted."))
+            Text(String(localized: "Applies to new connections. This response stays encrypted."))
                 .font(.system(size: metrics.metadataFontSize))
                 .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
                 .fixedSize(horizontal: false, vertical: true)
@@ -315,9 +334,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
             kind: .host,
             value: value,
             state: isReady ? .ready : .available,
-            statusDetail: isReady ?
-                String(localized: "Enabled for new connections") :
-                String(localized: "Off for new connections"),
+            statusDetail: String(localized: "Current host"),
             control: .toggle(isOn: isReady),
             action: isReady ? .disableDomain(value) : .enableDomain(value),
             controlTitle: String(localized: "Decrypt Host"),

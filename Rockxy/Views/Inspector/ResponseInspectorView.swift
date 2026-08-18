@@ -742,9 +742,7 @@ enum HTTPSConnectionInsight: Equatable {
     var summary: String {
         switch self {
         case .tunnelEstablished:
-            String(
-                localized: "This connection completed without inspecting HTTPS content."
-            )
+            String(localized: "HTTPS content was not inspected.")
         case .tlsInterceptionRejected:
             String(
                 localized: "Rockxy kept the app connected by returning this host to a protected encrypted tunnel."

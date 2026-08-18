@@ -446,6 +446,7 @@ struct InspectorRoutingTests {
         #expect(prompt?.requiresCertificateSetup == false)
         #expect(prompt?.insight == .tunnelEstablished(statusCode: 200))
         #expect(prompt?.insight?.title == "Content Not Inspected")
+        #expect(prompt?.insight?.summary == "HTTPS content was not inspected.")
     }
 
     @Test("CONNECT tunnel hides duplicate app action when only the current host is known")
@@ -719,6 +720,7 @@ struct InspectorRoutingTests {
 
         #expect(host.kind.title == "This Host")
         #expect(host.control == .toggle(isOn: false))
+        #expect(host.statusDetail == "Current host")
         #expect(host.controlTitle == "Decrypt Host")
         #expect(host.actionDescription == "Turn on HTTPS decryption for new connections to api.example.com")
 
