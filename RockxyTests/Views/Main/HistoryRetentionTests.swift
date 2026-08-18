@@ -118,9 +118,150 @@ struct HistoryRetentionTests {
         let coordinator = MainContentCoordinator()
         coordinator.setFollowingLiveTraffic(true)
 
-        coordinator.userDidSelectTraffic()
+        coordinator.userDidNavigateTrafficHistory()
 
         #expect(!coordinator.isFollowingLiveTraffic)
+    }
+
+    @Test("Enabling Follow Live on an empty view stays armed without a selection")
+    @MainActor
+    func followLiveArmedWhenEmpty() {
+        let coordinator = MainContentCoordinator()
+        coordinator.filterCriteria.sidebarDomain = "nothing.example.com"
+        coordinator.recomputeFilteredTransactions()
+
+        coordinator.setFollowingLiveTraffic(true)
+
+        #expect(coordinator.isFollowingLiveTraffic)
+        #expect(coordinator.selectedTransaction == nil)
+    }
+
+    @Test("Follow Live state is per-workspace and reflects the active workspace")
+    @MainActor
+    func followLiveIsPerWorkspace() {
+        let coordinator = MainContentCoordinator()
+        let first = coordinator.activeWorkspace
+        let second = coordinator.workspaceStore.createWorkspace(title: "Second")
+
+        // createWorkspace makes `second` active; it starts not following.
+        #expect(!coordinator.isFollowingLiveTraffic)
+        coordinator.setFollowingLiveTraffic(true)
+        #expect(second.isFollowingLiveTraffic)
+        #expect(!first.isFollowingLiveTraffic)
+
+        coordinator.workspaceStore.selectWorkspace(id: first.id)
+        #expect(!coordinator.isFollowingLiveTraffic)
+
+        coordinator.workspaceStore.selectWorkspace(id: second.id)
+        #expect(coordinator.isFollowingLiveTraffic)
+    }
+
+    @Test("Manual selection exits Follow Live only for the active workspace")
+    @MainActor
+    func manualSelectionScopedToActiveWorkspace() {
+        let coordinator = MainContentCoordinator()
+        let active = coordinator.activeWorkspace
+        let other = coordinator.workspaceStore.createWorkspace(title: "Other")
+        other.isFollowingLiveTraffic = true
+        coordinator.workspaceStore.selectWorkspace(id: active.id)
+        active.isFollowingLiveTraffic = true
+
+        coordinator.userDidNavigateTrafficHistory()
+
+        #expect(!active.isFollowingLiveTraffic)
+        #expect(other.isFollowingLiveTraffic)
+    }
+
+    @Test("Follow Live advances an inactive workspace from a background batch")
+    @MainActor
+    func followLiveAdvancesInactiveWorkspace() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+
+        let active = coordinator.activeWorkspace
+        let follower = coordinator.workspaceStore.createWorkspace(title: "Follower")
+        follower.isFollowingLiveTraffic = true
+        // Return focus to the default workspace so `follower` is inactive.
+        coordinator.workspaceStore.selectWorkspace(id: active.id)
+
+        // Anchor a manual selection on the active, non-following workspace.
+        let anchor = TestFixtures.makeTransaction(url: "https://anchor.example.com/keep")
+        coordinator.processBatch([anchor], generation: coordinator.sessionGeneration)
+        active.selectedTransaction = anchor
+        active.selectedTransactionIDs = [anchor.id]
+
+        let latest = TestFixtures.makeTransaction(url: "https://live.example.com/new")
+        coordinator.processBatch([latest], generation: coordinator.sessionGeneration)
+
+        // The inactive follower advanced to the newest batch transaction.
+        #expect(follower.selectedTransaction?.id == latest.id)
+        #expect(follower.selectedTransactionIDs == [latest.id])
+        // The active, non-following workspace retained its manual selection.
+        #expect(active.selectedTransaction?.id == anchor.id)
+        #expect(!active.isFollowingLiveTraffic)
+    }
+
+    @Test("Recomputing a followed workspace reconciles to the newest visible transaction in scope")
+    @MainActor
+    func followLiveReconcilesOnFilterChange() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+
+        let alpha = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        let betaOld = TestFixtures.makeTransaction(url: "https://beta.example.com/1")
+        let betaNew = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        coordinator.processBatch([alpha, betaOld, betaNew], generation: coordinator.sessionGeneration)
+
+        coordinator.setFollowingLiveTraffic(true)
+        #expect(coordinator.selectedTransaction?.id == betaNew.id)
+
+        coordinator.filterCriteria.sidebarDomain = "beta.example.com"
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.selectedTransaction?.id == betaNew.id)
+
+        // Narrowing to a scope whose only visible request is older snaps the selection to it.
+        coordinator.filterCriteria.sidebarDomain = "alpha.example.com"
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.selectedTransaction?.id == alpha.id)
+        #expect(coordinator.isFollowingLiveTraffic)
+    }
+
+    @Test("Recomputing a followed workspace with nothing visible clears the stale selection but stays armed")
+    @MainActor
+    func followLiveClearsStaleSelectionWhenScopeEmpties() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+
+        let alpha = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        coordinator.processBatch([alpha], generation: coordinator.sessionGeneration)
+        coordinator.setFollowingLiveTraffic(true)
+        #expect(coordinator.selectedTransaction?.id == alpha.id)
+
+        coordinator.filterCriteria.sidebarDomain = "empty.example.com"
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.selectedTransaction == nil)
+        #expect(coordinator.selectedTransactionIDs.isEmpty)
+        #expect(coordinator.isFollowingLiveTraffic)
+    }
+
+    @Test("Follow Live picks the chronological newest even under a custom display sort")
+    @MainActor
+    func followLiveIgnoresDisplaySort() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+        // Sort by URL so display order diverges from chronological capture order.
+        coordinator.activeSortDescriptors = [NSSortDescriptor(key: "url", ascending: true)]
+        coordinator.setFollowingLiveTraffic(true)
+
+        let firstByTime = TestFixtures.makeTransaction(url: "https://aaa.example.com/first")
+        let newestByTime = TestFixtures.makeTransaction(url: "https://zzz.example.com/second")
+        coordinator.processBatch([firstByTime, newestByTime], generation: coordinator.sessionGeneration)
+
+        // Display order (URL ascending) puts the older `firstByTime` first, but Follow Live must
+        // still choose the chronological newest, `newestByTime`.
+        #expect(coordinator.filteredRows.first?.id == firstByTime.id)
+        #expect(coordinator.selectedTransaction?.id == newestByTime.id)
     }
 
     @Test("Live buffer caps at policy limit during capture")

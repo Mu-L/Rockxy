@@ -85,6 +85,11 @@ final class WorkspaceState: Identifiable {
     var selectedLogEntry: LogEntry?
     var selectedTransactionIDs: Set<UUID> = []
 
+    /// Opt-in live-tail mode for this workspace. New visible traffic becomes the primary
+    /// selection until the user deliberately selects a row, at which point the mode yields.
+    /// Owned per-workspace so an inactive workspace can keep advancing independently.
+    var isFollowingLiveTraffic = false
+
     // Filtering
     var filterCriteria: FilterCriteria = .empty
     var filterRules: [FilterRule] = [FilterRule()]

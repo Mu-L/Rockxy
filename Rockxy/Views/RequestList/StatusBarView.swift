@@ -539,12 +539,10 @@ struct StatusBarView: View {
             HStack(spacing: 0) {
                 FooterPrimaryButton(
                     title: String(localized: "Follow Live"),
-                    systemImage: isFollowingLiveTraffic
-                        ? "dot.radiowaves.right"
-                        : "arrow.down.to.line",
+                    systemImage: "dot.radiowaves.right",
                     help: isFollowingLiveTraffic
-                        ? String(localized: "Following the newest visible request. Select a row to stop following.")
-                        : String(localized: "Follow the newest request that matches the current view."),
+                        ? String(localized: "Follow Live is on. Scroll, select a row, or click again to stop.")
+                        : String(localized: "Keep the newest request in the current view selected."),
                     isActive: isFollowingLiveTraffic,
                     action: onFollowLive
                 )

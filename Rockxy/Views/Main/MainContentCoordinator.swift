@@ -261,9 +261,6 @@ final class MainContentCoordinator {
     var trafficSamples: [(timestamp: Date, upload: Int64, download: Int64)] = []
     var bandwidthTimer: Timer?
     var isProxyOverridden = false
-    /// Opt-in live-tail mode. New visible traffic becomes the primary selection until the
-    /// user deliberately selects a row, at which point the mode yields immediately.
-    var isFollowingLiveTraffic = false
     nonisolated(unsafe) var evictionObserver: NSObjectProtocol?
 
     // MARK: - UI State — Engine Status
@@ -412,6 +409,13 @@ final class MainContentCoordinator {
     var focusNavigatorMode: FocusNavigatorMode {
         get { activeWorkspace.focusNavigatorMode }
         set { activeWorkspace.focusNavigatorMode = newValue }
+    }
+
+    /// Opt-in live-tail mode for the active workspace. Forwards to the active `WorkspaceState`
+    /// so existing UI/menu callers keep reading a single flag while the state is owned per-workspace.
+    var isFollowingLiveTraffic: Bool {
+        get { activeWorkspace.isFollowingLiveTraffic }
+        set { activeWorkspace.isFollowingLiveTraffic = newValue }
     }
 
     var selectedLogEntry: LogEntry? {

@@ -24,6 +24,7 @@ struct RequestTableView: NSViewRepresentable {
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
     var onSelectionChanged: ((Set<UUID>, UUID?) -> Void)?
+    var onUserScroll: (() -> Void)?
     var onDoubleClick: ((HTTPTransaction) -> Void)?
     var mainCoordinator: MainContentCoordinator?
     var headerColumns: [HeaderColumn] = []
@@ -98,6 +99,7 @@ struct RequestTableView: NSViewRepresentable {
         scrollView.autoresizingMask = [.width, .height]
         tableView.sizeLastColumnToFit()
         context.coordinator.tableView = tableView
+        context.coordinator.observeUserScrolling(in: scrollView)
         context.coordinator.applyDisplayMetrics(to: tableView)
 
         return scrollView
@@ -392,6 +394,7 @@ extension RequestTableView {
         private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
         private var pendingContextSelectionIDs: Set<UUID>?
         private var pendingContextPrimaryID: UUID?
+        private var userScrollObserver: NSObjectProtocol?
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -405,7 +408,31 @@ extension RequestTableView {
         private var lastSyncedSelectionIDs: Set<UUID> = []
         private var visibleMetricsRefreshGeneration = 0
 
+        deinit {
+            if let userScrollObserver {
+                NotificationCenter.default.removeObserver(userScrollObserver)
+            }
+        }
+
         // MARK: - NSTableViewDataSource
+
+        /// AppKit posts this notification only for user-initiated live scrolling, including
+        /// trackpad gestures and scroller tracking. Programmatic Follow Live scrolling does not
+        /// pass through this path, so it cannot turn itself off.
+        func observeUserScrolling(in scrollView: NSScrollView) {
+            if let userScrollObserver {
+                NotificationCenter.default.removeObserver(userScrollObserver)
+            }
+            userScrollObserver = NotificationCenter.default.addObserver(
+                forName: NSScrollView.didLiveScrollNotification,
+                object: scrollView,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.parent.onUserScroll?()
+                }
+            }
+        }
 
         func numberOfRows(in tableView: NSTableView) -> Int {
             rows.count

@@ -33,6 +33,7 @@ extension MainContentCoordinator {
         // lastDeriveWasAppendOnly is NOT reset here — it persists until the table
         // reads it in updateNSView and the next derive cycle overwrites it.
         workspace.refreshToken += 1
+        reconcileFollowLiveSelection(for: workspace)
     }
 
     private func appendDerivedRows(_ batch: [HTTPTransaction], to workspace: WorkspaceState) {

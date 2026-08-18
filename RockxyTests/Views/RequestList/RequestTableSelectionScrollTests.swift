@@ -228,6 +228,39 @@ struct RequestTableSelectionScrollTests {
         #expect(scrollView.contentView.bounds.origin.y == preservedOrigin.y)
     }
 
+    @Test("Only user-initiated scrolling yields Follow Live")
+    func userInitiatedScrollingYieldsFollowLive() {
+        var selectedIDs = Set<UUID>()
+        var userScrollCount = 0
+        let parent = RequestTableView(
+            workspaceID: UUID(),
+            rows: [],
+            refreshToken: 0,
+            isAppendOnly: false,
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            ),
+            onUserScroll: {
+                userScrollCount += 1
+            }
+        )
+        let coordinator = RequestTableView.Coordinator(parent: parent)
+        let tableView = makeTableView(rowCount: 20, coordinator: coordinator)
+        let scrollView = makeScrollView(documentView: tableView)
+        coordinator.observeUserScrolling(in: scrollView)
+
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: 40))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        #expect(userScrollCount == 0)
+
+        NotificationCenter.default.post(
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
+        #expect(userScrollCount == 1)
+    }
+
     @Test("Context actions preserve a selected group and isolate an unselected clicked row")
     func contextActionsFollowNativeSelectionSemantics() {
         let transactions = TestFixtures.makeBulkTransactions(count: 3)

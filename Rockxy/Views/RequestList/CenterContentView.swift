@@ -221,7 +221,7 @@ struct CenterContentView: View {
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
-                coordinator.userDidSelectTraffic()
+                coordinator.userDidNavigateTrafficHistory()
                 coordinator.selectedTransactionIDs = ids
                 if let primaryID,
                    ids.contains(primaryID),
@@ -238,6 +238,9 @@ struct CenterContentView: View {
                 } else {
                     coordinator.selectTransaction(nil)
                 }
+            },
+            onUserScroll: {
+                coordinator.userDidNavigateTrafficHistory()
             },
             mainCoordinator: coordinator,
             headerColumns: coordinator.headerColumnStore.columns
