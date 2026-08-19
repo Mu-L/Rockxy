@@ -899,4 +899,132 @@ struct RequestTableRefreshTests {
 
         #expect(coordinator.selectedTransaction == nil)
     }
+
+    // MARK: - Append-Chain Provenance
+
+    @Test("First append records the pre-append token as the append-chain origin")
+    func firstAppendRecordsChainOrigin() {
+        let coordinator = MainContentCoordinator()
+        coordinator.transactions = [TestFixtures.makeTransaction()]
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == nil)
+
+        let baseToken = coordinator.refreshToken
+        let appended = TestFixtures.makeTransaction()
+        coordinator.transactions.append(appended)
+        coordinator.appendFilteredTransactions([appended])
+
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == baseToken)
+    }
+
+    @Test("Coalesced pure appends preserve the original append-chain origin")
+    func coalescedAppendsPreserveChainOrigin() {
+        let coordinator = MainContentCoordinator()
+        coordinator.transactions = [TestFixtures.makeTransaction()]
+        coordinator.recomputeFilteredTransactions()
+
+        let baseToken = coordinator.refreshToken
+        for _ in 0 ..< 3 {
+            let appended = TestFixtures.makeTransaction()
+            coordinator.transactions.append(appended)
+            coordinator.appendFilteredTransactions([appended])
+        }
+
+        // Several batches were coalesced and the token advanced each time, but the origin
+        // still points at the base state the table last applied.
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == baseToken)
+        #expect(coordinator.refreshToken > baseToken)
+    }
+
+    @Test("Recompute invalidates the append-chain origin")
+    func recomputeInvalidatesChainOrigin() {
+        let coordinator = MainContentCoordinator()
+        coordinator.transactions = [TestFixtures.makeTransaction()]
+        coordinator.recomputeFilteredTransactions()
+        let appended = TestFixtures.makeTransaction()
+        coordinator.transactions.append(appended)
+        coordinator.appendFilteredTransactions([appended])
+        #expect(coordinator.activeWorkspace.appendChainOriginToken != nil)
+
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == nil)
+    }
+
+    @Test("Same-count sort invalidates the append-chain origin")
+    func sortInvalidatesChainOrigin() {
+        let coordinator = MainContentCoordinator()
+        let t1 = TestFixtures.makeTransaction(url: "https://beta.example.com/test")
+        let t2 = TestFixtures.makeTransaction(url: "https://alpha.example.com/test")
+        coordinator.transactions = [t1, t2]
+        coordinator.recomputeFilteredTransactions()
+        let appended = TestFixtures.makeTransaction()
+        coordinator.transactions.append(appended)
+        coordinator.appendFilteredTransactions([appended])
+        #expect(coordinator.activeWorkspace.appendChainOriginToken != nil)
+
+        coordinator.activeSortDescriptors = [NSSortDescriptor(key: "url", ascending: true)]
+        coordinator.deriveFilteredRows()
+
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == nil)
+    }
+
+    @Test("Client-app enrichment invalidates the append-chain origin")
+    func enrichmentInvalidatesChainOrigin() {
+        let coordinator = MainContentCoordinator()
+        let transaction = TestFixtures.makeTransaction()
+        coordinator.transactions = [transaction]
+        coordinator.recomputeFilteredTransactions()
+        let appended = TestFixtures.makeTransaction()
+        coordinator.transactions.append(appended)
+        coordinator.appendFilteredTransactions([appended])
+        #expect(coordinator.activeWorkspace.appendChainOriginToken != nil)
+
+        let tokenBefore = coordinator.refreshToken
+        transaction.clientApp = "Safari"
+        coordinator.handleClientAppEnrichment([transaction])
+
+        // In-place enrichment rewrote an existing row without a full derive, so it must have
+        // cleared the append provenance and still bumped the token for the table to reload.
+        #expect(coordinator.activeWorkspace.appendChainOriginToken == nil)
+        #expect(coordinator.refreshToken > tokenBefore)
+    }
+
+    @Test("Append after enrichment starts beyond the table's previously applied token")
+    func appendAfterEnrichmentStartsNewChain() throws {
+        let coordinator = MainContentCoordinator()
+        let original = TestFixtures.makeTransaction()
+        coordinator.transactions = [original]
+        coordinator.recomputeFilteredTransactions()
+
+        let firstAppend = TestFixtures.makeTransaction()
+        coordinator.transactions.append(firstAppend)
+        coordinator.appendFilteredTransactions([firstAppend])
+        let tableAppliedToken = coordinator.refreshToken
+
+        original.clientApp = "Safari"
+        coordinator.handleClientAppEnrichment([original])
+        let enrichmentToken = coordinator.refreshToken
+
+        let coalescedAppend = TestFixtures.makeTransaction()
+        coordinator.transactions.append(coalescedAppend)
+        coordinator.appendFilteredTransactions([coalescedAppend])
+
+        let origin = try #require(coordinator.activeWorkspace.appendChainOriginToken)
+        #expect(origin == enrichmentToken)
+        #expect(origin > tableAppliedToken)
+        #expect(coordinator.activeWorkspace.lastDeriveWasAppendOnly)
+    }
+
+    @Test("Reset invalidates append provenance")
+    func resetInvalidatesChainOrigin() {
+        let workspace = WorkspaceState()
+        workspace.appendChainOriginToken = 5
+        workspace.lastDeriveWasAppendOnly = true
+
+        workspace.reset()
+
+        #expect(workspace.appendChainOriginToken == nil)
+        #expect(!workspace.lastDeriveWasAppendOnly)
+    }
 }

@@ -462,7 +462,11 @@ extension MainContentCoordinator {
                 guard didUpdateRows else {
                     continue
                 }
+                // In-place enrichment rewrites existing rows without a full derive, so it must
+                // invalidate the append provenance itself — otherwise a later coalesced append
+                // could insert against a prefix this enrichment already mutated.
                 workspace.lastDeriveWasAppendOnly = false
+                workspace.appendChainOriginToken = nil
                 workspace.refreshToken += 1
             }
         }

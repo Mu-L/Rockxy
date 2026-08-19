@@ -100,10 +100,19 @@ final class WorkspaceState: Identifiable {
     var filteredRows: [RequestListRow] = []
     var refreshToken: Int = 0
 
-    /// Set true only by the genuine append fast-path in appendFilteredTransactions.
-    /// The table checks this to decide between insertRows (safe append) and reloadData.
-    /// Reset to false by deriveFilteredRows after each derivation cycle.
+    /// Set true only by the genuine append fast-path in appendFilteredTransactions, and
+    /// cleared by deriveFilteredRows (and reset) once a full derivation replaces the rows.
+    /// The table reads this as the coarse "the last mutation only appended rows" signal.
     var lastDeriveWasAppendOnly: Bool = false
+
+    /// Provenance for the append fast-path: the refreshToken of the base state that the
+    /// current unbroken run of pure appends builds on. `nil` whenever the last row mutation
+    /// was not a pure append (recompute, sort, enrichment, eviction, delete, reset). The
+    /// first append of a chain records the pre-append token and later coalesced appends
+    /// preserve it, so the request table can insert rows incrementally only when this origin
+    /// is <= the token it has already applied — otherwise a non-append mutation was coalesced
+    /// ahead of the append and the displayed prefix no longer matches the model.
+    var appendChainOriginToken: Int?
 
     /// Sort state (user preference, persists across session clears)
     var activeSortDescriptors: [NSSortDescriptor] = []
@@ -124,6 +133,8 @@ final class WorkspaceState: Identifiable {
     func reset() {
         filteredTransactions.removeAll()
         filteredRows.removeAll()
+        lastDeriveWasAppendOnly = false
+        appendChainOriginToken = nil
         refreshToken += 1
         // activeSortDescriptors intentionally preserved — sort is a user preference
         selectedTransaction = nil

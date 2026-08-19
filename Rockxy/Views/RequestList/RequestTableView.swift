@@ -19,6 +19,7 @@ struct RequestTableView: NSViewRepresentable {
     let rows: [RequestListRow]
     let refreshToken: Int
     let isAppendOnly: Bool
+    var appendChainOrigin: Int?
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
@@ -128,20 +129,27 @@ struct RequestTableView: NSViewRepresentable {
 
         if workspaceChanged || newToken != oldToken {
             let newCount = rows.count
-            if !workspaceChanged,
-               isAppendOnly,
-               newCount > coordinator.previousRowCount,
-               coordinator.previousRowCount > 0
-            {
+            if coordinator.canInsertAppendedRows(
+                newCount: newCount,
+                isAppendOnly: isAppendOnly,
+                appendChainOrigin: appendChainOrigin,
+                lastAppliedToken: oldToken,
+                workspaceChanged: workspaceChanged,
+                tableRowCount: tableView.numberOfRows
+            ) {
                 // Append-only fast path: coordinator confirmed rows were only appended
                 let newIndexes = IndexSet(integersIn: coordinator.previousRowCount ..< newCount)
-                tableView.insertRows(at: newIndexes, withAnimation: [])
+                coordinator.performProgrammaticTableUpdate {
+                    tableView.insertRows(at: newIndexes, withAnimation: [])
+                }
                 if displayChange?.reloadVisibleRows == true {
                     coordinator.reloadVisibleRows(in: tableView)
                     reloadedVisibleRowsForMetrics = true
                 }
             } else {
-                tableView.reloadData()
+                coordinator.performProgrammaticTableUpdate {
+                    tableView.reloadData()
+                }
                 reloadedVisibleRowsForMetrics = displayChange?.reloadVisibleRows == true
             }
             coordinator.previousRowCount = newCount
@@ -436,6 +444,38 @@ extension RequestTableView {
 
         func numberOfRows(in tableView: NSTableView) -> Int {
             rows.count
+        }
+
+        /// Incremental row insertion is valid only when AppKit and the SwiftUI coordinator agree
+        /// on the old row count and the current append chain started from a model snapshot this
+        /// table has already applied.
+        func canInsertAppendedRows(
+            newCount: Int,
+            isAppendOnly: Bool,
+            appendChainOrigin: Int?,
+            lastAppliedToken: Int,
+            workspaceChanged: Bool,
+            tableRowCount: Int
+        ) -> Bool {
+            guard let appendChainOrigin else {
+                return false
+            }
+            return !workspaceChanged
+                && isAppendOnly
+                && previousRowCount > 0
+                && tableRowCount == previousRowCount
+                && appendChainOrigin <= lastAppliedToken
+                && newCount > previousRowCount
+        }
+
+        /// AppKit may emit selection notifications while rows are inserted or reloaded. Treat the
+        /// entire table mutation as coordinator-owned so those callbacks cannot re-enter SwiftUI
+        /// selection/filter state halfway through applying a snapshot.
+        func performProgrammaticTableUpdate(_ update: () -> Void) {
+            let wasUpdatingSelection = isUpdatingSelection
+            isUpdatingSelection = true
+            defer { isUpdatingSelection = wasUpdatingSelection }
+            update()
         }
 
         struct DisplayMetricsChange: Equatable {
@@ -1135,9 +1175,9 @@ extension RequestTableView {
                 ? tableView.enclosingScrollView?.contentView.bounds.origin
                 : nil
 
-            isUpdatingSelection = true
-            tableView.selectRowIndexes(desired, byExtendingSelection: false)
-            isUpdatingSelection = false
+            performProgrammaticTableUpdate {
+                tableView.selectRowIndexes(desired, byExtendingSelection: false)
+            }
             lastSyncedSelectionIDs = ids
 
             let isFollowingLiveTraffic = MainActor.assumeIsolated {
@@ -1755,9 +1795,9 @@ extension RequestTableView {
                 clickedRow: clickedRow,
                 selectedRowIndexes: selection
             )
-            isUpdatingSelection = true
-            tableView.selectRowIndexes(selection, byExtendingSelection: false)
-            isUpdatingSelection = false
+            performProgrammaticTableUpdate {
+                tableView.selectRowIndexes(selection, byExtendingSelection: false)
+            }
             pendingContextSelectionIDs = ids
             pendingContextPrimaryID = rows[clickedRow].id
         }
