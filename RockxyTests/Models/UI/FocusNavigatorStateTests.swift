@@ -201,6 +201,63 @@ struct FocusNavigatorStateTests {
         #expect(focus.ruleCount == focus.includedRules.count + focus.excludedRules.count)
     }
 
+    @Test("Generated Focus Set names become meaningful without replacing custom names")
+    func focusSetDisplayNames() {
+        let legacyApplication = FocusSet(name: "New Focus Set 2", appName: "ChatGPT")
+        let legacyExclusion = FocusSet(name: "New Focus Set", excludedDomain: "exp.notion.so")
+        let compoundExclusion = FocusSet(
+            name: "New Focus Set",
+            excludedDomain: "exp.notion.so",
+            excludedPathPrefix: "/api/events"
+        )
+        let scoped = FocusSet(
+            name: "New Focus Set",
+            appName: "Google Chrome",
+            domain: "api.example.com",
+            pathPrefix: "/v1"
+        )
+        let custom = FocusSet(name: "Checkout Debugging", appName: "Safari")
+
+        #expect(legacyApplication.displayName == "ChatGPT")
+        #expect(legacyExclusion.displayName == "Hide exp.notion.so")
+        #expect(compoundExclusion.displayName == "Hide exp.notion.so and paths under /api/events")
+        #expect(scoped.displayName == "Google Chrome on api.example.com/v1")
+        #expect(custom.displayName == "Checkout Debugging")
+        #expect(custom.scopeSummary == "Safari")
+
+        #expect(legacyApplication.sidebarIncludedRules.isEmpty)
+        #expect(!legacyApplication.hasSidebarRuleDetails)
+        #expect(legacyExclusion.sidebarExcludedRules.isEmpty)
+        #expect(!legacyExclusion.hasSidebarRuleDetails)
+        #expect(scoped.sidebarIncludedRules.isEmpty)
+        #expect(!scoped.hasSidebarRuleDetails)
+        #expect(custom.sidebarIncludedRules == custom.includedRules)
+        #expect(custom.hasSidebarRuleDetails)
+        #expect(custom.sidebarScopeSummary == "Safari")
+
+        let scopedWithExclusion = FocusSet(
+            name: "Google Chrome",
+            appName: "Google Chrome",
+            excludedDomain: "telemetry.example.com"
+        )
+        #expect(scopedWithExclusion.sidebarIncludedRules.isEmpty)
+        #expect(scopedWithExclusion.sidebarExcludedRules == scopedWithExclusion.excludedRules)
+        #expect(scopedWithExclusion.sidebarScopeSummary == "Hide telemetry.example.com")
+    }
+
+    @Test("New Focus Sets start with the current scope as their editable name")
+    @MainActor
+    func focusSetNameFromCurrentScope() {
+        let coordinator = MainContentCoordinator()
+        coordinator.filterCriteria.sidebarApp = "Google Chrome"
+        coordinator.filterCriteria.sidebarDomain = "api.example.com"
+
+        let focus = coordinator.makeFocusSetFromCurrentScope()
+
+        #expect(focus.name == "Google Chrome on api.example.com")
+        #expect(focus.displayName == focus.name)
+    }
+
     @Test("Muted traffic source matches only its scope")
     func mutedSourceMatching() {
         let transaction = TestFixtures.makeTransaction(url: "https://telemetry.example.com/events")

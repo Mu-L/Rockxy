@@ -230,6 +230,23 @@ struct NativeAssistantProviderTests {
         #expect(!viewModel.isRefreshingProviderModels)
     }
 
+    @MainActor
+    @Test("Model availability detail matches local and remote providers")
+    func modelAvailabilityDetailMatchesProvider() {
+        let viewModel = AssistantSettingsViewModel(
+            manager: FixtureAssistantSettingsManager(),
+            credentialStorage: EmptyAssistantCredentialStorage(),
+            runtime: DelayedSettingsAssistantRuntime()
+        )
+
+        #expect(viewModel.availableModelsDetail.contains("local downloads"))
+
+        viewModel.selectProvider(.openAICompatible)
+
+        #expect(!viewModel.availableModelsDetail.contains("local downloads"))
+        #expect(viewModel.availableModelsDetail.contains(AssistantProviderKind.openAICompatible.title))
+    }
+
     @Test("Anthropic rejects a non-2xx streaming response with a typed error")
     func anthropicStreamRejectsHTTPFailure() async throws {
         let provider = try AnthropicAssistantProvider(

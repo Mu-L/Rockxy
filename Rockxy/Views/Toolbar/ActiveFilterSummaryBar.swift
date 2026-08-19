@@ -23,7 +23,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     if let focusSet = coordinator.activeWorkspace.activeFocusSet {
-                        FilterChip(label: String(localized: "Focus: \(focusSet.name)")) {
+                        FilterChip(label: String(localized: "Focus: \(focusSet.displayName)")) {
                             coordinator.applyFocusSet(nil)
                         }
                     }

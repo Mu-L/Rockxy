@@ -13,6 +13,102 @@ extension MainContentCoordinator {
         selectedTransaction = transaction
     }
 
+    /// Enables or disables live-tail selection on the active workspace. Enabling immediately
+    /// reveals the newest request already visible in the active workspace so the control has an
+    /// observable result even before another capture batch arrives; on an empty view it stays armed.
+    func setFollowingLiveTraffic(_ isEnabled: Bool) {
+        isFollowingLiveTraffic = isEnabled
+        guard isEnabled else {
+            return
+        }
+        selectLastFilteredTransaction()
+    }
+
+    func toggleFollowingLiveTraffic() {
+        setFollowingLiveTraffic(!isFollowingLiveTraffic)
+    }
+
+    /// User-driven table navigation yields Follow Live for the active workspace. The request
+    /// table suppresses this callback for coordinator-owned selection and scrolling updates.
+    func userDidNavigateTrafficHistory() {
+        isFollowingLiveTraffic = false
+    }
+
+    /// Advances live-tail selection for every workspace with Follow Live enabled — including
+    /// inactive ones — using each workspace's own scope and filters. Workspaces without the mode
+    /// keep their current selection.
+    func followLatestVisibleTransaction(from batch: [HTTPTransaction]) {
+        guard !batch.isEmpty else {
+            return
+        }
+        for workspace in workspaceStore.workspaces {
+            reconcileFollowLiveSelection(for: workspace, acceptedBatch: batch)
+        }
+    }
+
+    /// Reconciles a single workspace's Follow Live selection against its current filtered view.
+    ///
+    /// - With `acceptedBatch`, this is a batch-driven advance: the selection moves only when the
+    ///   batch contributed a newly-visible transaction; otherwise the workspace stays armed and
+    ///   keeps its current selection.
+    /// - Without a batch (`nil`), this is a filter/scope reconcile: the selection snaps to the
+    ///   newest currently-visible transaction, or clears any stale hidden selection while staying
+    ///   armed when nothing is visible.
+    ///
+    /// The newest transaction is always taken from `filteredTransactions` (chronological), never
+    /// the display-sorted `filteredRows`, so a custom column sort cannot change the chosen row.
+    func reconcileFollowLiveSelection(
+        for workspace: WorkspaceState,
+        acceptedBatch batch: [HTTPTransaction]? = nil
+    ) {
+        guard workspace.isFollowingLiveTraffic else {
+            return
+        }
+
+        let newest: HTTPTransaction?
+        if let batch {
+            let candidateIDs = Set(batch.map(\.id))
+            newest = workspace.filteredTransactions.last { candidateIDs.contains($0.id) }
+        } else {
+            newest = workspace.filteredTransactions.last
+        }
+
+        guard let newest else {
+            if batch == nil {
+                clearFollowLiveSelection(in: workspace)
+            }
+            return
+        }
+        applyFollowLiveSelection(newest, in: workspace)
+    }
+
+    /// Applies a Follow Live selection. The active workspace routes through the coordinator
+    /// selection path so inspector/assistant side effects fire; inactive workspaces are mutated
+    /// directly to avoid triggering the active workspace's side effects.
+    private func applyFollowLiveSelection(_ transaction: HTTPTransaction, in workspace: WorkspaceState) {
+        if workspace === activeWorkspace {
+            selectedTransactionIDs = [transaction.id]
+            selectTransaction(transaction)
+        } else {
+            workspace.selectedTransactionIDs = [transaction.id]
+            workspace.selectedTransaction = transaction
+        }
+    }
+
+    /// Clears a stale Follow Live selection when nothing is currently visible, keeping the mode armed.
+    private func clearFollowLiveSelection(in workspace: WorkspaceState) {
+        if workspace === activeWorkspace {
+            guard selectedTransaction != nil || !selectedTransactionIDs.isEmpty else {
+                return
+            }
+            selectedTransactionIDs = []
+            selectTransaction(nil)
+        } else {
+            workspace.selectedTransactionIDs = []
+            workspace.selectedTransaction = nil
+        }
+    }
+
     func selectLogEntry(_ entry: LogEntry?) {
         selectedLogEntry = entry
     }

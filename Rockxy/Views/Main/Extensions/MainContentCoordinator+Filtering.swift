@@ -30,9 +30,14 @@ extension MainContentCoordinator {
         if let selected = workspace.selectedTransaction, !visibleIDs.contains(selected.id) {
             workspace.selectedTransaction = nil
         }
-        // lastDeriveWasAppendOnly is NOT reset here — it persists until the table
-        // reads it in updateNSView and the next derive cycle overwrites it.
+        // A full derivation replaces the entire row set, so any in-flight append chain is
+        // void: clear both the append-only signal and its provenance token before bumping the
+        // token. Scattered callers that set lastDeriveWasAppendOnly = false rely on this so a
+        // stale append signal can never survive a recompute.
+        workspace.lastDeriveWasAppendOnly = false
+        workspace.appendChainOriginToken = nil
         workspace.refreshToken += 1
+        reconcileFollowLiveSelection(for: workspace)
     }
 
     private func appendDerivedRows(_ batch: [HTTPTransaction], to workspace: WorkspaceState) {
@@ -44,6 +49,12 @@ extension MainContentCoordinator {
             return
         }
 
+        // Record the base token this append chain builds on. The first append of a chain
+        // captures the current (pre-append) token; later coalesced appends preserve it so the
+        // table can still prove its displayed prefix matches the grown row set.
+        if workspace.appendChainOriginToken == nil {
+            workspace.appendChainOriginToken = workspace.refreshToken
+        }
         workspace.filteredRows.append(contentsOf: appendedRows)
         workspace.refreshToken += 1
     }

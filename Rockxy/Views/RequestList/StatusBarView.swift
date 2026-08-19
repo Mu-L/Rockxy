@@ -431,20 +431,28 @@ private struct FooterToolingChrome: ViewModifier {
 
 private struct FooterPrimaryButton: View {
     let title: String
+    let systemImage: String
+    let help: String
     var isActive = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(metrics.swiftUIFont())
-                .foregroundStyle(isActive ? Color.accentColor : Color(nsColor: .labelColor))
-                .lineLimit(1)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background(backgroundColor, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            ViewThatFits(in: .horizontal) {
+                Label(title, systemImage: systemImage)
+                Image(systemName: systemImage)
+            }
+            .font(metrics.swiftUIFont())
+            .foregroundStyle(isActive ? Color.accentColor : Color(nsColor: .labelColor))
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(backgroundColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(title)
+        .accessibilityValue(isActive ? String(localized: "On") : String(localized: "Off"))
         .onHover { isHovered = $0 }
     }
 
@@ -475,7 +483,7 @@ enum StatusBarRequestSummary {
     ) -> String {
         if activeFilterCount > 0, visibleCount != availableCount {
             if selectedCount > 0 {
-                return String(localized: "\(selectedCount) selected · \(visibleCount) of \(availableCount) shown")
+                return String(localized: "\(selectedCount) selected, \(visibleCount) of \(availableCount) shown")
             }
             return String(localized: "\(visibleCount) of \(availableCount) requests")
         }
@@ -492,7 +500,7 @@ enum StatusBarRequestSummary {
 // MARK: - StatusBarView
 
 /// Bottom status bar showing request counts, bandwidth stats (upload/download speed),
-/// and quick-action buttons for clearing, toggling filters, and auto-select mode.
+/// and quick-action buttons for clearing, filtering, and opt-in live-tail selection.
 struct StatusBarView: View {
     // MARK: Internal
 
@@ -508,7 +516,7 @@ struct StatusBarView: View {
     var isProxyOverridden: Bool = false
     var isAllowListActive: Bool = false
     var isNoCachingActive: Bool = false
-    var isAutoSelectEnabled: Bool = true
+    var isFollowingLiveTraffic: Bool = false
     var isFilterBarVisible: Bool = false
     var activeFilterCount: Int = 0
     var errorCount: Int = 0
@@ -522,13 +530,27 @@ struct StatusBarView: View {
 
     var onClear: () -> Void = {}
     var onFilter: () -> Void = {}
-    var onAutoSelect: () -> Void = {}
+    var onFollowLive: () -> Void = {}
     var onSwitchOffProxyOverride: () -> Void = {}
     var onOpenToolWindow: (String) -> Void = { _ in }
 
     var body: some View {
         WorkspaceFooterBar(horizontalPadding: 12) {
             HStack(spacing: 0) {
+                FooterPrimaryButton(
+                    title: String(localized: "Follow Live"),
+                    systemImage: "dot.radiowaves.right",
+                    help: isFollowingLiveTraffic
+                        ? String(localized: "Follow Live is on. Scroll, select a row, or click again to stop.")
+                        : String(localized: "Keep the newest request in the current view selected."),
+                    isActive: isFollowingLiveTraffic,
+                    action: onFollowLive
+                )
+
+                Divider()
+                    .frame(height: 12)
+                    .padding(.horizontal, 8)
+
                 quickTools
                 mutationIndicators
                 Spacer(minLength: 24)

@@ -13,83 +13,18 @@ struct FocusSetSidebarRow: View {
     let onApply: () -> Void
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            VStack(alignment: .leading, spacing: 7) {
-                if !focusSet.includedRules.isEmpty {
-                    ruleGroup(
-                        title: String(localized: "Include · all must match"),
-                        systemImage: "checkmark.circle",
-                        rules: focusSet.includedRules
-                    )
-                }
-                if !focusSet.excludedRules.isEmpty {
-                    ruleGroup(
-                        title: String(localized: "Exclude · any match is hidden"),
-                        systemImage: "minus.circle",
-                        rules: focusSet.excludedRules
-                    )
-                }
+        if focusSet.hasSidebarRuleDetails {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                ruleDetails
+            } label: {
+                rowLabel
             }
-            .padding(.top, 4)
-            .padding(.leading, 2)
-        } label: {
-            Button(action: onApply) {
-                HStack(alignment: .top, spacing: 7) {
-                    leadingIcon
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(focusSet.name)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Text(compactSummary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .truncationMode(.middle)
-                    }
-
-                    Spacer(minLength: 6)
-
-                    Text(ruleCountLabel)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-
-                    if isActive {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .accessibilityLabel(String(localized: "Active"))
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(isActive
-                ? String(localized: "This Focus Set is active. Click to reapply it.")
-                : String(localized: "Apply this Focus Set."))
+        } else {
+            rowLabel
         }
     }
 
     // MARK: Private
-
-    private var compactSummary: String {
-        let includes = focusSet.includedRules.map(compactRule).joined(separator: " · ")
-        let excludes = focusSet.excludedRules.map(compactRule).joined(separator: " · ")
-        guard !excludes.isEmpty else {
-            return includes
-        }
-        guard !includes.isEmpty else {
-            return String(localized: "Exclude \(excludes)")
-        }
-        return String(localized: "\(includes) · except \(excludes)")
-    }
-
-    private var ruleCountLabel: String {
-        focusSet.ruleCount == 1
-            ? String(localized: "1 rule")
-            : String(localized: "\(focusSet.ruleCount) rules")
-    }
 
     @ViewBuilder private var leadingIcon: some View {
         if focusSet.appName.isEmpty {
@@ -99,6 +34,69 @@ struct FocusSetSidebarRow: View {
         } else {
             CapturedApplicationIconView(name: focusSet.appName, size: 20)
         }
+    }
+
+    private var rowLabel: some View {
+        Button(action: onApply) {
+            HStack(alignment: .top, spacing: 7) {
+                leadingIcon
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(focusSet.displayName)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !isExpanded, let summary = focusSet.sidebarScopeSummary {
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                    }
+                }
+
+                Spacer(minLength: 6)
+
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .accessibilityLabel(String(localized: "Active"))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(isActive
+            ? String(localized: "This Focus Set is active. Click to reapply it.")
+            : String(localized: "Apply this Focus Set."))
+        .accessibilityValue(
+            focusSet.ruleCount == 1
+                ? String(localized: "1 condition")
+                : String(localized: "\(focusSet.ruleCount) conditions")
+        )
+    }
+
+    @ViewBuilder private var ruleDetails: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !focusSet.sidebarIncludedRules.isEmpty {
+                ruleGroup(
+                    title: String(localized: "Show when all match"),
+                    systemImage: "checkmark.circle",
+                    rules: focusSet.sidebarIncludedRules
+                )
+            }
+            if !focusSet.sidebarExcludedRules.isEmpty {
+                ruleGroup(
+                    title: String(localized: "Hide when any match"),
+                    systemImage: "eye.slash",
+                    rules: focusSet.sidebarExcludedRules
+                )
+            }
+        }
+        .padding(.top, 4)
+        .padding(.leading, 2)
     }
 
     private func ruleGroup(
@@ -114,14 +112,11 @@ struct FocusSetSidebarRow: View {
                 .foregroundStyle(.secondary)
 
             ForEach(rules) { rule in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "arrow.turn.down.right")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .frame(width: 14)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(ruleLabel(rule.kind))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .frame(width: 68, alignment: .leading)
                     Text(rule.pattern)
                         .font(.caption.monospaced())
                         .lineLimit(1)
@@ -132,14 +127,10 @@ struct FocusSetSidebarRow: View {
         }
     }
 
-    private func compactRule(_ rule: FocusSetRuleDescriptor) -> String {
-        "\(ruleLabel(rule.kind)): \(rule.pattern)"
-    }
-
     private func ruleLabel(_ kind: FocusSetRuleDescriptor.Kind) -> String {
         switch kind {
         case .application:
-            String(localized: "App")
+            String(localized: "Application")
         case .domain:
             String(localized: "Domain")
         case .pathPrefix:

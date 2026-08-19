@@ -15,6 +15,7 @@ enum HelperConnectionError: LocalizedError {
     case certInstallFailed(String)
     case certRemoveFailed(String)
     case bypassDomainsFailed(String)
+    case applicationMustReopen
     case appSignatureInvalid(String)
     case signingIdentityMismatch(app: String, helper: String)
 
@@ -38,8 +39,10 @@ enum HelperConnectionError: LocalizedError {
             "Helper failed to remove root certificate: \(reason)"
         case let .bypassDomainsFailed(reason):
             "Helper failed to set bypass domains: \(reason)"
-        case let .appSignatureInvalid(detail):
-            "This app build has an invalid code signature: \(detail)"
+        case .applicationMustReopen:
+            "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again."
+        case .appSignatureInvalid:
+            "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
         case let .signingIdentityMismatch(app, helper):
             "This app is signed by \"\(app)\" but the installed helper was signed by \"\(helper)\""
         }
@@ -647,6 +650,8 @@ final class HelperConnection {
     private func signingPreflight() async throws {
         let result = await signingCache.evaluate()
         switch result {
+        case .runningCodeChanged:
+            throw HelperConnectionError.applicationMustReopen
         case let .appSignatureInvalid(detail):
             throw HelperConnectionError.appSignatureInvalid(detail)
         case let .signingIdentityMismatch(app, helper):

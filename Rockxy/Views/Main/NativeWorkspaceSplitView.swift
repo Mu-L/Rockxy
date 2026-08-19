@@ -1,6 +1,45 @@
 import AppKit
 import SwiftUI
 
+// MARK: - NativeSplitDividerInteraction
+
+/// Keeps thin native dividers visually quiet while giving them a forgiving pointer target.
+/// Twelve points follows the interaction footprint of standard macOS splitters without adding
+/// visible chrome or stealing meaningful space from either pane.
+enum NativeSplitDividerInteraction {
+    static let minimumHitThickness: CGFloat = 12
+    /// AppKit performs user divider drags at priority 490. Pane holding priorities at
+    /// `.defaultHigh` (750) therefore make a divider look draggable while Auto Layout snaps it
+    /// straight back. Keep utility panes just above the flexible workspace, but below drag.
+    static let utilityPaneHoldingPriority = NSLayoutConstraint.Priority(rawValue: 251)
+
+    static func expandedHitRect(
+        systemRect: NSRect,
+        drawnRect: NSRect,
+        isVertical: Bool
+    )
+        -> NSRect
+    {
+        guard systemRect.width.isFinite,
+              systemRect.height.isFinite,
+              drawnRect.width.isFinite,
+              drawnRect.height.isFinite else
+        {
+            return systemRect
+        }
+
+        let expandedDrawnRect: NSRect
+        if isVertical {
+            let expansion = max(0, minimumHitThickness - drawnRect.width) / 2
+            expandedDrawnRect = drawnRect.insetBy(dx: -expansion, dy: 0)
+        } else {
+            let expansion = max(0, minimumHitThickness - drawnRect.height) / 2
+            expandedDrawnRect = drawnRect.insetBy(dx: 0, dy: -expansion)
+        }
+        return systemRect.union(expandedDrawnRect)
+    }
+}
+
 // MARK: - NativeWorkspaceSplitView
 
 /// Hosts the source list, workspace, and Context Dock in one native root split.
@@ -23,7 +62,6 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
         workspaceMinimumWidth: CGFloat,
         inspectorMinimumWidth: CGFloat,
         inspectorIdealWidth: CGFloat,
-        inspectorMaximumWidth: CGFloat,
         toolbarConfiguration: NativeWorkspaceToolbarConfiguration? = nil,
         @ViewBuilder sidebar: @escaping () -> Sidebar,
         @ViewBuilder workspace: @escaping () -> Workspace,
@@ -38,7 +76,6 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
         self.workspaceMinimumWidth = workspaceMinimumWidth
         self.inspectorMinimumWidth = inspectorMinimumWidth
         self.inspectorIdealWidth = inspectorIdealWidth
-        self.inspectorMaximumWidth = inspectorMaximumWidth
         self.toolbarConfiguration = toolbarConfiguration
         self.sidebar = sidebar
         self.workspace = workspace
@@ -89,7 +126,6 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
     let workspaceMinimumWidth: CGFloat
     let inspectorMinimumWidth: CGFloat
     let inspectorIdealWidth: CGFloat
-    let inspectorMaximumWidth: CGFloat
     let toolbarConfiguration: NativeWorkspaceToolbarConfiguration?
     @ViewBuilder let sidebar: () -> Sidebar
     @ViewBuilder let workspace: () -> Workspace
@@ -124,8 +160,7 @@ struct NativeWorkspaceSplitView<Sidebar: View, Workspace: View, Inspector: View>
                 sidebarMaximumWidth: sidebarMaximumWidth,
                 workspaceMinimumWidth: workspaceMinimumWidth,
                 inspectorMinimumWidth: inspectorMinimumWidth,
-                inspectorIdealWidth: inspectorIdealWidth,
-                inspectorMaximumWidth: inspectorMaximumWidth
+                inspectorIdealWidth: inspectorIdealWidth
             )
         )
         updateVisibilityCallbacks(on: controller)
@@ -215,7 +250,6 @@ struct NativeWorkspaceSplitLayout {
     let workspaceMinimumWidth: CGFloat
     let inspectorMinimumWidth: CGFloat
     let inspectorIdealWidth: CGFloat
-    let inspectorMaximumWidth: CGFloat
 }
 
 // MARK: - NativeWorkspaceSplitSizing
@@ -379,6 +413,27 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
         isApplyingInitialState = false
     }
 
+    override func splitView(
+        _ splitView: NSSplitView,
+        effectiveRect proposedEffectiveRect: NSRect,
+        forDrawnRect drawnRect: NSRect,
+        ofDividerAt dividerIndex: Int
+    )
+        -> NSRect
+    {
+        let systemRect = super.splitView(
+            splitView,
+            effectiveRect: proposedEffectiveRect,
+            forDrawnRect: drawnRect,
+            ofDividerAt: dividerIndex
+        )
+        return NativeSplitDividerInteraction.expandedHitRect(
+            systemRect: systemRect,
+            drawnRect: drawnRect,
+            isVertical: splitView.isVertical
+        )
+    }
+
     override func viewDidAppear() {
         super.viewDidAppear()
         installWindowChromeIfNeeded()
@@ -404,7 +459,7 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
         sidebarItem.canCollapse = true
         sidebarItem.collapseBehavior = .useConstraints
         sidebarItem.isSpringLoaded = true
-        sidebarItem.holdingPriority = .defaultHigh
+        sidebarItem.holdingPriority = NativeSplitDividerInteraction.utilityPaneHoldingPriority
 
         let workspaceItem = NSSplitViewItem(viewController: workspaceController)
         workspaceItem.minimumThickness = layout.workspaceMinimumWidth
@@ -413,11 +468,14 @@ final class NativeWorkspaceSplitViewController: NSSplitViewController {
 
         let inspectorItem = NSSplitViewItem(inspectorWithViewController: inspectorController)
         inspectorItem.minimumThickness = layout.inspectorMinimumWidth
-        inspectorItem.maximumThickness = layout.inspectorMaximumWidth
+        // AppKit's semantic inspector item applies a compact default maximum. A large finite
+        // value keeps the native inspector behavior while making its real upper bound the
+        // window and workspace minimum, without overflowing Auto Layout constraints.
+        inspectorItem.maximumThickness = 10_000
         inspectorItem.canCollapse = true
         inspectorItem.collapseBehavior = .useConstraints
         inspectorItem.isSpringLoaded = true
-        inspectorItem.holdingPriority = .defaultHigh
+        inspectorItem.holdingPriority = NativeSplitDividerInteraction.utilityPaneHoldingPriority
 
         addSplitViewItem(sidebarItem)
         addSplitViewItem(workspaceItem)

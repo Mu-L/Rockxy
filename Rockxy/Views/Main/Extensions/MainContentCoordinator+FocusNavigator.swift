@@ -54,12 +54,14 @@ extension MainContentCoordinator {
     }
 
     func makeFocusSetFromCurrentScope() -> FocusSet {
-        FocusSet(
+        var focusSet = FocusSet(
             name: String(localized: "New Focus Set"),
             appName: filterCriteria.sidebarApp ?? "",
             domain: filterCriteria.sidebarDomain ?? "",
             pathPrefix: filterCriteria.sidebarPathPrefix ?? ""
         )
+        focusSet.name = focusSet.suggestedName
+        return focusSet
     }
 
     func muteTrafficSource(_ source: MutedTrafficSource) {

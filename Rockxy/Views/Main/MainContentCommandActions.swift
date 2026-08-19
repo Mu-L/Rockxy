@@ -172,8 +172,12 @@ struct MainContentCommandActions {
 
     // MARK: - View
 
-    func toggleAutoSelect() {
-        coordinator.isAutoSelectEnabled.toggle()
+    var isFollowingLiveTraffic: Bool {
+        coordinator.isFollowingLiveTraffic
+    }
+
+    func setFollowingLiveTraffic(_ isEnabled: Bool) {
+        coordinator.setFollowingLiveTraffic(isEnabled)
     }
 
     func toggleSourceList() {

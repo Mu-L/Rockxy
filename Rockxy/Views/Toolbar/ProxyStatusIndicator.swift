@@ -18,6 +18,9 @@ struct ProxyStatusIndicator: View {
     let port: Int
     let updateStatusSummary: AppUpdater.UpdateStatusSummary?
     let openUpdates: () -> Void
+    let readiness: ReadinessCoordinator
+    let isSystemProxyConfigured: Bool
+    let onToggleCapture: () -> Void
 
     @Binding var showPopover: Bool
 
@@ -34,14 +37,17 @@ struct ProxyStatusIndicator: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
-                    if updateStatusSummary != nil {
-                        Text("|")
-                            .font(.system(size: metrics.badgeFontSize))
-                            .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-                    }
+                    Divider()
+                        .frame(height: 12)
+                        .accessibilityHidden(true)
+
+                    Text(listenerText)
+                        .font(.system(size: metrics.chromeFontSize, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 .padding(.leading, ProxyStatusChromeMetrics.horizontalPadding)
-                .padding(.trailing, updateStatusSummary == nil ? ProxyStatusChromeMetrics.horizontalPadding : 7)
+                .padding(.trailing, updateStatusSummary == nil ? ProxyStatusChromeMetrics.horizontalPadding : 8)
                 .frame(height: metrics.chromeControlHeight)
                 .contentShape(Capsule(style: .continuous))
             }
@@ -49,6 +55,11 @@ struct ProxyStatusIndicator: View {
             .help(statusHelpText)
 
             if let updateStatusSummary {
+                Divider()
+                    .frame(height: 13)
+                    .padding(.horizontal, 2)
+                    .accessibilityHidden(true)
+
                 updateStatus(updateStatusSummary)
                     .padding(.trailing, ProxyStatusChromeMetrics.horizontalPadding)
                     .frame(height: metrics.chromeControlHeight)
@@ -58,9 +69,12 @@ struct ProxyStatusIndicator: View {
         .contentShape(Rectangle())
         .popover(isPresented: $showPopover) {
             ProxyStatusPopover(
+                displayState: displayState,
                 listenAddress: listenAddress,
                 port: port,
-                loopbackAddress: AppSettingsManager.shared.settings.loopbackAddress,
+                readiness: readiness,
+                isSystemProxyConfigured: isSystemProxyConfigured,
+                onToggleCapture: onToggleCapture,
                 showPopover: $showPopover
             )
         }
@@ -110,22 +124,28 @@ struct ProxyStatusIndicator: View {
     }
 
     private var statusText: String {
-        "Rockxy | \(listenAddress):\(port) | \(displayState.title)"
+        displayState.captureTitle
+    }
+
+    private var listenerText: String {
+        CaptureStatusPresentation.listener(address: listenAddress, port: port)
     }
 
     private var statusHelpText: String {
+        let captureContext = [
+            statusText,
+            String(localized: "Listening on \(listenerText)"),
+        ]
         if let updateStatusSummary {
-            [
-                statusText,
+            return (captureContext + [
                 updateStatusSummary.title,
                 updateStatusSummary.versionLine,
                 updateStatusSummary.countLine,
-            ]
+            ])
             .compactMap { $0 }
             .joined(separator: "\n")
-        } else {
-            statusText
         }
+        return captureContext.joined(separator: "\n")
     }
 
     @ViewBuilder

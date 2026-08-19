@@ -77,6 +77,15 @@ struct ProxyToolbarContent: ToolbarContent {
                 openUpdates: {
                     updater.showUpdatesFromStatusBadge()
                 },
+                readiness: coordinator.readiness,
+                isSystemProxyConfigured: coordinator.isSystemProxyConfigured,
+                onToggleCapture: {
+                    if coordinator.isProxyRunning {
+                        coordinator.stopProxy()
+                    } else {
+                        coordinator.startProxy()
+                    }
+                },
                 showPopover: $coordinator.showProxyStatusPopover
             )
         }
@@ -106,6 +115,15 @@ struct ProxyToolbarStatusView: View {
             updateStatusSummary: updater.updateStatusSummary,
             openUpdates: {
                 updater.showUpdatesFromStatusBadge()
+            },
+            readiness: coordinator.readiness,
+            isSystemProxyConfigured: coordinator.isSystemProxyConfigured,
+            onToggleCapture: {
+                if coordinator.isProxyRunning {
+                    coordinator.stopProxy()
+                } else {
+                    coordinator.startProxy()
+                }
             },
             showPopover: $coordinator.showProxyStatusPopover
         )

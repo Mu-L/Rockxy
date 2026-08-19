@@ -11,11 +11,20 @@ import Security
 enum SigningDiagnostics {
     // MARK: Internal
 
+    enum AppSignatureValidation: Equatable {
+        case valid
+        /// The executable on disk no longer matches the code already running in this process.
+        case runningCodeChanged(detail: String)
+        case invalid(detail: String)
+    }
+
     // MARK: - Result
 
     enum Result: Equatable, Sendable {
         /// App signature is valid, helper exists, certificate chains match.
         case healthy
+        /// Rockxy was replaced or updated in place while this process was still running.
+        case runningCodeChanged(detail: String)
         /// App bundle code signature is invalid (e.g., missing dylib after stale Xcode build).
         case appSignatureInvalid(detail: String)
         /// App is valid, helper binary exists, but signing identities differ.
@@ -33,8 +42,7 @@ enum SigningDiagnostics {
 
     protocol Environment {
         /// Validate the current app bundle's code signature.
-        /// Returns `nil` if valid, or an error description if invalid.
-        func validateAppSignature() -> String?
+        func validateAppSignature() -> AppSignatureValidation
         /// Check whether the helper binary exists at the expected path.
         func helperBinaryExists() -> Bool
         /// Extract leaf certificate subject summary from the running app.
@@ -66,23 +74,40 @@ enum SigningDiagnostics {
     struct LiveEnvironment: Environment {
         // MARK: Internal
 
-        func validateAppSignature() -> String? {
+        func validateAppSignature() -> AppSignatureValidation {
             var code: SecCode?
             guard SecCodeCopySelf([], &code) == errSecSuccess, let selfCode = code else {
-                return "SecCodeCopySelf failed"
+                return .invalid(detail: "SecCodeCopySelf failed")
             }
+
+            let runningStatus = SecCodeCheckValidity(selfCode, [], nil)
+            if runningStatus == errSecCSStaticCodeChanged {
+                let description = SecCopyErrorMessageString(runningStatus, nil) as String? ?? "unknown"
+                return .runningCodeChanged(
+                    detail: "OSStatus \(runningStatus) (\(description))"
+                )
+            }
+            if runningStatus != errSecSuccess {
+                let description = SecCopyErrorMessageString(runningStatus, nil) as String? ?? "unknown"
+                return .invalid(
+                    detail: "Code signature invalid: OSStatus \(runningStatus) (\(description))"
+                )
+            }
+
             var staticCode: SecStaticCode?
             guard SecCodeCopyStaticCode(selfCode, [], &staticCode) == errSecSuccess,
                   let selfStatic = staticCode else
             {
-                return "SecCodeCopyStaticCode failed"
+                return .invalid(detail: "SecCodeCopyStaticCode failed")
             }
             let status = SecStaticCodeCheckValidity(selfStatic, SecCSFlags([]), nil)
             if status != errSecSuccess {
                 let desc = SecCopyErrorMessageString(status, nil) as String? ?? "unknown"
-                return "Code signature invalid: OSStatus \(status) (\(desc))"
+                return .invalid(
+                    detail: "Code signature invalid: OSStatus \(status) (\(desc))"
+                )
             }
-            return nil
+            return .valid
         }
 
         func helperBinaryExists() -> Bool {
@@ -179,8 +204,13 @@ enum SigningDiagnostics {
 
     /// Pure decision function. Maps environment observations to a diagnostic result.
     static func classify(_ env: some Environment) -> Result {
-        if let invalidReason = env.validateAppSignature() {
-            return .appSignatureInvalid(detail: invalidReason)
+        switch env.validateAppSignature() {
+        case .valid:
+            break
+        case let .runningCodeChanged(detail):
+            return .runningCodeChanged(detail: detail)
+        case let .invalid(detail):
+            return .appSignatureInvalid(detail: detail)
         }
 
         guard env.helperBinaryExists() else {
@@ -223,6 +253,8 @@ enum SigningDiagnostics {
         switch result {
         case .healthy:
             logger.debug("Signing diagnostics: healthy")
+        case let .runningCodeChanged(detail):
+            logger.warning("Signing diagnostics: running code changed — \(detail)")
         case let .appSignatureInvalid(detail):
             logger.warning("Signing diagnostics: app signature invalid — \(detail)")
         case let .signingIdentityMismatch(app, helper):

@@ -191,8 +191,8 @@ struct BottomInspectorLayoutMetrics: Equatable {
 
     let appMetrics: AppUIDisplayMetrics
 
-    /// Minimum height that keeps roughly six request rows plus the compact table header and
-    /// surrounding chrome visible. ≈200pt at the default 13pt app font, scaling up with it.
+    /// Compact lower bound that keeps two request rows plus the table header visible while
+    /// allowing the payload inspector to consume most of a tall window when the user wants it.
     var requestListMinimumHeight: CGFloat {
         let rowHeight = appMetrics.tableRowHeight
         let rows = rowHeight * Self.visibleRequestRows
@@ -200,8 +200,9 @@ struct BottomInspectorLayoutMetrics: Equatable {
         return (rows + header + Self.requestChromeInset).rounded()
     }
 
-    /// Minimum height for a compact, native inspector: the tab strip plus a readable stack of
-    /// content lines and vertical chrome. ≈232pt at 13pt, scaling up for larger app fonts.
+    /// Readable lower bound for the tab strip and a useful payload preview. The request list
+    /// deliberately keeps the smaller lower bound so users can still drag the inspector tall,
+    /// but the inspector itself must never collapse into a tab-strip-only sliver.
     var inspectorMinimumHeight: CGFloat {
         let tabStrip = appMetrics.inspectorTabHeight
         let contentLines = appMetrics.tableTextHeight * Self.inspectorVisibleLines
@@ -210,7 +211,7 @@ struct BottomInspectorLayoutMetrics: Equatable {
 
     // MARK: Private
 
-    private static let visibleRequestRows: CGFloat = 6
+    private static let visibleRequestRows: CGFloat = 2
     private static let requestChromeInset: CGFloat = 4
     private static let inspectorVisibleLines: CGFloat = 10
     private static let inspectorChromeInset: CGFloat = 29
