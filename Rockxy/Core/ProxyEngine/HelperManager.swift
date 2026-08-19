@@ -424,6 +424,7 @@ final class HelperManager {
                 previousSigningIssue: previousSigningIssue
             )
         }
+        try await ensureHelperMutationCanProceed()
         try await performUninstall()
     }
 

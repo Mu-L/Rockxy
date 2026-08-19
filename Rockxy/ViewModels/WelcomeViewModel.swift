@@ -88,6 +88,16 @@ final class WelcomeViewModel {
             || helperFailureRecovery == .repairAndReinstall
     }
 
+    var shouldShowHelperDiagnostics: Bool {
+        if errorArea == .helper || helperFailureRecovery == .rebuildApp {
+            return true
+        }
+        if case .appSignatureInvalid = helperSigningIssue {
+            return helperStatus == .signingMismatch
+        }
+        return false
+    }
+
     var helperStatusDetail: String? {
         switch helperStatus {
         case .notInstalled:

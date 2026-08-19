@@ -841,6 +841,12 @@ final class AssistantSettingsViewModel {
     }
 
     var availableModelsDetail: String {
+        if configuration.kind != .ollama {
+            if models.count == 1 {
+                return String(localized: "1 model available from \(configuration.kind.title).")
+            }
+            return String(localized: "\(models.count) models available from \(configuration.kind.title).")
+        }
         if models.count == 1 {
             return String(localized: "1 model available. The list refreshes after local downloads.")
         }

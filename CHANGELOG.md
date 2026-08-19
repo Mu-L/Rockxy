@@ -33,6 +33,101 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.34.0] - 2026-08-07
+
+### Added
+
+- Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.
+- Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.
+
+### Changed
+
+- Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.
+- Workspace questions report current request, error, and saved-item counts without attaching captured request content.
+
+## [0.33.0] - 2026-08-04
+
+### Added
+
+- Save notes directly on captured requests, then review or edit them from the Context Dock and request menus.
+- New empty-state guidance explains why no requests are visible and provides relevant recovery actions.
+
+### Fixed
+
+- Notes and the selected request now remain consistent when reopening sessions, switching workspaces, or changing filters.
+
+### Changed
+
+- Search, protocol filters, and inspector tabs now adapt better to smaller window sizes.
+- Request and response inspectors remain readable when resizing the workspace or bottom panel.
+- Context Dock now presents request details, response details, investigation evidence, and matched rules more clearly.
+- Request tooltips show complete details, while the workspace footer makes active traffic-modification rules easier to identify.
+
+## [0.32.0] - 2026-08-01
+
+### Added
+
+- Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.
+- Added privacy-aware local analysis and optional configured model workflows, with a review step before selected traffic is shared.
+- Added secure Babylon pairing and capture intake for supported companion traffic sessions.
+
+### Fixed
+
+- Kept investigations anchored to the exact request being reviewed.
+- Prevented configured provider traffic from being captured back into the active session.
+- Fixed certificate-share and Developer Setup probe lifecycle races so Stop reliably prevents an in-flight server start from publishing afterward.
+- Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.
+
+### Changed
+
+- Rebuilt the workspace around native macOS split views for steadier sidebar, request list, Context Dock, and inspector resizing.
+- Refined Settings with a stable native sidebar width and correctly aligned titlebar toggle.
+- Restored the Workspace login item beside the Start/Stop controls and refreshed its login flow with native macOS controls.
+- Clarified that Workspace connection and Pro license activation are separate states, keeping their displayed status synchronized.
+- Reworked Developer Setup into a compact, target-aware workflow with contextual guidance, resizable windows, clearer actions, and accurate launch results.
+- Refined license activation, Workspace sharing, Android automation, export review, and publishing confirmation flows for consistent keyboard and accessibility behavior.
+- Kept advanced model, Web3, and gRPC inspector tabs available at the end of the inspector tab row.
+
+## [0.31.0] - 2026-07-24
+
+### Added
+
+- Added Rockxy Assistant for investigating selected requests, explaining failures, comparing related traffic, checking authentication signals, and preparing bug reports.
+- Added built-in local analysis and optional configured model workflows, with a review step before selected traffic is shared.
+- Added secure Babylon pairing and capture intake for supported companion traffic sessions.
+
+### Fixed
+
+- Kept investigations anchored to the exact request being reviewed.
+- Prevented provider traffic from being recaptured into the active session.
+- Improved streaming responsiveness, request-table stability, and bottom-inspector behavior.
+
+### Changed
+
+- Rebuilt the workspace around native macOS split views for more stable sidebar, request list, Context Dock, and inspector sizing.
+- Expanded local model setup, provider configuration, context limits, and response-review controls.
+- Refined workspace typography, mode switching, inspector persistence, and narrow-window actions.
+
+## [0.30.0] - 2026-07-16
+
+### Added
+
+- Added a redesigned Focus Navigator with Browse, Focus, and Library modes for moving between all traffic, reusable investigation scopes, saved requests, and pinned requests.
+- Added reusable Focus Sets, traffic signals, and noise controls for isolating errors, slow requests, WebSocket or GraphQL activity, rule hits, selected apps, domains, and paths without deleting captured traffic.
+- Added a Context Dock that keeps request and response details available while navigating the traffic list.
+- Added encrypted nearby iPhone session transfers into a dedicated iOS workspace so current Mac traffic remains available.
+
+### Fixed
+
+- Fixed Quick Tools customization so every part of each dropdown field opens its menu reliably.
+- Kept selection state aligned when focus, signal, noise, or filter changes hide previously selected requests.
+
+### Changed
+
+- Refined workspace navigation, inspector layout, selection behavior, and persisted layout preferences for a clearer debugging workflow.
+- Kept nearby iPhone transfer discovery available while Rockxy is running, including when macOS restores the app without a main window.
+- Improved captured-value filtering so apps, domains, and paths are easier to reuse in focused investigations.
+
 ## [0.29.0] - 2026-07-12
 
 ### Added

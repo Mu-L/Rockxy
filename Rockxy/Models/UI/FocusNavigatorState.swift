@@ -176,11 +176,8 @@ struct FocusSet: Identifiable, Codable, Equatable {
         if let includedScopeName {
             return includedScopeName
         }
-        if !excludedDomain.isEmpty {
-            return String(localized: "Hide \(excludedDomain)")
-        }
-        if !excludedPathPrefix.isEmpty {
-            return String(localized: "Hide \(excludedPathPrefix)")
+        if let excludedScopeName {
+            return String(localized: "Hide \(excludedScopeName)")
         }
         return String(localized: "New Focus Set")
     }
