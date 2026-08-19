@@ -887,18 +887,11 @@ final class HelperManager {
 
         switch Self.installDisposition(for: service.status) {
         case .requiresApproval:
-            if Self.shouldUseLegacyInstallFallbackForCurrentBundle() {
-                try await installLegacyHelperForXcode(
-                    service: service,
-                    reason: "SMAppService requires Login Items approval for an Xcode-run app bundle"
-                )
-                return
-            }
-            Self.logger.info("Helper already registered and awaiting user approval")
-            status = .requiresApproval
-            registrationStatus = "Awaiting Approval"
-            lastErrorMessage = Self.helperApprovalMessage
-            SMAppService.openSystemSettingsLoginItems()
+            try await handleApprovalRequired(
+                service: service,
+                reason: "SMAppService requires Login Items approval for an Xcode-run app bundle",
+                message: Self.helperApprovalMessage
+            )
             return
         case .alreadyEnabled:
             Self.logger.info("Helper tool is already registered")
@@ -913,11 +906,11 @@ final class HelperManager {
             try service.register()
         } catch {
             if Self.requiresApproval(error: error, serviceStatus: service.status) {
-                Self.logger.info("Helper registration requires user approval in System Settings")
-                status = .requiresApproval
-                registrationStatus = "Awaiting Approval"
-                lastErrorMessage = Self.approvalMessage(error: error, serviceStatus: service.status)
-                SMAppService.openSystemSettingsLoginItems()
+                try await handleApprovalRequired(
+                    service: service,
+                    reason: "SMAppService registration was denied for an Xcode-run app bundle",
+                    message: Self.approvalMessage(error: error, serviceStatus: service.status)
+                )
                 return
             }
 
@@ -927,11 +920,11 @@ final class HelperManager {
 
         let currentStatus = service.status
         if currentStatus == .requiresApproval {
-            Self.logger.info("Helper requires user approval in System Settings")
-            status = .requiresApproval
-            registrationStatus = "Awaiting Approval"
-            lastErrorMessage = Self.helperApprovalMessage
-            SMAppService.openSystemSettingsLoginItems()
+            try await handleApprovalRequired(
+                service: service,
+                reason: "SMAppService registration transitioned to requires approval for an Xcode-run app bundle",
+                message: Self.helperApprovalMessage
+            )
         } else if currentStatus == .enabled {
             Self.logger.info("Helper tool installed and enabled")
             registrationStatus = "Enabled"
@@ -943,6 +936,26 @@ final class HelperManager {
             )
             status = .notInstalled
         }
+    }
+
+    /// Resolve every approval transition through the same policy. DerivedData builds
+    /// use the development-only legacy LaunchDaemon path; installed app bundles keep
+    /// the normal macOS Login Items approval flow.
+    private func handleApprovalRequired(
+        service: SMAppService,
+        reason: String,
+        message: String
+    ) async throws {
+        if Self.shouldUseLegacyInstallFallbackForCurrentBundle() {
+            try await installLegacyHelperForXcode(service: service, reason: reason)
+            return
+        }
+
+        Self.logger.info("Helper registration requires user approval in System Settings")
+        status = .requiresApproval
+        registrationStatus = "Awaiting Approval"
+        lastErrorMessage = message
+        SMAppService.openSystemSettingsLoginItems()
     }
 
     /// `SMAppService` can report `.enabled` while launchd is holding a broken submitted job

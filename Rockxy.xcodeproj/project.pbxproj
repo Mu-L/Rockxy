@@ -629,7 +629,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\ncase \"$TARGET_BUILD_DIR\" in\n    */DerivedData/*/Build/Products/*) ;;\n    *) exit 0 ;;\nesac\n\nDEST=\"${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}/rockxy-mcp\"\n\n# Xcode can fail to replace the embedded CLI if an MCP client still has the\n# previous DerivedData copy running. Stop only the bridge from this build bundle.\nif [ -n \"$DEST\" ]; then\n    /usr/bin/pkill -f \"$DEST\" 2>/dev/null || true\nfi\n\nif [ -e \"$DEST\" ]; then\n    /bin/chmod u+w \"$DEST\" 2>/dev/null || true\n    /bin/rm -f \"$DEST\"\nfi\n";
+			shellScript = "set -e\n\ncase \"$TARGET_BUILD_DIR\" in\n    */DerivedData/*/Build/Products/*) ;;\n    *) exit 0 ;;\nesac\n\nSOURCE=\"${BUILT_PRODUCTS_DIR}/rockxy-mcp\"\nDEST=\"${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}/rockxy-mcp\"\n\n# Stop only the bridge from this DerivedData bundle before replacing it. Copy the\n# product here as well as in the following Copy Files phase so an incremental build\n# can never leave the app's sealed MCP executable missing.\n/usr/bin/pkill -f \"$DEST\" 2>/dev/null || true\n\nif [ ! -x \"$SOURCE\" ]; then\n    echo \"error: Missing built MCP tool at $SOURCE\" >&2\n    exit 1\nfi\n\n/bin/cp -f \"$SOURCE\" \"$DEST\"\n";
 		};
 		DCA9D0212F700100005B1552 /* Generate Helper LaunchDaemon Plist */ = {
 			isa = PBXShellScriptBuildPhase;
