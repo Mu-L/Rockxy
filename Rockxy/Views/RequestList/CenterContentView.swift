@@ -136,9 +136,9 @@ struct CenterContentView: View {
     // MARK: Private
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        // Establish the payload-first split once, then persist every user-adjusted divider
-        // position normally again.
-        "workspaceBottomInspectorSplit.payloadFirst.v1"
+        // v2 applies the taller payload-first default once, then preserves every subsequent
+        // user-adjusted divider position normally again.
+        "workspaceBottomInspectorSplit.payloadFirst.v2"
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false

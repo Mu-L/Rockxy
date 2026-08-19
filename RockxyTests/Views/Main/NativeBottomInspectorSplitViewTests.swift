@@ -80,9 +80,9 @@ struct NativeBottomInspectorSplitViewTests {
         )
 
         #expect(primaryHeight == expectedPrimaryHeight)
-        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.36) < 0.0001)
-        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.64) < 0.0001)
-        #expect(controller.splitViewItems[1].viewController.view.frame.height > 440)
+        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.28) < 0.0001)
+        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.72) < 0.0001)
+        #expect(controller.splitViewItems[1].viewController.view.frame.height > 500)
         #expect(controller.defaultDividerApplicationCount == 1)
         removeSplitViewAutosaveDefaults(autosaveName)
     }
@@ -181,7 +181,7 @@ struct NativeBottomInspectorSplitViewTests {
         layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
 
         #expect(controller.isInspectorPresented)
-        #expect(controller.splitViewItems[1].viewController.view.frame.height > 440)
+        #expect(controller.splitViewItems[1].viewController.view.frame.height > 500)
         #expect(controller.defaultDividerApplicationCount == 1)
         removeSplitViewAutosaveDefaults(autosaveName)
     }

@@ -471,8 +471,6 @@ struct ResponseInspectorView: View {
             coordinator.installAndTrustCertificateFromInspector()
         case let .enableDomain(domain):
             coordinator.enableSSLProxyingFromInspector(for: domain)
-        case let .disableDomain(domain):
-            coordinator.disableSSLProxyingFromInspector(for: domain)
         case let .retryDomain(domain):
             coordinator.retrySSLProxyingFromInspector(for: domain)
         case let .enableApp(appName, fallbackDomain):
@@ -639,7 +637,6 @@ private enum ResponseSelectionIntent {
 enum HTTPSInspectionPromptAction: Equatable {
     case installCertificate
     case enableDomain(String)
-    case disableDomain(String)
     case retryDomain(String)
     case enableApp(String, fallbackDomain: String?)
     case openSSLProxyingList
@@ -712,11 +709,12 @@ struct HTTPSInspectionPromptModel: Equatable {
                 isReady: domainRuleEnabled,
                 requiresRetry: hasTLSRejectionEvidence
             ),
-            appScope: appScope.flatMap {
+            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap {
                 .appHosts(
                     name: $0.name,
                     enabledHostCount: $0.enabledHostCount,
                     knownHostCount: $0.knownHostCount,
+                    currentHostEnabled: domainRuleEnabled,
                     fallbackDomain: host
                 )
             }

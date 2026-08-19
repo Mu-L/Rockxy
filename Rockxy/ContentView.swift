@@ -56,26 +56,31 @@ struct ContentView: View {
         ) {
             SidebarView(coordinator: coordinator)
         } workspace: {
-            VStack(spacing: 0) {
-                if let warning = coordinator.systemProxyWarning {
-                    SystemProxyWarningBanner(
-                        message: warning.message,
-                        primaryActionTitle: warning.action?.title,
-                        onPrimaryAction: {
-                            handleSystemProxyWarningAction(warning.action)
-                        },
-                        onDismiss: warning.isDismissible ? {
-                            coordinator.readiness.dismissWarning()
-                        } : nil
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    if let warning = coordinator.systemProxyWarning {
+                        SystemProxyWarningBanner(
+                            message: warning.message,
+                            primaryActionTitle: warning.action?.title,
+                            onPrimaryAction: {
+                                handleSystemProxyWarningAction(warning.action)
+                            },
+                            onDismiss: warning.isDismissible ? {
+                                coordinator.readiness.dismissWarning()
+                            } : nil
+                        )
+                    }
+
+                    CenterContentView(
+                        coordinator: coordinator,
+                        onOpenToolWindow: { id in openWindow(id: id) }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                CenterContentView(
-                    coordinator: coordinator,
-                    onOpenToolWindow: { id in openWindow(id: id) }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                toastOverlay
             }
+            .animation(.easeOut(duration: 0.18), value: coordinator.activeToast?.id)
         } inspector: {
             ContextDockView(
                 coordinator: coordinator,
@@ -203,13 +208,6 @@ struct ContentView: View {
                 onCancel: { coordinator.gistPublishContext = nil }
             )
         }
-        .overlay(alignment: .bottom) {
-            if let toast = coordinator.activeToast {
-                ToastView(message: toast) {
-                    coordinator.activeToast = nil
-                }
-            }
-        }
         .appUIDisplayMetrics(displayMetrics)
     }
 
@@ -224,6 +222,20 @@ struct ContentView: View {
     private let settingsManager = AppSettingsManager.shared
     private let managesLifecycle: Bool
     private let representedWorkspaceID: UUID?
+
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast = coordinator.activeToast {
+            ToastView(message: toast) {
+                coordinator.dismissToast(id: toast.id)
+            }
+            .id(toast.id)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+            .allowsHitTesting(false)
+            .zIndex(100)
+        }
+    }
 
     private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
         // Establish compact utility panes once, then preserve every user-adjusted divider

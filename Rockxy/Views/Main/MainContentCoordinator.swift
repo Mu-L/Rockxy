@@ -480,6 +480,13 @@ final class MainContentCoordinator {
         sidebarFavoritesCache = nil
     }
 
+    func dismissToast(id: UUID) {
+        guard activeToast?.id == id else {
+            return
+        }
+        activeToast = nil
+    }
+
     /// Configure shared policy gates. Called once from the app's main
     /// ContentView after the first coordinator is created. Separated from
     /// init so test-created coordinators do not overwrite shared gate state.

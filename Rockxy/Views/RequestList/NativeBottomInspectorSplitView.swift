@@ -159,7 +159,7 @@ struct NativeBottomDeferredContent<Content: View>: View {
 enum NativeBottomInspectorSplitSizing {
     /// Fraction of the available height seated above the divider (request list) on a fresh
     /// layout, leaving the inspector a useful working area instead of a preview strip.
-    static let defaultRequestListRatio: CGFloat = 0.36
+    static let defaultRequestListRatio: CGFloat = 0.28
 
     static func resolve(_ proposal: ProposedViewSize, naturalHeight: CGFloat) -> CGSize? {
         let resolved = proposal.replacingUnspecifiedDimensions(
