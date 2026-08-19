@@ -1,4 +1,5 @@
 import Foundation
+@testable import Rockxy
 import Testing
 
 // MARK: - FocusSidebarPresentationTests
@@ -13,6 +14,12 @@ struct FocusSidebarPresentationTests {
         #expect(source.contains(".buttonStyle(.bordered)"))
         #expect(source.contains(".controlSize(.small)"))
         #expect(source.contains(".accessibilityLabel(actionLabel)"))
+    }
+
+    @Test("Browse reveals captured apps and domains without extra disclosure clicks")
+    func browseGroupsStartExpanded() {
+        #expect(SidebarDisclosureDefaults.appsExpanded)
+        #expect(SidebarDisclosureDefaults.domainsExpanded)
     }
 
     private func readProjectFile(_ relativePath: String) throws -> String {

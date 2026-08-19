@@ -196,8 +196,8 @@ struct SidebarView: View {
     @State private var editingFocusSet: FocusSet?
     @State private var isMutedSourcesPresented = false
     @State private var expandedFocusSetIDs: Set<UUID> = []
-    @State private var isAppsExpanded = false
-    @State private var isDomainsExpanded = false
+    @State private var isAppsExpanded = SidebarDisclosureDefaults.appsExpanded
+    @State private var isDomainsExpanded = SidebarDisclosureDefaults.domainsExpanded
     @State private var isPinnedExpanded = false
     @State private var isSavedExpanded = false
     @State private var isNotesExpanded = false
@@ -1178,4 +1178,11 @@ struct SidebarView: View {
             Label(String(localized: "Delete"), systemImage: "trash")
         }
     }
+}
+
+// MARK: - SidebarDisclosureDefaults
+
+enum SidebarDisclosureDefaults {
+    static let appsExpanded = true
+    static let domainsExpanded = true
 }

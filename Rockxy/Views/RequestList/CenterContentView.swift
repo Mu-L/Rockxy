@@ -136,9 +136,9 @@ struct CenterContentView: View {
     // MARK: Private
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        // v2 intentionally drops the tab-strip-height positions that v1 allowed. AppKit will
-        // establish the balanced default once, then persist every user drag normally again.
-        "workspaceBottomInspectorSplit.v2"
+        // Establish the payload-first split once, then persist every user-adjusted divider
+        // position normally again.
+        "workspaceBottomInspectorSplit.payloadFirst.v1"
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false

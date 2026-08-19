@@ -7,14 +7,15 @@ import Testing
 struct NativeWorkspaceSplitViewTests {
     // MARK: Internal
 
-    @Test("Workspace panes keep balanced defaults with a flexible Context Dock")
+    @Test("Workspace defaults favor the Context Dock over the navigation sidebar")
     func flexibleInspectorWidthPolicy() {
-        #expect(MainWindowLayoutMetrics.sidebarMinimumWidth == 300)
-        #expect(MainWindowLayoutMetrics.sidebarIdealWidth == 380)
-        #expect(MainWindowLayoutMetrics.sidebarMaximumWidth == 520)
+        #expect(MainWindowLayoutMetrics.sidebarMinimumWidth == 200)
+        #expect(MainWindowLayoutMetrics.sidebarIdealWidth == 250)
+        #expect(MainWindowLayoutMetrics.sidebarMaximumWidth == 350)
         #expect(MainWindowLayoutMetrics.workspaceMinimumWidth == 320)
-        #expect(MainWindowLayoutMetrics.contextDockMinimumWidth == 220)
-        #expect(MainWindowLayoutMetrics.contextDockIdealWidth == 380)
+        #expect(MainWindowLayoutMetrics.contextDockMinimumWidth == 260)
+        #expect(MainWindowLayoutMetrics.contextDockIdealWidth == 320)
+        #expect(MainWindowLayoutMetrics.sidebarIdealWidth < MainWindowLayoutMetrics.contextDockIdealWidth)
     }
 
     @Test("Workspace uses one native vertical split for both utility columns")

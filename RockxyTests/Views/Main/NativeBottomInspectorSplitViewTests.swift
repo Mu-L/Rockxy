@@ -57,8 +57,8 @@ struct NativeBottomInspectorSplitViewTests {
         #expect(controller.splitViewItems[1].minimumThickness == 232)
     }
 
-    @Test("Fresh bottom split gives the request list and payload inspector equal height")
-    func freshLayoutUsesBalancedDefaultRatio() {
+    @Test("Fresh bottom split gives the payload inspector most of the available height")
+    func freshLayoutFavorsPayloadInspector() {
         let autosaveName = uniqueAutosaveName()
         removeSplitViewAutosaveDefaults(autosaveName)
         let controller = makeConfiguredController(
@@ -80,11 +80,19 @@ struct NativeBottomInspectorSplitViewTests {
         )
 
         #expect(primaryHeight == expectedPrimaryHeight)
-        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.50) < 0.0001)
-        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.50) < 0.0001)
-        #expect(controller.splitViewItems[1].viewController.view.frame.height > 340)
+        #expect(abs(controller.splitViewItems[0].preferredThicknessFraction - 0.36) < 0.0001)
+        #expect(abs(controller.splitViewItems[1].preferredThicknessFraction - 0.64) < 0.0001)
+        #expect(controller.splitViewItems[1].viewController.view.frame.height > 440)
         #expect(controller.defaultDividerApplicationCount == 1)
         removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("Bottom inspector keeps a low holding priority so its divider remains draggable")
+    func bottomInspectorUsesResizableHoldingPriority() {
+        let controller = makeController(isInspectorPresented: true)
+
+        #expect(controller.splitViewItems[0].holdingPriority == .defaultLow)
+        #expect(controller.splitViewItems[1].holdingPriority == .defaultLow)
     }
 
     @Test("Horizontal divider has a forgiving vertical drag target")
@@ -153,6 +161,28 @@ struct NativeBottomInspectorSplitViewTests {
 
         #expect(controller.defaultDividerApplicationCount == 1)
         expectNonNegativeArrangedGeometry(controller)
+        removeSplitViewAutosaveDefaults(autosaveName)
+    }
+
+    @Test("First selection expands a fresh payload inspector at its default height")
+    func firstExpansionAppliesDefaultRatio() {
+        let autosaveName = uniqueAutosaveName()
+        removeSplitViewAutosaveDefaults(autosaveName)
+        let controller = makeConfiguredController(
+            isInspectorPresented: false,
+            autosaveName: autosaveName
+        )
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+
+        #expect(!controller.isInspectorPresented)
+        #expect(controller.defaultDividerApplicationCount == 0)
+
+        controller.setInspectorPresented(true, animated: false)
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_200, height: 700))
+
+        #expect(controller.isInspectorPresented)
+        #expect(controller.splitViewItems[1].viewController.view.frame.height > 440)
+        #expect(controller.defaultDividerApplicationCount == 1)
         removeSplitViewAutosaveDefaults(autosaveName)
     }
 

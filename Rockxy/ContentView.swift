@@ -9,12 +9,12 @@ enum MainWindowLayoutMetrics {
     static let defaultHeight: CGFloat = 760
     static let minimumWidth: CGFloat = 960
     static let minimumHeight: CGFloat = 620
-    static let sidebarMinimumWidth: CGFloat = 300
-    static let sidebarIdealWidth: CGFloat = 380
-    static let sidebarMaximumWidth: CGFloat = 520
+    static let sidebarMinimumWidth: CGFloat = 200
+    static let sidebarIdealWidth: CGFloat = 250
+    static let sidebarMaximumWidth: CGFloat = 350
     static let workspaceMinimumWidth: CGFloat = 320
-    static let contextDockMinimumWidth: CGFloat = 220
-    static let contextDockIdealWidth: CGFloat = 380
+    static let contextDockMinimumWidth: CGFloat = 260
+    static let contextDockIdealWidth: CGFloat = 320
 }
 
 // MARK: - ContentView
@@ -226,7 +226,9 @@ struct ContentView: View {
     private let representedWorkspaceID: UUID?
 
     private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        "nativeWorkspaceSplit.v1"
+        // Establish compact utility panes once, then preserve every user-adjusted divider
+        // position normally again.
+        "nativeWorkspaceSplit.compactUtilityPanes.v1"
     )
 
     private var displayMetrics: AppUIDisplayMetrics {
