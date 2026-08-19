@@ -57,7 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        let showAlert = UserDefaults.standard.bool(forKey: Self.identity.defaultsKey("showAlertOnQuit"))
+        let skipConfirmation = skipNextQuitConfirmation
+        skipNextQuitConfirmation = false
+        let showAlert = !skipConfirmation
+            && UserDefaults.standard.bool(forKey: Self.identity.defaultsKey("showAlertOnQuit"))
         if showAlert {
             let alert = NSAlert()
             alert.messageText = String(localized: "Quit Rockxy?")
@@ -102,6 +105,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
         return .terminateLater
     }
 
+    func requestQuitForRequiredReopen() {
+        skipNextQuitConfirmation = true
+        NSApp.terminate(nil)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         Self.logger.info("applicationWillTerminate — final proxy cleanup fallback")
         SystemProxyManager.shared.performEmergencyTerminationCleanup(
@@ -115,6 +123,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
     }
 
     // MARK: Private
+
+    private var skipNextQuitConfirmation = false
 
     private static let identity = RockxyIdentity.current
 

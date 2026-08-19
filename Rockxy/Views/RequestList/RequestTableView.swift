@@ -19,11 +19,13 @@ struct RequestTableView: NSViewRepresentable {
     let rows: [RequestListRow]
     let refreshToken: Int
     let isAppendOnly: Bool
+    var appendChainOrigin: Int?
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
     var onSelectionChanged: ((Set<UUID>, UUID?) -> Void)?
+    var onUserScroll: (() -> Void)?
     var onDoubleClick: ((HTTPTransaction) -> Void)?
     var mainCoordinator: MainContentCoordinator?
     var headerColumns: [HeaderColumn] = []
@@ -98,6 +100,7 @@ struct RequestTableView: NSViewRepresentable {
         scrollView.autoresizingMask = [.width, .height]
         tableView.sizeLastColumnToFit()
         context.coordinator.tableView = tableView
+        context.coordinator.observeUserScrolling(in: scrollView)
         context.coordinator.applyDisplayMetrics(to: tableView)
 
         return scrollView
@@ -126,20 +129,27 @@ struct RequestTableView: NSViewRepresentable {
 
         if workspaceChanged || newToken != oldToken {
             let newCount = rows.count
-            if !workspaceChanged,
-               isAppendOnly,
-               newCount > coordinator.previousRowCount,
-               coordinator.previousRowCount > 0
-            {
+            if coordinator.canInsertAppendedRows(
+                newCount: newCount,
+                isAppendOnly: isAppendOnly,
+                appendChainOrigin: appendChainOrigin,
+                lastAppliedToken: oldToken,
+                workspaceChanged: workspaceChanged,
+                tableRowCount: tableView.numberOfRows
+            ) {
                 // Append-only fast path: coordinator confirmed rows were only appended
                 let newIndexes = IndexSet(integersIn: coordinator.previousRowCount ..< newCount)
-                tableView.insertRows(at: newIndexes, withAnimation: [])
+                coordinator.performProgrammaticTableUpdate {
+                    tableView.insertRows(at: newIndexes, withAnimation: [])
+                }
                 if displayChange?.reloadVisibleRows == true {
                     coordinator.reloadVisibleRows(in: tableView)
                     reloadedVisibleRowsForMetrics = true
                 }
             } else {
-                tableView.reloadData()
+                coordinator.performProgrammaticTableUpdate {
+                    tableView.reloadData()
+                }
                 reloadedVisibleRowsForMetrics = displayChange?.reloadVisibleRows == true
             }
             coordinator.previousRowCount = newCount
@@ -392,6 +402,7 @@ extension RequestTableView {
         private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
         private var pendingContextSelectionIDs: Set<UUID>?
         private var pendingContextPrimaryID: UUID?
+        private var userScrollObserver: NSObjectProtocol?
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -405,10 +416,66 @@ extension RequestTableView {
         private var lastSyncedSelectionIDs: Set<UUID> = []
         private var visibleMetricsRefreshGeneration = 0
 
+        deinit {
+            if let userScrollObserver {
+                NotificationCenter.default.removeObserver(userScrollObserver)
+            }
+        }
+
         // MARK: - NSTableViewDataSource
+
+        /// AppKit posts this notification only for user-initiated live scrolling, including
+        /// trackpad gestures and scroller tracking. Programmatic Follow Live scrolling does not
+        /// pass through this path, so it cannot turn itself off.
+        func observeUserScrolling(in scrollView: NSScrollView) {
+            if let userScrollObserver {
+                NotificationCenter.default.removeObserver(userScrollObserver)
+            }
+            userScrollObserver = NotificationCenter.default.addObserver(
+                forName: NSScrollView.didLiveScrollNotification,
+                object: scrollView,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.parent.onUserScroll?()
+                }
+            }
+        }
 
         func numberOfRows(in tableView: NSTableView) -> Int {
             rows.count
+        }
+
+        /// Incremental row insertion is valid only when AppKit and the SwiftUI coordinator agree
+        /// on the old row count and the current append chain started from a model snapshot this
+        /// table has already applied.
+        func canInsertAppendedRows(
+            newCount: Int,
+            isAppendOnly: Bool,
+            appendChainOrigin: Int?,
+            lastAppliedToken: Int,
+            workspaceChanged: Bool,
+            tableRowCount: Int
+        ) -> Bool {
+            guard let appendChainOrigin else {
+                return false
+            }
+            return !workspaceChanged
+                && isAppendOnly
+                && previousRowCount > 0
+                && tableRowCount == previousRowCount
+                && appendChainOrigin <= lastAppliedToken
+                && newCount > previousRowCount
+        }
+
+        /// AppKit may emit selection notifications while rows are inserted or reloaded. Treat the
+        /// entire table mutation as coordinator-owned so those callbacks cannot re-enter SwiftUI
+        /// selection/filter state halfway through applying a snapshot.
+        func performProgrammaticTableUpdate(_ update: () -> Void) {
+            let wasUpdatingSelection = isUpdatingSelection
+            isUpdatingSelection = true
+            defer { isUpdatingSelection = wasUpdatingSelection }
+            update()
         }
 
         struct DisplayMetricsChange: Equatable {
@@ -1108,10 +1175,19 @@ extension RequestTableView {
                 ? tableView.enclosingScrollView?.contentView.bounds.origin
                 : nil
 
-            isUpdatingSelection = true
-            tableView.selectRowIndexes(desired, byExtendingSelection: false)
-            isUpdatingSelection = false
+            performProgrammaticTableUpdate {
+                tableView.selectRowIndexes(desired, byExtendingSelection: false)
+            }
             lastSyncedSelectionIDs = ids
+
+            let isFollowingLiveTraffic = MainActor.assumeIsolated {
+                parent.mainCoordinator?.isFollowingLiveTraffic == true
+            }
+            if isFollowingLiveTraffic,
+               let newestSelectedRow = desired.last
+            {
+                tableView.scrollRowToVisible(newestSelectedRow)
+            }
 
             if let visibleOrigin,
                let scrollView = tableView.enclosingScrollView
@@ -1719,9 +1795,9 @@ extension RequestTableView {
                 clickedRow: clickedRow,
                 selectedRowIndexes: selection
             )
-            isUpdatingSelection = true
-            tableView.selectRowIndexes(selection, byExtendingSelection: false)
-            isUpdatingSelection = false
+            performProgrammaticTableUpdate {
+                tableView.selectRowIndexes(selection, byExtendingSelection: false)
+            }
             pendingContextSelectionIDs = ids
             pendingContextPrimaryID = rows[clickedRow].id
         }

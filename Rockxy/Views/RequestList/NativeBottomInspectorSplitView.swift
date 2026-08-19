@@ -158,8 +158,8 @@ struct NativeBottomDeferredContent<Content: View>: View {
 
 enum NativeBottomInspectorSplitSizing {
     /// Fraction of the available height seated above the divider (request list) on a fresh
-    /// layout, leaving the remainder to the inspector — ≈62% / 38%.
-    static let defaultRequestListRatio: CGFloat = 0.62
+    /// layout, leaving the inspector a useful working area instead of a preview strip.
+    static let defaultRequestListRatio: CGFloat = 0.28
 
     static func resolve(_ proposal: ProposedViewSize, naturalHeight: CGFloat) -> CGSize? {
         let resolved = proposal.replacingUnspecifiedDimensions(
@@ -301,6 +301,27 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         applyDefaultDividerIfNeeded(totalHeight: bounds.height)
     }
 
+    override func splitView(
+        _ splitView: NSSplitView,
+        effectiveRect proposedEffectiveRect: NSRect,
+        forDrawnRect drawnRect: NSRect,
+        ofDividerAt dividerIndex: Int
+    )
+        -> NSRect
+    {
+        let systemRect = super.splitView(
+            splitView,
+            effectiveRect: proposedEffectiveRect,
+            forDrawnRect: drawnRect,
+            ofDividerAt: dividerIndex
+        )
+        return NativeSplitDividerInteraction.expandedHitRect(
+            systemRect: systemRect,
+            drawnRect: drawnRect,
+            isVertical: splitView.isVertical
+        )
+    }
+
     func configure(
         primaryController: NSViewController,
         inspectorController: NSViewController,
@@ -327,7 +348,9 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         inspectorItem.canCollapse = true
         inspectorItem.collapseBehavior = .useConstraints
         inspectorItem.isSpringLoaded = true
-        inspectorItem.holdingPriority = .defaultHigh
+        // A low holding priority lets the horizontal divider win the constraint negotiation.
+        // Higher priorities can show the resize cursor while refusing the drag on newer macOS.
+        inspectorItem.holdingPriority = .defaultLow
 
         if !hasAutosavedFrames {
             primaryItem.preferredThicknessFraction = NativeBottomInspectorSplitSizing
@@ -359,12 +382,18 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
         }
 
         if animated, view.window != nil {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                inspectorItem.animator().isCollapsed = !isPresented
-            }
+            NSAnimationContext.runAnimationGroup(
+                { context in
+                    context.duration = 0.18
+                    inspectorItem.animator().isCollapsed = !isPresented
+                },
+                completionHandler: { [weak self] in
+                    self?.applyDefaultDividerAfterPresentationIfNeeded(isPresented)
+                }
+            )
         } else {
             inspectorItem.isCollapsed = !isPresented
+            applyDefaultDividerAfterPresentationIfNeeded(isPresented)
         }
     }
 
@@ -386,6 +415,14 @@ final class NativeBottomInspectorSplitViewController: NSSplitViewController {
     private var pendingInitialVisibility: Bool?
     private var didApplyDefaultDivider = false
     private var isApplyingInitialState = true
+
+    private func applyDefaultDividerAfterPresentationIfNeeded(_ isPresented: Bool) {
+        guard isPresented else {
+            return
+        }
+        view.layoutSubtreeIfNeeded()
+        applyDefaultDividerIfNeeded(totalHeight: splitView.bounds.height)
+    }
 
     private func applyDefaultDividerIfNeeded(totalHeight: CGFloat) {
         guard !hasAutosavedFrames,

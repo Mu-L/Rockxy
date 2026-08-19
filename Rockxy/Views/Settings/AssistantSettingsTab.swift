@@ -439,7 +439,7 @@ struct AssistantSettingsTab: View {
                     VStack(alignment: .leading, spacing: 6) {
                         SecureField(
                             viewModel.hasStoredCredential
-                                ? String(localized: "Saved in Keychain · enter to replace")
+                                ? String(localized: "Saved in Keychain. Enter a new key to replace it.")
                                 : String(localized: "API key"),
                             text: $viewModel.credentialInput
                         )
@@ -706,7 +706,7 @@ struct AssistantSettingsTab: View {
         guard !provider.isImplemented else {
             return provider.title
         }
-        return String(localized: "\(provider.title) · adapter pending")
+        return String(localized: "Adapter pending for \(provider.title)")
     }
 
     @ViewBuilder private var endpointSecurityLabel: some View {
@@ -842,9 +842,9 @@ final class AssistantSettingsViewModel {
 
     var availableModelsDetail: String {
         if models.count == 1 {
-            return String(localized: "1 model available · refreshes automatically after local downloads.")
+            return String(localized: "1 model available. The list refreshes after local downloads.")
         }
-        return String(localized: "\(models.count) models available · refreshes automatically after local downloads.")
+        return String(localized: "\(models.count) models available. The list refreshes after local downloads.")
     }
 
     var ollamaRuntimeTitle: String {

@@ -66,6 +66,7 @@ struct WelcomeViewModelTests {
             (.installedOutdated, nil, String(localized: "Update")),
             (.installedIncompatible, nil, String(localized: "Update")),
             (.unreachable, nil, String(localized: "Retry")),
+            (.signingMismatch, .applicationMustReopen, String(localized: "Quit Rockxy")),
             (.signingMismatch, .appSignatureInvalid(detail: "x"), nil),
             (.signingMismatch, .identityMismatch(appSigner: "a", helperSigner: "b"), String(localized: "Reinstall")),
             (.signingMismatch, nil, nil),
@@ -113,6 +114,13 @@ struct WelcomeViewModelTests {
         )
 
         #expect(WelcomeViewModel.resolveHelperFailureRecovery(for: error) == .rebuildApp)
+    }
+
+    @Test("required reopen does not offer destructive helper repair")
+    func requiredReopenDoesNotOfferDestructiveRepair() {
+        let error = HelperManager.HelperOperationError.applicationMustReopen
+
+        #expect(WelcomeViewModel.resolveHelperFailureRecovery(for: error) == .reopenApp)
     }
 
     @Test("normal helper registration errors can use repair and reinstall")

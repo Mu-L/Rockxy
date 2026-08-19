@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Top-level inspector panel that hosts the URL bar and the request/response split view.
-/// Shown in the rightmost column when a transaction is selected in the request list.
+/// Top-level payload inspector that hosts the URL bar and side-by-side request/response panes.
+/// Shown below the request list when a transaction is selected.
 struct InspectorPanelView: View {
     let coordinator: MainContentCoordinator
     var onOpenToolWindow: (String) -> Void = { _ in }

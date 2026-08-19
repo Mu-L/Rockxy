@@ -171,6 +171,23 @@ extension MainContentCoordinator {
         )
     }
 
+    func retrySSLProxyingFromInspector(for domain: String) {
+        guard !domain.isEmpty else {
+            return
+        }
+
+        enableSSLProxyingForDomain(domain, refreshPresentation: false)
+        SSLProxyingManager.shared.retryInterception(for: domain)
+        refreshSSLProxyingPresentation()
+
+        activeToast = ToastMessage(
+            style: .success,
+            text: String(
+                localized: "Decryption retry is ready for \(domain). Repeat the request or reconnect the app."
+            )
+        )
+    }
+
     func disableSSLProxyingFromInspector(for domain: String) {
         guard !domain.isEmpty else {
             return

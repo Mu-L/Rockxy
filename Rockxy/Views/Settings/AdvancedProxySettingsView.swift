@@ -187,7 +187,9 @@ struct AdvancedProxySettingsView: View {
         case .unreachable:
             "xmark.circle.fill"
         case .signingMismatch:
-            if case .appSignatureInvalid = helperManager.signingIssue {
+            if case .applicationMustReopen = helperManager.signingIssue {
+                "arrow.clockwise.circle.fill"
+            } else if case .appSignatureInvalid = helperManager.signingIssue {
                 "xmark.seal.fill"
             } else {
                 "exclamationmark.triangle.fill"
@@ -209,7 +211,9 @@ struct AdvancedProxySettingsView: View {
         case .unreachable:
             .red
         case .signingMismatch:
-            if case .appSignatureInvalid = helperManager.signingIssue {
+            if case .applicationMustReopen = helperManager.signingIssue {
+                .orange
+            } else if case .appSignatureInvalid = helperManager.signingIssue {
                 .red
             } else {
                 .orange
@@ -232,7 +236,9 @@ struct AdvancedProxySettingsView: View {
         case .unreachable:
             String(localized: "Installed But Unreachable")
         case .signingMismatch:
-            if case .appSignatureInvalid = helperManager.signingIssue {
+            if case .applicationMustReopen = helperManager.signingIssue {
+                String(localized: "Reopen Required")
+            } else if case .appSignatureInvalid = helperManager.signingIssue {
                 String(localized: "Invalid App Signature")
             } else {
                 String(localized: "Signing Mismatch")
@@ -633,7 +639,11 @@ struct AdvancedProxySettingsView: View {
                 .disabled(helperManager.isBusy)
 
             case .signingMismatch:
-                if case .identityMismatch = helperManager.signingIssue {
+                if case .applicationMustReopen = helperManager.signingIssue {
+                    Button(String(localized: "Quit Rockxy")) {
+                        HelperRecoveryPresenter.requestRequiredReopen()
+                    }
+                } else if case .identityMismatch = helperManager.signingIssue {
                     Button(String(localized: "Reinstall Helper")) {
                         reinstallHelper()
                     }
@@ -652,12 +662,14 @@ struct AdvancedProxySettingsView: View {
             }
         }
 
-        Button(role: .destructive) {
-            HelperRecoveryPresenter.presentForceReset()
-        } label: {
-            Text(String(localized: "Force Reset…"))
+        if helperManager.signingIssue != .applicationMustReopen {
+            Button(role: .destructive) {
+                HelperRecoveryPresenter.presentForceReset()
+            } label: {
+                Text(String(localized: "Force Reset…"))
+            }
+            .disabled(helperManager.isBusy)
         }
-        .disabled(helperManager.isBusy)
     }
 
     // MARK: - Footer

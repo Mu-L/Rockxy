@@ -808,9 +808,13 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Auto Select the Latest Request")) {
-                actions?.toggleAutoSelect()
-            }
+            Toggle(
+                String(localized: "Follow Live Traffic"),
+                isOn: Binding(
+                    get: { actions?.isFollowingLiveTraffic == true },
+                    set: { actions?.setFollowingLiveTraffic($0) }
+                )
+            )
             .keyboardShortcut("l", modifiers: [.command, .shift])
 
             Divider()

@@ -87,7 +87,7 @@ struct CenterContentView: View {
                 isProxyOverridden: coordinator.isProxyOverridden,
                 isAllowListActive: allowListManager.isActive,
                 isNoCachingActive: isNoCachingEnabled,
-                isAutoSelectEnabled: coordinator.isAutoSelectEnabled,
+                isFollowingLiveTraffic: coordinator.isFollowingLiveTraffic,
                 isFilterBarVisible: coordinator.isFilterBarVisible,
                 activeFilterCount: activeFilterCount,
                 errorCount: coordinator.errorCount,
@@ -109,8 +109,8 @@ struct CenterContentView: View {
                     coordinator.isFilterBarVisible.toggle()
                     coordinator.recomputeFilteredTransactions()
                 },
-                onAutoSelect: {
-                    coordinator.isAutoSelectEnabled.toggle()
+                onFollowLive: {
+                    coordinator.toggleFollowingLiveTraffic()
                 },
                 onSwitchOffProxyOverride: {
                     coordinator.switchOffSystemProxyOverride()
@@ -136,7 +136,9 @@ struct CenterContentView: View {
     // MARK: Private
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        "workspaceBottomInspectorSplit.v1"
+        // v2 applies the taller payload-first default once, then preserves every subsequent
+        // user-adjusted divider position normally again.
+        "workspaceBottomInspectorSplit.payloadFirst.v2"
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false
@@ -217,8 +219,10 @@ struct CenterContentView: View {
             rows: coordinator.filteredRows,
             refreshToken: coordinator.refreshToken,
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
+            appendChainOrigin: coordinator.activeWorkspace.appendChainOriginToken,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
+                coordinator.userDidNavigateTrafficHistory()
                 coordinator.selectedTransactionIDs = ids
                 if let primaryID,
                    ids.contains(primaryID),
@@ -235,6 +239,9 @@ struct CenterContentView: View {
                 } else {
                     coordinator.selectTransaction(nil)
                 }
+            },
+            onUserScroll: {
+                coordinator.userDidNavigateTrafficHistory()
             },
             mainCoordinator: coordinator,
             headerColumns: coordinator.headerColumnStore.columns

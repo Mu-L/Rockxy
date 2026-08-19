@@ -42,12 +42,19 @@ struct HelperConnectionErrorTests {
         #expect(description.contains("timed out"))
     }
 
-    @Test("appSignatureInvalid includes detail in description")
+    @Test("appSignatureInvalid keeps technical detail out of end-user copy")
     func appSignatureInvalidDescription() {
         let error = HelperConnectionError.appSignatureInvalid("stale build")
         let description = error.errorDescription ?? ""
-        #expect(description.contains("code signature"))
-        #expect(description.contains("stale build"))
+        #expect(description.contains("fresh copy"))
+        #expect(!description.contains("stale build"))
+    }
+
+    @Test("applicationMustReopen gives an end-user recovery step")
+    func applicationMustReopenDescription() {
+        let description = HelperConnectionError.applicationMustReopen.errorDescription ?? ""
+        #expect(description.contains("Quit and reopen Rockxy"))
+        #expect(!description.localizedLowercase.contains("rebuild"))
     }
 
     @Test("signingIdentityMismatch includes signer names in description")
@@ -66,6 +73,7 @@ struct HelperConnectionErrorTests {
             .proxyRestoreFailed("test"),
             .uninstallFailed,
             .xpcTimeout,
+            .applicationMustReopen,
             .appSignatureInvalid("test"),
             .signingIdentityMismatch(app: "test", helper: "test"),
         ]

@@ -228,6 +228,75 @@ struct RequestTableSelectionScrollTests {
         #expect(scrollView.contentView.bounds.origin.y == preservedOrigin.y)
     }
 
+    @Test("Only user-initiated scrolling yields Follow Live")
+    func userInitiatedScrollingYieldsFollowLive() {
+        var selectedIDs = Set<UUID>()
+        var userScrollCount = 0
+        let parent = RequestTableView(
+            workspaceID: UUID(),
+            rows: [],
+            refreshToken: 0,
+            isAppendOnly: false,
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            ),
+            onUserScroll: {
+                userScrollCount += 1
+            }
+        )
+        let coordinator = RequestTableView.Coordinator(parent: parent)
+        let tableView = makeTableView(rowCount: 20, coordinator: coordinator)
+        let scrollView = makeScrollView(documentView: tableView)
+        coordinator.observeUserScrolling(in: scrollView)
+
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: 40))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        #expect(userScrollCount == 0)
+
+        NotificationCenter.default.post(
+            name: NSScrollView.didLiveScrollNotification,
+            object: scrollView
+        )
+        #expect(userScrollCount == 1)
+    }
+
+    @Test("Programmatic table reload suppresses selection delegate re-entry")
+    func programmaticReloadSuppressesSelectionDelegateReentry() {
+        let transactions = TestFixtures.makeBulkTransactions(count: 3)
+        let rows = transactions.map {
+            RequestListRow(from: $0, sslState: .insecure)
+        }
+        var selectedIDs: Set<UUID> = [rows[1].id]
+        var selectionChangeCount = 0
+        let parent = RequestTableView(
+            workspaceID: UUID(),
+            rows: rows,
+            refreshToken: 0,
+            isAppendOnly: false,
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            ),
+            onSelectionChanged: { _, _ in
+                selectionChangeCount += 1
+            }
+        )
+        let coordinator = RequestTableView.Coordinator(parent: parent)
+        coordinator.rows = rows
+        let tableView = makeTableView(rowCount: rows.count, coordinator: coordinator)
+        tableView.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+        selectionChangeCount = 0
+
+        coordinator.rows = [rows[0]]
+        coordinator.performProgrammaticTableUpdate {
+            tableView.reloadData()
+        }
+
+        #expect(selectionChangeCount == 0)
+        #expect(tableView.numberOfRows == 1)
+    }
+
     @Test("Context actions preserve a selected group and isolate an unselected clicked row")
     func contextActionsFollowNativeSelectionSemantics() {
         let transactions = TestFixtures.makeBulkTransactions(count: 3)
@@ -1120,5 +1189,124 @@ struct RequestTableSelectionScrollTests {
                 && constraint.secondItem as AnyObject? === container
                 && constraint.firstAttribute == .leading
         }.count
+    }
+}
+
+// MARK: - RequestTableAppendProvenanceTests
+
+@MainActor
+struct RequestTableAppendProvenanceTests {
+    @Test("Append-only refresh requires AppKit and coordinator row counts to agree")
+    func appendOnlyRefreshRejectsStaleTableCount() {
+        let coordinator = makeCoordinator()
+        coordinator.previousRowCount = 20
+
+        #expect(
+            coordinator.canInsertAppendedRows(
+                newCount: 24,
+                isAppendOnly: true,
+                appendChainOrigin: 7,
+                lastAppliedToken: 7,
+                workspaceChanged: false,
+                tableRowCount: 20
+            )
+        )
+        #expect(
+            !coordinator.canInsertAppendedRows(
+                newCount: 24,
+                isAppendOnly: true,
+                appendChainOrigin: 7,
+                lastAppliedToken: 7,
+                workspaceChanged: false,
+                tableRowCount: 12
+            )
+        )
+        #expect(
+            !coordinator.canInsertAppendedRows(
+                newCount: 24,
+                isAppendOnly: true,
+                appendChainOrigin: 7,
+                lastAppliedToken: 7,
+                workspaceChanged: true,
+                tableRowCount: 20
+            )
+        )
+        coordinator.previousRowCount = 0
+        #expect(
+            !coordinator.canInsertAppendedRows(
+                newCount: 1,
+                isAppendOnly: true,
+                appendChainOrigin: 7,
+                lastAppliedToken: 7,
+                workspaceChanged: false,
+                tableRowCount: 0
+            )
+        )
+    }
+
+    @Test("Coalesced non-append before an append rejects the incremental insert")
+    func coalescedNonAppendRejectsIncrementalInsert() {
+        let coordinator = makeCoordinator()
+        coordinator.previousRowCount = 20
+
+        #expect(
+            !coordinator.canInsertAppendedRows(
+                newCount: 24,
+                isAppendOnly: true,
+                appendChainOrigin: 9,
+                lastAppliedToken: 8,
+                workspaceChanged: false,
+                tableRowCount: 20
+            )
+        )
+    }
+
+    @Test("A missing append-chain origin rejects the incremental insert")
+    func missingAppendChainOriginRejectsInsert() {
+        let coordinator = makeCoordinator()
+        coordinator.previousRowCount = 20
+
+        #expect(
+            !coordinator.canInsertAppendedRows(
+                newCount: 24,
+                isAppendOnly: true,
+                appendChainOrigin: nil,
+                lastAppliedToken: 40,
+                workspaceChanged: false,
+                tableRowCount: 20
+            )
+        )
+    }
+
+    @Test("An append after a safe reload returns to the fast path once its origin is applied")
+    func appendAfterReloadReturnsToFastPath() {
+        let coordinator = makeCoordinator()
+        coordinator.previousRowCount = 24
+
+        #expect(
+            coordinator.canInsertAppendedRows(
+                newCount: 30,
+                isAppendOnly: true,
+                appendChainOrigin: 9,
+                lastAppliedToken: 11,
+                workspaceChanged: false,
+                tableRowCount: 24
+            )
+        )
+    }
+
+    private func makeCoordinator() -> RequestTableView.Coordinator {
+        var selectedIDs = Set<UUID>()
+        let parent = RequestTableView(
+            workspaceID: UUID(),
+            rows: [],
+            refreshToken: 0,
+            isAppendOnly: false,
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            )
+        )
+        return RequestTableView.Coordinator(parent: parent)
     }
 }

@@ -7,11 +7,15 @@ import Testing
 struct NativeWorkspaceSplitViewTests {
     // MARK: Internal
 
-    @Test("Sidebar and inspector share one balanced width policy")
-    func balancedUtilityPaneWidths() {
-        #expect(MainWindowLayoutMetrics.utilityPaneMinimumWidth == 300)
-        #expect(MainWindowLayoutMetrics.utilityPaneIdealWidth == 380)
-        #expect(MainWindowLayoutMetrics.utilityPaneMaximumWidth == 520)
+    @Test("Workspace defaults favor the Context Dock over the navigation sidebar")
+    func flexibleInspectorWidthPolicy() {
+        #expect(MainWindowLayoutMetrics.sidebarMinimumWidth == 200)
+        #expect(MainWindowLayoutMetrics.sidebarIdealWidth == 250)
+        #expect(MainWindowLayoutMetrics.sidebarMaximumWidth == 350)
+        #expect(MainWindowLayoutMetrics.workspaceMinimumWidth == 320)
+        #expect(MainWindowLayoutMetrics.contextDockMinimumWidth == 260)
+        #expect(MainWindowLayoutMetrics.contextDockIdealWidth == 320)
+        #expect(MainWindowLayoutMetrics.sidebarIdealWidth < MainWindowLayoutMetrics.contextDockIdealWidth)
     }
 
     @Test("Workspace uses one native vertical split for both utility columns")
@@ -26,9 +30,59 @@ struct NativeWorkspaceSplitViewTests {
         #expect(controller.splitViewItems[2].canCollapse)
         #expect(controller.splitViewItems[0].minimumThickness == 200)
         #expect(controller.splitViewItems[0].maximumThickness == 350)
-        #expect(controller.splitViewItems[1].minimumThickness == 600)
-        #expect(controller.splitViewItems[2].minimumThickness == 300)
-        #expect(controller.splitViewItems[2].maximumThickness == 520)
+        #expect(controller.splitViewItems[1].minimumThickness == 320)
+        #expect(controller.splitViewItems[2].minimumThickness == 220)
+        #expect(controller.splitViewItems[2].maximumThickness == 10_000)
+    }
+
+    @Test("Context Dock sizing policy permits widths beyond the former maximum")
+    func contextDockSupportsWideResize() {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let availableInspectorWidth = 1_600
+            - controller.splitView.dividerThickness * 2
+            - controller.splitViewItems[0].minimumThickness
+            - controller.splitViewItems[1].minimumThickness
+
+        #expect(availableInspectorWidth > 520)
+        #expect(controller.splitViewItems[2].maximumThickness >= availableInspectorWidth)
+    }
+
+    @Test("Vertical dividers have a forgiving horizontal drag target")
+    func verticalDividerHitTarget() {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let drawnRect = NSRect(x: 800, y: 0, width: 1, height: 700)
+        let effectiveRect = controller.splitView(
+            controller.splitView,
+            effectiveRect: drawnRect,
+            forDrawnRect: drawnRect,
+            ofDividerAt: 1
+        )
+
+        #expect(effectiveRect.width >= NativeSplitDividerInteraction.minimumHitThickness)
+        #expect(effectiveRect.minX < drawnRect.minX)
+        #expect(effectiveRect.maxX > drawnRect.maxX)
+    }
+
+    @Test("Context Dock divider moves through a useful width range after layout")
+    func contextDockDividerMovesAfterLayout() {
+        let controller = makeConfiguredController(
+            sidebarPresented: true,
+            inspectorPresented: true,
+            autosaveName: uniqueAutosaveName()
+        )
+        layout(controller, at: CGRect(x: 0, y: 0, width: 1_600, height: 700))
+
+        controller.splitView.setPosition(900, ofDividerAt: 1)
+        controller.view.layoutSubtreeIfNeeded()
+        let wideInspectorWidth = controller.splitViewItems[2].viewController.view.frame.width
+
+        controller.splitView.setPosition(1_250, ofDividerAt: 1)
+        controller.view.layoutSubtreeIfNeeded()
+        let compactInspectorWidth = controller.splitViewItems[2].viewController.view.frame.width
+
+        #expect(wideInspectorWidth > compactInspectorWidth)
+        #expect(wideInspectorWidth > 600)
+        #expect(compactInspectorWidth >= 220)
     }
 
     @Test("Collapsing utility columns preserves all hosted pane controllers")
@@ -378,10 +432,9 @@ struct NativeWorkspaceSplitViewTests {
                 sidebarMinimumWidth: 200,
                 sidebarIdealWidth: 250,
                 sidebarMaximumWidth: 350,
-                workspaceMinimumWidth: 600,
-                inspectorMinimumWidth: 300,
-                inspectorIdealWidth: 380,
-                inspectorMaximumWidth: 520
+                workspaceMinimumWidth: 320,
+                inspectorMinimumWidth: 220,
+                inspectorIdealWidth: 380
             )
         )
         return controller

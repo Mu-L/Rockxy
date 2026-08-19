@@ -31,7 +31,7 @@ struct StatusBarRequestSummaryTests {
             availableCount: 238,
             selectedCount: 2,
             activeFilterCount: 1
-        ) == "2 selected · 5 of 238 shown")
+        ) == "2 selected, 5 of 238 shown")
         #expect(StatusBarRequestSummary.text(
             visibleCount: 238,
             availableCount: 238,
