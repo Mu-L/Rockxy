@@ -262,7 +262,7 @@ struct WelcomeView: View {
             .disabled(viewModel.isBusy)
         }
 
-        if viewModel.errorArea == .helper || viewModel.helperFailureRecovery == .rebuildApp {
+        if viewModel.shouldShowHelperDiagnostics {
             Button {
                 openWindow(id: "advancedProxySettings")
             } label: {

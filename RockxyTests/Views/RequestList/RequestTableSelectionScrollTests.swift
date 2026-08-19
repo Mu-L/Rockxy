@@ -229,7 +229,7 @@ struct RequestTableSelectionScrollTests {
     }
 
     @Test("Only user-initiated scrolling yields Follow Live")
-    func userInitiatedScrollingYieldsFollowLive() {
+    func userInitiatedScrollingYieldsFollowLive() async {
         var selectedIDs = Set<UUID>()
         var userScrollCount = 0
         let parent = RequestTableView(
@@ -258,6 +258,7 @@ struct RequestTableSelectionScrollTests {
             name: NSScrollView.didLiveScrollNotification,
             object: scrollView
         )
+        await Task.yield()
         #expect(userScrollCount == 1)
     }
 

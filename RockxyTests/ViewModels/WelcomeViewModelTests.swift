@@ -107,6 +107,18 @@ struct WelcomeViewModelTests {
         #expect(viewModel.shouldOfferHelperRepair == false)
     }
 
+    @Test("invalid app signature exposes advanced diagnostics")
+    func invalidAppSignatureExposesDiagnostics() {
+        let viewModel = WelcomeViewModel()
+
+        viewModel.applyHelperState(
+            status: .signingMismatch,
+            signingIssue: .appSignatureInvalid(detail: "signature changed")
+        )
+
+        #expect(viewModel.shouldShowHelperDiagnostics)
+    }
+
     @Test("incomplete app package routes to rebuild instead of destructive repair")
     func incompletePackageDoesNotOfferDestructiveRepair() {
         let error = HelperManager.HelperInstallPreflightError.missingBundledHelperBinary(

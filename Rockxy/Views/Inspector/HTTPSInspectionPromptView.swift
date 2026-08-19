@@ -63,7 +63,7 @@ struct HTTPSInspectionPromptView: View {
             } label: {
                 Label(String(localized: "Settings…"), systemImage: "gearshape")
                     .lineLimit(1)
-                    .frame(width: promptActionLabelWidth)
+                    .frame(minWidth: promptActionLabelWidth)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -234,7 +234,7 @@ struct HTTPSInspectionPromptView: View {
             } label: {
                 Text(controlTitle)
                     .lineLimit(1)
-                    .frame(width: promptActionLabelWidth)
+                    .frame(minWidth: promptActionLabelWidth)
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -322,9 +322,7 @@ struct HTTPSInspectionScopePresentation: Equatable {
             return nil
         }
 
-        let state: State = if enabled == total {
-            .ready
-        } else if enabled > 0 {
+        let state: State = if enabled > 0 {
             .partial
         } else {
             .available

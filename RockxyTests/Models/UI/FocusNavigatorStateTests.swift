@@ -205,6 +205,11 @@ struct FocusNavigatorStateTests {
     func focusSetDisplayNames() {
         let legacyApplication = FocusSet(name: "New Focus Set 2", appName: "ChatGPT")
         let legacyExclusion = FocusSet(name: "New Focus Set", excludedDomain: "exp.notion.so")
+        let compoundExclusion = FocusSet(
+            name: "New Focus Set",
+            excludedDomain: "exp.notion.so",
+            excludedPathPrefix: "/api/events"
+        )
         let scoped = FocusSet(
             name: "New Focus Set",
             appName: "Google Chrome",
@@ -215,6 +220,7 @@ struct FocusNavigatorStateTests {
 
         #expect(legacyApplication.displayName == "ChatGPT")
         #expect(legacyExclusion.displayName == "Hide exp.notion.so")
+        #expect(compoundExclusion.displayName == "Hide exp.notion.so and paths under /api/events")
         #expect(scoped.displayName == "Google Chrome on api.example.com/v1")
         #expect(custom.displayName == "Checkout Debugging")
         #expect(custom.scopeSummary == "Safari")

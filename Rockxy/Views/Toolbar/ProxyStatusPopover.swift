@@ -316,7 +316,7 @@ struct ProxyStatusPopover: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(value)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     private func color(for level: CaptureReadinessLevel) -> Color {
