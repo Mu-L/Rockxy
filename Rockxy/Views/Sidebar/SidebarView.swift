@@ -379,7 +379,7 @@ struct SidebarView: View {
                         .font(.caption.weight(.medium))
                 }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
             .controlSize(.small)
             .foregroundStyle(.secondary)
             .help(actionLabel)
