@@ -6,28 +6,35 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.34.0 (build 51)</title>
-      <pubDate>Fri, 07 Aug 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-08-07T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.35.0 (build 52)</title>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-08-19T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.34.0/Rockxy-0.34.0-51.dmg"
-        sparkle:version="51"
-        sparkle:shortVersionString="0.34.0"
-        sparkle:edSignature="gWYq0Ui4VLYkVZ5u39HFqdfAcBpol4TJvqWipgQGyEc7ZZ5VLJtj6Zi4jaBv0bJ9HYvNmQ4EjFM7YTchfM+3CQ=="
-        length="34121247"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.35.0/Rockxy-0.35.0-52.dmg"
+        sparkle:version="52"
+        sparkle:shortVersionString="0.35.0"
+        sparkle:edSignature="j6mVzEXb0ttqCyLlj8Oq97nersUFz0I+cVKY3XZQmm9tIHkG9CbxCLe4zCRaKA+9nAOysTMSXG4vp3uoZbqIBQ=="
+        length="34293044"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.34.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.35.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
-  <li>Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.</li>
-  <li>Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.</li>
+  <li>Follow Live keeps each workspace on the newest request that matches its active filters until you navigate traffic manually.</li>
+  <li>Focus actions are now explicit sidebar buttons, making focused traffic views easier to discover and control.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Stabilized live request-table refresh and selection while high-volume captures and app metadata updates arrive.</li>
+  <li>Kept HTTPS decryption controls accessible with clearer host and app scope, retry guidance after TLS rejection, and safer encrypted passthrough recovery.</li>
+  <li>Preserved helper reset and reinstall recovery across development rebuilds, and now prompts for a clean reopen after app replacement.</li>
+  <li>Rebalanced sidebar, Context Dock, and inspector sizing while preserving each workspace&#x27;s active context and manual divider choices.</li>
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.</li>
-  <li>Workspace questions report current request, error, and saved-item counts without attaching captured request content.</li>
+  <li>Workspace feedback now appears in the relevant pane without obscuring capture controls or unrelated workspaces.</li>
+  <li>Official builds now include clearer binary licensing, public-source boundaries, third-party notices, and release provenance.</li>
 </ul>
       ]]></description>
     </item>
