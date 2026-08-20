@@ -424,5 +424,21 @@
     }
   ],
   "iclaVersion": "2.0",
-  "records": []
+  "records": [
+    {
+      "acceptedAt": "2026-08-20T06:37:25Z",
+      "assentStatement": "I have read and agree to the Rockxy ICLA v2.0",
+      "commentId": 5352329618,
+      "documentCommit": "161069cee26a3e374031e2d494b3c5b929fda45e",
+      "documentSha256": "376d89fe02303741bb5008a118f25c0a81a748bae7d1d42844fb3ff73667f900",
+      "documentUrl": "https://github.com/RockxyApp/Rockxy/blob/161069cee26a3e374031e2d494b3c5b929fda45e/legal/cla/ICLA-v2.0.md",
+      "iclaVersion": "2.0",
+      "login": "OctoBored",
+      "prId": 4313995428,
+      "prNodeId": "PR_kwDORxf6688AAAABASJYpA",
+      "prNumber": 260,
+      "repositoryId": 1192753899,
+      "userId": 212877535
+    }
+  ]
 }
