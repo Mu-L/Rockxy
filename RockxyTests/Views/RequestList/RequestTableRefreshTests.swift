@@ -320,6 +320,39 @@ struct RequestTableRefreshTests {
         #expect(coordinator.filteredRows.first?.id == t2.id)
     }
 
+    @Test("Keyboard delete removes the complete multi-selection")
+    func deleteMultiSelection() {
+        let coordinator = MainContentCoordinator()
+        let t1 = TestFixtures.makeTransaction()
+        let t2 = TestFixtures.makeTransaction()
+        let t3 = TestFixtures.makeTransaction()
+        coordinator.transactions = [t1, t2, t3]
+        coordinator.recomputeFilteredTransactions()
+        coordinator.selectedTransactionIDs = [t1.id, t2.id]
+        coordinator.selectTransaction(t1)
+
+        coordinator.deleteSelectedTransaction()
+
+        #expect(coordinator.transactions.map(\.id) == [t3.id])
+        #expect(coordinator.filteredRows.map(\.id) == [t3.id])
+        #expect(coordinator.selectedTransactionIDs.isEmpty)
+        #expect(coordinator.selectedTransaction == nil)
+    }
+
+    @Test("Deleting error rows recomputes the footer error count")
+    func deletingErrorsRecomputesErrorCount() {
+        let coordinator = MainContentCoordinator()
+        let error = TestFixtures.makeTransaction(statusCode: 500)
+        let success = TestFixtures.makeTransaction(statusCode: 200)
+        coordinator.transactions = [error, success]
+        coordinator.recomputeErrorCount()
+        #expect(coordinator.errorCount == 1)
+
+        coordinator.deleteTransactions([error])
+
+        #expect(coordinator.errorCount == 0)
+    }
+
     @Test("Keyboard delete works for persisted-only rows")
     func deletePersistedOnlyRow() {
         let coordinator = MainContentCoordinator()

@@ -863,13 +863,13 @@ struct RockxyMenuCommands: Commands {
                 actions?.selectFirstTransaction()
             }
             .keyboardShortcut(.upArrow, modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(actions?.hasVisibleTransactions != true)
 
             Button(String(localized: "Jump to Last Request")) {
                 actions?.selectLastTransaction()
             }
             .keyboardShortcut(.downArrow, modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(actions?.hasVisibleTransactions != true)
         }
     }
 
@@ -895,11 +895,6 @@ struct RockxyMenuCommands: Commands {
             .disabled(actions?.hasSelectedTransaction != true)
 
             Divider()
-
-            Button(String(localized: "Save Requests")) {
-                actions?.saveSession()
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
 
             Menu(String(localized: "Export")) {
                 Button(String(localized: "Export as HAR…")) {
@@ -963,11 +958,6 @@ struct RockxyMenuCommands: Commands {
             }
             .keyboardShortcut(.delete, modifiers: [.command])
             .disabled(actions?.hasSelectedTransaction != true)
-
-            Button(String(localized: "Delete All")) {
-                actions?.deleteAll()
-            }
-            .keyboardShortcut(.delete, modifiers: [.command, .shift])
         }
     }
 
@@ -988,6 +978,7 @@ struct RockxyMenuCommands: Commands {
                 actions?.toggleRecording()
             }
             .keyboardShortcut("p", modifiers: [.command])
+            .disabled(actions?.canToggleRecording != true)
 
             Button(String(localized: "Toggle System Proxy")) {
                 actions?.toggleSystemProxyOverride()
@@ -1083,7 +1074,6 @@ struct RockxyMenuCommands: Commands {
             Button(String(localized: "Protobuf…")) {
                 openWindow(id: "protobufSettings")
             }
-            .keyboardShortcut("u", modifiers: [.command, .option])
 
             Button(String(localized: "Network Conditions…")) {
                 openWindow(id: "networkConditions")

@@ -215,10 +215,14 @@ extension MainContentCoordinator {
     }
 
     func deleteSelectedTransaction() {
-        guard let selected = selectedTransaction else {
+        var selected = resolveSelectedTransactions()
+        if selected.isEmpty, let selectedTransaction {
+            selected = [selectedTransaction]
+        }
+        guard !selected.isEmpty else {
             return
         }
-        deleteTransactions([selected])
+        deleteTransactions(selected)
     }
 
     func selectFirstFilteredTransaction() {

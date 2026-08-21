@@ -512,6 +512,7 @@ extension MainContentCoordinator {
         let ids = Set(transactionsToDelete.map(\.id))
         transactions.removeAll { ids.contains($0.id) }
         rebuildObservedDomainsByApp()
+        recomputeErrorCount()
         persistedFavorites.removeAll { ids.contains($0.id) }
         invalidateSidebarFavoriteCache()
 

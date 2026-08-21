@@ -4,10 +4,14 @@ import SwiftUI
 
 // MARK: - CenterContentView
 
-/// Primary content area composing the protocol filter bar, optional advanced filter bar,
-/// the NSTableView-backed request list, an optional bottom inspector panel,
+/// Primary content area composing the traffic command strip, the protocol filter bar, the optional
+/// advanced filter bar, the NSTableView-backed request list, an optional bottom inspector panel,
 /// and the status bar. Manages the bridge between NSTableView selection (Set<UUID>) and the
 /// coordinator's single-selection model.
+///
+/// The `TrafficCommandBar` owns session, live-navigation, and selected-request handoffs.
+/// Persistent tool launchers stay in the footer, while filtering stays exclusively with
+/// `SearchFilterBar` / `AdvancedFilterBar`.
 struct CenterContentView: View {
     // MARK: Internal
 
@@ -16,6 +20,8 @@ struct CenterContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            TrafficCommandBar(coordinator: coordinator, onOpenToolWindow: onOpenToolWindow)
+
             ProtocolFilterBar(
                 activeFilters: Binding(
                     get: { coordinator.filterCriteria.activeProtocolFilters },
@@ -87,8 +93,6 @@ struct CenterContentView: View {
                 isProxyOverridden: coordinator.isProxyOverridden,
                 isAllowListActive: allowListManager.isActive,
                 isNoCachingActive: isNoCachingEnabled,
-                isFollowingLiveTraffic: coordinator.isFollowingLiveTraffic,
-                isFilterBarVisible: coordinator.isFilterBarVisible,
                 activeFilterCount: activeFilterCount,
                 errorCount: coordinator.errorCount,
                 proxyStartedAt: coordinator.proxyStartedAt,
@@ -100,18 +104,6 @@ struct CenterContentView: View {
                 mapLocalToolEnabled: mapLocalToolEnabled,
                 mapRemoteToolEnabled: mapRemoteToolEnabled,
                 breakpointToolEnabled: breakpointToolEnabled,
-                onClear: {
-                    Task { @MainActor in
-                        await coordinator.clearSession()
-                    }
-                },
-                onFilter: {
-                    coordinator.isFilterBarVisible.toggle()
-                    coordinator.recomputeFilteredTransactions()
-                },
-                onFollowLive: {
-                    coordinator.toggleFollowingLiveTraffic()
-                },
                 onSwitchOffProxyOverride: {
                     coordinator.switchOffSystemProxyOverride()
                 },

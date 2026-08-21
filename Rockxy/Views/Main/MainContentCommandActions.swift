@@ -20,8 +20,16 @@ struct MainContentCommandActions {
         coordinator.isProxyRunning
     }
 
+    var canToggleRecording: Bool {
+        coordinator.isProxyRunning
+    }
+
     var hasSelectedTransaction: Bool {
         coordinator.selectedTransaction != nil
+    }
+
+    var hasVisibleTransactions: Bool {
+        !coordinator.filteredTransactions.isEmpty
     }
 
     var isBottomInspectorVisible: Bool {
@@ -80,11 +88,7 @@ struct MainContentCommandActions {
 
     func clearCaptureAndFilters() {
         Task { @MainActor in
-            await coordinator.clearSession()
-            coordinator.filterCriteria = .empty
-            coordinator.filterCriteria.sidebarScope = .allTraffic
-            coordinator.filterRules = [FilterRule()]
-            coordinator.recomputeFilteredTransactions()
+            await coordinator.clearCaptureAndFilters()
         }
     }
 
@@ -162,12 +166,6 @@ struct MainContentCommandActions {
             return
         }
         coordinator.setHighlight(color, for: transaction)
-    }
-
-    func deleteAll() {
-        Task { @MainActor in
-            await coordinator.clearSession()
-        }
     }
 
     // MARK: - View

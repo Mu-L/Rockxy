@@ -341,8 +341,7 @@ private struct AIAssistantDockView: View {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
-            .keyboardShortcut("k", modifiers: .command)
-            .help(String(localized: "Search conversations (⌘K)"))
+            .help(String(localized: "Search conversations"))
             .accessibilityLabel(String(localized: "Conversation History"))
             .popover(isPresented: $isConversationSwitcherPresented, arrowEdge: .top) {
                 conversationSwitcher

@@ -71,10 +71,11 @@ enum KeyboardShortcutCatalog {
             ),
         ]),
         KeyboardShortcutSection(id: "main", title: "Main Capture", shortcuts: [
-            row("main.clear", "Main Capture", "Clear capture", "⌘K", "Main capture window", "Flow", nil),
-            row("main.clearAll", "Main Capture", "Clear capture and filters", "⇧⌘K", "Main capture window", "Flow", nil),
+            row("main.clear", "Main Capture", "Clear session", "⌘K", "Main capture window", "Flow", nil),
+            row("main.clearAll", "Main Capture", "Clear session and filters", "⇧⌘K", "Main capture window", "Flow", nil),
             row("main.pause", "Main Capture", "Pause or resume capture", "⌘P", "Main capture window", "Tools", nil),
             row("main.search", "Main Capture", "Focus the search bar", "⌘L", "Main capture search field", "Edit", nil),
+            row("main.followLive", "Main Capture", "Follow the newest visible request", "⇧⌘L", "Active workspace tab", "View", nil),
             row("main.first", "Main Capture", "Jump to the first or last captured row", "⌘↑", "Request table selection", "View", nil),
             row("main.last", "Main Capture", "Jump to the first or last captured row", "⌘↓", "Request table selection", "View", nil),
             row("main.move", "Main Capture", "Move row selection", "↑ / ↓", "Focused request table", nil, "Native table behavior."),

@@ -98,10 +98,13 @@ extension MainContentCoordinator {
         FocusSetPersistence.save(focusSets)
         for workspace in workspaceStore.workspaces where workspace.id != activeWorkspace.id {
             workspace.focusSets = focusSets
+            let hadActiveFocusSet = workspace.activeFocusSetID != nil
             if let activeID = workspace.activeFocusSetID,
                !focusSets.contains(where: { $0.id == activeID })
             {
                 workspace.activeFocusSetID = nil
+            }
+            if hadActiveFocusSet {
                 recomputeFilteredTransactions(for: workspace)
             }
         }

@@ -124,15 +124,29 @@ extension MainContentCoordinator {
     /// then recompute. Single source of truth for the filter-summary "Clear All" chip and the
     /// request-list empty-state recovery actions so they cannot drift apart.
     func clearAllWorkspaceFilters() {
-        filterCriteria = .empty
-        filterCriteria.sidebarScope = .allTraffic
-        sidebarSelection = nil
-        isFilterBarVisible = false
-        filterRules = [FilterRule()]
-        activeWorkspace.activeTrafficSignal = nil
-        activeWorkspace.activeFocusSetID = nil
-        activeWorkspace.mutedTrafficSources.removeAll()
+        resetFilters(in: activeWorkspace)
         recomputeFilteredTransactions()
+    }
+
+    /// Session-level reset used by "Clear Session and Filters". Session data spans every
+    /// workspace, so leaving an inactive workspace's visibility lenses behind would silently
+    /// hide newly captured traffic when the user returns to it.
+    func clearFiltersAcrossAllWorkspaces() {
+        for workspace in workspaceStore.workspaces {
+            resetFilters(in: workspace)
+        }
+        recomputeAllWorkspaces()
+    }
+
+    private func resetFilters(in workspace: WorkspaceState) {
+        workspace.filterCriteria = .empty
+        workspace.filterCriteria.sidebarScope = .allTraffic
+        workspace.sidebarSelection = nil
+        workspace.isFilterBarVisible = false
+        workspace.filterRules = [FilterRule()]
+        workspace.activeTrafficSignal = nil
+        workspace.activeFocusSetID = nil
+        workspace.mutedTrafficSources.removeAll()
     }
 
     var availableTransactionCountForCurrentScope: Int {
