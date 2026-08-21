@@ -20,6 +20,7 @@ struct RequestTableView: NSViewRepresentable {
     let refreshToken: Int
     let isAppendOnly: Bool
     var appendChainOrigin: Int?
+    var selectionIndex: [UUID: TrafficSelectionIndexEntry] = [:]
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
@@ -1160,9 +1161,18 @@ extension RequestTableView {
 
         func syncSelection(to ids: Set<UUID>, in tableView: NSTableView) {
             let currentSelected = tableView.selectedRowIndexes
-            var desired = IndexSet()
-            for (index, rowData) in rows.enumerated() where ids.contains(rowData.id) {
-                desired.insert(index)
+            let desired = if parent.selectionIndex.isEmpty, !rows.isEmpty {
+                IndexSet(rows.indices.filter { ids.contains(rows[$0].id) })
+            } else {
+                IndexSet(ids.compactMap { id in
+                    guard let index = parent.selectionIndex[id]?.rowIndex,
+                          rows.indices.contains(index),
+                          rows[index].id == id else
+                    {
+                        return nil
+                    }
+                    return index
+                })
             }
 
             guard currentSelected != desired else {
@@ -1405,15 +1415,14 @@ extension RequestTableView {
         private func menuItem(
             _ title: String,
             action: Selector,
-            key: String = "",
-            modifiers: NSEvent.ModifierFlags = .command,
             symbol: String? = nil,
             transaction: HTTPTransaction
         )
             -> NSMenuItem
         {
-            let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-            item.keyEquivalentModifierMask = modifiers
+            // Apple context menus expose relevant actions, not shortcut ownership. Main-menu
+            // equivalents remain the single source for key commands and their enabled state.
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             item.representedObject = transaction
             if let symbol {
@@ -1425,11 +1434,11 @@ extension RequestTableView {
         private func buildCopyGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
                 String(localized: "Copy URL"), action: #selector(handleCopyURL(_:)),
-                key: "c", symbol: "doc.on.doc", transaction: transaction
+                symbol: "doc.on.doc", transaction: transaction
             ))
             menu.addItem(menuItem(
                 String(localized: "Copy cURL"), action: #selector(handleCopyCURL(_:)),
-                key: "c", modifiers: [.command, .shift], transaction: transaction
+                transaction: transaction
             ))
             menu.addItem(menuItem(
                 String(localized: "Copy Cell Value"), action: #selector(handleCopyCellValue(_:)),
@@ -1518,11 +1527,11 @@ extension RequestTableView {
         private func buildRepeatGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
                 String(localized: "Repeat"), action: #selector(handleRepeat(_:)),
-                key: "\r", symbol: "arrow.clockwise", transaction: transaction
+                symbol: "arrow.clockwise", transaction: transaction
             ))
             menu.addItem(menuItem(
                 String(localized: "Edit and Repeat…"), action: #selector(handleEditAndRepeat(_:)),
-                key: "\r", modifiers: [.command, .option], transaction: transaction
+                transaction: transaction
             ))
         }
 
@@ -1541,7 +1550,7 @@ extension RequestTableView {
             let saveSymbol = transaction.isSaved ? "tray.full.fill" : "tray.and.arrow.down.fill"
             menu.addItem(menuItem(
                 saveTitle, action: #selector(handleSaveRequest(_:)),
-                key: "s", modifiers: [.command, .shift], symbol: saveSymbol, transaction: transaction
+                symbol: saveSymbol, transaction: transaction
             ))
         }
 
@@ -1625,7 +1634,7 @@ extension RequestTableView {
         private func buildAnnotationGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
                 String(localized: "Add Note…"), action: #selector(handleAddComment(_:)),
-                key: "l", symbol: "pencil.line", transaction: transaction
+                symbol: "pencil.line", transaction: transaction
             ))
 
             let highlightSubmenu = NSMenu()
@@ -1774,7 +1783,7 @@ extension RequestTableView {
         private func buildDeleteGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             let item = menuItem(
                 String(localized: "Delete"), action: #selector(handleDelete(_:)),
-                key: "\u{8}", modifiers: [], symbol: "trash", transaction: transaction
+                symbol: "trash", transaction: transaction
             )
             menu.addItem(item)
         }

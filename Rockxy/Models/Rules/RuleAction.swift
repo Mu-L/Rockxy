@@ -33,6 +33,15 @@ enum RuleAction {
 }
 
 extension RuleAction {
+    var responseBreakpointPhase: BreakpointRulePhase? {
+        guard case let .breakpoint(phase) = self,
+              phase == .response || phase == .both else
+        {
+            return nil
+        }
+        return phase
+    }
+
     var toolCategory: String {
         switch self {
         case .breakpoint: "breakpoint"

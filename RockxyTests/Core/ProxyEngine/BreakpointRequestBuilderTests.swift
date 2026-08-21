@@ -282,6 +282,40 @@ struct BreakpointRequestBuilderTests {
         #expect(contentLength == "\(result.requestData.body?.count ?? 0)")
     }
 
+    @Test("Non-editable request body is preserved while headers can change")
+    func nonEditableBodyPreserved() {
+        let binary = Data([0x1F, 0x8B, 0x08, 0x00])
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .POST, uri: "/upload")
+        let originalData = HTTPRequestData(
+            method: "POST",
+            url: URL(string: "http://api.example.com/upload")!,
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Content-Encoding", value: "gzip")],
+            body: binary
+        )
+        let modified = BreakpointRequestData(
+            method: "POST",
+            url: "http://api.example.com/upload",
+            headers: [
+                EditableHeader(name: "Content-Encoding", value: "gzip"),
+                EditableHeader(name: "X-Debug", value: "true"),
+            ],
+            body: "",
+            statusCode: 200,
+            isBodyEditable: false
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.requestData.body == binary)
+        #expect(result.requestData.headers.contains { $0.name == "X-Debug" && $0.value == "true" })
+        #expect(result.requestData.headers.first { $0.name == "Content-Length" }?.value == "4")
+    }
+
     @Test("HTTP scheme change to HTTPS is reverted")
     func httpSchemeChangeReverted() {
         let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://example.com/api")

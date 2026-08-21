@@ -8,6 +8,10 @@ struct InspectorURLBar: View {
     let transaction: HTTPTransaction
     var highlightContext: InspectorHighlightContext = .empty
 
+    /// When supplied, a restrained trailing button pops the inspector into its own
+    /// window. Omitted in the detached window itself so it never offers to detach again.
+    var onOpenDetachedInspector: (() -> Void)?
+
     var body: some View {
         HStack(spacing: 8) {
             methodBadge
@@ -21,6 +25,9 @@ struct InspectorURLBar: View {
             }
             urlText
             Spacer()
+            if let onOpenDetachedInspector {
+                detachedInspectorButton(action: onOpenDetachedInspector)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -28,6 +35,8 @@ struct InspectorURLBar: View {
     }
 
     // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     @ViewBuilder private var methodBadge: some View {
         if transaction.request.method == "CONNECT" {
@@ -100,10 +109,18 @@ struct InspectorURLBar: View {
                     .font(.system(size: metrics.controlFontSize, design: .monospaced))
             }
         }
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .textSelection(.enabled))
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .textSelection(.enabled))
     }
 
-    @Environment(\.appUIDisplayMetrics) private var metrics
+    private func detachedInspectorButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "macwindow.on.rectangle")
+                .font(.system(size: metrics.controlFontSize))
+        }
+        .buttonStyle(.borderless)
+        .help(String(localized: "Open Inspector in New Window"))
+        .accessibilityLabel(String(localized: "Open Inspector in New Window"))
+    }
 }

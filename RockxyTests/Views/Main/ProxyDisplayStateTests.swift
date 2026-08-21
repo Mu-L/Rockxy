@@ -40,6 +40,21 @@ struct ProxyDisplayStateTests {
         #expect(coordinator.proxyDisplayState == .paused)
     }
 
+    @Test("Recording cannot be toggled while the proxy is stopped")
+    func recordingToggleRequiresRunningProxy() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+
+        coordinator.toggleRecording()
+
+        #expect(coordinator.isRecording)
+
+        coordinator.isProxyRunning = true
+        coordinator.toggleRecording()
+
+        #expect(!coordinator.isRecording)
+    }
+
     @Test("Coordinator reports stopped after failed start clears startup state")
     func stoppedAfterFailedStart() {
         let coordinator = MainContentCoordinator()

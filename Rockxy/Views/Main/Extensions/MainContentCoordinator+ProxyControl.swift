@@ -159,6 +159,9 @@ extension MainContentCoordinator {
     }
 
     func toggleRecording() {
+        guard isProxyRunning else {
+            return
+        }
         isRecording.toggle()
     }
 
@@ -299,6 +302,17 @@ extension MainContentCoordinator {
         }
 
         NotificationCenter.default.post(name: .sessionCleared, object: nil)
+    }
+
+    func clearCaptureAndFilters() async {
+        await clearSession()
+        clearFiltersAcrossAllWorkspaces()
+    }
+
+    func recomputeErrorCount() {
+        errorCount = transactions.count { transaction in
+            (transaction.response?.statusCode ?? 0) >= 400
+        }
     }
 
     // MARK: - Proxy Configuration

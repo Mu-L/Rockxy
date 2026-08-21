@@ -27,6 +27,10 @@ final class WebSocketConnection: @unchecked Sendable {
         lock.withLock { _frames.count }
     }
 
+    var isCaptureLimitReached: Bool {
+        lock.withLock { _isCaptureLimitReached }
+    }
+
     var sentFrames: [WebSocketFrameData] {
         lock.withLock { _frames.filter { $0.direction == .sent } }
     }
@@ -44,10 +48,30 @@ final class WebSocketConnection: @unchecked Sendable {
 
     @discardableResult
     func addFrame(_ frame: WebSocketFrameData, maximumTotalPayloadSize: Int) -> Bool {
+        addFrame(
+            frame,
+            maximumTotalPayloadSize: maximumTotalPayloadSize,
+            maximumFrameCount: .max
+        )
+    }
+
+    @discardableResult
+    func addFrame(
+        _ frame: WebSocketFrameData,
+        maximumTotalPayloadSize: Int,
+        maximumFrameCount: Int
+    )
+        -> Bool
+    {
         lock.withLock {
-            guard frame.payload.count <= maximumTotalPayloadSize,
+            guard !_isCaptureLimitReached else {
+                return false
+            }
+            guard _frames.count < maximumFrameCount,
+                  frame.payload.count <= maximumTotalPayloadSize,
                   _totalPayloadSize <= maximumTotalPayloadSize - frame.payload.count else
             {
+                _isCaptureLimitReached = true
                 return false
             }
             _frames.append(frame)
@@ -56,9 +80,16 @@ final class WebSocketConnection: @unchecked Sendable {
         }
     }
 
+    func stopCaptureAtLimit() {
+        lock.withLock {
+            _isCaptureLimitReached = true
+        }
+    }
+
     // MARK: Private
 
     private let lock = NSLock()
     private var _frames: [WebSocketFrameData]
     private var _totalPayloadSize: Int
+    private var _isCaptureLimitReached = false
 }

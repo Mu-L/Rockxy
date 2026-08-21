@@ -1,8 +1,12 @@
 import SwiftUI
 
+// MARK: - InspectorPanelView
+
 /// Top-level payload inspector that hosts the URL bar and side-by-side request/response panes.
 /// Shown below the request list when a transaction is selected.
 struct InspectorPanelView: View {
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
     var onOpenToolWindow: (String) -> Void = { _ in }
 
@@ -12,7 +16,17 @@ struct InspectorPanelView: View {
                 InspectorSelectionSummaryView(coordinator: coordinator)
             } else if let transaction = coordinator.selectedTransaction {
                 let highlightContext = coordinator.activeInspectorHighlightContext()
-                InspectorURLBar(transaction: transaction, highlightContext: highlightContext)
+                InspectorURLBar(
+                    transaction: transaction,
+                    highlightContext: highlightContext,
+                    onOpenDetachedInspector: {
+                        DetachedInspectorStore.shared.present(
+                            transaction: transaction,
+                            highlightContext: highlightContext
+                        )
+                        openWindow(id: "detachedInspector")
+                    }
+                )
                 Divider()
                 HSplitView {
                     RequestInspectorView(
@@ -39,9 +53,17 @@ struct InspectorPanelView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: Private
+
+    @Environment(\.openWindow) private var openWindow
 }
 
+// MARK: - InspectorSelectionSummaryView
+
 private struct InspectorSelectionSummaryView: View {
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
 
     var body: some View {
@@ -64,6 +86,8 @@ private struct InspectorSelectionSummaryView: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+
+    // MARK: Private
 
     private var transactions: [HTTPTransaction] {
         coordinator.selectedTransactionIDs.compactMap(coordinator.transaction(for:))

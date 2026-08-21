@@ -64,7 +64,28 @@ struct ResponseInspectorView: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var httpsPromptModel: HTTPSInspectionPromptModel? {
-        let appScope = normalizedClientAppName.map { appName in
+        guard transaction.request.method == "CONNECT", transaction.response != nil else {
+            return nil
+        }
+        let canInterceptHTTPS = coordinator.readiness.canInterceptHTTPS
+        let domainRuleEnabled = coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+        let hasRecentTLSRejection = SSLProxyingManager.shared.isAutoPassthrough(transaction.request.host)
+        let promptWithoutAppScope = HTTPSInspectionPromptModel.make(
+            transaction: transaction,
+            canInterceptHTTPS: canInterceptHTTPS,
+            domainRuleEnabled: domainRuleEnabled,
+            hasRecentTLSRejection: hasRecentTLSRejection,
+            appScope: nil
+        )
+        guard let promptWithoutAppScope,
+              promptWithoutAppScope.certificateAction == nil,
+              promptWithoutAppScope.insight?.isWarning == false,
+              let appName = normalizedClientAppName else
+        {
+            return promptWithoutAppScope
+        }
+
+        let appScope: HTTPSInspectionAppScope = {
             let domains = coordinator.observedDomainsForApp(
                 named: appName,
                 fallbackDomain: transaction.request.host
@@ -74,13 +95,13 @@ struct ResponseInspectorView: View {
                 knownHostCount: domains.count,
                 enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:))
             )
-        }
+        }()
 
         return HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            canInterceptHTTPS: coordinator.readiness.canInterceptHTTPS,
-            domainRuleEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host),
-            hasRecentTLSRejection: SSLProxyingManager.shared.isAutoPassthrough(transaction.request.host),
+            canInterceptHTTPS: canInterceptHTTPS,
+            domainRuleEnabled: domainRuleEnabled,
+            hasRecentTLSRejection: hasRecentTLSRejection,
             appScope: appScope
         )
     }
@@ -96,7 +117,7 @@ struct ResponseInspectorView: View {
 
     private var tabDescriptors: [InspectorTabDescriptor] {
         var descriptors: [InspectorTabDescriptor] = ResponseInspectorTab
-            .availableTabs(hasAIInspection: hasAIInspection)
+            .availableTabs()
             .map { tab in
                 InspectorTabDescriptor(
                     id: "native.\(tab.rawValue)",

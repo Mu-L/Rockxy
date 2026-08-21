@@ -6,6 +6,14 @@ import Testing
 // Regression tests for `RuleAction` in the core rule engine layer.
 
 struct RuleActionTests {
+    @Test("Only response-capable breakpoints expose a response pre-pass phase")
+    func responseBreakpointPhase() {
+        #expect(RuleAction.breakpoint(phase: .request).responseBreakpointPhase == nil)
+        #expect(RuleAction.breakpoint(phase: .response).responseBreakpointPhase == .response)
+        #expect(RuleAction.breakpoint(phase: .both).responseBreakpointPhase == .both)
+        #expect(RuleAction.block(statusCode: 403).responseBreakpointPhase == nil)
+    }
+
     @Test("Block action returns correct status code")
     func blockAction() async throws {
         let engine = RuleEngine()

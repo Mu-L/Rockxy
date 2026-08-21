@@ -1129,7 +1129,8 @@ struct ToolWindowReadabilityTests {
         #expect(editorSource.contains("syncRawMessageFromDraft(itemId: selectedItemId, force: true)"))
         #expect(source.contains("item.editableDraft.isBodyEditable"))
         #expect(editorSource.contains(#"String(localized: "Original payload protected")"#))
-        #expect(editorSource.contains("draft.isBodyEditable"))
+        #expect(editorSource.contains("draftFor(itemId)?.isBodyEditable == false"))
+        #expect(editorSource.contains("canApplySelectedChanges = true"))
     }
 
     @Test("HTTPS decryption and full proxy bypass keep distinct native workflows")
