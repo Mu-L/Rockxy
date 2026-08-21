@@ -33,69 +33,67 @@ jobs:
     name: Classify changes
     runs-on: ubuntu-latest
     outputs:
-      metadata-only: ${{ steps.classify.outputs.metadata-only }}
+      lightweight-only: ${{ steps.classify.outputs.lightweight-only }}
+      release-metadata-changed: ${{ steps.classify.outputs.release-metadata-changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
           fetch-depth: 0
           persist-credentials: false
       - id: classify
-        name: Detect release-metadata-only changes
+        name: Detect lightweight-only changes
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          metadata_only=false
           if { [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; } &&
              [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] &&
              [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
-            changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
-            if [ -n "$changed_files" ]; then
-              metadata_only=true
-              while IFS= read -r path; do
-                case "$path" in
-                  CHANGELOG.md|docs/changelog.mdx|appcast.xml|releases/latest.json|releases/catalog.json|README.md|README.*.md) ;;
-                  *) metadata_only=false; break ;;
-                esac
-              done <<<"$changed_files"
-            fi
+            git diff --name-only --no-renames -z "$BASE_SHA" "$HEAD_SHA" |
+              python3 .github/tools/classify_ci_changes.py |
+              tee -a "$GITHUB_OUTPUT"
+          else
+            {
+              echo "lightweight-only=false"
+              echo "release-metadata-changed=false"
+            } | tee -a "$GITHUB_OUTPUT"
           fi
-          echo "metadata-only=$metadata_only" >> "$GITHUB_OUTPUT"
-          echo "metadata-only: $metadata_only"
 
   lint:
     name: SwiftLint
     needs: changes
-    runs-on: "${{ needs.changes.outputs.metadata-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
+    runs-on: "${{ needs.changes.outputs.lightweight-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
           persist-credentials: false
       - name: Install SwiftLint
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: brew install swiftlint
+      - name: Test CI change policy
+        run: python3 .github/tools/tests/test_classify_ci_changes.py
       - name: Test release metadata policy
         run: python3 -m unittest discover -s releases/tests -p 'test_*.py'
       - name: Lint
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: swiftlint lint --strict
       - name: Validate release metadata
-        if: needs.changes.outputs.metadata-only == 'true'
+        if: needs.changes.outputs.release-metadata-changed == 'true'
         run: python3 releases/validate_metadata.py
 
   test:
     name: Test
     needs: changes
-    runs-on: "${{ needs.changes.outputs.metadata-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
+    runs-on: "${{ needs.changes.outputs.lightweight-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
           persist-credentials: false
       - name: Prepare CI developer config
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'
           #include "LocalDev.xcconfig"
@@ -105,7 +103,7 @@ jobs:
           DEVELOPMENT_TEAM =
           EOF
       - name: Select Xcode
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           for candidate in \
             /Applications/Xcode_16.4.app \
@@ -124,7 +122,7 @@ jobs:
           ls -1 /Applications | grep '^Xcode' || true
           exit 1
       - name: Run tests
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           mkdir -p build/test-results
           xcodebuild -project Rockxy.xcodeproj \
@@ -141,20 +139,20 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             test
       - name: Run release metadata tests
-        if: needs.changes.outputs.metadata-only == 'true'
+        if: needs.changes.outputs.lightweight-only == 'true'
         run: python3 -m unittest discover -s releases/tests -p 'test_*.py'
 
   build-universal:
     name: Build (Universal)
     needs: changes
-    runs-on: "${{ needs.changes.outputs.metadata-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
+    runs-on: "${{ needs.changes.outputs.lightweight-only == 'true' && 'ubuntu-latest' || 'macos-15' }}"
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
           persist-credentials: false
       - name: Prepare CI developer config
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           cat > Configuration/Developer.xcconfig <<'EOF'
           #include "LocalDev.xcconfig"
@@ -164,7 +162,7 @@ jobs:
           DEVELOPMENT_TEAM =
           EOF
       - name: Select Xcode
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           for candidate in \
             /Applications/Xcode_16.4.app \
@@ -183,7 +181,7 @@ jobs:
           ls -1 /Applications | grep '^Xcode' || true
           exit 1
       - name: Build arm64
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           xcodebuild -project Rockxy.xcodeproj \
             -scheme Rockxy \
@@ -199,7 +197,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             build
       - name: Build x86_64
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           xcodebuild -project Rockxy.xcodeproj \
             -scheme Rockxy \
@@ -215,7 +213,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             build
       - name: Create universal binary
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           helper_plist_name_from_app() {
             /usr/libexec/PlistBuddy -c 'Print :RockxyHelperPlistName' "$1/Contents/Info.plist"
@@ -275,7 +273,7 @@ jobs:
 
           cd artifacts && zip -r "$ARTIFACT_BASENAME-universal.zip" "$APP_NAME.app"
       - name: Verify bundled helper resources
-        if: needs.changes.outputs.metadata-only != 'true'
+        if: needs.changes.outputs.lightweight-only != 'true'
         run: |
           verify_helper_resources_in_app() {
             local app_path="$1"
@@ -331,6 +329,3 @@ jobs:
           verify_helper_resources_in_app "build/arm64/Build/Products/Release/Rockxy.app" "arm64 app bundle"
           verify_helper_resources_in_app "build/x86_64/Build/Products/Release/Rockxy.app" "x86_64 app bundle"
           verify_helper_resources_in_app "artifacts/Rockxy.app" "universal app bundle"
-      - name: Validate release metadata without rebuilding application binaries
-        if: needs.changes.outputs.metadata-only == 'true'
-        run: python3 releases/validate_metadata.py
