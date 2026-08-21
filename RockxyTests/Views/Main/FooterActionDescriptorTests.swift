@@ -2,6 +2,8 @@ import Foundation
 @testable import Rockxy
 import Testing
 
+// MARK: - FooterActionDescriptorTests
+
 struct FooterActionDescriptorTests {
     @Test("Footer tooling action order is stable")
     func toolingActionOrder() {
@@ -95,6 +97,160 @@ struct FooterActionDescriptorTests {
         let actions = FooterActionDescriptor.toolingActions(isAllowListActive: false)
 
         #expect(FooterActionKind.defaultQuickTools == actions.map(\.id))
+    }
+
+    @Test("Each customizable tool maps to its approved tool-window ID")
+    func toolWindowIDMapping() {
+        #expect(FooterActionKind.blockList.toolWindowID == "blockList")
+        #expect(FooterActionKind.allowList.toolWindowID == "allowList")
+        #expect(FooterActionKind.mapRemote.toolWindowID == "mapRemote")
+        #expect(FooterActionKind.mapLocal.toolWindowID == "mapLocal")
+        #expect(FooterActionKind.scripting.toolWindowID == "scriptingList")
+        #expect(FooterActionKind.breakpoint.toolWindowID == "breakpointRules")
+        #expect(FooterActionKind.networkConditions.toolWindowID == "networkConditions")
+        #expect(FooterActionKind.proxyOverride.toolWindowID == nil)
+    }
+}
+
+// MARK: - QuickToolsLayoutTests
+
+struct QuickToolsLayoutTests {
+    @Test("Approved defaults place three tools on top and four in the footer")
+    func approvedDefaults() {
+        let layout = QuickToolsLayout.default
+
+        #expect(layout.commandBar == [.blockList, .allowList, .mapRemote])
+        #expect(layout.footer == [.breakpoint, .mapLocal, .scripting, .networkConditions])
+    }
+
+    @Test("All seven customizable tools occur exactly once across both regions")
+    func sevenUniqueAssignments() {
+        let layout = QuickToolsLayout.default
+        let combined = layout.commandBar + layout.footer
+
+        #expect(combined.count == 7)
+        #expect(Set(combined) == Set(FooterActionKind.customizableQuickTools))
+        #expect(!combined.contains(.proxyOverride))
+        #expect(layout.commandBar.count == QuickToolsLayout.commandBarSlotCount)
+        #expect(layout.footer.count == QuickToolsLayout.footerSlotCount)
+    }
+
+    @Test("Encode/decode round trips a valid layout")
+    func encodeDecodeRoundTrip() {
+        let layout = QuickToolsLayout(
+            commandBar: [.scripting, .breakpoint, .networkConditions],
+            footer: [.blockList, .allowList, .mapRemote, .mapLocal]
+        )
+
+        let decoded = QuickToolsLayout.decode(layout.encoded)
+
+        #expect(decoded == layout)
+    }
+
+    @Test("Empty storage decodes to nil so callers fall back to migration")
+    func emptyStorageDecodesNil() {
+        #expect(QuickToolsLayout.decode("") == nil)
+        #expect(QuickToolsLayout.decode("   ") == nil)
+    }
+
+    @Test("Persistence decoding tolerates whitespace around tool IDs")
+    func persistenceWhitespaceRepair() throws {
+        let decoded = try #require(QuickToolsLayout.decode(
+            " blockList, allowList,mapRemote | breakpoint,mapLocal,scripting,networkConditions "
+        ))
+
+        #expect(decoded == .default)
+    }
+
+    @Test("Malformed and duplicate persistence repairs to a valid unique layout")
+    func malformedRepair() throws {
+        // Duplicates, an unknown token, proxyOverride, and a missing footer side.
+        let repaired = try #require(
+            QuickToolsLayout.decode("blockList,blockList,proxyOverride,bogus|allowList,allowList")
+        )
+
+        let combined = repaired.commandBar + repaired.footer
+        #expect(repaired.commandBar.count == 3)
+        #expect(repaired.footer.count == 4)
+        #expect(Set(combined) == Set(FooterActionKind.customizableQuickTools))
+        #expect(!combined.contains(.proxyOverride))
+        // Cleaned survivors keep their leading position before backfill.
+        #expect(repaired.commandBar.first == .blockList)
+    }
+
+    @Test("Legacy footer order migrates its four tools to the footer and the rest on top")
+    func legacyFooterMigration() {
+        let legacy = "breakpoint,mapLocal,scripting,networkConditions"
+        let layout = QuickToolsLayout.resolved(storageRaw: "", legacyFooterRaw: legacy)
+
+        #expect(layout.footer == [.breakpoint, .mapLocal, .scripting, .networkConditions])
+        #expect(Set(layout.commandBar) == [.blockList, .allowList, .mapRemote])
+    }
+
+    @Test("A customized legacy footer migration preserves its exact four selections")
+    func legacyFooterMigrationPreservesSelection() {
+        let legacy = "allowList,scripting,mapRemote,breakpoint"
+        let layout = QuickToolsLayout.resolved(storageRaw: "", legacyFooterRaw: legacy)
+
+        #expect(layout.footer == [.allowList, .scripting, .mapRemote, .breakpoint])
+        #expect(Set(layout.commandBar) == [.blockList, .mapLocal, .networkConditions])
+    }
+
+    @Test("New storage value wins over the legacy footer key")
+    func newStorageWinsOverLegacy() {
+        let stored = QuickToolsLayout(
+            commandBar: [.mapLocal, .scripting, .networkConditions],
+            footer: [.blockList, .allowList, .mapRemote, .breakpoint]
+        )
+        let layout = QuickToolsLayout.resolved(
+            storageRaw: stored.encoded,
+            legacyFooterRaw: "breakpoint,mapLocal,scripting,networkConditions"
+        )
+
+        #expect(layout == stored)
+    }
+
+    @Test("Assigning a tool already in the other region swaps the two slots")
+    func crossRegionSwap() {
+        let layout = QuickToolsLayout.default
+        // mapLocal currently lives in footer slot 1; move it to command-bar slot 0.
+        let swapped = layout.assigning(.mapLocal, to: .commandBar, slot: 0)
+
+        #expect(swapped.commandBar[0] == .mapLocal)
+        // The displaced command-bar tool (blockList) lands where mapLocal used to sit.
+        #expect(swapped.footer[1] == .blockList)
+        // Invariant preserved.
+        let combined = swapped.commandBar + swapped.footer
+        #expect(Set(combined) == Set(FooterActionKind.customizableQuickTools))
+        #expect(combined.count == 7)
+    }
+
+    @Test("Assigning within the same region swaps intra-region slots")
+    func intraRegionSwap() {
+        let layout = QuickToolsLayout.default
+        // allowList is command-bar slot 1; assign it to slot 0 (blockList).
+        let swapped = layout.assigning(.allowList, to: .commandBar, slot: 0)
+
+        #expect(swapped.commandBar[0] == .allowList)
+        #expect(swapped.commandBar[1] == .blockList)
+        #expect(swapped.footer == layout.footer)
+    }
+
+    @Test("Assigning a tool to the slot it already occupies is a no-op")
+    func idempotentAssignment() {
+        let layout = QuickToolsLayout.default
+        #expect(layout.assigning(.blockList, to: .commandBar, slot: 0) == layout)
+    }
+
+    @Test("Responsive policy collapses three to two to zero, never icon-only")
+    func responsivePolicy() {
+        #expect(QuickToolsResponsivePolicy.candidateCommandBarCounts == [3, 2, 0])
+
+        #expect(QuickToolsResponsivePolicy.visibleCommandBarCount { $0 <= 3 } == 3)
+        #expect(QuickToolsResponsivePolicy.visibleCommandBarCount { $0 <= 2 } == 2)
+        #expect(QuickToolsResponsivePolicy.visibleCommandBarCount { $0 == 0 } == 0)
+        // No candidate produces one visible capsule — it never falls to a single icon.
+        #expect(!QuickToolsResponsivePolicy.candidateCommandBarCounts.contains(1))
     }
 }
 
@@ -251,6 +407,8 @@ struct FooterMutationIndicatorBuilderTests {
     }
 }
 
+// MARK: - ProxyOverrideCommandActionsTests
+
 struct ProxyOverrideCommandActionsTests {
     @Test("system proxy override command is enabled only while proxy is running")
     @MainActor
@@ -263,6 +421,34 @@ struct ProxyOverrideCommandActionsTests {
 
         coordinator.isProxyRunning = true
         #expect(actions.canToggleSystemProxyOverride)
+    }
+
+    @Test("recording command is enabled only while proxy is running")
+    @MainActor
+    func toggleRecordingCommandAvailability() {
+        let coordinator = MainContentCoordinator()
+        let actions = MainContentCommandActions(coordinator: coordinator)
+
+        #expect(actions.canToggleRecording == false)
+
+        coordinator.isProxyRunning = true
+        #expect(actions.canToggleRecording)
+    }
+
+    @Test("first and last navigation are available without an existing selection")
+    @MainActor
+    func firstAndLastNavigationAvailability() {
+        let coordinator = MainContentCoordinator()
+        let actions = MainContentCommandActions(coordinator: coordinator)
+
+        #expect(actions.hasSelectedTransaction == false)
+        #expect(actions.hasVisibleTransactions == false)
+
+        coordinator.transactions = [TestFixtures.makeTransaction()]
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(actions.hasSelectedTransaction == false)
+        #expect(actions.hasVisibleTransactions)
     }
 
     @Test("OpenAPI export command requires eligible HTTP traffic")

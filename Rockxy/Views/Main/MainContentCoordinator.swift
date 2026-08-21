@@ -25,6 +25,57 @@ enum ProxyDisplayState: Equatable {
             String(localized: "Stopped")
         }
     }
+
+    var captureTitle: String {
+        switch self {
+        case .starting:
+            String(localized: "Starting Capture")
+        case .running:
+            String(localized: "Capturing Traffic")
+        case .paused:
+            String(localized: "Capture Paused")
+        case .stopped:
+            String(localized: "Capture Stopped")
+        }
+    }
+
+    var captureDescription: String {
+        switch self {
+        case .starting:
+            String(localized: "Preparing the listener and system routing.")
+        case .running:
+            String(localized: "New traffic is being added to the active workspace.")
+        case .paused:
+            String(localized: "The listener stays available, but new traffic is not being added.")
+        case .stopped:
+            String(localized: "No new traffic is being captured.")
+        }
+    }
+
+    var captureSystemImage: String {
+        switch self {
+        case .starting:
+            "circle.dotted"
+        case .running:
+            "record.circle.fill"
+        case .paused:
+            "pause.circle.fill"
+        case .stopped:
+            "stop.circle"
+        }
+    }
+
+    var captureActionTitle: String {
+        switch self {
+        case .starting:
+            String(localized: "Starting…")
+        case .running,
+             .paused:
+            String(localized: "Stop Capture")
+        case .stopped:
+            String(localized: "Start Capture")
+        }
+    }
 }
 
 // MARK: - ProxyListenerSnapshot
@@ -210,7 +261,6 @@ final class MainContentCoordinator {
     var trafficSamples: [(timestamp: Date, upload: Int64, download: Int64)] = []
     var bandwidthTimer: Timer?
     var isProxyOverridden = false
-    var isAutoSelectEnabled = true
     nonisolated(unsafe) var evictionObserver: NSObjectProtocol?
 
     // MARK: - UI State — Engine Status
@@ -361,6 +411,13 @@ final class MainContentCoordinator {
         set { activeWorkspace.focusNavigatorMode = newValue }
     }
 
+    /// Opt-in live-tail mode for the active workspace. Forwards to the active `WorkspaceState`
+    /// so existing UI/menu callers keep reading a single flag while the state is owned per-workspace.
+    var isFollowingLiveTraffic: Bool {
+        get { activeWorkspace.isFollowingLiveTraffic }
+        set { activeWorkspace.isFollowingLiveTraffic = newValue }
+    }
+
     var selectedLogEntry: LogEntry? {
         get { activeWorkspace.selectedLogEntry }
         set { activeWorkspace.selectedLogEntry = newValue }
@@ -421,6 +478,13 @@ final class MainContentCoordinator {
 
     func invalidateSidebarFavoriteCache() {
         sidebarFavoritesCache = nil
+    }
+
+    func dismissToast(id: UUID) {
+        guard activeToast?.id == id else {
+            return
+        }
+        activeToast = nil
     }
 
     /// Configure shared policy gates. Called once from the app's main

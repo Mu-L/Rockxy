@@ -4,10 +4,14 @@ import SwiftUI
 
 // MARK: - CenterContentView
 
-/// Primary content area composing the protocol filter bar, optional advanced filter bar,
-/// the NSTableView-backed request list, an optional bottom inspector panel,
+/// Primary content area composing the traffic command strip, the protocol filter bar, the optional
+/// advanced filter bar, the NSTableView-backed request list, an optional bottom inspector panel,
 /// and the status bar. Manages the bridge between NSTableView selection (Set<UUID>) and the
 /// coordinator's single-selection model.
+///
+/// The `TrafficCommandBar` owns session, live-navigation, and selected-request handoffs.
+/// Persistent tool launchers stay in the footer, while filtering stays exclusively with
+/// `SearchFilterBar` / `AdvancedFilterBar`.
 struct CenterContentView: View {
     // MARK: Internal
 
@@ -16,6 +20,8 @@ struct CenterContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            TrafficCommandBar(coordinator: coordinator, onOpenToolWindow: onOpenToolWindow)
+
             ProtocolFilterBar(
                 activeFilters: Binding(
                     get: { coordinator.filterCriteria.activeProtocolFilters },
@@ -87,8 +93,6 @@ struct CenterContentView: View {
                 isProxyOverridden: coordinator.isProxyOverridden,
                 isAllowListActive: allowListManager.isActive,
                 isNoCachingActive: isNoCachingEnabled,
-                isAutoSelectEnabled: coordinator.isAutoSelectEnabled,
-                isFilterBarVisible: coordinator.isFilterBarVisible,
                 activeFilterCount: activeFilterCount,
                 errorCount: coordinator.errorCount,
                 proxyStartedAt: coordinator.proxyStartedAt,
@@ -100,18 +104,6 @@ struct CenterContentView: View {
                 mapLocalToolEnabled: mapLocalToolEnabled,
                 mapRemoteToolEnabled: mapRemoteToolEnabled,
                 breakpointToolEnabled: breakpointToolEnabled,
-                onClear: {
-                    Task { @MainActor in
-                        await coordinator.clearSession()
-                    }
-                },
-                onFilter: {
-                    coordinator.isFilterBarVisible.toggle()
-                    coordinator.recomputeFilteredTransactions()
-                },
-                onAutoSelect: {
-                    coordinator.isAutoSelectEnabled.toggle()
-                },
                 onSwitchOffProxyOverride: {
                     coordinator.switchOffSystemProxyOverride()
                 },
@@ -136,7 +128,9 @@ struct CenterContentView: View {
     // MARK: Private
 
     private static let bottomInspectorSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        "workspaceBottomInspectorSplit.v1"
+        // v2 applies the taller payload-first default once, then preserves every subsequent
+        // user-adjusted divider position normally again.
+        "workspaceBottomInspectorSplit.payloadFirst.v2"
     )
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false
@@ -217,24 +211,15 @@ struct CenterContentView: View {
             rows: coordinator.filteredRows,
             refreshToken: coordinator.refreshToken,
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
+            appendChainOrigin: coordinator.activeWorkspace.appendChainOriginToken,
+            selectionIndex: coordinator.activeWorkspace.trafficSelectionIndex,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
-                coordinator.selectedTransactionIDs = ids
-                if let primaryID,
-                   ids.contains(primaryID),
-                   let transaction = coordinator.transaction(for: primaryID)
-                {
-                    coordinator.selectTransaction(transaction)
-                } else if let firstVisibleID = coordinator.filteredRows
-                    .lazy
-                    .map(\.id)
-                    .first(where: ids.contains),
-                    let transaction = coordinator.transaction(for: firstVisibleID)
-                {
-                    coordinator.selectTransaction(transaction)
-                } else {
-                    coordinator.selectTransaction(nil)
-                }
+                coordinator.userDidNavigateTrafficHistory()
+                coordinator.selectTransactions(ids, primaryID: primaryID)
+            },
+            onUserScroll: {
+                coordinator.userDidNavigateTrafficHistory()
             },
             mainCoordinator: coordinator,
             headerColumns: coordinator.headerColumnStore.columns

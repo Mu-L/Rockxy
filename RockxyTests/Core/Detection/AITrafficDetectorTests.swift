@@ -91,7 +91,7 @@ struct AITrafficDetectorTests {
 
         #expect(!AITrafficDetector.isLikelyAI(transaction: transaction))
         #expect(AITrafficDetector.detect(transaction: transaction) == nil)
-        #expect(!ResponseInspectorTab.availableTabs(hasAIInspection: false).contains(.ai))
+        #expect(!ResponseInspectorTab.availableTabs().contains(.ai))
     }
 
     @Test("AI tab is available only when AI metadata is likely")
@@ -103,7 +103,7 @@ struct AITrafficDetectorTests {
         )
 
         #expect(AITrafficDetector.isLikelyAI(transaction: transaction))
-        #expect(!ResponseInspectorTab.availableTabs(hasAIInspection: true).contains(.ai))
+        #expect(!ResponseInspectorTab.availableTabs().contains(.ai))
         #expect(ProtocolTabKind.availableTabs(for: transaction).contains(.ai))
         #expect(ProtocolTabKind.defaultFor(transaction) == .ai)
     }

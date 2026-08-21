@@ -159,6 +159,9 @@ extension MainContentCoordinator {
     }
 
     func toggleRecording() {
+        guard isProxyRunning else {
+            return
+        }
         isRecording.toggle()
     }
 
@@ -301,6 +304,17 @@ extension MainContentCoordinator {
         NotificationCenter.default.post(name: .sessionCleared, object: nil)
     }
 
+    func clearCaptureAndFilters() async {
+        await clearSession()
+        clearFiltersAcrossAllWorkspaces()
+    }
+
+    func recomputeErrorCount() {
+        errorCount = transactions.count { transaction in
+            (transaction.response?.statusCode ?? 0) >= 400
+        }
+    }
+
     // MARK: - Proxy Configuration
 
     func configureProxy(port: Int? = nil, settings: AppSettings? = nil) async {
@@ -420,6 +434,7 @@ extension MainContentCoordinator {
         appendObservedDomainsByApp(from: filteredBatch)
 
         updateAllWorkspaces(with: filteredBatch)
+        followLatestVisibleTransaction(from: filteredBatch)
 
         headerColumnStore.updateDiscoveredHeaders(fromBatch: filteredBatch)
     }
@@ -461,7 +476,11 @@ extension MainContentCoordinator {
                 guard didUpdateRows else {
                     continue
                 }
+                // In-place enrichment rewrites existing rows without a full derive, so it must
+                // invalidate the append provenance itself — otherwise a later coalesced append
+                // could insert against a prefix this enrichment already mutated.
                 workspace.lastDeriveWasAppendOnly = false
+                workspace.appendChainOriginToken = nil
                 workspace.refreshToken += 1
             }
         }

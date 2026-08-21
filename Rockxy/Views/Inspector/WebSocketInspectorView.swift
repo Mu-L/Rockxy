@@ -153,6 +153,14 @@ struct WebSocketInspectorView: View {
                     value: "\(connection.receivedFrames.count) (\(totalSize(connection.receivedFrames)))"
                 )
             }
+            if connection.isCaptureLimitReached {
+                Label(
+                    String(localized: "Frame capture stopped at the safety limit; the live connection remains active."),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.system(size: metrics.secondaryFontSize))
+                .foregroundStyle(.orange)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

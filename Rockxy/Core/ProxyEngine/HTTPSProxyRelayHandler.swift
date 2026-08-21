@@ -61,20 +61,28 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        guard !requestBodyLimitState.isRejected else {
+            return
+        }
         let part = unwrapInboundIn(data)
         switch part {
         case let .head(head):
             requestHead = head
             requestBody = context.channel.allocator.buffer(capacity: 0)
             requestStartTime = .now()
-            accumulatedBodySize = 0
+            requestBodyLimitState.reset()
 
         case let .body(buffer):
-            accumulatedBodySize += buffer.readableBytes
-            guard accumulatedBodySize <= ProxyLimits.maxRequestBodySize else {
+            guard requestBodyLimitState.accept(buffer.readableBytes) else {
                 httpsRelayLogger
                     .warning("SECURITY: HTTPS request body exceeds \(ProxyLimits.maxRequestBodySize) bytes, rejecting")
-                sendErrorResponse(context: context, status: 413)
+                let head = requestHead ?? HTTPRequestHead(version: .http1_1, method: .POST, uri: "/")
+                sendErrorResponse(
+                    context: context,
+                    status: 413,
+                    requestData: buildRequestData(from: head),
+                    callback: onTransactionComplete
+                )
                 requestHead = nil
                 requestBody = nil
                 return
@@ -121,7 +129,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
     private var requestStartTime: DispatchTime?
-    private var accumulatedBodySize: Int = 0
+    private var requestBodyLimitState = RequestBodyLimitState()
 
     nonisolated private func makeTransactionCallback(
         for matchedRule: ProxyRule?
@@ -139,27 +147,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         head: HTTPRequestHead
     ) {
         pendingBreakpointPhase = nil
-        let headers = head.headers.map { HTTPHeader(name: $0.name, value: $0.value) }
-        let body: Data? = if let buf = requestBody, buf.readableBytes > 0 {
-            if let bytes = buf.getBytes(at: buf.readerIndex, length: buf.readableBytes) {
-                Data(bytes)
-            } else {
-                nil
-            }
-        } else {
-            nil
-        }
-        let urlString = "https://\(host)\(head.uri)"
-        let fallbackURL = URL(string: "https://localhost/")!
-        let parsedURL = URL(string: urlString) ?? URL(string: "https://\(host)/") ?? fallbackURL
-        var requestData = HTTPRequestData(
-            method: head.method.rawValue,
-            url: parsedURL,
-            httpVersion: "\(head.version.major).\(head.version.minor)",
-            headers: headers,
-            body: body,
-            contentType: ContentTypeDetector.detect(headers: headers, body: body)
-        )
+        var requestData = buildRequestData(from: head)
 
         var head = head
         if NoCacheHeaderMutator.isEnabled {
@@ -177,12 +165,12 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         eventLoop.makeFutureWithTask {
             let breakpointRule = await ruleEngine.evaluateBreakpointRule(
                 method: head.method.rawValue,
-                url: parsedURL,
+                url: requestData.url,
                 headers: requestData.headers
             )
             let matchedRule = await ruleEngine.evaluateRule(
                 method: head.method.rawValue,
-                url: parsedURL,
+                url: requestData.url,
                 headers: requestData.headers
             )
             return (breakpointRule, matchedRule)
@@ -194,6 +182,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             let breakpointRule = evaluation?.0
             let matchedRule = evaluation?.1
             let matchedRuleCallback = self.makeTransactionCallback(for: matchedRule)
+
+            if let responsePhase = breakpointRule?.action.responseBreakpointPhase {
+                self.pendingBreakpointPhase = responsePhase
+            }
 
             if let breakpointRule,
                case let .breakpoint(phase) = breakpointRule.action,
@@ -280,6 +272,32 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         }
     }
 
+    nonisolated private func buildRequestData(from head: HTTPRequestHead) -> HTTPRequestData {
+        let headers = head.headers.map { HTTPHeader(name: $0.name, value: $0.value) }
+        let body: Data? = if let buffer = requestBody, buffer.readableBytes > 0,
+                            let bytes = buffer.getBytes(
+                                at: buffer.readerIndex,
+                                length: buffer.readableBytes
+                            )
+        {
+            Data(bytes)
+        } else {
+            nil
+        }
+        let fallbackURL = URL(string: "https://localhost/")!
+        let parsedURL = URL(string: "https://\(host)\(head.uri)")
+            ?? URL(string: "https://\(host)/")
+            ?? fallbackURL
+        return HTTPRequestData(
+            method: head.method.rawValue,
+            url: parsedURL,
+            httpVersion: "\(head.version.major).\(head.version.minor)",
+            headers: headers,
+            body: body,
+            contentType: ContentTypeDetector.detect(headers: headers, body: body)
+        )
+    }
+
     nonisolated private func connectToUpstream(
         context: ChannelHandlerContext,
         head: HTTPRequestHead,
@@ -295,7 +313,12 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
 
         guard connectionLimiter.acquire(host: upstreamHost, port: upstreamPort) else {
             httpsRelayLogger.warning("Connection limit reached for \(upstreamHost):\(upstreamPort)")
-            sendErrorResponse(context: context, status: 503)
+            sendErrorResponse(
+                context: context,
+                status: 503,
+                requestData: requestData,
+                callback: callback
+            )
             return
         }
 
@@ -346,7 +369,12 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         } catch {
             httpsRelayLogger.error("Client TLS setup failed: \(error.localizedDescription)")
             limiter.release(host: upstreamHost, port: upstreamPort)
-            sendErrorResponse(context: context, status: 502)
+            sendErrorResponse(
+                context: context,
+                status: 502,
+                requestData: requestData,
+                callback: callback
+            )
         }
     }
 
@@ -808,22 +836,6 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         transaction.measuredDuration = requestElapsedDuration()
         transaction.sourcePort = clientSourcePort
         callback(transaction)
-    }
-
-    nonisolated private func sendErrorResponse(
-        context: ChannelHandlerContext,
-        status: Int
-    ) {
-        guard context.channel.isActive else {
-            return
-        }
-        let httpStatus = HTTPResponseStatus(statusCode: status)
-        var responseHead = HTTPResponseHead(version: .http1_1, status: httpStatus)
-        responseHead.headers.add(name: "Connection", value: "close")
-        context.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
-        context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil))).whenComplete { _ in
-            context.close(promise: nil)
-        }
     }
 
     nonisolated private func sendErrorResponse(

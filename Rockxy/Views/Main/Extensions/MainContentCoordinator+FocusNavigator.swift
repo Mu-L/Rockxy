@@ -54,12 +54,14 @@ extension MainContentCoordinator {
     }
 
     func makeFocusSetFromCurrentScope() -> FocusSet {
-        FocusSet(
+        var focusSet = FocusSet(
             name: String(localized: "New Focus Set"),
             appName: filterCriteria.sidebarApp ?? "",
             domain: filterCriteria.sidebarDomain ?? "",
             pathPrefix: filterCriteria.sidebarPathPrefix ?? ""
         )
+        focusSet.name = focusSet.suggestedName
+        return focusSet
     }
 
     func muteTrafficSource(_ source: MutedTrafficSource) {
@@ -96,10 +98,13 @@ extension MainContentCoordinator {
         FocusSetPersistence.save(focusSets)
         for workspace in workspaceStore.workspaces where workspace.id != activeWorkspace.id {
             workspace.focusSets = focusSets
+            let hadActiveFocusSet = workspace.activeFocusSetID != nil
             if let activeID = workspace.activeFocusSetID,
                !focusSets.contains(where: { $0.id == activeID })
             {
                 workspace.activeFocusSetID = nil
+            }
+            if hadActiveFocusSet {
                 recomputeFilteredTransactions(for: workspace)
             }
         }

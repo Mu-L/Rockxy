@@ -806,6 +806,72 @@ struct FilteringTests {
         #expect(coordinator.filteredTransactions.count == 2)
     }
 
+    @Test("clear capture and filters resets visibility lenses in every workspace")
+    func clearCaptureAndFiltersResetsEveryWorkspaceVisibilityLens() async {
+        let coordinator = MainContentCoordinator()
+        let firstWorkspace = coordinator.activeWorkspace
+        let secondWorkspace = coordinator.workspaceStore.createWorkspace(title: "Filtered")
+        let focusSet = FocusSet(name: "API", domain: "example.com")
+
+        for workspace in [firstWorkspace, secondWorkspace] {
+            workspace.filterCriteria.searchText = "api"
+            workspace.filterCriteria.sidebarScope = .saved
+            workspace.sidebarSelection = .allSaved
+            workspace.isFilterBarVisible = true
+            workspace.filterRules = [
+                FilterRule(isEnabled: true, field: .url, filterOperator: .contains, value: "api"),
+            ]
+            workspace.activeTrafficSignal = .errors
+            workspace.focusSets = [focusSet]
+            workspace.activeFocusSetID = focusSet.id
+            workspace.mutedTrafficSources = [.host("noise.example.com")]
+        }
+
+        await coordinator.clearCaptureAndFilters()
+
+        for workspace in [firstWorkspace, secondWorkspace] {
+            #expect(workspace.filterCriteria.isEmpty)
+            #expect(workspace.filterCriteria.sidebarScope == .allTraffic)
+            #expect(workspace.sidebarSelection == nil)
+            #expect(!workspace.isFilterBarVisible)
+            #expect(workspace.filterRules.count == 1)
+            #expect(workspace.filterRules[0].value.isEmpty)
+            #expect(workspace.activeTrafficSignal == nil)
+            #expect(workspace.activeFocusSetID == nil)
+            #expect(workspace.mutedTrafficSources.isEmpty)
+            #expect(workspace.focusSets == [focusSet])
+        }
+
+        let fresh = TestFixtures.makeTransaction(url: "https://fresh.example.net/new")
+        coordinator.processBatch([fresh], generation: coordinator.sessionGeneration)
+
+        #expect(firstWorkspace.filteredTransactions.map(\.id) == [fresh.id])
+        #expect(secondWorkspace.filteredTransactions.map(\.id) == [fresh.id])
+    }
+
+    @Test("Editing an active Focus Set refreshes every workspace that uses it")
+    func editingFocusSetRefreshesOtherWorkspaces() {
+        let coordinator = MainContentCoordinator()
+        let api = TestFixtures.makeTransaction(url: "https://api.example.com/data")
+        let web = TestFixtures.makeTransaction(url: "https://www.example.com/home")
+        coordinator.transactions = [api, web]
+        coordinator.recomputeFilteredTransactions()
+
+        let second = coordinator.workspaceStore.createWorkspace(title: "Second")
+        coordinator.recomputeFilteredTransactions(for: second)
+
+        var focusSet = FocusSet(name: "Target", domain: "api.example.com")
+        coordinator.saveFocusSet(focusSet)
+        second.activeFocusSetID = focusSet.id
+        coordinator.recomputeFilteredTransactions(for: second)
+        #expect(second.filteredTransactions.map(\.id) == [api.id])
+
+        focusSet.domain = "www.example.com"
+        coordinator.saveFocusSet(focusSet)
+
+        #expect(second.filteredTransactions.map(\.id) == [web.id])
+    }
+
     // MARK: Private
 
     // MARK: - Setup

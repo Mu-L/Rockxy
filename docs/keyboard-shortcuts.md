@@ -22,10 +22,11 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 
 | Shortcut | Action |
 |---|---|
-| `⌘K` | Clear capture |
-| `⇧⌘K` | Clear capture and filters |
+| `⌘K` | Clear session |
+| `⇧⌘K` | Clear session and filters |
 | `⌘P` | Pause or resume capture |
 | `⌘L` | Focus the search bar |
+| `⇧⌘L` | Follow the newest visible request in the active workspace tab |
 | `⌘↑` / `⌘↓` | Jump to the first or last captured row |
 | `↑` / `↓` | Move row selection |
 | `⌘E` | Edit and Repeat the selected request |

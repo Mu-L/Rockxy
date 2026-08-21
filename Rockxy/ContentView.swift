@@ -9,9 +9,12 @@ enum MainWindowLayoutMetrics {
     static let defaultHeight: CGFloat = 760
     static let minimumWidth: CGFloat = 960
     static let minimumHeight: CGFloat = 620
-    static let utilityPaneMinimumWidth: CGFloat = 300
-    static let utilityPaneIdealWidth: CGFloat = 380
-    static let utilityPaneMaximumWidth: CGFloat = 520
+    static let sidebarMinimumWidth: CGFloat = 200
+    static let sidebarIdealWidth: CGFloat = 250
+    static let sidebarMaximumWidth: CGFloat = 350
+    static let workspaceMinimumWidth: CGFloat = 320
+    static let contextDockMinimumWidth: CGFloat = 260
+    static let contextDockIdealWidth: CGFloat = 320
 }
 
 // MARK: - ContentView
@@ -40,13 +43,12 @@ struct ContentView: View {
             isSidebarPresented: $isSidebarPresented,
             isInspectorPresented: contextDockVisibility,
             autosaveName: Self.workspaceSplitAutosaveName,
-            sidebarMinimumWidth: MainWindowLayoutMetrics.utilityPaneMinimumWidth,
-            sidebarIdealWidth: MainWindowLayoutMetrics.utilityPaneIdealWidth,
-            sidebarMaximumWidth: MainWindowLayoutMetrics.utilityPaneMaximumWidth,
-            workspaceMinimumWidth: Self.minimumWorkspaceWidth,
-            inspectorMinimumWidth: MainWindowLayoutMetrics.utilityPaneMinimumWidth,
-            inspectorIdealWidth: MainWindowLayoutMetrics.utilityPaneIdealWidth,
-            inspectorMaximumWidth: MainWindowLayoutMetrics.utilityPaneMaximumWidth,
+            sidebarMinimumWidth: MainWindowLayoutMetrics.sidebarMinimumWidth,
+            sidebarIdealWidth: MainWindowLayoutMetrics.sidebarIdealWidth,
+            sidebarMaximumWidth: MainWindowLayoutMetrics.sidebarMaximumWidth,
+            workspaceMinimumWidth: MainWindowLayoutMetrics.workspaceMinimumWidth,
+            inspectorMinimumWidth: MainWindowLayoutMetrics.contextDockMinimumWidth,
+            inspectorIdealWidth: MainWindowLayoutMetrics.contextDockIdealWidth,
             toolbarConfiguration: NativeWorkspaceToolbarConfiguration(
                 coordinator: coordinator,
                 onOpenDeveloperHub: { openWindow(id: "developerSetupHub") }
@@ -54,26 +56,31 @@ struct ContentView: View {
         ) {
             SidebarView(coordinator: coordinator)
         } workspace: {
-            VStack(spacing: 0) {
-                if let warning = coordinator.systemProxyWarning {
-                    SystemProxyWarningBanner(
-                        message: warning.message,
-                        primaryActionTitle: warning.action?.title,
-                        onPrimaryAction: {
-                            handleSystemProxyWarningAction(warning.action)
-                        },
-                        onDismiss: warning.isDismissible ? {
-                            coordinator.readiness.dismissWarning()
-                        } : nil
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    if let warning = coordinator.systemProxyWarning {
+                        SystemProxyWarningBanner(
+                            message: warning.message,
+                            primaryActionTitle: warning.action?.title,
+                            onPrimaryAction: {
+                                handleSystemProxyWarningAction(warning.action)
+                            },
+                            onDismiss: warning.isDismissible ? {
+                                coordinator.readiness.dismissWarning()
+                            } : nil
+                        )
+                    }
+
+                    CenterContentView(
+                        coordinator: coordinator,
+                        onOpenToolWindow: { id in openWindow(id: id) }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                CenterContentView(
-                    coordinator: coordinator,
-                    onOpenToolWindow: { id in openWindow(id: id) }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                toastOverlay
             }
+            .animation(.easeOut(duration: 0.18), value: coordinator.activeToast?.id)
         } inspector: {
             ContextDockView(
                 coordinator: coordinator,
@@ -201,13 +208,6 @@ struct ContentView: View {
                 onCancel: { coordinator.gistPublishContext = nil }
             )
         }
-        .overlay(alignment: .bottom) {
-            if let toast = coordinator.activeToast {
-                ToastView(message: toast) {
-                    coordinator.activeToast = nil
-                }
-            }
-        }
         .appUIDisplayMetrics(displayMetrics)
     }
 
@@ -223,9 +223,24 @@ struct ContentView: View {
     private let managesLifecycle: Bool
     private let representedWorkspaceID: UUID?
 
-    private static let minimumWorkspaceWidth: CGFloat = 600
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let toast = coordinator.activeToast {
+            ToastView(message: toast) {
+                coordinator.dismissToast(id: toast.id)
+            }
+            .id(toast.id)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+            .allowsHitTesting(false)
+            .zIndex(100)
+        }
+    }
+
     private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        "nativeWorkspaceSplit.v1"
+        // Establish compact utility panes once, then preserve every user-adjusted divider
+        // position normally again.
+        "nativeWorkspaceSplit.compactUtilityPanes.v1"
     )
 
     private var displayMetrics: AppUIDisplayMetrics {

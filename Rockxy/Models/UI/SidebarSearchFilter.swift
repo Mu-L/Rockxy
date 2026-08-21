@@ -66,6 +66,7 @@ enum SidebarSearchFilter {
         values.filter { value in
             [
                 value.name,
+                value.displayName,
                 value.appName,
                 value.domain,
                 value.pathPrefix,

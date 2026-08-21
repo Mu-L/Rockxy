@@ -10,6 +10,11 @@ enum ContextDockTab: Equatable {
     case aiAssistant
 }
 
+struct TrafficSelectionIndexEntry {
+    let transaction: HTTPTransaction
+    let rowIndex: Int
+}
+
 // MARK: - WorkspaceState
 
 @MainActor @Observable
@@ -85,6 +90,11 @@ final class WorkspaceState: Identifiable {
     var selectedLogEntry: LogEntry?
     var selectedTransactionIDs: Set<UUID> = []
 
+    /// Opt-in live-tail mode for this workspace. New visible traffic becomes the primary
+    /// selection until the user deliberately selects a row, at which point the mode yields.
+    /// Owned per-workspace so an inactive workspace can keep advancing independently.
+    var isFollowingLiveTraffic = false
+
     // Filtering
     var filterCriteria: FilterCriteria = .empty
     var filterRules: [FilterRule] = [FilterRule()]
@@ -93,12 +103,22 @@ final class WorkspaceState: Identifiable {
 
     // Table-facing derived state (derived from filteredTransactions via deriveFilteredRows)
     var filteredRows: [RequestListRow] = []
+    @ObservationIgnored var trafficSelectionIndex: [UUID: TrafficSelectionIndexEntry] = [:]
     var refreshToken: Int = 0
 
-    /// Set true only by the genuine append fast-path in appendFilteredTransactions.
-    /// The table checks this to decide between insertRows (safe append) and reloadData.
-    /// Reset to false by deriveFilteredRows after each derivation cycle.
+    /// Set true only by the genuine append fast-path in appendFilteredTransactions, and
+    /// cleared by deriveFilteredRows (and reset) once a full derivation replaces the rows.
+    /// The table reads this as the coarse "the last mutation only appended rows" signal.
     var lastDeriveWasAppendOnly: Bool = false
+
+    /// Provenance for the append fast-path: the refreshToken of the base state that the
+    /// current unbroken run of pure appends builds on. `nil` whenever the last row mutation
+    /// was not a pure append (recompute, sort, enrichment, eviction, delete, reset). The
+    /// first append of a chain records the pre-append token and later coalesced appends
+    /// preserve it, so the request table can insert rows incrementally only when this origin
+    /// is <= the token it has already applied — otherwise a non-append mutation was coalesced
+    /// ahead of the append and the displayed prefix no longer matches the model.
+    var appendChainOriginToken: Int?
 
     /// Sort state (user preference, persists across session clears)
     var activeSortDescriptors: [NSSortDescriptor] = []
@@ -119,6 +139,9 @@ final class WorkspaceState: Identifiable {
     func reset() {
         filteredTransactions.removeAll()
         filteredRows.removeAll()
+        trafficSelectionIndex.removeAll()
+        lastDeriveWasAppendOnly = false
+        appendChainOriginToken = nil
         refreshToken += 1
         // activeSortDescriptors intentionally preserved — sort is a user preference
         selectedTransaction = nil

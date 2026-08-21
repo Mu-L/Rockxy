@@ -27,6 +27,7 @@ final class WelcomeViewModel {
     enum HelperFailureRecovery: Equatable {
         case repairAndReinstall
         case rebuildApp
+        case reopenApp
     }
 
     var certInstalled = false
@@ -87,6 +88,16 @@ final class WelcomeViewModel {
             || helperFailureRecovery == .repairAndReinstall
     }
 
+    var shouldShowHelperDiagnostics: Bool {
+        if errorArea == .helper || helperFailureRecovery == .rebuildApp {
+            return true
+        }
+        if case .appSignatureInvalid = helperSigningIssue {
+            return helperStatus == .signingMismatch
+        }
+        return false
+    }
+
     var helperStatusDetail: String? {
         switch helperStatus {
         case .notInstalled:
@@ -98,18 +109,20 @@ final class WelcomeViewModel {
         case .installedCompatible:
             String(localized: "Installed, compatible, and reachable.")
         case .installedOutdated:
-            String(localized: "An older helper is installed. Update it from this Rockxy build.")
+            String(localized: "An older helper is installed. Update it from this version of Rockxy.")
         case .installedIncompatible:
-            String(localized: "The installed helper is incompatible with this Rockxy build.")
+            String(localized: "The installed helper is incompatible with this version of Rockxy.")
         case .unreachable:
             String(localized: "The helper is registered, but Rockxy cannot reach it.")
         case .signingMismatch:
             switch helperSigningIssue {
+            case .applicationMustReopen:
+                String(localized: "Quit and reopen Rockxy, then check the helper again.")
             case .identityMismatch:
-                String(localized: "The installed helper belongs to a differently signed Rockxy build.")
+                String(localized: "The installed helper does not match this copy of Rockxy.")
             case .appSignatureInvalid,
                  nil:
-                String(localized: "This Rockxy build has a signing problem. Open diagnostics before continuing.")
+                String(localized: "Rockxy could not verify this app copy. Open diagnostics before continuing.")
             }
         }
     }
@@ -119,6 +132,9 @@ final class WelcomeViewModel {
     }
 
     static func resolveHelperFailureRecovery(for error: Error) -> HelperFailureRecovery {
+        if error as? HelperManager.HelperOperationError == .applicationMustReopen {
+            return .reopenApp
+        }
         if error is HelperManager.HelperInstallPreflightError {
             return .rebuildApp
         }

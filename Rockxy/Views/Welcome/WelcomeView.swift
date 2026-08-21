@@ -262,7 +262,7 @@ struct WelcomeView: View {
             .disabled(viewModel.isBusy)
         }
 
-        if viewModel.errorArea == .helper || viewModel.helperFailureRecovery == .rebuildApp {
+        if viewModel.shouldShowHelperDiagnostics {
             Button {
                 openWindow(id: "advancedProxySettings")
             } label: {
@@ -426,7 +426,9 @@ struct WelcomeView: View {
              .installedIncompatible:
             await viewModel.updateHelper()
         case .signingMismatch:
-            if case .identityMismatch = viewModel.helperSigningIssue {
+            if case .applicationMustReopen = viewModel.helperSigningIssue {
+                HelperRecoveryPresenter.requestRequiredReopen()
+            } else if case .identityMismatch = viewModel.helperSigningIssue {
                 await viewModel.reinstallHelper()
             }
         case .unreachable:

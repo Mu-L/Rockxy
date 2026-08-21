@@ -227,14 +227,21 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
                         shouldBreakOnResponse: shouldBreakOnResponse
                     )
                     switch decision {
-                    case .keepBufferingForBreakpoint:
-                        // Response breakpoint is armed — the breakpoint still owns the
-                        // relay decision in `.end`. Drop scripting deferral so we don't
-                        // run the script on the truncated body, but keep buffering for
-                        // the breakpoint UI to act on.
+                    case .suppressBreakpointAndResumeStreaming:
+                        // The complete original body is no longer available, so allowing
+                        // the breakpoint to Execute or Cancel would relay only a prefix.
+                        // Suppress it, flush the captured prefix, and preserve the live
+                        // response by streaming this and all subsequent chunks.
+                        responseBreakpointSuppressed = true
                         deferRelayForScript = false
+                        if let head = responseHead {
+                            relayResponseHead(head)
+                        }
+                        if let buffered = responseBody, buffered.readableBytes > 0 {
+                            relayResponseBody(buffered)
+                        }
                         upstreamLogger.warning(
-                            "Response exceeded capture cap; skipping script mutation but preserving breakpoint for \(self.requestData.url, privacy: .private)"
+                            "Response exceeded capture cap; skipping response breakpoint and script mutation for \(self.requestData.url, privacy: .private)"
                         )
                     case .flushBufferedAndResumeStreaming:
                         // No breakpoint in play; abandon deferral, flush prefix, resume streaming.
@@ -323,6 +330,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     private var channelClosedCalled = false
     private var responseBody: ByteBuffer?
     private var responseBodyTruncated = false
+    private var responseBreakpointSuppressed = false
     private var firstByteTime: DispatchTime?
     private var completed = false
     private var readTimeoutTask: Scheduled<Void>?
@@ -336,7 +344,10 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     private var deferRelayForScript: Bool = false
 
     private var shouldBreakOnResponse: Bool {
-        guard let phase = breakpointPhase else {
+        guard !responseBreakpointSuppressed,
+              onBreakpointHit != nil,
+              let phase = breakpointPhase else
+        {
             return false
         }
         return phase == .response || phase == .both
@@ -587,9 +598,16 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     ) {
         switch decision {
         case .execute:
+            let originalBody = responseBody.flatMap { buffer -> Data? in
+                guard let bytes = buffer.getBytes(at: buffer.readerIndex, length: buffer.readableBytes) else {
+                    return nil
+                }
+                return Data(bytes)
+            }
             let built = BreakpointResponseBuilder.build(
                 modifiedData: modifiedData,
-                originalHead: originalHead
+                originalHead: originalHead,
+                originalBody: originalBody
             )
             self.responseHead = built.head
             if let body = built.body {

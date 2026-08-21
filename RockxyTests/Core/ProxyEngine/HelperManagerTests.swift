@@ -335,6 +335,14 @@ struct HelperManagerTests {
 
     // MARK: - Probe Error Classification
 
+    @Test("classifyProbeError preserves required reopen recovery")
+    @MainActor
+    func classifyProbeErrorApplicationMustReopen() {
+        let probe = HelperManager.classifyProbeError(.applicationMustReopen)
+        #expect(probe == .applicationMustReopen)
+        #expect(HelperManager.decideRecovery(probe: probe) == .surfaceApplicationMustReopen)
+    }
+
     @Test("classifyProbeError maps appSignatureInvalid")
     @MainActor
     func classifyProbeErrorAppSignature() {
@@ -412,6 +420,22 @@ struct HelperManagerTests {
         #expect(label == nil)
     }
 
+    @Test("required reopen produces a quit action without developer wording")
+    @MainActor
+    func requiredReopenActionAndWarning() {
+        let label = HelperManager.helperActionLabel(
+            status: .signingMismatch,
+            signingIssue: .applicationMustReopen
+        )
+        let reason = HelperManager.signingMismatchWarningReason(
+            issue: .applicationMustReopen
+        )
+
+        #expect(label == String(localized: "Quit Rockxy"))
+        #expect(reason.localizedLowercase.contains("reopened"))
+        #expect(!reason.localizedLowercase.contains("rebuild"))
+    }
+
     @Test("identityMismatch produces reinstall action label")
     @MainActor
     func identityMismatchReinstallLabel() {
@@ -432,12 +456,13 @@ struct HelperManagerTests {
         #expect(label == nil)
     }
 
-    @Test("appSignatureInvalid warning mentions clean build")
+    @Test("appSignatureInvalid warning guides a fresh install")
     func appSignatureInvalidWarning() {
         let reason = HelperManager.signingMismatchWarningReason(
             issue: .appSignatureInvalid(detail: "stale")
         )
-        #expect(reason.localizedLowercase.contains("clean"))
+        #expect(reason.localizedLowercase.contains("fresh copy"))
+        #expect(!reason.localizedLowercase.contains("rebuild"))
     }
 
     @Test("identityMismatch warning mentions reinstall")

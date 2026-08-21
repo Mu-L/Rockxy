@@ -25,26 +25,56 @@ extension MainContentCoordinator {
             }
         }
         workspace.filteredRows = rows
+        let transactionsByID = Dictionary(
+            workspace.filteredTransactions.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        workspace.trafficSelectionIndex = Dictionary(
+            rows.enumerated().compactMap { index, row in
+                transactionsByID[row.id].map {
+                    (row.id, TrafficSelectionIndexEntry(transaction: $0, rowIndex: index))
+                }
+            },
+            uniquingKeysWith: { _, latest in latest }
+        )
         let visibleIDs = Set(workspace.filteredTransactions.map(\.id))
         workspace.selectedTransactionIDs.formIntersection(visibleIDs)
         if let selected = workspace.selectedTransaction, !visibleIDs.contains(selected.id) {
             workspace.selectedTransaction = nil
         }
-        // lastDeriveWasAppendOnly is NOT reset here — it persists until the table
-        // reads it in updateNSView and the next derive cycle overwrites it.
+        // A full derivation replaces the entire row set, so any in-flight append chain is
+        // void: clear both the append-only signal and its provenance token before bumping the
+        // token. Scattered callers that set lastDeriveWasAppendOnly = false rely on this so a
+        // stale append signal can never survive a recompute.
+        workspace.lastDeriveWasAppendOnly = false
+        workspace.appendChainOriginToken = nil
         workspace.refreshToken += 1
+        reconcileFollowLiveSelection(for: workspace)
     }
 
     private func appendDerivedRows(_ batch: [HTTPTransaction], to workspace: WorkspaceState) {
-        let appendedRows = batch
-            .filter { !$0.isTLSFailure }
+        let visibleTransactions = batch.filter { !$0.isTLSFailure }
+        let appendedRows = visibleTransactions
             .map { RequestListRow(from: $0, sslState: sslState(for: $0)) }
 
         guard !appendedRows.isEmpty else {
             return
         }
 
+        // Record the base token this append chain builds on. The first append of a chain
+        // captures the current (pre-append) token; later coalesced appends preserve it so the
+        // table can still prove its displayed prefix matches the grown row set.
+        if workspace.appendChainOriginToken == nil {
+            workspace.appendChainOriginToken = workspace.refreshToken
+        }
+        let firstAppendedIndex = workspace.filteredRows.count
         workspace.filteredRows.append(contentsOf: appendedRows)
+        for (offset, transaction) in visibleTransactions.enumerated() {
+            workspace.trafficSelectionIndex[transaction.id] = TrafficSelectionIndexEntry(
+                transaction: transaction,
+                rowIndex: firstAppendedIndex + offset
+            )
+        }
         workspace.refreshToken += 1
     }
 
@@ -113,15 +143,29 @@ extension MainContentCoordinator {
     /// then recompute. Single source of truth for the filter-summary "Clear All" chip and the
     /// request-list empty-state recovery actions so they cannot drift apart.
     func clearAllWorkspaceFilters() {
-        filterCriteria = .empty
-        filterCriteria.sidebarScope = .allTraffic
-        sidebarSelection = nil
-        isFilterBarVisible = false
-        filterRules = [FilterRule()]
-        activeWorkspace.activeTrafficSignal = nil
-        activeWorkspace.activeFocusSetID = nil
-        activeWorkspace.mutedTrafficSources.removeAll()
+        resetFilters(in: activeWorkspace)
         recomputeFilteredTransactions()
+    }
+
+    /// Session-level reset used by "Clear Session and Filters". Session data spans every
+    /// workspace, so leaving an inactive workspace's visibility lenses behind would silently
+    /// hide newly captured traffic when the user returns to it.
+    func clearFiltersAcrossAllWorkspaces() {
+        for workspace in workspaceStore.workspaces {
+            resetFilters(in: workspace)
+        }
+        recomputeAllWorkspaces()
+    }
+
+    private func resetFilters(in workspace: WorkspaceState) {
+        workspace.filterCriteria = .empty
+        workspace.filterCriteria.sidebarScope = .allTraffic
+        workspace.sidebarSelection = nil
+        workspace.isFilterBarVisible = false
+        workspace.filterRules = [FilterRule()]
+        workspace.activeTrafficSignal = nil
+        workspace.activeFocusSetID = nil
+        workspace.mutedTrafficSources.removeAll()
     }
 
     var availableTransactionCountForCurrentScope: Int {

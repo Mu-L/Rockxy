@@ -90,7 +90,6 @@ struct BreakpointEditorView: View {
                     Divider()
                 }
                 requestLine(itemId: itemId)
-                    .disabled(!item.editableDraft.isBodyEditable)
                 Divider()
                 tabContent(itemId: itemId)
             }
@@ -131,7 +130,7 @@ struct BreakpointEditorView: View {
                     .font(toolMetrics.secondaryFont(weight: .semibold))
                 Text(
                     String(
-                        localized: "This body is not UTF-8 text, so Rockxy cannot safely apply edits. Continue Original preserves every byte."
+                        localized: "This body is not UTF-8 text, so body edits are disabled. Applying request-line, status, or header changes preserves every body byte."
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -283,7 +282,6 @@ struct BreakpointEditorView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .disabled(draftFor(itemId)?.isBodyEditable == false)
         }
     }
 
@@ -372,7 +370,11 @@ struct BreakpointEditorView: View {
         ContentUnavailableView {
             Label(String(localized: "Binary Body"), systemImage: "doc.badge.lock")
         } description: {
-            Text(String(localized: "Editing is unavailable for this payload. Continue Original preserves it unchanged."))
+            Text(
+                String(
+                    localized: "Body editing is unavailable. Applying metadata changes or continuing original preserves every body byte."
+                )
+            )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -615,7 +617,7 @@ struct BreakpointEditorView: View {
             canApplySelectedChanges = false
             return
         }
-        canApplySelectedChanges = draft.isBodyEditable
+        canApplySelectedChanges = true
     }
 
     private func syncRawMessageFromDraft(itemId: UUID, force: Bool = false) {
@@ -626,7 +628,7 @@ struct BreakpointEditorView: View {
         }
         rawMessageItemID = itemId
         rawMessage = BreakpointRawMessage.rawMessage(from: draft, kind: rawKind(for: itemId))
-        canApplySelectedChanges = draft.isBodyEditable
+        canApplySelectedChanges = true
     }
 
     private func updateRawMessage(_ newValue: String, itemId: UUID) {

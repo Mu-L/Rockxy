@@ -11,6 +11,22 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct SidebarSSLProxyingTests {
+    @Test("Stale toast dismissal keeps the replacement notification visible")
+    func staleToastDismissalKeepsReplacement() {
+        let coordinator = MainContentCoordinator()
+        let first = ToastMessage(style: .success, text: "First")
+        let replacement = ToastMessage(style: .success, text: "Replacement")
+
+        coordinator.activeToast = first
+        coordinator.activeToast = replacement
+        coordinator.dismissToast(id: first.id)
+
+        #expect(coordinator.activeToast?.id == replacement.id)
+
+        coordinator.dismissToast(id: replacement.id)
+        #expect(coordinator.activeToast == nil)
+    }
+
     // MARK: - isSSLProxyingEnabled(for:)
 
     @Test("exclude rule is not treated as enabled by isSSLProxyingEnabled")

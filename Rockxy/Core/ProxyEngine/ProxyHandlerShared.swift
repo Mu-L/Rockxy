@@ -24,11 +24,11 @@ enum ProxyHandlerShared {
 
     /// Decision returned by `oversizeRelayDecision` when a response body chunk
     /// pushes the capture buffer past the cap. Drives both the script-deferral
-    /// flush logic and the response-breakpoint preservation.
+    /// flush logic and response-breakpoint safety.
     enum OversizeRelayDecision: Equatable {
-        /// Continue buffering for the breakpoint UI, do not flush. Reached when
-        /// a response breakpoint is armed even if the script hook was deferring.
-        case keepBufferingForBreakpoint
+        /// Suppress the breakpoint, flush the captured prefix, and resume streaming.
+        /// A breakpoint cannot safely own a response after the capture buffer truncates.
+        case suppressBreakpointAndResumeStreaming
         /// Flush the buffered head + body to the client and resume streaming.
         /// Reached when scripting was deferring but no breakpoint is in play.
         case flushBufferedAndResumeStreaming
@@ -46,8 +46,8 @@ enum ProxyHandlerShared {
     )
         -> OversizeRelayDecision
     {
-        if deferRelayForScript, shouldBreakOnResponse {
-            return .keepBufferingForBreakpoint
+        if shouldBreakOnResponse {
+            return .suppressBreakpointAndResumeStreaming
         }
         if deferRelayForScript {
             return .flushBufferedAndResumeStreaming

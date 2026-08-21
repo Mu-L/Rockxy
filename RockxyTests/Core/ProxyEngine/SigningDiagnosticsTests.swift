@@ -6,15 +6,15 @@ import Testing
 // MARK: - MockSigningEnvironment
 
 private struct MockSigningEnvironment: SigningDiagnostics.Environment {
-    var appSignatureError: String?
+    var appSignatureValidation: SigningDiagnostics.AppSignatureValidation = .valid
     var helperExists: Bool = true
     var appSigner: String? = "Apple Development: dev@example.com"
     var helperSigner: String? = "Developer ID Application: Dev Corp"
     var appChain: [Data]? = [Data([1, 2, 3]), Data([4, 5, 6])]
     var helperChain: [Data]? = [Data([1, 2, 3]), Data([4, 5, 6])]
 
-    func validateAppSignature() -> String? {
-        appSignatureError
+    func validateAppSignature() -> SigningDiagnostics.AppSignatureValidation {
+        appSignatureValidation
     }
 
     func helperBinaryExists() -> Bool {
@@ -70,13 +70,28 @@ struct SigningDiagnosticsClassifyTests {
     @Test("app signature invalid returns appSignatureInvalid")
     func appSignatureInvalid() {
         var env = MockSigningEnvironment()
-        env.appSignatureError = "Code signature invalid (OSStatus -67054)"
+        env.appSignatureValidation = .invalid(
+            detail: "Code signature invalid (OSStatus -67054)"
+        )
 
         let result = SigningDiagnostics.classify(env)
 
         #expect(result == .appSignatureInvalid(
             detail: "Code signature invalid (OSStatus -67054)"
         ))
+    }
+
+    @Test("running code change requires reopening before helper checks")
+    func runningCodeChanged() {
+        var env = MockSigningEnvironment()
+        env.appSignatureValidation = .runningCodeChanged(
+            detail: "OSStatus -67034"
+        )
+        env.helperExists = false
+
+        let result = SigningDiagnostics.classify(env)
+
+        #expect(result == .runningCodeChanged(detail: "OSStatus -67034"))
     }
 
     @Test("healthy when app valid and certificates match")
@@ -147,7 +162,7 @@ struct SigningDiagnosticsClassifyTests {
     @Test("app signature check runs before helper existence check")
     func appSignatureBeforeHelperCheck() {
         var env = MockSigningEnvironment()
-        env.appSignatureError = "invalid"
+        env.appSignatureValidation = .invalid(detail: "invalid")
         env.helperExists = false
 
         let result = SigningDiagnostics.classify(env)
@@ -198,12 +213,11 @@ struct SigningDiagnosticsLiveTests {
             return
         }
         let env = SigningDiagnostics.LiveEnvironment()
-        guard env.validateAppSignature() == nil else {
+        guard env.validateAppSignature() == .valid else {
             return
         }
 
-        let error = env.validateAppSignature()
-        #expect(error == nil)
+        #expect(env.validateAppSignature() == .valid)
     }
 
     @Test("LiveEnvironment resolves the bundled helper executable from the app package")
@@ -227,7 +241,7 @@ struct SigningDiagnosticsLiveTests {
             return
         }
         let env = SigningDiagnostics.LiveEnvironment()
-        guard env.validateAppSignature() == nil else {
+        guard env.validateAppSignature() == .valid else {
             return
         }
 
@@ -242,7 +256,7 @@ struct SigningDiagnosticsLiveTests {
             return
         }
         let env = SigningDiagnostics.LiveEnvironment()
-        guard env.validateAppSignature() == nil else {
+        guard env.validateAppSignature() == .valid else {
             return
         }
 
@@ -260,7 +274,7 @@ struct SigningDiagnosticsLiveTests {
             return
         }
         let env = SigningDiagnostics.LiveEnvironment()
-        guard env.validateAppSignature() == nil else {
+        guard env.validateAppSignature() == .valid else {
             return
         }
 
@@ -278,7 +292,8 @@ struct SigningDiagnosticsLiveTests {
              .signingIdentityMismatch,
              .certificateChainUnavailable:
             break
-        case .appSignatureInvalid,
+        case .runningCodeChanged,
+             .appSignatureInvalid,
              .diagnosticError:
             Issue.record("Live classify returned unexpected result: \(result)")
         }

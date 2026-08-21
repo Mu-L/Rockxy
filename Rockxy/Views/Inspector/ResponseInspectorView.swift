@@ -64,15 +64,45 @@ struct ResponseInspectorView: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var httpsPromptModel: HTTPSInspectionPromptModel? {
-        HTTPSInspectionPromptModel.make(
+        guard transaction.request.method == "CONNECT", transaction.response != nil else {
+            return nil
+        }
+        let canInterceptHTTPS = coordinator.readiness.canInterceptHTTPS
+        let domainRuleEnabled = coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+        let hasRecentTLSRejection = SSLProxyingManager.shared.isAutoPassthrough(transaction.request.host)
+        let promptWithoutAppScope = HTTPSInspectionPromptModel.make(
             transaction: transaction,
-            sslProxyingEnabled: SSLProxyingManager.shared.isEnabled,
-            canInterceptHTTPS: coordinator.readiness.canInterceptHTTPS,
-            domainRuleEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host),
-            appName: normalizedClientAppName,
-            appRuleEnabled: normalizedClientAppName.map {
-                coordinator.isSSLProxyingFullyEnabled(forAppNamed: $0, fallbackDomain: transaction.request.host)
-            } ?? false
+            canInterceptHTTPS: canInterceptHTTPS,
+            domainRuleEnabled: domainRuleEnabled,
+            hasRecentTLSRejection: hasRecentTLSRejection,
+            appScope: nil
+        )
+        guard let promptWithoutAppScope,
+              promptWithoutAppScope.certificateAction == nil,
+              promptWithoutAppScope.insight?.isWarning == false,
+              let appName = normalizedClientAppName else
+        {
+            return promptWithoutAppScope
+        }
+
+        let appScope: HTTPSInspectionAppScope = {
+            let domains = coordinator.observedDomainsForApp(
+                named: appName,
+                fallbackDomain: transaction.request.host
+            )
+            return HTTPSInspectionAppScope(
+                name: appName,
+                knownHostCount: domains.count,
+                enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:))
+            )
+        }()
+
+        return HTTPSInspectionPromptModel.make(
+            transaction: transaction,
+            canInterceptHTTPS: canInterceptHTTPS,
+            domainRuleEnabled: domainRuleEnabled,
+            hasRecentTLSRejection: hasRecentTLSRejection,
+            appScope: appScope
         )
     }
 
@@ -87,7 +117,7 @@ struct ResponseInspectorView: View {
 
     private var tabDescriptors: [InspectorTabDescriptor] {
         var descriptors: [InspectorTabDescriptor] = ResponseInspectorTab
-            .availableTabs(hasAIInspection: hasAIInspection)
+            .availableTabs()
             .map { tab in
                 InspectorTabDescriptor(
                     id: "native.\(tab.rawValue)",
@@ -452,59 +482,8 @@ struct ResponseInspectorView: View {
     }
 
     private func encryptedHTTPSPrompt(_ prompt: HTTPSInspectionPromptModel) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 18) {
-                HStack(spacing: 10) {
-                    Image(systemName: "lock")
-                        .font(.system(size: max(24, metrics.primaryFontSize + 15), weight: .regular))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-
-                    Text(prompt.title)
-                        .font(.system(size: max(20, metrics.primaryFontSize + 11), weight: .regular))
-                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                }
-
-                Text(prompt.message)
-                    .font(.system(size: max(metrics.primaryFontSize, metrics.controlFontSize), weight: .regular))
-                    .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
-
-                Button {
-                    handleHTTPSPromptAction(prompt.primaryAction)
-                } label: {
-                    Text(prompt.primaryTitle)
-                        .frame(minWidth: 220)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-
-                if let secondaryTitle = prompt.secondaryTitle,
-                   let secondaryAction = prompt.secondaryAction
-                {
-                    Text(String(localized: "or"))
-                        .font(.system(size: metrics.controlFontSize, weight: .medium))
-                        .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-
-                    Button {
-                        handleHTTPSPromptAction(secondaryAction)
-                    } label: {
-                        Text(secondaryTitle)
-                            .multilineTextAlignment(.center)
-                            .frame(minWidth: 220)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        HTTPSInspectionPromptView(prompt: prompt, onAction: handleHTTPSPromptAction)
+            .id(transaction.id)
     }
 
     private func handleHTTPSPromptAction(_ action: HTTPSInspectionPromptAction) {
@@ -513,12 +492,10 @@ struct ResponseInspectorView: View {
             coordinator.installAndTrustCertificateFromInspector()
         case let .enableDomain(domain):
             coordinator.enableSSLProxyingFromInspector(for: domain)
-        case let .disableDomain(domain):
-            coordinator.disableSSLProxyingFromInspector(for: domain)
+        case let .retryDomain(domain):
+            coordinator.retrySSLProxyingFromInspector(for: domain)
         case let .enableApp(appName, fallbackDomain):
             coordinator.enableSSLProxyingFromInspector(forAppNamed: appName, fallbackDomain: fallbackDomain)
-        case let .disableApp(appName, fallbackDomain):
-            coordinator.disableSSLProxyingFromInspector(forAppNamed: appName, fallbackDomain: fallbackDomain)
         case .openSSLProxyingList:
             onOpenToolWindow("sslProxyingList")
         }
@@ -681,36 +658,43 @@ private enum ResponseSelectionIntent {
 enum HTTPSInspectionPromptAction: Equatable {
     case installCertificate
     case enableDomain(String)
-    case disableDomain(String)
+    case retryDomain(String)
     case enableApp(String, fallbackDomain: String?)
-    case disableApp(String, fallbackDomain: String?)
     case openSSLProxyingList
+}
+
+// MARK: - HTTPSInspectionAppScope
+
+struct HTTPSInspectionAppScope: Equatable {
+    let name: String
+    let knownHostCount: Int
+    let enabledHostCount: Int
 }
 
 // MARK: - HTTPSInspectionPromptModel
 
 struct HTTPSInspectionPromptModel: Equatable {
-    let title: String
-    let message: String
-    let primaryTitle: String
-    let primaryAction: HTTPSInspectionPromptAction
-    let secondaryTitle: String?
-    let secondaryAction: HTTPSInspectionPromptAction?
+    let host: String
+    let insight: HTTPSConnectionInsight?
+    let certificateAction: HTTPSInspectionPromptAction?
+    let hostScope: HTTPSInspectionScopePresentation?
+    let appScope: HTTPSInspectionScopePresentation?
+
+    var requiresCertificateSetup: Bool {
+        certificateAction == .installCertificate
+    }
 
     static func make(
         transaction: HTTPTransaction,
-        sslProxyingEnabled: Bool,
         canInterceptHTTPS: Bool,
         domainRuleEnabled: Bool,
-        appName: String?,
-        appRuleEnabled: Bool
+        hasRecentTLSRejection: Bool = false,
+        appScope: HTTPSInspectionAppScope?
     )
         -> HTTPSInspectionPromptModel?
     {
         guard transaction.request.method == "CONNECT",
-              let response = transaction.response,
-              response.statusCode == 200,
-              !transaction.isTLSFailure else
+              let response = transaction.response else
         {
             return nil
         }
@@ -720,58 +704,106 @@ struct HTTPSInspectionPromptModel: Equatable {
             return nil
         }
 
+        let hasTLSRejectionEvidence = transaction.isTLSFailure || hasRecentTLSRejection
+        guard hasTLSRejectionEvidence || (200 ... 299).contains(response.statusCode) else {
+            return nil
+        }
+
         if !canInterceptHTTPS {
             return HTTPSInspectionPromptModel(
-                title: String(localized: "HTTPS Response"),
-                message: String(
-                    localized: "This HTTPS response is encrypted. Install and trust the certificate to see the content."
-                ),
-                primaryTitle: String(localized: "Install & Trust Certificate"),
-                primaryAction: .installCertificate,
-                secondaryTitle: nil,
-                secondaryAction: nil
+                host: host,
+                insight: nil,
+                certificateAction: .installCertificate,
+                hostScope: nil,
+                appScope: nil
             )
-        }
-
-        let domainTitle = domainRuleEnabled ?
-            String(localized: "Disable only this domain") :
-            String(localized: "Enable only this domain")
-        let domainAction: HTTPSInspectionPromptAction = domainRuleEnabled ?
-            .disableDomain(host) :
-            .enableDomain(host)
-
-        let message: String
-        if domainRuleEnabled || appRuleEnabled {
-            message = String(
-                localized: "SSL Proxying is enabled for this HTTPS target. You can adjust the scope below."
-            )
-        } else if sslProxyingEnabled {
-            message = String(localized: "This HTTPS response is encrypted. Enable SSL Proxying to see the content.")
-        } else {
-            message = String(localized: "SSL Proxying is off. Enable it to see the encrypted content.")
-        }
-
-        let appAction: (String?, HTTPSInspectionPromptAction?) = if let appName {
-            (
-                appRuleEnabled ?
-                    String(localized: "Disable all domains from \"\(appName)\"") :
-                    String(localized: "Enable all domains from \"\(appName)\""),
-                appRuleEnabled ?
-                    .disableApp(appName, fallbackDomain: host) :
-                    .enableApp(appName, fallbackDomain: host)
-            )
-        } else {
-            (nil, nil)
         }
 
         return HTTPSInspectionPromptModel(
-            title: String(localized: "HTTPS Response"),
-            message: message,
-            primaryTitle: domainTitle,
-            primaryAction: domainAction,
-            secondaryTitle: appAction.0,
-            secondaryAction: appAction.1
+            host: host,
+            insight: hasTLSRejectionEvidence ? .tlsInterceptionRejected : .tunnelEstablished(
+                statusCode: response.statusCode
+            ),
+            certificateAction: nil,
+            hostScope: .host(
+                value: host,
+                isReady: domainRuleEnabled,
+                requiresRetry: hasTLSRejectionEvidence
+            ),
+            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap {
+                .appHosts(
+                    name: $0.name,
+                    enabledHostCount: $0.enabledHostCount,
+                    knownHostCount: $0.knownHostCount,
+                    currentHostEnabled: domainRuleEnabled,
+                    fallbackDomain: host
+                )
+            }
         )
+    }
+}
+
+// MARK: - HTTPSConnectionInsight
+
+enum HTTPSConnectionInsight: Equatable {
+    case tunnelEstablished(statusCode: Int)
+    case tlsInterceptionRejected
+
+    var title: String {
+        switch self {
+        case .tunnelEstablished:
+            String(localized: "Content Not Inspected")
+        case .tlsInterceptionRejected:
+            String(localized: "Decryption Was Declined")
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .tunnelEstablished:
+            String(localized: "HTTPS content was not inspected.")
+        case .tlsInterceptionRejected:
+            String(
+                localized: "Rockxy kept the app connected by returning this host to a protected encrypted tunnel."
+            )
+        }
+    }
+
+    var evidence: String {
+        switch self {
+        case let .tunnelEstablished(statusCode):
+            String(
+                localized: "Rockxy received status \(statusCode) and has no recent TLS rejection for this host."
+            )
+        case .tlsInterceptionRejected:
+            String(
+                localized: "The app rejected Rockxy’s TLS handshake for this host. Certificate pinning is possible, but a custom trust policy can produce the same signal."
+            )
+        }
+    }
+
+    var nextStep: String {
+        switch self {
+        case .tunnelEstablished:
+            String(localized: "Enable decryption below, then repeat the request.")
+        case .tlsInterceptionRejected:
+            String(
+                localized: "Retry decryption and repeat the request. If the app rejects it again, leave this host tunneled."
+            )
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .tunnelEstablished:
+            "checkmark.shield"
+        case .tlsInterceptionRejected:
+            "exclamationmark.shield"
+        }
+    }
+
+    var isWarning: Bool {
+        self == .tlsInterceptionRejected
     }
 }
 
