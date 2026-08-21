@@ -71,17 +71,24 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.34.0** — 2026-08-07
+**v0.35.0** — 2026-08-19
 
 ### Added
 
-- Ask Rockxy Assistant how to use Rockxy or check the current workspace even when no request is selected.
-- Open the relevant Rockxy window directly from supported Assistant answers, while keeping every workflow under your control.
+- Follow Live keeps each workspace on the newest request that matches its active filters until you navigate traffic manually.
+- Focus actions are now explicit sidebar buttons, making focused traffic views easier to discover and control.
+
+### Fixed
+
+- Stabilized live request-table refresh and selection while high-volume captures and app metadata updates arrive.
+- Kept HTTPS decryption controls accessible with clearer host and app scope, retry guidance after TLS rejection, and safer encrypted passthrough recovery.
+- Preserved helper reset and reinstall recovery across development rebuilds, and now prompts for a clean reopen after app replacement.
+- Rebalanced sidebar, Context Dock, and inspector sizing while preserving each workspace's active context and manual divider choices.
 
 ### Changed
 
-- Assistant conversations now present clearer summaries, next steps, evidence, and follow-up actions in a more focused native layout.
-- Workspace questions report current request, error, and saved-item counts without attaching captured request content.
+- Workspace feedback now appears in the relevant pane without obscuring capture controls or unrelated workspaces.
+- Official builds now include clearer binary licensing, public-source boundaries, third-party notices, and release provenance.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->

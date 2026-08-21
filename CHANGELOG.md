@@ -34,6 +34,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.35.0] - 2026-08-19
+
+### Added
+
+- Follow Live keeps each workspace on the newest request that matches its active filters until you navigate traffic manually.
+- Focus actions are now explicit sidebar buttons, making focused traffic views easier to discover and control.
+
+### Fixed
+
+- Stabilized live request-table refresh and selection while high-volume captures and app metadata updates arrive.
+- Kept HTTPS decryption controls accessible with clearer host and app scope, retry guidance after TLS rejection, and safer encrypted passthrough recovery.
+- Preserved helper reset and reinstall recovery across development rebuilds, and now prompts for a clean reopen after app replacement.
+- Rebalanced sidebar, Context Dock, and inspector sizing while preserving each workspace's active context and manual divider choices.
+
+### Changed
+
+- Workspace feedback now appears in the relevant pane without obscuring capture controls or unrelated workspaces.
+- Official builds now include clearer binary licensing, public-source boundaries, third-party notices, and release provenance.
+
 ## [0.34.0] - 2026-08-07
 
 ### Added
