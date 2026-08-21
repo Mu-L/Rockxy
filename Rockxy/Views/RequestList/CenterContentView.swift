@@ -212,25 +212,11 @@ struct CenterContentView: View {
             refreshToken: coordinator.refreshToken,
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
             appendChainOrigin: coordinator.activeWorkspace.appendChainOriginToken,
+            selectionIndex: coordinator.activeWorkspace.trafficSelectionIndex,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
                 coordinator.userDidNavigateTrafficHistory()
-                coordinator.selectedTransactionIDs = ids
-                if let primaryID,
-                   ids.contains(primaryID),
-                   let transaction = coordinator.transaction(for: primaryID)
-                {
-                    coordinator.selectTransaction(transaction)
-                } else if let firstVisibleID = coordinator.filteredRows
-                    .lazy
-                    .map(\.id)
-                    .first(where: ids.contains),
-                    let transaction = coordinator.transaction(for: firstVisibleID)
-                {
-                    coordinator.selectTransaction(transaction)
-                } else {
-                    coordinator.selectTransaction(nil)
-                }
+                coordinator.selectTransactions(ids, primaryID: primaryID)
             },
             onUserScroll: {
                 coordinator.userDidNavigateTrafficHistory()

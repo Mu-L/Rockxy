@@ -10,6 +10,11 @@ enum ContextDockTab: Equatable {
     case aiAssistant
 }
 
+struct TrafficSelectionIndexEntry {
+    let transaction: HTTPTransaction
+    let rowIndex: Int
+}
+
 // MARK: - WorkspaceState
 
 @MainActor @Observable
@@ -98,6 +103,7 @@ final class WorkspaceState: Identifiable {
 
     // Table-facing derived state (derived from filteredTransactions via deriveFilteredRows)
     var filteredRows: [RequestListRow] = []
+    @ObservationIgnored var trafficSelectionIndex: [UUID: TrafficSelectionIndexEntry] = [:]
     var refreshToken: Int = 0
 
     /// Set true only by the genuine append fast-path in appendFilteredTransactions, and
@@ -133,6 +139,7 @@ final class WorkspaceState: Identifiable {
     func reset() {
         filteredTransactions.removeAll()
         filteredRows.removeAll()
+        trafficSelectionIndex.removeAll()
         lastDeriveWasAppendOnly = false
         appendChainOriginToken = nil
         refreshToken += 1

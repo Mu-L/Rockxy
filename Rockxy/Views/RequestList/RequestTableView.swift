@@ -20,6 +20,7 @@ struct RequestTableView: NSViewRepresentable {
     let refreshToken: Int
     let isAppendOnly: Bool
     var appendChainOrigin: Int?
+    var selectionIndex: [UUID: TrafficSelectionIndexEntry] = [:]
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
@@ -1160,9 +1161,18 @@ extension RequestTableView {
 
         func syncSelection(to ids: Set<UUID>, in tableView: NSTableView) {
             let currentSelected = tableView.selectedRowIndexes
-            var desired = IndexSet()
-            for (index, rowData) in rows.enumerated() where ids.contains(rowData.id) {
-                desired.insert(index)
+            let desired = if parent.selectionIndex.isEmpty, !rows.isEmpty {
+                IndexSet(rows.indices.filter { ids.contains(rows[$0].id) })
+            } else {
+                IndexSet(ids.compactMap { id in
+                    guard let index = parent.selectionIndex[id]?.rowIndex,
+                          rows.indices.contains(index),
+                          rows[index].id == id else
+                    {
+                        return nil
+                    }
+                    return index
+                })
             }
 
             guard currentSelected != desired else {

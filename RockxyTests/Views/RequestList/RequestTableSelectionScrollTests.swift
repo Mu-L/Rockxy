@@ -228,6 +228,35 @@ struct RequestTableSelectionScrollTests {
         #expect(scrollView.contentView.bounds.origin.y == preservedOrigin.y)
     }
 
+    @Test("Stale selection indexes are ignored before reaching NSTableView")
+    func staleSelectionIndexIsIgnored() {
+        var selectedIDs = Set<UUID>()
+        let transaction = TestFixtures.makeTransaction()
+        let row = RequestListRow(from: transaction, sslState: .insecure)
+        let parent = RequestTableView(
+            workspaceID: UUID(),
+            rows: [row],
+            refreshToken: 1,
+            isAppendOnly: false,
+            selectionIndex: [
+                transaction.id: TrafficSelectionIndexEntry(
+                    transaction: transaction,
+                    rowIndex: 10
+                ),
+            ],
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            )
+        )
+        let coordinator = RequestTableView.Coordinator(parent: parent)
+        let tableView = makeTableView(rowCount: 1, coordinator: coordinator)
+
+        coordinator.syncSelection(to: [transaction.id], in: tableView)
+
+        #expect(tableView.selectedRowIndexes.isEmpty)
+    }
+
     @Test("Only user-initiated scrolling yields Follow Live")
     func userInitiatedScrollingYieldsFollowLive() async {
         var selectedIDs = Set<UUID>()
