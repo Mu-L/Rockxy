@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       lightweight-only: ${{ steps.classify.outputs.lightweight-only }}
+      release-metadata-changed: ${{ steps.classify.outputs.release-metadata-changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
@@ -46,17 +47,18 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          lightweight_only=false
           if { [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; } &&
              [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] &&
              [ "$BASE_SHA" != "0000000000000000000000000000000000000000" ]; then
-            lightweight_only="$(
-              git diff --name-only --no-renames -z "$BASE_SHA" "$HEAD_SHA" |
-                python3 .github/tools/classify_ci_changes.py
-            )"
+            git diff --name-only --no-renames -z "$BASE_SHA" "$HEAD_SHA" |
+              python3 .github/tools/classify_ci_changes.py |
+              tee -a "$GITHUB_OUTPUT"
+          else
+            {
+              echo "lightweight-only=false"
+              echo "release-metadata-changed=false"
+            } | tee -a "$GITHUB_OUTPUT"
           fi
-          echo "lightweight-only=$lightweight_only" >> "$GITHUB_OUTPUT"
-          echo "lightweight-only: $lightweight_only"
 
   lint:
     name: SwiftLint
@@ -78,7 +80,7 @@ jobs:
         if: needs.changes.outputs.lightweight-only != 'true'
         run: swiftlint lint --strict
       - name: Validate release metadata
-        if: needs.changes.outputs.lightweight-only == 'true'
+        if: needs.changes.outputs.release-metadata-changed == 'true'
         run: python3 releases/validate_metadata.py
 
   test:
@@ -327,6 +329,3 @@ jobs:
           verify_helper_resources_in_app "build/arm64/Build/Products/Release/Rockxy.app" "arm64 app bundle"
           verify_helper_resources_in_app "build/x86_64/Build/Products/Release/Rockxy.app" "x86_64 app bundle"
           verify_helper_resources_in_app "artifacts/Rockxy.app" "universal app bundle"
-      - name: Validate release metadata without rebuilding application binaries
-        if: needs.changes.outputs.lightweight-only == 'true'
-        run: python3 releases/validate_metadata.py

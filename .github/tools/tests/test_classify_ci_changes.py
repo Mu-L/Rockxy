@@ -38,9 +38,11 @@ class CIChangeClassifierTests(unittest.TestCase):
         ]
 
         self.assertTrue(classifier.is_lightweight_only(paths))
+        self.assertTrue(classifier.release_metadata_changed(paths))
 
     def test_empty_history_only_diff_uses_lightweight_ci(self):
         self.assertTrue(classifier.is_lightweight_only([]))
+        self.assertFalse(classifier.release_metadata_changed([]))
 
     def test_source_change_requires_full_ci(self):
         self.assertFalse(
@@ -53,6 +55,12 @@ class CIChangeClassifierTests(unittest.TestCase):
                 ["README.md", "RockxyTests/Core/ProxyEngine/ProxyServerTests.swift"]
             )
         )
+
+    def test_mixed_source_and_release_metadata_still_requires_validation(self):
+        paths = ["Rockxy/RockxyApp.swift", "releases/latest.json"]
+
+        self.assertFalse(classifier.is_lightweight_only(paths))
+        self.assertTrue(classifier.release_metadata_changed(paths))
 
     def test_workflow_change_requires_full_ci(self):
         self.assertFalse(
