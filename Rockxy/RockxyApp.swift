@@ -358,6 +358,8 @@ struct RockxyApp: App {
 
         composeWindow
 
+        detachedInspectorWindow
+
         Settings {
             AppUIDisplayMetricsProvider {
                 SettingsView()
@@ -389,6 +391,46 @@ struct RockxyApp: App {
 
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+
+    private var detachedInspectorWindow: some Scene {
+        DetachedInspectorWindowScene(coordinator: mainCoordinator)
+    }
+}
+
+// MARK: - DetachedInspectorWindowScene
+
+/// Standalone Inspector window pinned to one transaction. It is an intent-dependent
+/// utility window, so restoration is disabled on macOS 15+ (mirroring the Compose /
+/// Certificate scene wrappers) rather than re-opening empty after a relaunch.
+private struct DetachedInspectorWindowScene: Scene {
+    // MARK: Internal
+
+    let coordinator: MainContentCoordinator
+
+    var body: some Scene {
+        detachedInspectorWindow
+    }
+
+    // MARK: Private
+
+    private var detachedInspectorWindow: some Scene {
+        let base = Window(String(localized: "Inspector"), id: "detachedInspector") {
+            AppUIDisplayMetricsProvider {
+                DetachedInspectorWindowView(coordinator: coordinator)
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 1_040, height: 680)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
