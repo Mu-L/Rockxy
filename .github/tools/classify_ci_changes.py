@@ -8,12 +8,12 @@ from pathlib import PurePosixPath
 from typing import Iterable
 
 
-LIGHTWEIGHT_FILES = {
-    "LICENSE",
+RELEASE_METADATA_FILES = {
     "appcast.xml",
     "releases/catalog.json",
     "releases/latest.json",
 }
+LIGHTWEIGHT_FILES = {"LICENSE", *RELEASE_METADATA_FILES}
 DOCUMENTATION_SUFFIXES = {".md", ".mdx"}
 DOCUMENTATION_DIRECTORIES = {"docs", "legal"}
 
@@ -37,6 +37,11 @@ def is_lightweight_only(paths: Iterable[str]) -> bool:
     return all(is_lightweight_path(path) for path in paths)
 
 
+def release_metadata_changed(paths: Iterable[str]) -> bool:
+    """Return whether repository release metadata is part of the change."""
+    return any(path in RELEASE_METADATA_FILES for path in paths)
+
+
 def paths_from_null_delimited(payload: bytes) -> list[str]:
     """Decode the null-delimited output produced by ``git diff -z``."""
     return [
@@ -48,7 +53,11 @@ def paths_from_null_delimited(payload: bytes) -> list[str]:
 
 def main() -> None:
     paths = paths_from_null_delimited(sys.stdin.buffer.read())
-    print("true" if is_lightweight_only(paths) else "false")
+    print(f"lightweight-only={'true' if is_lightweight_only(paths) else 'false'}")
+    print(
+        "release-metadata-changed="
+        f"{'true' if release_metadata_changed(paths) else 'false'}"
+    )
 
 
 if __name__ == "__main__":
