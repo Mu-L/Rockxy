@@ -55,7 +55,7 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
 
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let frame = unwrapInboundIn(data)
-        captureFrame(frame, context: context)
+        captureFrame(frame)
         forwardFrame(frame, context: context)
     }
 
@@ -80,26 +80,23 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
 
     /// Unmasks the frame payload (WebSocket client frames are always masked per RFC 6455)
     /// and records it in the shared connection model before forwarding.
-    nonisolated private func captureFrame(
-        _ frame: WebSocketFrame,
-        context: ChannelHandlerContext
-    ) {
+    nonisolated private func captureFrame(_ frame: WebSocketFrame) {
+        guard !webSocketConnection.isCaptureLimitReached else {
+            return
+        }
         let opcode = mapOpcode(frame.opcode)
         var dataBuffer = frame.unmaskedData
         let payloadBytes = dataBuffer.readBytes(length: dataBuffer.readableBytes) ?? []
         let payload = Data(payloadBytes)
 
         guard payload.count <= ProxyLimits.maxWebSocketFrameSize else {
-            wsLogger.warning("SECURITY: WebSocket frame exceeds \(ProxyLimits.maxWebSocketFrameSize) bytes, closing")
-            context.close(promise: nil)
+            webSocketConnection.stopCaptureAtLimit()
+            notifyTransactionUpdate()
+            wsLogger.warning(
+                "WebSocket frame exceeds capture limit; capture stopped while relay remains active"
+            )
             return
         }
-        guard webSocketConnection.totalPayloadSize + payload.count <= ProxyLimits.maxWebSocketConnectionSize else {
-            wsLogger.warning("SECURITY: WebSocket connection exceeds total payload limit, closing")
-            context.close(promise: nil)
-            return
-        }
-
         let frameData = WebSocketFrameData(
             direction: direction,
             opcode: opcode,
@@ -107,8 +104,22 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
             isFinal: frame.fin
         )
 
-        webSocketConnection.addFrame(frameData)
+        guard webSocketConnection.addFrame(
+            frameData,
+            maximumTotalPayloadSize: ProxyLimits.maxWebSocketConnectionSize,
+            maximumFrameCount: ProxyLimits.maxWebSocketFrameCount
+        ) else {
+            notifyTransactionUpdate()
+            wsLogger.warning(
+                "WebSocket connection exceeds capture limits; capture stopped while relay remains active"
+            )
+            return
+        }
 
+        notifyTransactionUpdate()
+    }
+
+    nonisolated private func notifyTransactionUpdate() {
         let transaction = parentTransaction
         Task { @MainActor in
             transaction.webSocketFrameVersion += 1
