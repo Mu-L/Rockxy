@@ -49,6 +49,10 @@
 </p>
 
 <p align="center">
+  <a href="https://trendshift.io/repositories/26380?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-26380" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/26380/daily?language=Swift" alt="RockxyApp/Rockxy | Trendshift" width="250" height="55" /></a>
+</p>
+
+<p align="center">
   <a href="https://youtu.be/RvkQuwUjBaQ" title="Watch the Rockxy demo on YouTube">
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy auf macOS" width="800" />
   </a>

@@ -48,6 +48,10 @@
   <a href="https://opencollective.com/rockxy/donate"><img src="https://img.shields.io/badge/Open%20Collective-support%20Rockxy-7FADF2?logo=opencollective&logoColor=white" alt="Support Rockxy on Open Collective" /></a>
 </p>
 
+<p align="center">
+  <a href="https://trendshift.io/repositories/26380?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-26380" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/26380/daily?language=Swift" alt="RockxyApp/Rockxy | Trendshift" width="250" height="55" /></a>
+</p>
+
 > [!IMPORTANT]
 > This repository contains the public Rockxy Community source edition under
 > AGPL-3.0-or-later. Builds made solely from this repository are AGPL builds.
