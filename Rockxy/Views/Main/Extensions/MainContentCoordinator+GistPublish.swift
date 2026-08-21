@@ -72,7 +72,11 @@ extension MainContentCoordinator {
     // MARK: Private
 
     private func presentGistPublish(transactions: [HTTPTransaction]) {
-        if AppSettingsManager.shared.settings.githubGistAskBeforePublishing {
+        let settings = AppSettingsManager.shared.settings
+        if GistPublishConfirmationPolicy.requiresReview(
+            askBeforePublishing: settings.githubGistAskBeforePublishing,
+            redactsSensitiveData: settings.githubGistRedactSensitiveData
+        ) {
             gistPublishContext = GistPublishContext(transactions: transactions)
             return
         }
@@ -90,6 +94,12 @@ extension MainContentCoordinator {
                 )
             }
         }
+    }
+}
+
+enum GistPublishConfirmationPolicy {
+    static func requiresReview(askBeforePublishing: Bool, redactsSensitiveData: Bool) -> Bool {
+        askBeforePublishing || !redactsSensitiveData
     }
 }
 

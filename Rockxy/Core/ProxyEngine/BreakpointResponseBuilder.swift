@@ -16,7 +16,8 @@ enum BreakpointResponseBuilder {
 
     static func build(
         modifiedData: BreakpointRequestData,
-        originalHead: HTTPResponseHead
+        originalHead: HTTPResponseHead,
+        originalBody: Data? = nil
     )
         -> Result
     {
@@ -31,7 +32,15 @@ enum BreakpointResponseBuilder {
         }
 
         let body: Data?
-        if modifiedData.body.isEmpty {
+        if !modifiedData.isBodyEditable {
+            body = originalBody
+            headers.remove(name: "Transfer-Encoding")
+            if let originalBody {
+                headers.replaceOrAdd(name: "Content-Length", value: "\(originalBody.count)")
+            } else {
+                headers.remove(name: "Content-Length")
+            }
+        } else if modifiedData.body.isEmpty {
             body = nil
             headers.remove(name: "Content-Length")
             headers.remove(name: "Transfer-Encoding")

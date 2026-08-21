@@ -311,12 +311,11 @@ struct BreakpointWindowView: View {
 
     private var canApplySelection: Bool {
         guard canApplySelectedChanges,
-              let selectedItemId = manager.selectedItemId,
-              let item = manager.pausedItems.first(where: { $0.id == selectedItemId })
+              let selectedItemId = manager.selectedItemId
         else {
             return false
         }
-        return item.editableDraft.isBodyEditable
+        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
     }
 
     private var applyButtonHelp: String {
@@ -328,7 +327,7 @@ struct BreakpointWindowView: View {
            !item.editableDraft.isBodyEditable
         {
             return String(
-                localized: "This message cannot be safely edited. Continue Original preserves its payload."
+                localized: "The body is protected. Request-line, status, and header changes can still be applied."
             )
         }
         if !canApplySelectedChanges {

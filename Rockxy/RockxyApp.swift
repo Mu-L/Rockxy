@@ -358,6 +358,8 @@ struct RockxyApp: App {
 
         composeWindow
 
+        detachedInspectorWindow
+
         Settings {
             AppUIDisplayMetricsProvider {
                 SettingsView()
@@ -389,6 +391,46 @@ struct RockxyApp: App {
 
     private var composeWindow: some Scene {
         ComposeWindowScene()
+    }
+
+    private var detachedInspectorWindow: some Scene {
+        DetachedInspectorWindowScene(coordinator: mainCoordinator)
+    }
+}
+
+// MARK: - DetachedInspectorWindowScene
+
+/// Standalone Inspector window pinned to one transaction. It is an intent-dependent
+/// utility window, so restoration is disabled on macOS 15+ (mirroring the Compose /
+/// Certificate scene wrappers) rather than re-opening empty after a relaunch.
+private struct DetachedInspectorWindowScene: Scene {
+    // MARK: Internal
+
+    let coordinator: MainContentCoordinator
+
+    var body: some Scene {
+        detachedInspectorWindow
+    }
+
+    // MARK: Private
+
+    private var detachedInspectorWindow: some Scene {
+        let base = Window(String(localized: "Inspector"), id: "detachedInspector") {
+            AppUIDisplayMetricsProvider {
+                DetachedInspectorWindowView(coordinator: coordinator)
+            }
+        }
+        .commandsRemoved()
+        .defaultSize(width: 1_040, height: 680)
+        .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
+        .windowResizability(.contentMinSize)
+
+        if #available(macOS 15.0, *) {
+            return base.restorationBehavior(.disabled)
+        } else {
+            return base
+        }
     }
 }
 
@@ -863,13 +905,13 @@ struct RockxyMenuCommands: Commands {
                 actions?.selectFirstTransaction()
             }
             .keyboardShortcut(.upArrow, modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(actions?.hasVisibleTransactions != true)
 
             Button(String(localized: "Jump to Last Request")) {
                 actions?.selectLastTransaction()
             }
             .keyboardShortcut(.downArrow, modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(actions?.hasVisibleTransactions != true)
         }
     }
 
@@ -895,11 +937,6 @@ struct RockxyMenuCommands: Commands {
             .disabled(actions?.hasSelectedTransaction != true)
 
             Divider()
-
-            Button(String(localized: "Save Requests")) {
-                actions?.saveSession()
-            }
-            .keyboardShortcut("s", modifiers: [.command, .shift])
 
             Menu(String(localized: "Export")) {
                 Button(String(localized: "Export as HAR…")) {
@@ -963,11 +1000,6 @@ struct RockxyMenuCommands: Commands {
             }
             .keyboardShortcut(.delete, modifiers: [.command])
             .disabled(actions?.hasSelectedTransaction != true)
-
-            Button(String(localized: "Delete All")) {
-                actions?.deleteAll()
-            }
-            .keyboardShortcut(.delete, modifiers: [.command, .shift])
         }
     }
 
@@ -988,6 +1020,7 @@ struct RockxyMenuCommands: Commands {
                 actions?.toggleRecording()
             }
             .keyboardShortcut("p", modifiers: [.command])
+            .disabled(actions?.canToggleRecording != true)
 
             Button(String(localized: "Toggle System Proxy")) {
                 actions?.toggleSystemProxyOverride()
@@ -1083,7 +1116,6 @@ struct RockxyMenuCommands: Commands {
             Button(String(localized: "Protobuf…")) {
                 openWindow(id: "protobufSettings")
             }
-            .keyboardShortcut("u", modifiers: [.command, .option])
 
             Button(String(localized: "Network Conditions…")) {
                 openWindow(id: "networkConditions")

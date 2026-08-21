@@ -76,6 +76,52 @@ struct RequestTableRefreshTests {
         #expect(coordinator.filteredRows.map(\.id) == previousIDs + [appended.id])
     }
 
+    @Test("Row derivation builds selection indexes in displayed order")
+    func rowDerivationBuildsSelectionIndexes() {
+        let coordinator = MainContentCoordinator()
+        let beta = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        let alpha = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        coordinator.transactions = [beta, alpha]
+        coordinator.activeSortDescriptors = [NSSortDescriptor(key: "url", ascending: true)]
+
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[alpha.id]?.rowIndex == 0)
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[beta.id]?.rowIndex == 1)
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[alpha.id]?.transaction === alpha)
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[beta.id]?.transaction === beta)
+    }
+
+    @Test("Append-only derivation extends selection indexes without rebuilding selection state")
+    func appendExtendsSelectionIndexes() {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        coordinator.transactions = [first]
+        coordinator.recomputeFilteredTransactions()
+
+        let appended = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        coordinator.transactions.append(appended)
+        coordinator.appendFilteredTransactions([appended])
+
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[first.id]?.rowIndex == 0)
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[appended.id]?.rowIndex == 1)
+        #expect(coordinator.activeWorkspace.trafficSelectionIndex[appended.id]?.transaction === appended)
+    }
+
+    @Test("Table selection resolves its primary transaction from workspace indexes")
+    func tableSelectionUsesWorkspaceIndexes() {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
+        let second = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
+        coordinator.transactions = [first, second]
+        coordinator.recomputeFilteredTransactions()
+
+        coordinator.selectTransactions([first.id, second.id], primaryID: second.id)
+
+        #expect(coordinator.selectedTransactionIDs == [first.id, second.id])
+        #expect(coordinator.selectedTransaction === second)
+    }
+
     @Test("Sort active + append: token changes")
     func sortActiveAppend() {
         let coordinator = MainContentCoordinator()
@@ -318,6 +364,39 @@ struct RequestTableRefreshTests {
         #expect(coordinator.filteredRows.count == 1)
         #expect(coordinator.selectedTransaction == nil)
         #expect(coordinator.filteredRows.first?.id == t2.id)
+    }
+
+    @Test("Keyboard delete removes the complete multi-selection")
+    func deleteMultiSelection() {
+        let coordinator = MainContentCoordinator()
+        let t1 = TestFixtures.makeTransaction()
+        let t2 = TestFixtures.makeTransaction()
+        let t3 = TestFixtures.makeTransaction()
+        coordinator.transactions = [t1, t2, t3]
+        coordinator.recomputeFilteredTransactions()
+        coordinator.selectedTransactionIDs = [t1.id, t2.id]
+        coordinator.selectTransaction(t1)
+
+        coordinator.deleteSelectedTransaction()
+
+        #expect(coordinator.transactions.map(\.id) == [t3.id])
+        #expect(coordinator.filteredRows.map(\.id) == [t3.id])
+        #expect(coordinator.selectedTransactionIDs.isEmpty)
+        #expect(coordinator.selectedTransaction == nil)
+    }
+
+    @Test("Deleting error rows recomputes the footer error count")
+    func deletingErrorsRecomputesErrorCount() {
+        let coordinator = MainContentCoordinator()
+        let error = TestFixtures.makeTransaction(statusCode: 500)
+        let success = TestFixtures.makeTransaction(statusCode: 200)
+        coordinator.transactions = [error, success]
+        coordinator.recomputeErrorCount()
+        #expect(coordinator.errorCount == 1)
+
+        coordinator.deleteTransactions([error])
+
+        #expect(coordinator.errorCount == 0)
     }
 
     @Test("Keyboard delete works for persisted-only rows")

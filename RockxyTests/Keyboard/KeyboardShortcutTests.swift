@@ -59,6 +59,60 @@ struct KeyboardShortcutTests {
         #expect(KeyboardShortcutCatalog.filtered(by: "compare").contains { $0.title == "Basic Compare" })
     }
 
+    @Test("Main capture shortcuts do not collide with Context Dock or Protobuf")
+    func mainCaptureShortcutsDoNotCollide() throws {
+        let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
+        let contextDock = try Self.projectFile(named: "Rockxy/Views/Inspector/ContextDockView.swift")
+
+        #expect(Self.occurrences(of: #".keyboardShortcut("u", modifiers: [.command, .option])"#, in: app) == 1)
+        #expect(!contextDock.contains(#".keyboardShortcut("k", modifiers: .command)"#))
+    }
+
+    @Test("Clear does not render in the workspace footer")
+    func clearDoesNotRenderInWorkspaceFooter() throws {
+        let footer = try Self.projectFile(named: "Rockxy/Views/RequestList/StatusBarView.swift")
+        let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
+
+        #expect(!footer.contains(#"title: String(localized: "Clear")"#))
+        #expect(!footer.contains("var onClear:"))
+        #expect(app.contains(#"Button(String(localized: "Clear Session"))"#))
+        #expect(app.contains(#".keyboardShortcut("k", modifiers: [.command])"#))
+        #expect(KeyboardShortcutCatalog.allShortcuts.contains {
+            $0.action == "Clear session" && $0.shortcut == "⌘K"
+        })
+    }
+
+    @Test("Traffic command strip reuses menu shortcuts instead of registering duplicates")
+    func trafficCommandStripDoesNotOwnShortcuts() throws {
+        let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
+        let commandBar = try Self.projectFile(named: "Rockxy/Views/Toolbar/TrafficCommandBar.swift")
+
+        #expect(!commandBar.contains(".keyboardShortcut"))
+        #expect(Self.occurrences(
+            of: #".keyboardShortcut(.downArrow, modifiers: [.command])"#,
+            in: app
+        ) == 1)
+        #expect(KeyboardShortcutCatalog.allShortcuts.contains {
+            $0.action == "Follow the newest visible request" && $0.shortcut == "⇧⌘L"
+        })
+    }
+
+    @Test("Session and row commands have one truthful owner")
+    func sessionAndContextMenuOwnership() throws {
+        let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
+        let actions = try Self.projectFile(named: "Rockxy/Views/Main/MainContentCommandActions.swift")
+        let requestTable = try Self.projectFile(named: "Rockxy/Views/RequestList/RequestTableView.swift")
+
+        // File owns Save Session; Flow owns Clear Session. Neither gets a misleading alias.
+        #expect(Self.occurrences(of: #"Button(String(localized: "Save Session…"))"#, in: app) == 1)
+        #expect(!app.contains(#"Button(String(localized: "Save Requests"))"#))
+        #expect(!app.contains(#"Button(String(localized: "Delete All"))"#))
+        #expect(!actions.contains("func deleteAll()"))
+
+        // Context menus reuse actions but never display or register keyboard shortcuts.
+        #expect(!requestTable.contains("keyEquivalentModifierMask"))
+    }
+
     private static func documentation(named name: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let repoRoot = testFile
@@ -67,6 +121,19 @@ struct KeyboardShortcutTests {
             .deletingLastPathComponent()
         let url = repoRoot.appendingPathComponent("docs").appendingPathComponent(name)
         return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private static func projectFile(named path: String) throws -> String {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let repoRoot = testFile
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try String(contentsOf: repoRoot.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private static func occurrences(of needle: String, in source: String) -> Int {
+        source.components(separatedBy: needle).count - 1
     }
 
     private static func shortcutIsDocumented(_ shortcut: String, in reference: String) -> Bool {

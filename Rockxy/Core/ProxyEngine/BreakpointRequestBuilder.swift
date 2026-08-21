@@ -90,9 +90,11 @@ enum BreakpointRequestBuilder {
         }
 
         // 4. Build body
-        let body: Data? = modifiedData.body.isEmpty
-            ? nil
-            : modifiedData.body.data(using: .utf8)
+        let body: Data? = if modifiedData.isBodyEditable {
+            modifiedData.body.isEmpty ? nil : modifiedData.body.data(using: .utf8)
+        } else {
+            originalRequestData.body
+        }
 
         // 5. Reconcile Content-Length and Transfer-Encoding with the actual body
         if let body, !body.isEmpty {

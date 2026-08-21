@@ -94,6 +94,24 @@ struct WebSocketConnectionTests {
         #expect(connection.receivedFrames.isEmpty)
     }
 
+    @Test("bounded add rejects empty-frame floods at the count cap")
+    func boundedAddEnforcesFrameCount() {
+        let request = TestFixtures.makeRequest(url: "wss://example.com/ws")
+        let connection = WebSocketConnection(upgradeRequest: request)
+        let frame = WebSocketFrameData(direction: .received, opcode: .ping, payload: Data())
+
+        #expect(connection.addFrame(frame, maximumTotalPayloadSize: 10, maximumFrameCount: 2))
+        #expect(connection.addFrame(frame, maximumTotalPayloadSize: 10, maximumFrameCount: 2))
+        #expect(!connection.addFrame(frame, maximumTotalPayloadSize: 10, maximumFrameCount: 2))
+        #expect(connection.frameCount == 2)
+        #expect(connection.totalPayloadSize == 0)
+        #expect(connection.isCaptureLimitReached)
+
+        let payloadFrame = WebSocketFrameData(direction: .received, opcode: .text, payload: Data([0x01]))
+        #expect(!connection.addFrame(payloadFrame, maximumTotalPayloadSize: 10, maximumFrameCount: 3))
+        #expect(connection.frameCount == 2)
+    }
+
     @Test("upgradeRequest preserved correctly")
     func upgradeRequestPreserved() {
         let request = TestFixtures.makeRequest(url: "wss://example.com/ws/v2")

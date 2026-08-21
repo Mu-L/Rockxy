@@ -13,6 +13,48 @@ extension MainContentCoordinator {
         selectedTransaction = transaction
     }
 
+    /// Applies a request-table selection as one coordinator transition. The table-facing
+    /// indexes keep this path proportional to the number of selected rows instead of the
+    /// total captured history, which is critical when the inspector opens over large sessions.
+    func selectTransactions(_ ids: Set<UUID>, primaryID: UUID?) {
+        let workspace = activeWorkspace
+
+        func validEntry(for id: UUID) -> TrafficSelectionIndexEntry? {
+            guard let entry = workspace.trafficSelectionIndex[id],
+                  workspace.filteredRows.indices.contains(entry.rowIndex),
+                  workspace.filteredRows[entry.rowIndex].id == id else
+            {
+                return nil
+            }
+            return entry
+        }
+
+        let resolvedPrimaryID: UUID? = if let primaryID,
+                                          ids.contains(primaryID),
+                                          validEntry(for: primaryID) != nil
+        {
+            primaryID
+        } else {
+            ids.min { lhs, rhs in
+                (validEntry(for: lhs)?.rowIndex ?? .max)
+                    < (validEntry(for: rhs)?.rowIndex ?? .max)
+            }
+        }
+        let transaction = resolvedPrimaryID.flatMap { validEntry(for: $0)?.transaction }
+        let selectionChanged = workspace.selectedTransactionIDs != ids
+            || workspace.selectedTransaction?.id != transaction?.id
+
+        workspace.selectedTransactionIDs = ids
+        workspace.selectedTransaction = transaction
+
+        if selectionChanged {
+            resetDebugAssistantForSelectionChange()
+        }
+        if transaction != nil {
+            revealInspectorForSelectionIfNeeded()
+        }
+    }
+
     /// Enables or disables live-tail selection on the active workspace. Enabling immediately
     /// reveals the newest request already visible in the active workspace so the control has an
     /// observable result even before another capture batch arrives; on an empty view it stays armed.
@@ -215,10 +257,14 @@ extension MainContentCoordinator {
     }
 
     func deleteSelectedTransaction() {
-        guard let selected = selectedTransaction else {
+        var selected = resolveSelectedTransactions()
+        if selected.isEmpty, let selectedTransaction {
+            selected = [selectedTransaction]
+        }
+        guard !selected.isEmpty else {
             return
         }
-        deleteTransactions([selected])
+        deleteTransactions(selected)
     }
 
     func selectFirstFilteredTransaction() {

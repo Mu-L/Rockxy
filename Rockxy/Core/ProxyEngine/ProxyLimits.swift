@@ -11,6 +11,10 @@ enum ProxyLimits {
     /// Maximum total WebSocket payload per connection (100 MB).
     static let maxWebSocketConnectionSize = 100 * 1_024 * 1_024
 
+    /// Maximum captured frames retained for one WebSocket connection. This count cap
+    /// complements the byte cap so empty-frame floods cannot grow memory without bound.
+    static let maxWebSocketFrameCount = 100_000
+
     /// Maximum HTTP response body size retained for capture/inspection (100 MB).
     /// Bodies exceeding this limit are truncated in the capture buffer while the full
     /// response continues to relay to the client.
@@ -30,4 +34,33 @@ enum ProxyLimits {
 
     /// Maximum uploaded .proto schema file size (1 MB).
     static let maxProtobufSchemaFileSize = 1 * 1_024 * 1_024
+}
+
+struct RequestBodyLimitState {
+    private(set) var isRejected = false
+
+    mutating func reset() {
+        accumulatedBytes = 0
+        isRejected = false
+    }
+
+    mutating func accept(
+        _ byteCount: Int,
+        maximum: Int = ProxyLimits.maxRequestBodySize
+    )
+        -> Bool
+    {
+        guard !isRejected,
+              byteCount >= 0,
+              byteCount <= maximum,
+              accumulatedBytes <= maximum - byteCount else
+        {
+            isRejected = true
+            return false
+        }
+        accumulatedBytes += byteCount
+        return true
+    }
+
+    private var accumulatedBytes = 0
 }

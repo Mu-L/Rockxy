@@ -311,15 +311,15 @@ struct ScriptingRegressionTests {
         #expect((mutated.body?.count ?? 0) > 5)
     }
 
-    // MARK: - Finding #4: response-breakpoint preservation when oversize hits
+    // MARK: - Finding #4: response-breakpoint safety when oversize hits
 
-    @Test("Oversize body with breakpoint armed keeps buffering — does NOT flush early")
-    func oversizeBreakpointKeepsBuffering() {
+    @Test("Oversize body suppresses breakpoint and resumes lossless streaming")
+    func oversizeBreakpointResumesStreaming() {
         let decision = ProxyHandlerShared.oversizeRelayDecision(
             deferRelayForScript: true,
             shouldBreakOnResponse: true
         )
-        #expect(decision == .keepBufferingForBreakpoint)
+        #expect(decision == .suppressBreakpointAndResumeStreaming)
     }
 
     @Test("Oversize body without breakpoint flushes buffered prefix and streams the rest")
@@ -340,16 +340,13 @@ struct ScriptingRegressionTests {
         #expect(decision == .alreadyStreaming)
     }
 
-    @Test("Oversize body with breakpoint but no script defer is already streaming (current chunks already relayed)")
+    @Test("Oversize body with breakpoint but no script defer still suppresses the breakpoint")
     func oversizeBreakpointNoDefer() {
-        // shouldBreakOnResponse already suppresses chunk relay independently of
-        // deferRelayForScript, so reaching here means buffering for the breakpoint
-        // is already in place — nothing extra for the truncation branch to do.
         let decision = ProxyHandlerShared.oversizeRelayDecision(
             deferRelayForScript: false,
             shouldBreakOnResponse: true
         )
-        #expect(decision == .alreadyStreaming)
+        #expect(decision == .suppressBreakpointAndResumeStreaming)
     }
 
     // MARK: - Finding #8: master toggle disables runtime hooks

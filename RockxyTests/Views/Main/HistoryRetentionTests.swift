@@ -309,6 +309,22 @@ struct HistoryRetentionTests {
         #expect(coordinator.cachedSessionStore == nil)
     }
 
+    @Test("Evicting error rows recomputes the footer error count")
+    @MainActor
+    func evictionRecomputesErrorCount() {
+        let coordinator = MainContentCoordinator()
+        let error = TestFixtures.makeTransaction(statusCode: 503)
+        let success = TestFixtures.makeTransaction(statusCode: 200)
+        coordinator.transactions = [error, success]
+        coordinator.recomputeErrorCount()
+        #expect(coordinator.errorCount == 1)
+
+        coordinator.evictOldestTransactions(count: 1)
+
+        #expect(coordinator.transactions.map(\.id) == [success.id])
+        #expect(coordinator.errorCount == 0)
+    }
+
     @Test("reportAcceptedCount triggers eviction sized to the exact overflow")
     @MainActor
     func reportAcceptedCountTriggersEviction() async {

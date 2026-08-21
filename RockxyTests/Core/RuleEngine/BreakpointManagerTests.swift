@@ -275,8 +275,8 @@ struct BreakpointManagerTests {
         manager.resolveAll(decision: .cancel)
     }
 
-    @Test("execute cannot strip a protected binary payload")
-    func protectedPayloadExecuteFallsBackToOriginal() async throws {
+    @Test("execute preserves a protected binary payload while applying metadata edits")
+    func protectedPayloadExecutePreservesBody() async throws {
         let manager = BreakpointManager()
         var data = BreakpointRequestData(
             method: "POST",
@@ -296,7 +296,7 @@ struct BreakpointManagerTests {
         manager.resolve(id: item.id, decision: .execute)
 
         let result = await task.value
-        #expect(result.0 == .cancel)
+        #expect(result.0 == .execute)
         #expect(result.1.isBodyEditable == false)
     }
 

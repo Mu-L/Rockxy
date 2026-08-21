@@ -107,6 +107,22 @@ struct GistPublishConfirmationSheetTests {
         #expect(GistPublishCopy.publicWarning.localizedCaseInsensitiveContains("searchable"))
     }
 
+    @Test("Unredacted publishing always requires review")
+    func unredactedPublishingRequiresReview() {
+        #expect(GistPublishConfirmationPolicy.requiresReview(
+            askBeforePublishing: false,
+            redactsSensitiveData: false
+        ))
+        #expect(GistPublishConfirmationPolicy.requiresReview(
+            askBeforePublishing: true,
+            redactsSensitiveData: true
+        ))
+        #expect(!GistPublishConfirmationPolicy.requiresReview(
+            askBeforePublishing: false,
+            redactsSensitiveData: true
+        ))
+    }
+
     // MARK: Source contract
 
     @Test("Sheet keeps a native, scalable, progress-aware publish contract")

@@ -53,20 +53,22 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     typealias OutboundOut = HTTPServerResponsePart
 
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        guard !requestBodyLimitState.isRejected else {
+            return
+        }
         let part = unwrapInboundIn(data)
         switch part {
         case let .head(head):
             requestHead = head
             requestBody = context.channel.allocator.buffer(capacity: 0)
             requestStartTime = .now()
-            accumulatedBodySize = 0
+            requestBodyLimitState.reset()
             if clientSourcePort == nil, let port = context.channel.remoteAddress?.port {
                 clientSourcePort = UInt16(port)
             }
 
         case let .body(buffer):
-            accumulatedBodySize += buffer.readableBytes
-            guard accumulatedBodySize <= ProxyLimits.maxRequestBodySize else {
+            guard requestBodyLimitState.accept(buffer.readableBytes) else {
                 proxyHandlerLogger
                     .warning("SECURITY: Request body exceeds \(ProxyLimits.maxRequestBodySize) bytes, rejecting")
                 let head = requestHead ?? HTTPRequestHead(version: .http1_1, method: .POST, uri: "/")
@@ -117,7 +119,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private var requestBody: ByteBuffer?
     private var requestStartTime: DispatchTime?
     private var clientSourcePort: UInt16?
-    private var accumulatedBodySize: Int = 0
+    private var requestBodyLimitState = RequestBodyLimitState()
 
     nonisolated private func makeTransactionCallback(
         for matchedRule: ProxyRule?
@@ -194,6 +196,10 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                 }
                 self.handleConnect(context: context, head: head)
                 return
+            }
+
+            if let responsePhase = breakpointRule?.action.responseBreakpointPhase {
+                self.pendingBreakpointPhase = responsePhase
             }
 
             if let breakpointRule,

@@ -15,6 +15,8 @@ enum FooterActionKind: String, CaseIterable {
     case networkConditions
     case proxyOverride
 
+    // MARK: Internal
+
     static let defaultQuickTools: [Self] = [.breakpoint, .mapLocal, .scripting, .networkConditions]
 }
 
@@ -32,7 +34,9 @@ struct FooterActionDescriptor: Identifiable, Equatable {
         isAllowListActive: Bool,
         isProxyOverridden: Bool = false,
         quickTools: [FooterActionKind] = FooterActionKind.defaultQuickTools
-    ) -> [Self] {
+    )
+        -> [Self]
+    {
         let catalog: [Self] = [
             .init(
                 id: .blockList,
@@ -248,7 +252,11 @@ enum FooterMutationIndicatorBuilder {
 
 // MARK: - FooterToolingButton
 
-private struct FooterToolingButton: View {
+/// Shared capsule launcher rendered identically in the top command bar and the footer. This is the
+/// single visual source of truth for Quick Tools chrome — never fork a top-only variant.
+struct FooterToolingButton: View {
+    // MARK: Internal
+
     let descriptor: FooterActionDescriptor
     let action: () -> Void
 
@@ -264,6 +272,8 @@ private struct FooterToolingButton: View {
         .buttonStyle(.plain)
         .disabled(!descriptor.isEnabled)
         .help(descriptor.help)
+        .accessibilityLabel(descriptor.title)
+        .accessibilityValue(descriptor.isActive ? String(localized: "Active") : "")
         .onHover { isHovered = $0 }
     }
 
@@ -302,7 +312,8 @@ private struct FooterMutationIndicatorButton: View {
 
     private var indicatorColor: Color {
         switch indicator.id {
-        case .mapLocal, .mapRemote:
+        case .mapLocal,
+             .mapRemote:
             Color(nsColor: .systemOrange)
         case .breakpoint:
             Color(nsColor: .systemPurple)
@@ -334,6 +345,8 @@ private struct FooterMutationIndicatorButton: View {
 // MARK: - FooterProxyOverrideButton
 
 private struct FooterProxyOverrideButton: View {
+    // MARK: Internal
+
     let descriptor: FooterActionDescriptor
     let proxyHost: String
     let proxyPort: Int
@@ -361,9 +374,12 @@ private struct FooterProxyOverrideButton: View {
 // MARK: - FooterProxyOverridePopover
 
 private struct FooterProxyOverridePopover: View {
+    // MARK: Internal
+
     let proxyHost: String
     let proxyPort: Int
     @Binding var isPresented: Bool
+
     let onSwitchOff: () -> Void
 
     var body: some View {
@@ -389,6 +405,8 @@ private struct FooterProxyOverridePopover: View {
         .frame(width: 660, alignment: .leading)
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var statusText: String {
@@ -398,7 +416,9 @@ private struct FooterProxyOverridePopover: View {
 
 // MARK: - FooterToolingChrome
 
-private struct FooterToolingChrome: ViewModifier {
+struct FooterToolingChrome: ViewModifier {
+    // MARK: Internal
+
     let isActive: Bool
     let isEnabled: Bool
     let isHovered: Bool
@@ -414,6 +434,8 @@ private struct FooterToolingChrome: ViewModifier {
             .opacity(isEnabled ? 1 : 0.45)
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var backgroundColor: Color {
@@ -427,51 +449,6 @@ private struct FooterToolingChrome: ViewModifier {
     }
 }
 
-// MARK: - FooterPrimaryButton
-
-private struct FooterPrimaryButton: View {
-    let title: String
-    let systemImage: String
-    let help: String
-    var isActive = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            ViewThatFits(in: .horizontal) {
-                Label(title, systemImage: systemImage)
-                Image(systemName: systemImage)
-            }
-            .font(metrics.swiftUIFont())
-            .foregroundStyle(isActive ? Color.accentColor : Color(nsColor: .labelColor))
-            .lineLimit(1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(backgroundColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(title)
-        .accessibilityValue(isActive ? String(localized: "On") : String(localized: "Off"))
-        .onHover { isHovered = $0 }
-    }
-
-    // MARK: Private
-
-    @State private var isHovered = false
-    @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var backgroundColor: Color {
-        if isActive {
-            return Color.accentColor.opacity(0.12)
-        }
-        if isHovered {
-            return Color(nsColor: .controlBackgroundColor)
-        }
-        return Color(nsColor: .controlBackgroundColor).opacity(0.72)
-    }
-}
-
 // MARK: - StatusBarRequestSummary
 
 enum StatusBarRequestSummary {
@@ -480,7 +457,9 @@ enum StatusBarRequestSummary {
         availableCount: Int,
         selectedCount: Int,
         activeFilterCount: Int
-    ) -> String {
+    )
+        -> String
+    {
         if activeFilterCount > 0, visibleCount != availableCount {
             if selectedCount > 0 {
                 return String(localized: "\(selectedCount) selected, \(visibleCount) of \(availableCount) shown")
@@ -499,8 +478,9 @@ enum StatusBarRequestSummary {
 
 // MARK: - StatusBarView
 
-/// Bottom status bar showing request counts, bandwidth stats (upload/download speed),
-/// and quick-action buttons for clearing, filtering, and opt-in live-tail selection.
+/// Bottom status bar showing request counts, bandwidth stats (upload/download speed), active
+/// mutation indicators, quick tools, request status, and the proxy-override control. The primary
+/// Clear Session and Follow Live workflows live in the top `TrafficCommandBar`, not here.
 struct StatusBarView: View {
     // MARK: Internal
 
@@ -516,8 +496,6 @@ struct StatusBarView: View {
     var isProxyOverridden: Bool = false
     var isAllowListActive: Bool = false
     var isNoCachingActive: Bool = false
-    var isFollowingLiveTraffic: Bool = false
-    var isFilterBarVisible: Bool = false
     var activeFilterCount: Int = 0
     var errorCount: Int = 0
     var proxyStartedAt: Date?
@@ -528,29 +506,12 @@ struct StatusBarView: View {
     var mapRemoteToolEnabled: Bool = true
     var breakpointToolEnabled: Bool = true
 
-    var onClear: () -> Void = {}
-    var onFilter: () -> Void = {}
-    var onFollowLive: () -> Void = {}
     var onSwitchOffProxyOverride: () -> Void = {}
     var onOpenToolWindow: (String) -> Void = { _ in }
 
     var body: some View {
         WorkspaceFooterBar(horizontalPadding: 12) {
             HStack(spacing: 0) {
-                FooterPrimaryButton(
-                    title: String(localized: "Follow Live"),
-                    systemImage: "dot.radiowaves.right",
-                    help: isFollowingLiveTraffic
-                        ? String(localized: "Follow Live is on. Scroll, select a row, or click again to stop.")
-                        : String(localized: "Keep the newest request in the current view selected."),
-                    isActive: isFollowingLiveTraffic,
-                    action: onFollowLive
-                )
-
-                Divider()
-                    .frame(height: 12)
-                    .padding(.horizontal, 8)
-
                 quickTools
                 mutationIndicators
                 Spacer(minLength: 24)
@@ -562,6 +523,11 @@ struct StatusBarView: View {
     }
 
     // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
+    @AppStorage(QuickToolsLayout.storageKey) private var quickToolsLayoutRaw = ""
+    @AppStorage(QuickToolsLayout.legacyFooterStorageKey) private var legacyFooterQuickToolOrder = ""
+    @State private var isCustomizingQuickTools = false
 
     private var statusText: String {
         StatusBarRequestSummary.text(
@@ -585,6 +551,13 @@ struct StatusBarView: View {
         )
     }
 
+    private var quickToolsLayout: QuickToolsLayout {
+        QuickToolsLayout.resolved(
+            storageRaw: quickToolsLayoutRaw,
+            legacyFooterRaw: legacyFooterQuickToolOrder
+        )
+    }
+
     @ViewBuilder private var mutationIndicators: some View {
         let indicators = mutationIndicatorList
         if !indicators.isEmpty {
@@ -602,59 +575,17 @@ struct StatusBarView: View {
         }
     }
 
-    private func mutationIndicatorRow(
-        _ indicators: [FooterMutationIndicator],
-        showsTitles: Bool
-    ) -> some View {
-        HStack(spacing: 6) {
-            ForEach(indicators) { indicator in
-                FooterMutationIndicatorButton(indicator: indicator, showsTitle: showsTitles) {
-                    onOpenToolWindow(indicator.windowID)
-                }
-            }
-        }
-    }
-
-    private func mutationIndicatorMenu(_ indicators: [FooterMutationIndicator]) -> some View {
-        Menu {
-            ForEach(indicators) { indicator in
-                Button {
-                    onOpenToolWindow(indicator.windowID)
-                } label: {
-                    Label("\(indicator.title)  \(indicator.count)", systemImage: indicator.systemImage)
-                }
-            }
-        } label: {
-            Label(
-                "\(indicators.reduce(0) { $0 + $1.count })",
-                systemImage: "bolt.horizontal.circle"
-            )
-            .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .foregroundStyle(Color(nsColor: .systemOrange))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(Color(nsColor: .systemOrange).opacity(0.14), in: Capsule())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help(String(localized: "Active mutation rules"))
-        .accessibilityLabel(String(localized: "Active mutation rules"))
-    }
-
-    private var centerStatus: some View {
-        Group {
-            if let provenance = sessionProvenance {
-                Text(provenance.displayText)
-                    .font(.system(size: metrics.secondaryFontSize, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            } else {
-                Text(statusText)
-                    .font(.system(size: metrics.secondaryFontSize))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-            }
+    @ViewBuilder private var centerStatus: some View {
+        if let provenance = sessionProvenance {
+            Text(provenance.displayText)
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        } else {
+            Text(statusText)
+                .font(.system(size: metrics.secondaryFontSize))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
         }
     }
 
@@ -723,36 +654,11 @@ struct StatusBarView: View {
         .lineLimit(1)
     }
 
-    private func formattedSpeed(_ bytesPerSecond: Int64) -> String {
-        if bytesPerSecond < 1_024 {
-            return "\(bytesPerSecond) B/s"
-        } else if bytesPerSecond < 1_048_576 {
-            return "\(bytesPerSecond / 1_024) KB/s"
-        } else {
-            let mb = Double(bytesPerSecond) / 1_048_576
-            return String(format: "%.1f MB/s", mb)
-        }
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
-    @AppStorage("footerQuickToolOrder") private var quickToolOrder = FooterActionKind.defaultQuickTools
-        .map(\.rawValue)
-        .joined(separator: ",")
-    @State private var isCustomizingQuickTools = false
-
-    private var selectedQuickTools: [FooterActionKind] {
-        let decoded = quickToolOrder.split(separator: ",").compactMap { FooterActionKind(rawValue: String($0)) }
-        let unique = decoded.reduce(into: [FooterActionKind]()) { result, item in
-            if item != .proxyOverride, !result.contains(item) { result.append(item) }
-        }
-        return unique.count == 4 ? unique : FooterActionKind.defaultQuickTools
-    }
-
     private var quickTools: some View {
         HStack(spacing: 6) {
             ForEach(FooterActionDescriptor.toolingActions(
                 isAllowListActive: isAllowListActive,
-                quickTools: selectedQuickTools
+                quickTools: quickToolsLayout.footer
             )) { descriptor in
                 FooterToolingButton(descriptor: descriptor) {
                     performAction(descriptor.id)
@@ -766,18 +672,56 @@ struct StatusBarView: View {
             .buttonStyle(.plain)
             .help(String(localized: "Customize Quick Tools"))
             .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
-                FooterQuickToolsEditor(
-                    selection: selectedQuickTools,
-                    onSave: { quickToolOrder = $0.map(\.rawValue).joined(separator: ",") },
-                    onReset: {
-                        quickToolOrder = FooterActionKind.defaultQuickTools.map(\.rawValue).joined(separator: ",")
-                    },
-                    onDone: {
-                        isCustomizingQuickTools = false
-                    }
+                QuickToolsEditor(
+                    layout: quickToolsLayout,
+                    onSave: { quickToolsLayoutRaw = $0.encoded },
+                    onReset: { quickToolsLayoutRaw = QuickToolsLayout.default.encoded },
+                    onDone: { isCustomizingQuickTools = false }
                 )
             }
         }
+    }
+
+    private func mutationIndicatorRow(
+        _ indicators: [FooterMutationIndicator],
+        showsTitles: Bool
+    )
+        -> some View
+    {
+        HStack(spacing: 6) {
+            ForEach(indicators) { indicator in
+                FooterMutationIndicatorButton(indicator: indicator, showsTitle: showsTitles) {
+                    onOpenToolWindow(indicator.windowID)
+                }
+            }
+        }
+    }
+
+    private func mutationIndicatorMenu(_ indicators: [FooterMutationIndicator]) -> some View {
+        Menu {
+            ForEach(indicators) { indicator in
+                Button {
+                    onOpenToolWindow(indicator.windowID)
+                } label: {
+                    Label("\(indicator.title)  \(indicator.count)", systemImage: indicator.systemImage)
+                }
+            }
+        } label: {
+            Label(
+                "\(indicators.reduce(0) { $0 + $1.count })",
+                systemImage: "bolt.horizontal.circle"
+            )
+            .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+            .foregroundStyle(Color(nsColor: .systemOrange))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Color(nsColor: .systemOrange).opacity(0.14), in: Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(String(localized: "Active mutation rules"))
+        .accessibilityLabel(String(localized: "Active mutation rules"))
     }
 
     private func statusPill(_ title: String, color: Color) -> some View {
@@ -790,25 +734,22 @@ struct StatusBarView: View {
             .background(color, in: Capsule())
     }
 
-    private func performAction(_ action: FooterActionKind) {
-        switch action {
-        case .blockList:
-            onOpenToolWindow("blockList")
-        case .allowList:
-            onOpenToolWindow("allowList")
-        case .mapLocal:
-            onOpenToolWindow("mapLocal")
-        case .scripting:
-            onOpenToolWindow("scriptingList")
-        case .mapRemote:
-            onOpenToolWindow("mapRemote")
-        case .breakpoint:
-            onOpenToolWindow("breakpointRules")
-        case .networkConditions:
-            onOpenToolWindow("networkConditions")
-        case .proxyOverride:
-            break
+    private func formattedSpeed(_ bytesPerSecond: Int64) -> String {
+        if bytesPerSecond < 1_024 {
+            return "\(bytesPerSecond) B/s"
+        } else if bytesPerSecond < 1_048_576 {
+            return "\(bytesPerSecond / 1_024) KB/s"
+        } else {
+            let mb = Double(bytesPerSecond) / 1_048_576
+            return String(format: "%.1f MB/s", mb)
         }
+    }
+
+    private func performAction(_ action: FooterActionKind) {
+        guard let windowID = action.toolWindowID else {
+            return
+        }
+        onOpenToolWindow(windowID)
     }
 }
 
@@ -817,6 +758,8 @@ struct StatusBarView: View {
 /// Shared bottom-edge chrome for the traffic workspace and its native inspector.
 /// Keeping height and separator construction in one view guarantees both panes meet on one pixel row.
 struct WorkspaceFooterBar<Content: View>: View {
+    // MARK: Internal
+
     let horizontalPadding: CGFloat
     @ViewBuilder let content: () -> Content
 
@@ -831,112 +774,9 @@ struct WorkspaceFooterBar<Content: View>: View {
             }
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
-}
-
-private struct FooterQuickToolsEditor: View {
-    let onSave: ([FooterActionKind]) -> Void
-    let onReset: () -> Void
-    let onDone: () -> Void
-
-    init(
-        selection: [FooterActionKind],
-        onSave: @escaping ([FooterActionKind]) -> Void,
-        onReset: @escaping () -> Void,
-        onDone: @escaping () -> Void
-    ) {
-        _selection = State(initialValue: selection)
-        self.onSave = onSave
-        self.onReset = onReset
-        self.onDone = onDone
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Customize Quick Tools"))
-                .font(.headline)
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                ForEach(selection.indices, id: \.self) { index in
-                    GridRow {
-                        Text(String(localized: "Slot \(index + 1)"))
-                            .frame(width: 44, alignment: .leading)
-                        Menu {
-                            ForEach(availableKinds(for: index), id: \.self) { kind in
-                                Button {
-                                    selection[index] = kind
-                                } label: {
-                                    if selection[index] == kind {
-                                        Label(descriptor(for: kind).title, systemImage: "checkmark")
-                                    } else {
-                                        Text(descriptor(for: kind).title)
-                                    }
-                                }
-                            }
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                                HStack(spacing: 8) {
-                                    Text(descriptor(for: selection[index]).title)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                    Spacer(minLength: 8)
-                                    Image(systemName: "chevron.down")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.horizontal, 8)
-                            }
-                            .frame(width: 126, height: 24)
-                            .contentShape(Rectangle())
-                        }
-                        .menuStyle(.button)
-                        .buttonStyle(.plain)
-                        .menuIndicator(.hidden)
-                        .controlSize(.small)
-                        .frame(width: 126, height: 24, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .accessibilityLabel(descriptor(for: selection[index]).title)
-                        .accessibilityIdentifier("footerQuickTools.slot\(index + 1)")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Divider()
-            HStack {
-                Button(String(localized: "Reset Defaults")) {
-                    selection = FooterActionKind.defaultQuickTools
-                    onReset()
-                }
-                Spacer()
-                Button(String(localized: "Done")) {
-                    onSave(selection)
-                    onDone()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(16)
-        .frame(width: 250)
-        .onChange(of: selection) { _, value in onSave(value) }
-    }
-
-    @State private var selection: [FooterActionKind]
-
-    private func availableKinds(for index: Int) -> [FooterActionKind] {
-        FooterActionKind.allCases.filter { kind in
-            kind != .proxyOverride && (kind == selection[index] || !selection.contains(kind))
-        }
-    }
-
-    private func descriptor(for kind: FooterActionKind) -> FooterActionDescriptor {
-        FooterActionDescriptor.toolingActions(
-            isAllowListActive: false,
-            quickTools: [kind]
-        )[0]
-    }
 }
 
 // MARK: - SessionDurationView

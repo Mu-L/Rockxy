@@ -90,10 +90,9 @@ final class BreakpointManager {
         }
         let item = pausedItems[index]
         pausedItems.remove(at: index)
-        let resolvedDecision = safeDecision(decision, for: item)
 
         if let continuation = continuations.removeValue(forKey: id) {
-            continuation.resume(returning: (resolvedDecision, item.editableDraft))
+            continuation.resume(returning: (decision, item.editableDraft))
         }
 
         if selectedItemId == id {
@@ -103,15 +102,14 @@ final class BreakpointManager {
             selectedItemId = pausedItems.isEmpty ? nil : pausedItems[min(index, pausedItems.count - 1)].id
         }
 
-        Self.logger.info("Breakpoint resolved (\(String(describing: resolvedDecision)))")
+        Self.logger.info("Breakpoint resolved (\(String(describing: decision)))")
     }
 
     /// Resolve all paused items at once with the same decision.
     func resolveAll(decision: BreakpointDecision) {
         for item in pausedItems {
             if let continuation = continuations.removeValue(forKey: item.id) {
-                let resolvedDecision = safeDecision(decision, for: item)
-                continuation.resume(returning: (resolvedDecision, item.editableDraft))
+                continuation.resume(returning: (decision, item.editableDraft))
             }
         }
         let count = pausedItems.count
@@ -151,19 +149,6 @@ final class BreakpointManager {
             return false
         }
         return pausedItems.contains { $0.id == selectedItemId }
-    }
-
-    private func safeDecision(
-        _ decision: BreakpointDecision,
-        for item: PausedBreakpointItem
-    )
-        -> BreakpointDecision
-    {
-        if case .execute = decision, !item.editableDraft.isBodyEditable {
-            Self.logger.warning("Protected breakpoint payload cannot be edited; continuing original")
-            return .cancel
-        }
-        return decision
     }
 
     private static func displayURL(from urlString: String) -> String {
