@@ -139,9 +139,9 @@ extension MainContentCoordinator {
         Self.logger.error("Project transfer failed: \(String(describing: error))")
         let alert = NSAlert()
         alert.messageText = title
-        alert
-            .informativeText =
-            String(localized: "The Project configuration could not be processed safely. \(String(describing: error))")
+        alert.informativeText = String(
+            localized: "The Project configuration could not be processed safely. Verify the file and try again."
+        )
         alert.alertStyle = .warning
         alert.addButton(withTitle: String(localized: "OK"))
         alert.runModal()

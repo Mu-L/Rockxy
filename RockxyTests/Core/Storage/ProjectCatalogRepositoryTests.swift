@@ -300,6 +300,23 @@ struct ProjectCatalogRepositoryTests {
         #expect(try Data(contentsOf: sentinel) == Data("keep".utf8))
     }
 
+    @Test("reset preserves an existing recovery backup when the live catalog is non-regular")
+    func resetKeepsRecoveryBackupWhenLiveCatalogIsInvalid() async throws {
+        let repo = makeRepo()
+        try FileManager.default.createDirectory(at: repo.directoryURL, withIntermediateDirectories: true)
+        let backupURL = repo.directoryURL.appendingPathComponent(ProjectCatalogRepository.recoveryBackupFileName)
+        let recoveryData = Data("previous recovery".utf8)
+        try recoveryData.write(to: backupURL)
+        try FileManager.default.createDirectory(at: repo.fileURL, withIntermediateDirectories: true)
+
+        await #expect(throws: ProjectCatalogRepositoryError.notRegularFile) {
+            try await repo.reset()
+        }
+
+        #expect(try Data(contentsOf: backupURL) == recoveryData)
+        #expect(FileManager.default.fileExists(atPath: repo.fileURL.path))
+    }
+
     @Test("reset refuses to recursively remove a non-regular recovery node")
     func resetPreservesNonRegularRecoveryNode() async throws {
         let repo = makeRepo()

@@ -465,7 +465,9 @@ extension MainContentCoordinator {
         transactions = transactionsByProjectID[projectID] ?? []
         logEntries = logEntriesByProjectID[projectID] ?? []
         sessionProvenance = sessionProvenanceByProjectID[projectID]
-        nextSequenceNumber = (transactions.map(\.sequenceNumber).max() ?? -1) + 1
+        let maximumLiveSequence = transactions.map(\.sequenceNumber).max() ?? -1
+        let maximumFavoriteSequence = persistedFavorites.map(\.sequenceNumber).max() ?? -1
+        nextSequenceNumber = max(maximumLiveSequence, maximumFavoriteSequence) + 1
         nextSequenceNumberByProjectID[projectID] = nextSequenceNumber
         recomputeErrorCount()
         resetTrafficMetrics()

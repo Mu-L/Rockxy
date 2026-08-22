@@ -627,7 +627,9 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
             return
         }
 
-        endEditing(commit: true)
+        guard endEditing(commit: true) else {
+            return
+        }
         editingWorkspaceID = workspaceID
         originalTitle = workspace.title
 
@@ -648,28 +650,42 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
-    func endEditing(commit: Bool) {
+    @discardableResult
+    func endEditing(commit: Bool) -> Bool {
         guard let editingWorkspaceID,
               let field = editField else {
-            return
+            return true
         }
-        removeEditingMonitor()
 
-        let fallbackTitle = originalTitle
-        let committedTitle: String
+        var committedTitle = originalTitle
         if commit {
-            let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            committedTitle = trimmed.isEmpty ? fallbackTitle : trimmed
-        } else {
-            committedTitle = fallbackTitle
+            do {
+                committedTitle = try ProjectNormalization.normalizedDisplayName(field.stringValue)
+            } catch let error as ProjectNameNormalizationError {
+                field.textColor = .systemRed
+                field.toolTip = inlineRenameErrorMessage(for: error)
+                NSSound.beep()
+                window?.makeFirstResponder(field)
+                return false
+            } catch {
+                field.textColor = .systemRed
+                field.toolTip = String(localized: "Enter a valid Traffic Tab name.")
+                NSSound.beep()
+                window?.makeFirstResponder(field)
+                return false
+            }
         }
 
+        removeEditingMonitor()
         self.editingWorkspaceID = nil
         originalTitle = ""
         editField = nil
         field.removeFromSuperview()
-        manager.renameWorkspace(editingWorkspaceID, to: committedTitle)
+        if commit {
+            manager.renameWorkspace(editingWorkspaceID, to: committedTitle)
+        }
         needsDisplay = true
+        return true
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
@@ -1388,8 +1404,22 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
                 return event
             }
         }
-        endEditing(commit: true)
-        return event
+        return endEditing(commit: true) ? event : nil
+    }
+
+    private func inlineRenameErrorMessage(for error: ProjectNameNormalizationError) -> String {
+        switch error {
+        case .empty:
+            String(localized: "Enter a Traffic Tab name.")
+        case .containsControlCharacters:
+            String(localized: "Traffic Tab names cannot contain control characters.")
+        case let .tooLong(count):
+            String(
+                localized: "Traffic Tab names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count))."
+            )
+        case .notCanonical:
+            String(localized: "The Traffic Tab name is not in canonical Unicode form.")
+        }
     }
 
     @objc private func renameTabFromMenu(_ sender: NSMenuItem) {

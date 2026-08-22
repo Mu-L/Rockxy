@@ -347,6 +347,25 @@ struct ProjectCoordinationTests {
         #expect(coordinator.logEntries.first?.correlatedTransactionId == alphaTransaction.id)
     }
 
+    @Test("project switching advances live sequence numbers beyond persisted favorites")
+    func projectSwitchAccountsForFavoriteSequences() async {
+        let (catalog, alpha, beta) = Self.twoProjectCatalog()
+        let coordinator = MainContentCoordinator(
+            projectCatalogRepository: FakeProjectRepo(loadResult: .success(catalog))
+        )
+        await coordinator.hydrateProjectsOnLaunch()
+        let favorite = TestFixtures.makeTransaction(url: "https://favorite.example.com")
+        favorite.sequenceNumber = 100
+        coordinator.persistedFavorites = [favorite]
+
+        #expect(coordinator.switchToProject(id: beta.id))
+        #expect(coordinator.switchToProject(id: alpha.id))
+        let fresh = TestFixtures.makeTransaction(url: "https://alpha.example.com/fresh")
+        coordinator.processActiveProjectTestBatch([fresh])
+
+        #expect(fresh.sequenceNumber == 101)
+    }
+
     @Test("live traffic history is capped independently for every bounded Project")
     func perProjectHistoryIsBounded() async {
         let (catalog, alpha, beta) = Self.twoProjectCatalog()

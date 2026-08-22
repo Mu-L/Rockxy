@@ -14,7 +14,7 @@ final class WorkspaceStore {
         self.maxWorkspaces = Self.clampCreationCapacity(maxWorkspaces)
         self.layoutPreferences = layoutPreferences
         let defaultWorkspace = Self.makeWorkspace(
-            title: String(localized: "All Traffic"),
+            title: ProjectStructuralLimits.defaultTabTitle,
             isClosable: false,
             filter: .empty,
             layoutPreferences: layoutPreferences
@@ -65,15 +65,19 @@ final class WorkspaceStore {
             Self.logger.warning("Maximum workspace count (\(self.maxWorkspaces)) reached")
             return activeWorkspace
         }
+        guard let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(title) else {
+            Self.logger.warning("Refused to create a workspace with an invalid title")
+            return activeWorkspace
+        }
         let workspace = Self.makeWorkspace(
-            title: title,
+            title: normalizedTitle,
             isClosable: true,
             filter: filter,
             layoutPreferences: layoutPreferences
         )
         workspaces.append(workspace)
         activeWorkspaceID = workspace.id
-        Self.logger.info("Created workspace: \(title)")
+        Self.logger.info("Created workspace: \(normalizedTitle)")
         return workspace
     }
 
@@ -163,8 +167,18 @@ final class WorkspaceStore {
         {
             return nil
         }
+        let suffix = " " + String(localized: "Copy")
+        let maximumBaseCount = max(
+            1,
+            ProjectStructuralLimits.nameGraphemeRange.upperBound - suffix.count
+        )
+        let candidateTitle = source.title.boundedToGraphemes(maximumBaseCount) + suffix
+        guard let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(candidateTitle) else {
+            Self.logger.warning("Refused to duplicate a workspace with an invalid title")
+            return nil
+        }
         let duplicate = WorkspaceState(
-            title: source.title + " " + String(localized: "Copy"),
+            title: normalizedTitle,
             isClosable: true,
             initialFilter: source.filterCriteria
         )
@@ -198,10 +212,12 @@ final class WorkspaceStore {
     }
 
     func renameWorkspace(id: UUID, to newTitle: String) {
-        guard let workspace = workspaces.first(where: { $0.id == id }) else {
+        guard let workspace = workspaces.first(where: { $0.id == id }),
+              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(newTitle) else {
+            Self.logger.warning("Refused to rename a workspace with an invalid title")
             return
         }
-        workspace.title = newTitle
+        workspace.title = normalizedTitle
     }
 
     // MARK: Project snapshot seams
@@ -223,7 +239,7 @@ final class WorkspaceStore {
 
         if hydrated.isEmpty {
             hydrated = [Self.makeWorkspace(
-                title: String(localized: "All Traffic"),
+                title: ProjectStructuralLimits.defaultTabTitle,
                 isClosable: false,
                 filter: .empty,
                 layoutPreferences: layoutPreferences
@@ -231,7 +247,7 @@ final class WorkspaceStore {
         } else if !hydrated.contains(where: { !$0.isClosable }) {
             hydrated.insert(
                 Self.makeWorkspace(
-                    title: String(localized: "All Traffic"),
+                    title: ProjectStructuralLimits.defaultTabTitle,
                     isClosable: false,
                     filter: .empty,
                     layoutPreferences: layoutPreferences

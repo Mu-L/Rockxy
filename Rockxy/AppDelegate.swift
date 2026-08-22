@@ -91,7 +91,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
 
         Self.logger.info("Rockxy terminating — cleaning up system proxy")
         Task {
-            await RockxyWorkspaceWindowManager.shared.flushProjectStateForTermination()
             Self.logger.info("Quit: starting proxy restore")
             do {
                 try await SystemProxyManager.shared.disableSystemProxy()
@@ -99,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
             } catch {
                 Self.logger.error("Quit: proxy restore failed — \(error.localizedDescription)")
             }
+            await RockxyWorkspaceWindowManager.shared.flushProjectStateForTermination()
             await MCPServerCoordinator.shared.stop()
             MCPHandshakeStore.delete()
             NSApplication.shared.reply(toApplicationShouldTerminate: true)

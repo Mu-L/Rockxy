@@ -167,6 +167,7 @@ struct ProjectNameEditorSheet: View {
         self.context = context
         self.coordinator = coordinator
         _name = State(initialValue: context.initialName)
+        _operationErrorMessage = State(initialValue: nil)
     }
 
     let context: ProjectNameEditorContext
@@ -197,9 +198,12 @@ struct ProjectNameEditorSheet: View {
                     .font(.subheadline.weight(.medium))
                 TextField(String(localized: "For example: Checkout API"), text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text(validationMessage ?? String(localized: "1–80 characters. Names must be unique."))
+                    .onChange(of: name) { _, _ in
+                        operationErrorMessage = nil
+                    }
+                Text(editorMessage)
                     .font(.caption)
-                    .foregroundStyle(validationMessage == nil ? Color.secondary : Color.orange)
+                    .foregroundStyle(hasEditorError ? Color.orange : Color.secondary)
             }
             .padding(18)
 
@@ -225,6 +229,19 @@ struct ProjectNameEditorSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
+    @State private var operationErrorMessage: String?
+
+    private var editorMessage: String {
+        validationMessage
+            ?? operationErrorMessage
+            ?? String(
+                localized: "1–\(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters. Names must be unique."
+            )
+    }
+
+    private var hasEditorError: Bool {
+        validationMessage != nil || operationErrorMessage != nil
+    }
 
     private var normalizedName: String? {
         try? ProjectNormalization.normalizedDisplayName(name)
@@ -258,6 +275,8 @@ struct ProjectNameEditorSheet: View {
             coordinator.renameProject(id: id, to: normalizedName)
         }
         guard succeeded else {
+            operationErrorMessage = coordinator.projectOperationErrorMessage
+                ?? String(localized: "The Project could not be updated. Try again.")
             return
         }
         RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
@@ -529,6 +548,7 @@ struct ProjectManagerSheet: View {
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .help(String(localized: "New Project"))
+            .accessibilityLabel(String(localized: "New Project"))
             .disabled(!canCreateProject)
 
             Rectangle()
@@ -552,6 +572,7 @@ struct ProjectManagerSheet: View {
             }
             .buttonStyle(.plain)
             .help(String(localized: "Delete Project"))
+            .accessibilityLabel(String(localized: "Delete Project"))
             .disabled(!canDeleteSelectedProject)
         }
         .frame(
@@ -627,10 +648,8 @@ struct ProjectManagerSheet: View {
     }
 
     private func trafficTabCountText(_ count: Int) -> String {
-        if count == 1 {
-            return String(localized: "1 Traffic Tab")
-        }
-        return String(localized: "\(count) Traffic Tabs")
+        let inflected = AttributedString(localized: "^[\(count) Traffic Tab](inflect: true)")
+        return String(inflected.characters)
     }
 
     private func projectAccessibilityValue(_ project: Project) -> String {
