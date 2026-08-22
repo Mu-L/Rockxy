@@ -341,22 +341,47 @@ Jeśli po instalacji chcesz połączyć Rockxy z lokalnym klientem MCP, zapoznaj
 
 ## Rockxy kontra alternatywy
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Model projektu** | Projekt open source AGPL-3.0 | Zastrzeżona aplikacja komercyjna | Zastrzeżona aplikacja komercyjna |
-| **Kod źródłowy** | Publiczne, podlegające audytowi, możliwe do rozwidlenia | Zamknięte źródło | Zamknięte źródło |
-| **Kompiluj ze źródła** | Bezpłatnie z Xcode z tego repozytorium | Niedostępne ze źródła publicznego | Niedostępne ze źródła publicznego |
-| **Natywna podstawa systemu MacOS** | Swift + SwiftNIO + SwiftUI/AppKit | Natywna aplikacja macOS o zamkniętym źródle | Wieloplatformowa aplikacja o zamkniętym źródle |
-| **Przechwytywanie lokalne** | Lokalny serwer proxy, certyfikaty, pomocnik i dane przechwytywania pozostają na komputerze Mac | Aplikacja proxy na komputer stacjonarny | Aplikacja proxy na komputer stacjonarny |
-| **Proces konfiguracji programisty** | Wbudowane centrum konfiguracji programisty dla środowisk wykonawczych, klientów, urządzeń, frameworków i środowisk | Wbudowana automatyczna konfiguracja oraz przewodniki dla platform i środowisk wykonawczych | Przewodniki konfiguracji specyficzne dla platformy |
-| **Zewnętrzny serwer proxy + routing PAC** | Serwer proxy HTTP/HTTPS, automatyczna konfiguracja PAC i reguły omijania | Komercyjny serwer proxy nadrzędny i obsługa PAC | Komercyjna konfiguracja serwera proxy nadrzędnego |
-| **Integracja MCP** | [Wbudowany lokalny MCP](docs/features/mcp.mdx): 10 narzędzi tylko do odczytu dla ruchu, statusu, certyfikatów, inspekcji reguł i eksportu cURL; uwierzytelnianie tokenem; redakcja domyślnie włączona | Wbudowany lokalny MCP: inspekcja ruchu oraz narzędzia reguł, sesji, certyfikatów, konfiguracji i sterowania aplikacją; tylko localhost; uwierzytelnianie tokenem na sesję; redakcja danych wrażliwych | Nie znaleziono integracji MCP producenta w [oficjalnej dokumentacji](https://www.charlesproxy.com/documentation/) sprawdzonej 2026-08-13 |
-| **Natywny AI Assistant** | Wbudowany do analizy ruchu dla wybranego żądania i wielu żądań w Rockxy | Nieznane | Nieznane |
-| **Otwarta ścieżka wkładu** | Publiczne źródło, issues, dyskusje, plan działania i PR-y | Publiczny tracker issue; źródło aplikacji i wydania są kontrolowane przez producenta | Dokumentacja i wsparcie producenta; źródło aplikacji i wydania są kontrolowane przez producenta |
+Główna macierz obejmuje serwery proxy ogólnego przeznaczenia do debugowania sieci. Testowanie bezpieczeństwa
+pakiety i przechwytywacze zorientowane na przeglądarkę/API ze znacznym nakładaniem się przepływów pracy
+są wymienione osobno, więc w odróżnieniu od produktów nie są prezentowane jako zamienne.
+Analizatory pakietów i klienci wyłącznie API nie podlegają temu porównaniu.
 
-Powyższe możliwości konkurencji zostały zweryfikowane względem oficjalnej dokumentacji produktu w dniu 2026-08-13 i mogą ulec zmianie po publikacji.
+### Bezpośrednie proxy do debugowania sieci
 
-Plan działania: głębsze protocol-aware rules, bezpieczniejsze redacted evidence bundles, mocniejsze workflow replay i comparison, szersze przewodniki Developer Setup oraz dalsze badania HTTP/2 i HTTP/3.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Kształt produktu** | Natywny serwer proxy debugowania macOS | Natywna aplikacja na macOS; Wersje Electron oparte na systemie Windows/Linux | Wieloplatformowy serwer proxy debugowania pulpitu | Wieloplatformowy zestaw narzędzi proxy CLI/TUI i interfejsu internetowego | Wieloplatformowy serwer proxy Electron i klient HTTP | Wieloplatformowy serwer proxy debugowania pulpitu |
+| **Źródło i model kompilacji** | Źródło społeczności publicznej pod AGPL-3.0-or-later; można zbudować z Xcode. Oficjalny DMG zawiera również niepubliczne komponenty downstream | Zamknięte źródło; w przeglądanych oficjalnych materiałach nie wskazano żadnego źródła aplikacji publicznych | Zamknięte źródło; w przeglądanych oficjalnych materiałach nie wskazano żadnego źródła aplikacji publicznych | Publiczne źródło licencjonowane MIT; możliwość zbudowania ze źródła | Publiczne źródło pulpitu AGPL; możliwość zbudowania ze źródła; opublikowane pliki binarne mają dodatkowe opcje licencjonowania | Zamknięte źródło; dystrybuowany jako kod obiektowy pod nazwą Fiddler Everywhere EULA |
+| **Przechwytywanie i konfiguracja** | Lokalny serwer proxy systemu z przewodnikiem dotyczącym konfiguracji aplikacji dla komputerów Mac, środowisk wykonawczych, urządzeń iOS i symulatora | Automatyczna konfiguracja aplikacji Mac, środowisk wykonawczych i urządzeń mobilnych | Lokalny serwer proxy z przewodnikami konfiguracji macOS, iOS i międzyplatformowymi | Zwykły, proces lokalny, WireGuard, tryb odwrotny, przezroczysty i inne tryby przechwytywania | Ukierunkowane i ręczne przechwytywanie proxy dla przeglądarek, środowisk wykonawczych, kontenerów i urządzeń mobilnych | Tryby przechwytywania systemu, sieci, przeglądarki, terminala, jawne i urządzenia zdalnego |
+| **Modyfikuj i kpij** | Punkty przerwania, Map Local/Remote, reguły nagłówków, blokowanie i reguły opóźnień | Punkty przerwania, Map Local/Remote, listy bloków, warunki sieciowe i reguły JavaScript | Punkty przerwania, przepisywanie, Map Local/Remote, blokowanie i ograniczanie | Map Local/Remote, modyfikacja treści/nagłówka, blokowanie i odtwarzanie serwera | Punkty przerwania oraz przepisywanie, przekierowywanie, próbowanie i wstrzykiwanie błędów w oparciu o reguły; część automatyzacji jest ograniczona planem | Reguły, punkty przerwania, przekierowania, modyfikacja odpowiedzi i drwiny |
+| **Odtwórz i porównaj** | Utwórz/odtwórz ponownie oraz porównanie lokalnych żądań równoległych, nagłówków i treści | Twórz, powtarzaj i różnicuj | Powtarzaj i edytuj żądania | Powtórka po stronie klienta i serwera | Wbudowany klient HTTP do tworzenia i wysyłania żądań | API Kompozytor, odtwarzanie ruchu i porównanie ruchu udokumentowane w wersji beta |
+| **Przepływy pracy WebSocket** | Inspekcja ramek tekstowych/binarnych za pomocą ograniczonej heurystyki Protobuf | Kontrola WS/WSS; skrypty mogą modyfikować adresy URL/nagłówki uzgadniania, a nie wiadomości | Obsługa WebSocket jest udokumentowana w oficjalnej historii wersji | Przechwytywanie i wykonywanie skryptów WebSocket; Powtórka WebSocket nie jest obsługiwana | Kontrola WebSocket plus zasady specyficzne dla WebSocket | WebSocket przechwytywanie i inspekcja |
+| **Skrypty i rozszerzalność** | Haki JavaScriptCore w trybie piaskownicy z ograniczonym API i przekroczeniem limitu czasu wykonania | JavaScript skrypt żądania/odpowiedzi | Przepisz reguły i kontroluj interfejs sieciowy; brak udokumentowanej ogólnej funkcji skryptowej JavaScript | Dodatki Python i automatyzacja wiersza poleceń | Automatyzacja oparta na regułach oraz publiczne biblioteki źródłowe i proxy | Automatyzacja oparta na regułach; nie udokumentowano żadnej ogólnej funkcji tworzenia skryptów |
+| **Routing upstream** | [HTTP/HTTPS upstream proxy i PAC routing URL](docs/features/upstream-proxy.mdx); Polityka społeczności wyłącza uwierzytelnianie proxy i SOCKS5 oraz ogranicza reguły obejścia do trzech | Zewnętrzne routing HTTP/HTTPS/SOCKS i PAC z regułami obejścia | Zewnętrzne proxy HTTP/HTTPS/SOCKS z regułami uwierzytelniania i obejścia | HTTP/HTTPS tryb przesyłania danych plus tryby odtwarzania wstecznego i SOCKS | Ustawienia przesyłania danych systemowych, HTTP, HTTPS i SOCKS; mogą obowiązywać limity planu | Automatyczne łączenie z systemowymi serwerami proxy oraz przechwytywanie zwrotnego proxy |
+| **AI i MCP** | [Asystent AI w aplikacji](docs/features/ai-assistant.mdx) i [wbudowany lokalny MCP](docs/features/mcp.mdx) z 10 narzędziami tylko do odczytu, domyślnie włączonym uwierzytelnianiem tokenem i redakcją | Wbudowany MCP dla zewnętrznych klientów AI, w tym odczyty ruchu i kontrola aplikacji/reguł | Nieudokumentowane | Nieudokumentowane | Aktualne oficjalne źródła zawierają dołączony lokalny most MCP; brak udokumentowanego asystenta w aplikacji | Wbudowany MCP plus profesjonalny asystent debugowania, którego aktualna dokumentacja wymaga wklejenia przechwyconych szczegółów ruchu do czatu |
+
+### Sąsiednie narzędzia przechwytujące
+
+Produkty te w znacznym stopniu pokrywają się z Rockxy, ale prowadzą testy bezpieczeństwa,
+reguły przeglądarki lub przepływy pracy klienta API, zamiast tego samego ogólnego przeznaczenia
+natywny fokus debugowania-proxy.
+
+| **Produkt** | **Dlaczego sąsiaduje** | **Źródło i model kompilacji** | **Odpowiednie nakładanie się** | **AI i MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Zestaw do testowania bezpieczeństwa sieciowego z przechwytującym serwerem proxy | Aplikacja o zamkniętym kodzie źródłowym; w EULA stwierdza się, że użytkownicy nie mają prawa do źródła aplikacji. Rozszerzenia mogą korzystać z oddzielnych licencji | Przechwytywanie i dopasowywanie/zamiana proxy proxy, wzmacniak, WebSocket, proxy upstream/SOCKS i ekosystem dużych rozszerzeń | Burp AI jest dostępny w Repeaterze; PortSwigger utrzymuje również publiczne rozszerzenie serwera MCP dla zewnętrznych klientów AI |
+| **ZAP** | Skaner bezpieczeństwa i przechwytujący serwer proxy | Publiczne źródło Apache-2.0; możliwość zbudowania ze źródła | Przechwytywanie/edycja, ręczne ponowne wysyłanie, punkty przerwania i skrypty WebSocket, skrypty wielojęzyczne, dodatki i automatyzacja | Oficjalna integracja MCP i opcjonalne dodatki LLM Support |
+| **Requestly HTTP Interceptor** | Rozszerzenie przeglądarki i wieloplatformowe narzędzie do przechwytywania/makiet na pulpicie | Publiczne źródło przechwytywacza komputerów stacjonarnych AGPL; oddzielny klient Requestly API jest zastrzeżony zgodnie z zawiadomieniem o repozytorium społeczności publicznej | Przechwytywanie, przekierowywanie w całym systemie/przeglądarce, Map Local/Remote, modyfikacja nagłówka/treści, transformacje JavaScript, kpiny i symulacja opóźnień/błędów | Oddzielny oficjalny serwer MCP zarządza regułami i grupami; brak udokumentowanego asystenta analizy ruchu w aplikacji |
+
+Dostępność funkcji może się różnić w zależności od wersji, planu, platformy lub dodatku.
+„Nieudokumentowane” oznacza, że w oficjalnej wersji pierwszej nie znaleziono możliwości
+źródła sprawdzone w 2026-08-22; nie jest to dowód na brak takiej zdolności.
+Powyższe oświadczenia dotyczące produktów i funkcji zostały sprawdzone z dokumentacją dostawcy,
+repozytoria źródłowe prowadzone przez dostawcę lub warunki licencji dostawcy obowiązujące w tym dniu oraz
+może się zmienić. Nazwy produktów i znaki towarowe należą do ich odpowiednich właścicieli;
+Rockxy nie jest z nimi powiązany ani nie jest przez nich wspierany. Poprawki mile widziane
+poprzez narzędzie do śledzenia problemów Rockxy.
+
+Plan działania: głębsze zasady uwzględniające protokoły, bezpieczniejsze zredagowane pakiety dowodów, skuteczniejsze procesy odtwarzania i porównywania, szersze wskazówki dotyczące konfiguracji dla programistów oraz ciągłe badania nad protokołami HTTP/2 i HTTP/3.
 
 ## Bezpieczeństwo
 

@@ -341,22 +341,47 @@ Als je Rockxy na de installatie met een lokale MCP-client wilt verbinden, zie da
 
 ## Rockxy versus alternatieven
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Projectmodel** | AGPL-3.0 open source-project | Eigen commerciële app | Eigen commerciële app |
-| **Broncode** | Openbaar, controleerbaar, forkeerbaar | Gesloten bron | Gesloten bron |
-| **Bouw vanuit de bron** | Gratis bij Xcode uit deze repository | Niet beschikbaar via openbare bron | Niet beschikbaar via openbare bron |
-| **Native macOS-basis** | Swift + SwiftNIO + SwiftUI/AppKit | Native macOS-app met gesloten bron | Platformoverschrijdende app met gesloten bron |
-| **Lokale eerste opname** | Lokale proxy, certificaten, helper en vastgelegde gegevens blijven op uw Mac | Desktop proxy-app | Desktop proxy-app |
-| **Werkstroom voor het instellen van ontwikkelaars** | Ingebouwde Developer Setup Hub voor runtimes, clients, apparaten, frameworks en omgevingen | Ingebouwde automatische installatie plus platform- en runtime-gidsen | Platformspecifieke installatiegidsen |
-| **Externe proxy + PAC-routering** | HTTP/HTTPS upstream-proxy, automatische PAC-configuratie en bypass-regels | Commerciële upstream-proxy en PAC-ondersteuning | Commerciële upstream-proxyconfiguratie |
-| **MCP-integratie** | [Ingebouwde lokale MCP](docs/features/mcp.mdx): 10 alleen-lezen tools voor verkeer, status, certificaten, regelinspectie en cURL-export; token-geauthenticeerd; redactie standaard aan | Ingebouwde lokale MCP: verkeersinspectie plus tools voor regels, sessie, certificaat, installatie en app-besturing; alleen localhost; token-authenticatie per sessie; redactie van gevoelige gegevens | Geen eigen MCP-integratie gevonden in de op 2026-08-13 beoordeelde [officiële documentatie](https://www.charlesproxy.com/documentation/) |
-| **Native AI Assistant** | Ingebouwd voor verkeersanalyse van geselecteerd verzoek en meerdere verzoeken binnen Rockxy | Onbekend | Onbekend |
-| **Open bijdragepad** | Openbare bron, issues, discussies, roadmap en PR's | Openbare issue-tracker; applicatiebron en releases worden beheerd door de leverancier | Documentatie en ondersteuning van de leverancier; applicatiebron en releases worden beheerd door de leverancier |
+De hoofdmatrix omvat algemene proxy's voor webfoutopsporing. Beveiligingstests
+suites en browser/API-georiënteerde interceptors met aanzienlijke workflow-overlapping
+worden afzonderlijk vermeld, zodat andere producten niet als onderling uitwisselbaar worden gepresenteerd.
+Pakketanalysatoren en clients die alleen API gebruiken, vallen buiten deze vergelijking.
 
-De bovenstaande mogelijkheden van concurrenten zijn op 2026-08-13 geverifieerd aan de hand van officiële productdocumentatie en kunnen na publicatie veranderen.
+### Directe proxy's voor webfoutopsporing
 
-Op de routekaart: diepere protocolbewuste regels, veiligere geredigeerde bewijsbundels, sterkere replay- en vergelijkingsworkflows, bredere Developer Setup-gidsen en doorlopend onderzoek naar HTTP/2 en HTTP/3.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Productvorm** | Native macOS-foutopsporingsproxy | Native macOS-app; Electron-gebaseerde Windows/Linux-edities | Cross-platform desktop-foutopsporingsproxy | Cross-platform CLI/TUI en web-UI proxy-toolkit | Cross-platform Electron desktopproxy en HTTP-client | Cross-platform desktop-foutopsporingsproxy |
+| **Bron- en bouwmodel** | Openbare communitybron onder AGPL-3.0-or-later; bouwbaar met Xcode. De officiële DMG bevat ook niet-openbare downstream-componenten | Gesloten bron; geen openbare applicatiebron geïdentificeerd in het beoordeelde officiële materiaal | Gesloten bron; geen openbare applicatiebron geïdentificeerd in het beoordeelde officiële materiaal | Openbare MIT-gelicentieerde bron; bouwbaar vanaf bron | Openbare AGPL desktopbron; bouwbaar vanaf de bron; gepubliceerde binaire bestanden hebben extra licentiemogelijkheden | Gesloten bron; gedistribueerd als objectcode onder de Fiddler Everywhere EULA |
+| **Vastleggen en instellen** | Lokale systeemproxy met begeleide installatie voor Mac-apps, runtimes, iOS-apparaten en Simulator | Automatische configuratie voor Mac-apps, runtimes en mobiele apparaten | Lokale proxy met macOS-, iOS- en platformonafhankelijke installatiehandleidingen | Reguliere, lokale proces-, WireGuard-, omgekeerde, transparante en andere opnamemodi | Gerichte en handmatige proxy-onderschepping voor browsers, runtimes, containers en mobiele apparaten | Systeem-, netwerk-, browser-, terminal-, expliciete en externe apparaatopnamemodi |
+| **Wijzigen en bespotten** | Breekpunten, Map Local/Remote, headerregels, blokkering en latentieregels | Breekpunten, Map Local/Remote, blokkeerlijsten, netwerkvoorwaarden en JavaScript-regels | Breekpunten, herschrijven, Map Local/Remote, blokkeren en beperken | Map Local/Remote, wijziging van hoofdtekst/header, blokkeren en serverherhaling | Breekpunten plus op regels gebaseerd herschrijven, omleiden, schijn- en foutinjectie; sommige automatisering is plangebonden | Regels, breekpunten, omleidingen, reactiewijzigingen en spottende opmerkingen |
+| **Herhaal en vergelijk** | Opstellen/afspelen plus lokaal naast elkaar geplaatst verzoek, header en bodyvergelijking | Componeren, herhalen en differentiëren | Aanvragen herhalen en bewerken | Herhaling op client- en serverzijde | Ingebouwde HTTP-client voor het opstellen en verzenden van verzoeken | API Componist, verkeersherhaling en verkeersvergelijking gedocumenteerd als bèta |
+| **WebSocket-workflows** | Tekst-/binaire frame-inspectie met begrensde Protobuf-heuristieken | WS/WSS-inspectie; scripts kunnen handshake-URL/headers wijzigen, geen berichten | WebSocket-ondersteuning is gedocumenteerd in de officiële versiegeschiedenis | WebSocket onderschepping en scripting; WebSocket opnieuw afspelen wordt niet ondersteund | WebSocket-inspectie plus WebSocket-specifieke regels | WebSocket afvang en inspectie |
+| **Scripting en uitbreidbaarheid** | Sandboxed JavaScriptCore hooks met een begrensde API en uitvoeringstime-out | JavaScript verzoek/antwoord-scripting | Herschrijf regels en een controle-webinterface; geen algemene JavaScript-scriptfunctie gedocumenteerd | Python-add-ons en opdrachtregelautomatisering | Op regels gebaseerde automatisering plus openbare bron- en proxybibliotheken | Regelgebaseerde automatisering; geen algemene scriptfunctie van eigen hand gedocumenteerd |
+| **Upstream-routering** | [HTTP/HTTPS upstream proxy en PAC URL-routering](docs/features/upstream-proxy.mdx); Het communitybeleid schakelt proxy-authenticatie uit en SOCKS5 en caps omzeilen regels op drie | Externe HTTP/HTTPS/SOCKS- en PAC-routering met bypass-regels | Externe HTTP/HTTPS/SOCKS-proxy's met authenticatie- en bypass-regels | HTTP/HTTPS upstream-modus plus omgekeerde en SOCKS luisteraarmodi | Systeem-, HTTP-, HTTPS- en SOCKS upstream-instellingen; planlimieten kunnen van toepassing zijn | Automatische koppeling aan systeemproxy's plus reverse-proxy-opname |
+| **AI en MCP** | [In-app AI Assistant](docs/features/ai-assistant.mdx) en [ingebouwde lokale MCP](docs/features/mcp.mdx) met 10 alleen-lezen tools, tokenauthenticatie en redactie standaard ingeschakeld | Ingebouwde MCP voor externe AI-clients, inclusief verkeerslezingen en app-/regelcontroles | Niet gedocumenteerd | Niet gedocumenteerd | Een gebundelde lokale MCP-brug is aanwezig in de huidige officiële bron; geen in-app-assistent gedocumenteerd | Ingebouwde MCP plus een professionele foutopsporingsassistent waarvan de huidige documentatie vereist dat vastgelegde verkeersgegevens in de chat worden geplakt |
+
+### Aangrenzende onderscheppingstools
+
+Deze producten overlappen betekenisvol met Rockxy, maar zijn toonaangevend op het gebied van beveiligingstests.
+browserregels of API-clientworkflows in plaats van hetzelfde algemene doel
+native debugging-proxy focus.
+
+| **Product** | **Waarom het aangrenzend is** | **Bron- en bouwmodel** | **Relevante overlap** | **AI en MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Testpakket voor webbeveiliging met een onderscheppende proxy | Gesloten source-applicatie; in de EULA staat dat gebruikers geen recht hebben op de applicatiebron. Extensies kunnen aparte licenties gebruiken | Proxy-onderschepping en match/replace, Repeater, WebSockets, upstream/SOCKS proxying en een groot uitbreidingsecosysteem | Burp AI is beschikbaar in Repeater; PortSwigger onderhoudt ook een openbare MCP-serverextensie voor externe AI-clients |
+| **ZAP** | Beveiligingsscanner en onderscheppingsproxy | Openbare Apache-2.0-bron; bouwbaar vanaf bron | Onderscheppen/bewerken, handmatig opnieuw verzenden, WebSocket breekpunten en scripts, meertalige scripting, add-ons en automatisering | Officiële MCP-integratie en optionele LLM-ondersteuningsadd-ons |
+| **Requestly HTTP Interceptor** | Browserextensie en platformonafhankelijke desktop-interceptor/mock-tool | Openbare AGPL desktop-interceptorbron; de afzonderlijke Requestly API Client is eigendom volgens de openbare community-repository-kennisgeving | Systeembrede/browserregistratie, omleiding, Map Local/Remote, header/body-wijziging, JavaScript-transformaties, mocks en vertragings-/foutsimulatie | Een aparte officiële MCP-server beheert regels en groepen; geen in-app-assistent voor verkeersanalyse gedocumenteerd |
+
+De beschikbaarheid van functies kan variëren per editie, abonnement, platform of add-on.
+"Niet gedocumenteerd" betekent dat er geen mogelijkheid is gevonden in de officiële first-party
+bronnen beoordeeld op 2026-08-22; het is geen bewijs dat dit vermogen ontbreekt.
+Product- en functieverklaringen hierboven zijn gecontroleerd aan de hand van leveranciersdocumentatie,
+door de leverancier onderhouden bronopslagplaatsen, of licentievoorwaarden van de leverancier op die datum en
+kan veranderen. Productnamen en handelsmerken zijn eigendom van hun respectievelijke eigenaren;
+Rockxy is niet gelieerd aan of goedgekeurd door hen. Correcties zijn welkom
+via de Rockxy issuetracker.
+
+Op de routekaart: diepere protocolbewuste regels, veiliger geredigeerde bewijsbundels, sterkere herhalings- en vergelijkingsworkflows, bredere richtlijnen voor het instellen van ontwikkelaars en voortgezet HTTP/2- en HTTP/3-onderzoek.
 
 ## Beveiliging
 
