@@ -114,8 +114,8 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
 // MARK: - TrafficRecordingCommandPresentation
 
 /// Presentation for the capture-buffer toggle. Start/Stop remains a window-toolbar lifecycle
-/// control; pausing recording stays in the traffic actions menu to avoid adjacent stop/pause
-/// symbols with overlapping meanings.
+/// control, while this command explicitly names the recording-buffer state so the two actions
+/// cannot be mistaken for one another.
 struct TrafficRecordingCommandPresentation: Equatable {
     let title: String
     let systemImage: String
@@ -125,23 +125,31 @@ struct TrafficRecordingCommandPresentation: Equatable {
     static func make(isProxyRunning: Bool, isRecording: Bool) -> Self {
         .init(
             title: isRecording ? String(localized: "Pause Recording") : String(localized: "Resume Recording"),
-            systemImage: isRecording ? "pause.fill" : "record.circle",
+            systemImage: isRecording ? "pause.circle" : "record.circle",
             help: isProxyRunning
                 ? (isRecording
-                    ? String(localized: "Pause recording new traffic without stopping the proxy. ⌘P")
-                    : String(localized: "Resume recording new traffic. ⌘P"))
-                : String(localized: "Start the proxy before changing recording. ⌘P"),
+                    ? String(localized: "Pause recording new traffic without stopping the proxy. ⌥⌘R")
+                    : String(localized: "Resume recording new traffic. ⌥⌘R"))
+                : String(localized: "Start the proxy before changing recording. ⌥⌘R"),
             isEnabled: isProxyRunning
         )
     }
 }
 
+// MARK: - TrafficActionsMenuPresentation
+
+enum TrafficActionsMenuPresentation {
+    static let systemImage = "ellipsis.circle"
+    static let help = String(localized: "More traffic actions")
+    static let accessibilityLabel = String(localized: "More Traffic Actions")
+}
+
 // MARK: - TrafficCommandBar
 
-/// A native command strip for immediate traffic work. Session clearing and live-tail state stay
-/// visible; richer request, rule, navigation, session, and export workflows live in one structured
-/// icon menu. Proxy Start/Stop remains in the window toolbar; recording pause lives in overflow
-/// so the two different capture semantics never compete as adjacent transport buttons.
+/// A native command strip for immediate traffic work. Recording, session clearing, and live-tail
+/// state stay visible; richer request, rule, navigation, session, and export workflows live in one
+/// structured icon menu. Proxy Start/Stop remains in the window toolbar, spatially separate from
+/// the explicitly labeled recording-buffer control here.
 struct TrafficCommandBar: View {
     // MARK: Internal
 
@@ -225,14 +233,38 @@ struct TrafficCommandBar: View {
 
     private var commandRow: some View {
         HStack(spacing: 8) {
+            recordingButton
             clearSessionButton
             commandDivider
             followLiveButton
             responsiveQuickToolsGroup
 
             Spacer(minLength: 12)
-            actionsMenu
+            moreActionsMenu
         }
+    }
+
+    private var recordingButton: some View {
+        let presentation = TrafficRecordingCommandPresentation.make(
+            isProxyRunning: coordinator.isProxyRunning,
+            isRecording: coordinator.isRecording
+        )
+        return Button {
+            actions.toggleRecording()
+        } label: {
+            Label(presentation.title, systemImage: presentation.systemImage)
+                .font(.system(size: metrics.secondaryFontSize))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(!presentation.isEnabled)
+        .help(presentation.help)
+        .accessibilityLabel(presentation.title)
+        .accessibilityValue(
+            coordinator.isRecording ? String(localized: "Recording") : String(localized: "Paused")
+        )
     }
 
     /// The shared quick-tool capsules for the command bar. Responsive: three capsules when wide,
@@ -283,21 +315,8 @@ struct TrafficCommandBar: View {
         .accessibilityValue(descriptor.isActive ? String(localized: "On") : String(localized: "Off"))
     }
 
-    private var actionsMenu: some View {
-        let recording = TrafficRecordingCommandPresentation.make(
-            isProxyRunning: coordinator.isProxyRunning,
-            isRecording: coordinator.isRecording
-        )
-        return Menu {
-            Button {
-                actions.toggleRecording()
-            } label: {
-                Label(recording.title, systemImage: recording.systemImage)
-            }
-            .disabled(!recording.isEnabled)
-
-            Divider()
-
+    private var moreActionsMenu: some View {
+        Menu {
             navigationMenu
 
             Divider()
@@ -315,7 +334,7 @@ struct TrafficCommandBar: View {
             sessionMenu
             exportMenu
         } label: {
-            Image(systemName: "bolt.circle")
+            Image(systemName: TrafficActionsMenuPresentation.systemImage)
                 .font(.system(size: metrics.controlFontSize, weight: .medium))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .frame(width: metrics.filterBarHeight, height: metrics.filterBarHeight)
@@ -323,8 +342,8 @@ struct TrafficCommandBar: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(String(localized: "Traffic, request, rule, session, and export actions"))
-        .accessibilityLabel(String(localized: "Traffic Actions"))
+        .help(TrafficActionsMenuPresentation.help)
+        .accessibilityLabel(TrafficActionsMenuPresentation.accessibilityLabel)
         .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
             QuickToolsEditor(
                 layout: quickToolsLayout,
@@ -336,7 +355,7 @@ struct TrafficCommandBar: View {
     }
 
     /// Keeps the command-bar quick tools discoverable when the responsive strip collapses, and
-    /// bridges into the shared customization editor without adding a second ellipsis on top.
+    /// bridges into the shared customization editor through the stable trailing More menu.
     @ViewBuilder private var quickToolsMenu: some View {
         Menu(String(localized: "Quick Tools")) {
             ForEach(

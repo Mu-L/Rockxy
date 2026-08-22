@@ -339,24 +339,49 @@ Xcode에서 빌드하고 실행. 환영 윈도우가 루트 CA 설정, 헬퍼 �
 
 설치 후 Rockxy를 로컬 MCP 클라이언트에 연결하려면 [MCP 연동 가이드](docs/features/mcp.mdx)를 참조하세요.
 
-## Rockxy vs. 대안 도구
+## Rockxy 대 대안
 
-|  | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **프로젝트 모델** | AGPL-3.0 오픈소스 프로젝트 | 독점 상용 앱 | 독점 상용 앱 |
-| **소스 코드** | 공개, 감사 가능, fork 가능 | 비공개 소스 | 비공개 소스 |
-| **소스에서 빌드** | 이 저장소에서 Xcode로 무료 빌드 | 공개 소스로는 제공되지 않음 | 공개 소스로는 제공되지 않음 |
-| **네이티브 macOS 기반** | Swift + SwiftNIO + SwiftUI/AppKit | 비공개 소스 네이티브 macOS 앱 | 비공개 소스 크로스 플랫폼 앱 |
-| **Local-first 캡처** | 로컬 프록시, 인증서, 헬퍼, 캡처 데이터가 Mac에 유지됨 | 데스크톱 프록시 앱 | 데스크톱 프록시 앱 |
-| **개발자 설정 워크플로** | runtime, client, device, framework, environment를 위한 Developer Setup Hub 내장 | 내장 자동 설정과 플랫폼/런타임 가이드 | 플랫폼별 설정 가이드 |
-| **외부 프록시 + PAC 라우팅** | HTTP/HTTPS 업스트림 프록시, PAC 자동 구성, bypass 규칙 | 상용 업스트림 프록시 및 PAC 지원 | 상용 업스트림 프록시 구성 |
-| **MCP 연동** | [내장 로컬 MCP](docs/features/mcp.mdx): 트래픽, 상태, 인증서, 규칙 검사, cURL 내보내기용 10개 읽기 전용 도구; 토큰 인증; redaction 기본 활성화 | 내장 로컬 MCP: 트래픽 검사와 규칙, 세션, 인증서, 설정, 앱 제어 도구; localhost 전용; 세션별 토큰 인증; 민감 데이터 redaction | 2026-08-13에 검토한 [공식 문서](https://www.charlesproxy.com/documentation/)에서 퍼스트파티 MCP 연동을 찾지 못함 |
-| **네이티브 AI Assistant** | Rockxy 내에서 선택 request 및 다중 request 트래픽 분석용으로 내장 | 알 수 없음 | 알 수 없음 |
-| **열린 기여 경로** | 공개 소스, issues, discussions, roadmap, PR | 공개 issue 트래커; 앱 소스와 릴리스는 벤더가 관리 | 벤더 문서 및 지원; 앱 소스와 릴리스는 벤더가 관리 |
+주요 매트릭스는 범용 웹 디버깅 프록시를 다룹니다. 보안 테스트
+상당한 작업 흐름이 겹치는 제품군 및 브라우저/API 지향 인터셉터
+서로 다른 제품이 별도로 나열되어 있으므로 서로 바꿔 사용할 수 있는 것으로 표시되지 않습니다.
+패킷 분석기와 API 전용 클라이언트는 이 비교 대상에서 제외됩니다.
 
-위 경쟁 제품 기능은 2026-08-13에 공식 제품 문서와 대조해 확인했으며 공개 후 변경될 수 있습니다.
+### 직접 웹 디버깅 프록시
 
-로드맵 방향: 더 깊은 protocol-aware rules, 더 안전한 redacted evidence bundle, 강력한 replay/comparison workflow, 폭넓은 Developer Setup guide, HTTP/2 및 HTTP/3에 대한 지속적인 연구.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **제품 형태** | macOS 네이티브 디버깅 프록시 | macOS 네이티브 앱, Windows/Linux 버전은 Electron 기반 | 크로스플랫폼 데스크톱 디버깅 프록시 | 크로스플랫폼 CLI/TUI 및 Web UI 프록시 툴킷 | 크로스플랫폼 Electron 데스크톱 프록시 및 HTTP 클라이언트 | 크로스플랫폼 데스크톱 디버깅 프록시 |
+| **소스 및 빌드 모델** | Community 소스는 AGPL-3.0-or-later로 공개되며 Xcode로 빌드 가능. 공식 DMG에는 비공개 downstream 구성 요소도 포함 | 비공개 소스. 검토한 공식 자료에서 공개 애플리케이션 소스를 확인하지 못함 | 비공개 소스. 검토한 공식 자료에서 공개 애플리케이션 소스를 확인하지 못함 | MIT 라이선스 공개 소스. 소스에서 빌드 가능 | AGPL 공개 데스크톱 소스. 소스에서 빌드 가능하며 배포 바이너리에는 추가 라이선스 옵션이 있음 | 비공개 소스. Fiddler Everywhere EULA에 따라 object code로 배포 |
+| **캡처 및 설정** | Mac 앱, 런타임, iOS 기기 및 Simulator를 위한 안내식 로컬 시스템 프록시 설정 | Mac 앱, 런타임 및 모바일 기기 자동 설정 | macOS, iOS 및 크로스플랫폼 설정 가이드를 제공하는 로컬 프록시 | regular, local-process, WireGuard, reverse, transparent 등 다양한 캡처 모드 | 브라우저, 런타임, 컨테이너 및 모바일 기기를 위한 targeted/manual proxy interception | system, network, browser, terminal, explicit 및 remote-device 캡처 모드 |
+| **수정 및 모킹** | Breakpoint, Map Local/Remote, header rule, blocking 및 latency rule | Breakpoint, Map Local/Remote, block list, network condition 및 JavaScript rule | Breakpoint, Rewrite, Map Local/Remote, blocking 및 throttling | Map Local/Remote, body/header 수정, blocking 및 server replay | Breakpoint와 rule 기반 rewrite, redirect, mock, error injection. 일부 automation은 요금제 제한 | rule, Breakpoint, redirect, response 수정 및 mock |
+| **리플레이 및 비교** | Compose/replay와 request, header, body의 로컬 나란히 비교 | Compose, Repeat, Diff | request 반복 및 편집 | client-side 및 server-side replay | request 작성 및 전송을 위한 내장 HTTP 클라이언트 | API Composer, traffic replay 및 traffic comparison은 beta로 문서화 |
+| **WebSocket 워크플로** | 제한된 Protobuf heuristic을 포함한 text/binary frame 검사 | WS/WSS 검사. script는 handshake URL/header를 수정할 수 있지만 message는 수정하지 못함 | WebSocket 지원은 공식 버전 기록에 문서화 | WebSocket interception 및 scripting. WebSocket replay는 미지원 | WebSocket 검사 및 전용 rule | WebSocket capture 및 inspection |
+| **스크립팅 및 확장성** | 제한된 API와 실행 timeout을 갖춘 sandboxed JavaScriptCore hook | JavaScript request/response scripting | Rewrite rule과 Control Web Interface. 일반 JavaScript scripting 기능은 문서화되지 않음 | Python add-on 및 command-line automation | rule 기반 automation, 공개 소스 및 proxy library | rule 기반 automation. first-party 일반 scripting 기능은 문서화되지 않음 |
+| **업스트림 라우팅** | [HTTP/HTTPS upstream proxy 및 PAC URL routing](docs/features/upstream-proxy.mdx). Community에서는 proxy authentication과 SOCKS5가 비활성화되고 bypass rule은 최대 3개 | bypass rule을 포함한 external HTTP/HTTPS/SOCKS 및 PAC routing | authentication과 bypass rule을 포함한 external HTTP/HTTPS/SOCKS proxy | HTTP/HTTPS upstream mode, reverse 및 SOCKS listener mode | system, HTTP, HTTPS, SOCKS upstream 설정. 요금제 제한이 적용될 수 있음 | system proxy 자동 chaining 및 reverse-proxy capture |
+| **AI 및 MCP** | [앱 내 AI Assistant](docs/features/ai-assistant.mdx)와 [내장 로컬 MCP](docs/features/mcp.mdx). read-only tool 10개, token authentication, 기본 redaction | 외부 AI client용 내장 MCP. traffic read와 app/rule control 포함 | 문서화되지 않음 | 문서화되지 않음 | 현재 공식 소스에 bundled local MCP bridge가 있음. 앱 내 assistant는 문서화되지 않음 | 내장 MCP와 Pro-tier Debugging Assistant. 현재 문서상 capture한 traffic details를 chat에 붙여넣어야 함 |
+
+### 인접 차단 도구
+
+이들 제품은 Rockxy와 의미가 겹치지만 보안 테스트로 이어집니다.
+동일한 범용이 아닌 브라우저 규칙 또는 API 클라이언트 워크플로
+네이티브 디버깅 프록시 포커스.
+
+| **제품** | **인접 도구인 이유** | **소스 및 빌드 모델** | **관련 중복 기능** | **AI 및 MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | intercepting proxy를 포함한 웹 보안 테스트 suite | 비공개 소스 애플리케이션. EULA는 사용자가 애플리케이션 소스에 대한 권리가 없다고 명시하며 extension은 별도 라이선스를 사용할 수 있음 | proxy interception, match/replace, Repeater, WebSocket, upstream/SOCKS proxy 및 대규모 extension ecosystem | Repeater에서 Burp AI 사용 가능. PortSwigger는 외부 AI client용 공개 MCP Server extension도 유지 |
+| **ZAP** | 보안 scanner 및 intercepting proxy | Apache-2.0 공개 소스. 소스에서 빌드 가능 | intercept/edit, manual resend, WebSocket breakpoint와 script, 다중 언어 scripting, add-on 및 automation | 공식 MCP Integration add-on과 선택형 LLM Support add-on |
+| **Requestly HTTP Interceptor** | browser extension 및 크로스플랫폼 desktop interceptor/mock tool | desktop interceptor는 AGPL 공개 소스. 별도 API Client는 공개 community repository 고지상 proprietary | system-wide/browser capture, redirect, Map Local/Remote, header/body 수정, JavaScript transform, mock, delay/error simulation | 별도 공식 MCP server가 rule과 group을 관리. 앱 내 traffic-analysis assistant는 문서화되지 않음 |
+
+기능 가용성은 에디션, 계획, 플랫폼 또는 추가 기능에 따라 다를 수 있습니다.
+"문서화되지 않음"은 공식 자사에서 기능을 찾을 수 없음을 의미합니다.
+2026-08-22에서 검토된 소스; 능력이 없다는 증거는 아닙니다.
+위의 제품 및 기능 설명은 공급업체 문서와 비교하여 확인되었습니다.
+공급업체가 유지 관리하는 소스 리포지토리 또는 해당 날짜의 공급업체 라이선스 조건 및
+변경될 수 있습니다. 제품 이름과 상표는 해당 소유자의 자산입니다.
+Rockxy는 이들과 제휴하거나 보증하지 않습니다. 수정은 환영합니다
+Rockxy 이슈 트래커를 통해.
+
+로드맵: 더 심층적인 프로토콜 인식 규칙, 더 안전하게 수정된 증거 번들, 더 강력한 재생 및 비교 워크플로, 더 광범위한 개발자 설정 지침, 지속적인 HTTP/2 및 HTTP/3 연구.
 
 ## 보안
 

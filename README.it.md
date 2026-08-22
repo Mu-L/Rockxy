@@ -339,24 +339,49 @@ Costruisci ed esegui in Xcode. La finestra di benvenuto guida l'utente attravers
 
 Se desideri connettere Rockxy a un client MCP locale dopo l'installazione, consulta la [Guida all'integrazione MCP](docs/features/mcp.mdx).
 
-## Rockxy vs. Alternative
+## Rockxy rispetto alle alternative
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Modello di progetto** | Progetto open source AGPL-3.0 | App commerciale proprietaria | App commerciale proprietaria |
-| **Codice sorgente** | Pubblico, verificabile, divisibile | Sorgente chiusa | Sorgente chiusa |
-| **Costruisci dalla fonte** | Gratuito con Xcode da questo repository | Non disponibile da fonte pubblica | Non disponibile da fonte pubblica |
-| **Base macOS nativa** | Swift + SwiftNIO + SwiftUI/AppKit | App macOS nativa a sorgente chiusa | App multipiattaforma a sorgente chiusa |
-| **Prima acquisizione locale** | Il proxy locale, i certificati, l'helper e i dati di acquisizione rimangono sul tuo Mac | Applicazione proxy desktop | Applicazione proxy desktop |
-| **Flusso di lavoro di configurazione dello sviluppatore** | Hub di configurazione per sviluppatori integrato per runtime, client, dispositivi, framework e ambienti | Configurazione automatica integrata più guide di piattaforma e runtime | Guide di configurazione specifiche della piattaforma |
-| **Proxy esterno + instradamento PAC** | Proxy upstream HTTP/HTTPS, configurazione automatica PAC e regole di bypass | Proxy upstream commerciale e supporto PAC | Configurazione proxy upstream commerciale |
-| **Integrazione MCP** | [MCP locale integrato](docs/features/mcp.mdx): 10 strumenti di sola lettura per traffico, stato, certificati, ispezione delle regole ed export cURL; autenticato tramite token; redazione attiva per impostazione predefinita | MCP locale integrato: ispezione del traffico più strumenti per regole, sessione, certificati, configurazione e controllo app; solo localhost; autenticazione tramite token per sessione; redazione dei dati sensibili | Nessuna integrazione MCP first-party trovata nella [documentazione ufficiale](https://www.charlesproxy.com/documentation/) esaminata il 2026-08-13 |
-| **AI Assistant nativo** | Integrato per l'analisi del traffico su richiesta selezionata e multi-richiesta dentro Rockxy | Sconosciuto | Sconosciuto |
-| **Percorso di contributo aperto** | Sorgente pubblica, issue, discussioni, roadmap e PR | Issue tracker pubblico; il sorgente dell'applicazione e le release sono controllati dal fornitore | Documentazione e supporto del fornitore; il sorgente dell'applicazione e le release sono controllati dal fornitore |
+La matrice principale copre i proxy di debug Web generici. Test di sicurezza
+suite e intercettori orientati al browser/API con sostanziale sovrapposizione del flusso di lavoro
+sono elencati separatamente quindi i prodotti a differenza non sono presentati come intercambiabili.
+Gli analizzatori di pacchetti e i client solo API non rientrano in questo confronto.
 
-Le capacità dei concorrenti sopra riportate sono state verificate rispetto alla documentazione ufficiale del prodotto il 2026-08-13 e potrebbero cambiare dopo la pubblicazione.
+### Proxy di debug web diretto
 
-Sulla roadmap: regole protocol-aware più profonde, bundle di prove redatte più sicuri, workflow di replay e confronto più solidi, guide Developer Setup più ampie e ricerca continua su HTTP/2 e HTTP/3.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Forma del prodotto** | Proxy di debug nativo di macOS | App macOS nativa; Edizioni Windows/Linux basate su Electron | Proxy di debug desktop multipiattaforma | CLI/TUI multipiattaforma e toolkit proxy dell'interfaccia utente Web | Proxy desktop multipiattaforma Electron e client HTTP | Proxy di debug desktop multipiattaforma |
+| **Modello di origine e creazione** | Fonte comunitaria pubblica sotto AGPL-3.0-or-later; costruibile con Xcode. Lo DMG ufficiale contiene anche componenti downstream non pubblici | Sorgente chiusa; nessuna fonte di applicazione pubblica identificata nei materiali ufficiali esaminati | Sorgente chiusa; nessuna fonte di applicazione pubblica identificata nei materiali ufficiali esaminati | Sorgente con licenza pubblica MIT; costruibile dal sorgente | Sorgente desktop pubblica AGPL; costruibile dalla fonte; i binari pubblicati hanno opzioni di licenza aggiuntive | Sorgente chiusa; distribuito come codice oggetto sotto Fiddler Everywhere EULA |
+| **Cattura e configura** | Proxy di sistema locale con configurazione guidata per app Mac, runtime, dispositivi iOS e simulatore | Configurazione automatica per app, runtime e dispositivi mobili Mac | Proxy locale con guide di configurazione per macOS, iOS e multipiattaforma | Modalità di acquisizione normale, processo locale, WireGuard, inversa, trasparente e altre | Intercettazione proxy mirata e manuale per browser, runtime, contenitori e dispositivi mobili | Modalità di acquisizione di sistema, rete, browser, terminale, esplicita e da dispositivo remoto |
+| **Modifica e deride** | Punti di interruzione, Map Local/Remote, regole di intestazione, blocco e regole di latenza | Punti di interruzione, Map Local/Remote, elenchi di blocchi, condizioni di rete e regole JavaScript | Punti di interruzione, riscrittura, Map Local/Remote, blocco e limitazione | Map Local/Remote, modifica del corpo/intestazione, blocco e riproduzione del server | Punti di interruzione più riscrittura, reindirizzamento, simulazione e inserimento di errori basati su regole; parte dell'automazione è limitata al piano | Regole, punti di interruzione, reindirizzamenti, modifica della risposta e mocking |
+| **Riproduci e confronta** | Composizione/riproduzione più richiesta locale affiancata, intestazione e confronto del corpo | Componi, ripeti e confronta | Ripeti e modifica le richieste | Riproduzione lato client e lato server | Client HTTP integrato per la composizione e l'invio di richieste | API Compositore, riproduzione del traffico e confronto del traffico documentati come beta |
+| **Flussi di lavoro WebSocket** | Ispezione di testo/frame binario con euristica limitata Protobuf | Ispezione WS/WSS; gli script possono modificare URL/intestazioni di handshake, non messaggi | Il supporto WebSocket è documentato nella cronologia delle versioni ufficiali | Intercettazione e scripting WebSocket; La riproduzione WebSocket non è supportata | Ispezione WebSocket più regole specifiche WebSocket | WebSocket cattura e ispezione |
+| **Scripting ed estensibilità** | Hook JavaScriptCore sandbox con API limitato e timeout di esecuzione | JavaScript script di richiesta/risposta | Riscrivere le regole e un'interfaccia Web di controllo; nessuna funzionalità di scripting generale JavaScript documentata | Componenti aggiuntivi Python e automazione della riga di comando | Automazione basata su regole più librerie proxy e di origine pubblica | Automazione basata su regole; nessuna funzionalità di scripting generale di prima parte documentata |
+| **Instradamento a monte** | [Proxy upstream HTTP/HTTPS e routing URL PAC](docs/features/upstream-proxy.mdx); La politica della community disabilita l'autenticazione proxy e SOCKS5 e limita le regole di bypass a tre | Routing esterno HTTP/HTTPS/SOCKS e PAC con regole di bypass | Proxy esterni HTTP/HTTPS/SOCKS con regole di autenticazione e bypass | Modalità upstream HTTP/HTTPS più modalità inversa e listener SOCKS | Impostazioni upstream di sistema, HTTP, HTTPS e SOCKS; potrebbero applicarsi limiti del piano | Concatenamento automatico ai proxy di sistema più acquisizione proxy inverso |
+| **AI e MCP** | [Assistente AI in-app](docs/features/ai-assistant.mdx) e [MCP locale integrato](docs/features/mcp.mdx) con 10 strumenti di sola lettura, autenticazione token e redazione attiva per impostazione predefinita | MCP integrato per client AI esterni, incluse letture del traffico e controlli di app/regole | Non documentato | Non documentato | Nell'attuale fonte ufficiale è presente un bridge locale MCP in bundle; nessun assistente in-app documentato | MCP integrato più un assistente di debug di livello professionale la cui documentazione attuale richiede che i dettagli sul traffico acquisiti siano incollati nella chat |
+
+### Strumenti di intercettazione adiacenti
+
+Questi prodotti si sovrappongono in modo significativo a Rockxy ma sono leader nei test di sicurezza,
+regole del browser o flussi di lavoro del client API anziché lo stesso scopo generale
+focus nativo del proxy di debug.
+
+| **Prodotto** | **Perché è adiacente** | **Modello di origine e creazione** | **Sovrapposizione rilevante** | **AI e MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Suite di test di sicurezza web con proxy di intercettazione | Applicazione a codice chiuso; il suo EULA afferma che gli utenti non hanno diritto alla fonte dell'applicazione. Le estensioni possono utilizzare licenze separate | Intercettazione proxy e corrispondenza/sostituzione, ripetitore, WebSocket, proxy upstream/SOCKS e un ampio ecosistema di estensione | Burp AI è disponibile in Repeater; PortSwigger mantiene anche un'estensione server pubblica MCP per client AI esterni |
+| **ZAP** | Security scanner e proxy di intercettazione | Sorgente pubblica Apache-2.0; costruibile dal sorgente | Intercettazione/modifica, rinvio manuale, punti di interruzione e script WebSocket, scripting multilingue, componenti aggiuntivi e automazione | Integrazione ufficiale MCP e componenti aggiuntivi di supporto LLM opzionali |
+| **Requestly HTTP Interceptor** | Estensione del browser e strumento interceptor/mock desktop multipiattaforma | Sorgente di intercettazione desktop pubblica AGPL; il client Requestly API separato è proprietario in base all'avviso del repository pubblico della comunità | Acquisizione a livello di sistema/browser, reindirizzamento, Map Local/Remote, modifica di intestazione/corpo, trasformazioni JavaScript, mock e simulazione di ritardo/errore | Un server MCP ufficiale separato gestisce regole e gruppi; nessun assistente per l'analisi del traffico in-app documentato |
+
+La disponibilità delle funzionalità può variare in base all'edizione, al piano, alla piattaforma o al componente aggiuntivo.
+"Non documentato" significa che una funzionalità non è stata trovata nel file first-party ufficiale
+fonti recensite su 2026-08-22; non è una prova che la capacità sia assente.
+Le dichiarazioni su prodotti e funzionalità di cui sopra sono state confrontate con la documentazione del fornitore,
+repository di sorgenti gestiti dal fornitore o termini di licenza del fornitore in quella data e
+potrebbe cambiare. I nomi dei prodotti e i marchi appartengono ai rispettivi proprietari;
+Rockxy non è affiliato o approvato da loro. Le correzioni sono benvenute
+tramite il tracker dei problemi Rockxy.
+
+Sulla tabella di marcia: regole più approfondite basate sul protocollo, pacchetti di prove redatte più sicure, flussi di lavoro di riproduzione e confronto più efficaci, linee guida più ampie per l'impostazione degli sviluppatori e ricerca continua su HTTP/2 e HTTP/3.
 
 ## Sicurezza
 

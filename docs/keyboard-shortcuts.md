@@ -24,10 +24,11 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 |---|---|
 | `⌘K` | Clear session |
 | `⇧⌘K` | Clear session and filters |
-| `⌘P` | Pause or resume capture |
+| `⌥⌘R` | Pause or resume recording without stopping the proxy |
 | `⌘L` | Focus the search bar |
 | `⇧⌘L` | Follow the newest visible request in the active workspace tab |
-| `⌘↑` / `⌘↓` | Jump to the first or last captured row |
+| `⌘↑` | Jump to the first visible row when the request table has focus |
+| `⌘↓` | Jump to the last visible row when the request table has focus |
 | `↑` / `↓` | Move row selection |
 | `⌘E` | Edit and Repeat the selected request |
 | `⌘R` | Replay the selected request |

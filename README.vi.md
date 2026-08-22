@@ -341,20 +341,33 @@ Nếu bạn muốn kết nối Rockxy với một local MCP client sau khi cài 
 
 ## Rockxy vs. Các Giải Pháp Khác
 
-|  | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Mô hình dự án** | Dự án mã nguồn mở AGPL-3.0 | Ứng dụng thương mại độc quyền | Ứng dụng thương mại độc quyền |
-| **Mã nguồn** | Công khai, có thể kiểm tra, có thể fork | Mã nguồn đóng | Mã nguồn đóng |
-| **Build từ mã nguồn** | Miễn phí với Xcode từ repo này | Không có mã nguồn công khai để build | Không có mã nguồn công khai để build |
-| **Nền tảng macOS native** | Swift + SwiftNIO + SwiftUI/AppKit | Ứng dụng macOS native mã nguồn đóng | Ứng dụng đa nền tảng mã nguồn đóng |
-| **Capture local-first** | Proxy local, chứng chỉ, helper và dữ liệu capture ở trên máy Mac của bạn | Ứng dụng proxy desktop | Ứng dụng proxy desktop |
-| **Workflow thiết lập developer** | Developer Setup Hub tích hợp cho runtime, client, device, framework và environment | Thiết lập tự động tích hợp cùng hướng dẫn theo nền tảng và runtime | Hướng dẫn thiết lập theo nền tảng |
-| **External proxy + PAC routing** | Upstream proxy HTTP/HTTPS, PAC auto-configuration và bypass rule | Upstream proxy thương mại và hỗ trợ PAC | Cấu hình upstream proxy thương mại |
-| **Tích hợp MCP** | [MCP local tích hợp](docs/features/mcp.mdx): 10 read-only tool cho traffic, status, chứng chỉ, kiểm tra rule và export cURL; xác thực bằng token; redaction bật mặc định | MCP local tích hợp: inspect traffic cùng các tool rule, session, chứng chỉ, setup và app-control; chỉ localhost; xác thực token theo từng session; redaction dữ liệu nhạy cảm | Không tìm thấy tích hợp MCP first-party trong [tài liệu chính thức](https://www.charlesproxy.com/documentation/) đã xem xét ngày 2026-08-13 |
-| **AI Assistant native** | Tích hợp sẵn để phân tích traffic cho request được chọn và nhiều request trong Rockxy | Không rõ | Không rõ |
-| **Đường đóng góp mở** | Mã nguồn công khai, issues, discussions, roadmap và PR | Issue tracker công khai; mã nguồn ứng dụng và các bản phát hành do vendor kiểm soát | Tài liệu và hỗ trợ của vendor; mã nguồn ứng dụng và các bản phát hành do vendor kiểm soát |
+Ma trận chính bao gồm các proxy debug web đa dụng. Các bộ công cụ kiểm thử bảo mật và interceptor thiên về trình duyệt/API có workflow chồng lấn đáng kể được liệt kê riêng để không coi các sản phẩm khác loại là có thể thay thế trực tiếp. Packet analyzer và API client thuần túy không nằm trong phạm vi so sánh này.
 
-Các khả năng của đối thủ ở trên đã được kiểm chứng với tài liệu sản phẩm chính thức vào ngày 2026-08-13 và có thể thay đổi sau khi công bố.
+### Proxy debug web trực tiếp
+
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Dạng sản phẩm** | Proxy debug macOS native | Ứng dụng macOS native; bản Windows/Linux dựa trên Electron | Proxy debug desktop đa nền tảng | Bộ công cụ proxy CLI/TUI và web UI đa nền tảng | Proxy desktop Electron và HTTP client đa nền tảng | Proxy debug desktop đa nền tảng |
+| **Mã nguồn và cách build** | Mã nguồn Community công khai theo AGPL-3.0-or-later, build được bằng Xcode; DMG chính thức còn chứa các thành phần downstream không công khai | Mã nguồn đóng; không xác định được mã nguồn ứng dụng công khai trong tài liệu chính thức đã xem xét | Mã nguồn đóng; không xác định được mã nguồn ứng dụng công khai trong tài liệu chính thức đã xem xét | Mã nguồn công khai theo MIT; build được từ source | Mã nguồn desktop công khai theo AGPL; build được từ source; binary phát hành có thêm lựa chọn giấy phép | Mã nguồn đóng; phân phối dưới dạng object code theo EULA của Fiddler Everywhere |
+| **Capture và thiết lập** | System proxy local với hướng dẫn thiết lập cho ứng dụng Mac, runtime, thiết bị iOS và Simulator | Thiết lập tự động cho ứng dụng Mac, runtime và thiết bị di động | Proxy local với hướng dẫn cho macOS, iOS và các nền tảng khác | Chế độ regular, local-process, WireGuard, reverse, transparent và các kiểu capture khác | Interception theo target hoặc cấu hình thủ công cho trình duyệt, runtime, container và thiết bị di động | Capture qua system, network, browser, terminal, explicit proxy và thiết bị từ xa |
+| **Sửa đổi và mock** | Breakpoint, Map Local/Remote, rule header, blocking và latency | Breakpoint, Map Local/Remote, block list, network condition và JavaScript rule | Breakpoint, Rewrite, Map Local/Remote, blocking và throttling | Map Local/Remote, sửa body/header, blocking và server replay | Breakpoint cùng rule rewrite, redirect, mock và error injection; một số automation bị giới hạn theo gói | Rule, breakpoint, redirect, sửa response và mocking |
+| **Replay và so sánh** | Compose/replay cùng so sánh request, header và body song song tại local | Compose, Repeat và Diff | Repeat và chỉnh sửa request | Replay phía client và server | HTTP client tích hợp để soạn và gửi request | API Composer, traffic replay và traffic comparison được ghi là beta |
+| **Workflow WebSocket** | Kiểm tra frame text/binary với heuristic Protobuf có giới hạn | Kiểm tra WS/WSS; script sửa được URL/header handshake nhưng không sửa message | Hỗ trợ WebSocket được ghi trong lịch sử phiên bản chính thức | Interception và scripting WebSocket; không hỗ trợ replay WebSocket | Kiểm tra WebSocket cùng rule chuyên biệt | Capture và kiểm tra WebSocket |
+| **Scripting và mở rộng** | Hook JavaScriptCore sandbox với API giới hạn và timeout thực thi | Script JavaScript cho request/response | Rewrite rule và Control Web Interface; không có tính năng JavaScript tổng quát được ghi nhận | Add-on Python và automation dòng lệnh | Automation dựa trên rule cùng mã nguồn và thư viện proxy công khai | Automation dựa trên rule; không có tính năng scripting tổng quát first-party được ghi nhận |
+| **Upstream routing** | [Upstream proxy HTTP/HTTPS và định tuyến PAC URL](docs/features/upstream-proxy.mdx); Community không bật proxy authentication và SOCKS5, giới hạn 3 bypass rule | Định tuyến HTTP/HTTPS/SOCKS ngoài và PAC với bypass rule | Proxy HTTP/HTTPS/SOCKS ngoài, có authentication và bypass rule | Chế độ upstream HTTP/HTTPS cùng reverse và SOCKS listener | Thiết lập upstream system, HTTP, HTTPS và SOCKS; có thể bị giới hạn theo gói | Tự động nối chuỗi với system proxy cùng reverse-proxy capture |
+| **AI và MCP** | [AI Assistant trong ứng dụng](docs/features/ai-assistant.mdx) và [MCP local tích hợp](docs/features/mcp.mdx) với 10 tool read-only, token authentication và redaction bật mặc định | MCP tích hợp cho AI client bên ngoài, gồm đọc traffic và điều khiển app/rule | Không được ghi nhận | Không được ghi nhận | Có local MCP bridge đi kèm trong mã nguồn chính thức hiện tại; không ghi nhận assistant trong ứng dụng | MCP tích hợp cùng Debugging Assistant gói Pro; tài liệu hiện tại yêu cầu dán chi tiết traffic đã capture vào chat |
+
+### Công cụ interception liền kề
+
+Các sản phẩm này chồng lấn đáng kể với Rockxy nhưng tập trung chính vào kiểm thử bảo mật, rule trình duyệt hoặc workflow API client thay vì proxy debug native đa dụng.
+
+| **Sản phẩm** | **Vì sao liền kề** | **Mã nguồn và cách build** | **Phần chồng lấn liên quan** | **AI và MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Bộ kiểm thử bảo mật web có intercepting proxy | Ứng dụng mã nguồn đóng; EULA nêu người dùng không có quyền với source ứng dụng; extension có thể dùng giấy phép riêng | Proxy interception và match/replace, Repeater, WebSocket, upstream/SOCKS proxy và hệ sinh thái extension lớn | Burp AI có trong Repeater; PortSwigger cũng duy trì MCP Server extension công khai cho AI client bên ngoài |
+| **ZAP** | Security scanner và intercepting proxy | Mã nguồn công khai Apache-2.0; build được từ source | Intercept/edit, resend thủ công, breakpoint và script WebSocket, scripting đa ngôn ngữ, add-on và automation | Add-on MCP Integration chính thức và LLM Support tùy chọn |
+| **Requestly HTTP Interceptor** | Công cụ interceptor/mock dạng browser extension và desktop đa nền tảng | Mã nguồn desktop interceptor công khai theo AGPL; API Client riêng là proprietary theo thông báo trong repository cộng đồng | Capture toàn hệ thống/trình duyệt, redirect, Map Local/Remote, sửa header/body, transform JavaScript, mock và mô phỏng delay/error | MCP server chính thức riêng để quản lý rule và group; không ghi nhận assistant phân tích traffic trong ứng dụng |
+
+Tính năng có thể khác nhau theo edition, gói, nền tảng hoặc add-on. “Không được ghi nhận” nghĩa là không tìm thấy khả năng đó trong nguồn first-party chính thức đã xem xét ngày 2026-08-22; đây không phải bằng chứng rằng khả năng đó không tồn tại. Các tuyên bố về sản phẩm và tính năng được kiểm tra theo tài liệu của vendor, repository do vendor duy trì hoặc điều khoản giấy phép vào ngày đó và có thể thay đổi. Tên sản phẩm và nhãn hiệu thuộc chủ sở hữu tương ứng; Rockxy không liên kết với và không được họ chứng thực. Vui lòng gửi đính chính qua issue tracker của Rockxy.
 
 Trên lộ trình: protocol-aware rules sâu hơn, redacted evidence bundle an toàn hơn, workflow replay và comparison mạnh hơn, hướng dẫn Developer Setup rộng hơn, cùng việc tiếp tục nghiên cứu HTTP/2 và HTTP/3.
 

@@ -904,13 +904,11 @@ struct RockxyMenuCommands: Commands {
             Button(String(localized: "Jump to First Request")) {
                 actions?.selectFirstTransaction()
             }
-            .keyboardShortcut(.upArrow, modifiers: [.command])
             .disabled(actions?.hasVisibleTransactions != true)
 
             Button(String(localized: "Jump to Last Request")) {
                 actions?.selectLastTransaction()
             }
-            .keyboardShortcut(.downArrow, modifiers: [.command])
             .disabled(actions?.hasVisibleTransactions != true)
         }
     }
@@ -1016,10 +1014,14 @@ struct RockxyMenuCommands: Commands {
             .keyboardShortcut(".", modifiers: [.command])
             .disabled(actions?.isProxyRunning != true)
 
-            Button(String(localized: "Toggle Recording")) {
+            Button(
+                actions?.isRecording == false
+                    ? String(localized: "Resume Recording")
+                    : String(localized: "Pause Recording")
+            ) {
                 actions?.toggleRecording()
             }
-            .keyboardShortcut("p", modifiers: [.command])
+            .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(actions?.canToggleRecording != true)
 
             Button(String(localized: "Toggle System Proxy")) {
@@ -1093,7 +1095,6 @@ struct RockxyMenuCommands: Commands {
             Button(String(localized: "Map Remote…")) {
                 openWindow(id: "mapRemote")
             }
-            .keyboardShortcut("r", modifiers: [.command, .option])
 
             Divider()
 

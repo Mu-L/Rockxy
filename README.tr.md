@@ -341,22 +341,47 @@ Rockxy'yi kurulumdan sonra yerel bir MCP istemcisine bağlamak istiyorsanız, bk
 
 ## Rockxy ve Alternatifler
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Proje modeli** | AGPL-3.0 açık kaynak projesi | Tescilli ticari uygulama | Tescilli ticari uygulama |
-| **Kaynak kodu** | Herkese açık, denetlenebilir, çatallanabilir | Kapalı kaynak | Kapalı kaynak |
-| **Kaynaktan derle** | Bu depodan Xcode ile ücretsiz | Herkese açık kaynakta mevcut değil | Herkese açık kaynakta mevcut değil |
-| **Yerel macOS temeli** | Swift + SwiftNIO + SwiftUI/AppKit | Kapalı kaynak yerel macOS uygulaması | Kapalı kaynak platformlar arası uygulama |
-| **Yerel öncelikli yakalama** | Yerel proxy, sertifikalar, yardımcı ve yakalama verileri Mac'inizde kalır | Masaüstü proxy uygulaması | Masaüstü proxy uygulaması |
-| **Geliştirici kurulumu iş akışı** | Çalışma zamanları, istemciler, cihazlar, çerçeveler ve ortamlar için yerleşik Geliştirici Kurulum Merkezi | Yerleşik otomatik kurulum ile platform ve çalışma zamanı kılavuzları | Platforma özel kurulum kılavuzları |
-| **Harici proxy + PAC yönlendirme** | HTTP/HTTPS yukarı akış proxy'si, PAC otomatik yapılandırması ve bypass kuralları | Ticari yukarı akış proxy'si ve PAC desteği | Ticari yukarı akış proxy yapılandırması |
-| **MCP entegrasyonu** | [Yerleşik yerel MCP](docs/features/mcp.mdx): trafik, durum, sertifikalar, kural incelemesi ve cURL dışa aktarma için 10 salt okunur araç; token ile kimlik doğrulama; redaction varsayılan olarak açık | Yerleşik yerel MCP: trafik incelemesiyle birlikte kural, oturum, sertifika, kurulum ve uygulama kontrol araçları; yalnızca localhost; oturum başına token kimlik doğrulaması; hassas veri redaction | 2026-08-13'te incelenen [resmi belgelerde](https://www.charlesproxy.com/documentation/) birinci taraf MCP entegrasyonu bulunamadı |
-| **Yerel AI Assistant** | Rockxy içinde seçili istek ve çoklu istek trafik analizi için yerleşik | Bilinmiyor | Bilinmiyor |
-| **Açık katkı yolu** | Herkese açık kaynak, issue'lar, tartışmalar, yol haritası ve PR'lar | Herkese açık issue izleyici; uygulama kaynağı ve sürümler satıcı tarafından kontrol edilir | Satıcı belgeleri ve desteği; uygulama kaynağı ve sürümler satıcı tarafından kontrol edilir |
+Ana matris, genel amaçlı web hata ayıklama proxy'lerini kapsar. Güvenlik testi
+önemli iş akışı örtüşmesine sahip paketler ve tarayıcı/API odaklı önleyiciler
+Birbirinden farklı ürünler birbirinin yerine kullanılabilir şekilde sunulmadığından ayrı ayrı listelenir.
+Paket analizörleri ve yalnızca API istemcileri bu karşılaştırmanın dışındadır.
 
-Yukarıdaki rakip yetenekleri 2026-08-13'te resmi ürün belgeleriyle karşılaştırılarak doğrulanmıştır ve yayınlandıktan sonra değişebilir.
+### Doğrudan web hata ayıklama proxy'leri
 
-Yol haritasında: daha derin protocol-aware rules, daha güvenli redacted evidence bundle, güçlü replay/comparison workflow, daha kapsamlı Developer Setup rehberleri ve devam eden HTTP/2/HTTP/3 araştırması.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Ürün şekli** | Yerel macOS hata ayıklama proxy'si | Yerel macOS uygulaması; Electron tabanlı Windows/Linux sürümleri | Platformlar arası masaüstü hata ayıklama proxy'si | Platformlar arası CLI/TUI ve web kullanıcı arayüzü proxy araç seti | Platformlar arası Electron masaüstü proxy ve HTTP istemcisi | Platformlar arası masaüstü hata ayıklama proxy'si |
+| **Kaynak ve derleme modeli** | AGPL-3.0-or-later kapsamındaki Kamu Topluluğu kaynağı; Xcode ile oluşturulabilir. Resmi DMG ayrıca halka açık olmayan alt bileşenler de içerir | Kapalı kaynak; incelenen resmi materyallerde kamuya açık başvuru kaynağı belirtilmedi | Kapalı kaynak; incelenen resmi materyallerde kamuya açık başvuru kaynağı belirtilmedi | Herkese açık MIT lisanslı kaynak; kaynaktan üretilebilir | Genel AGPL masaüstü kaynağı; kaynaktan üretilebilir; yayınlanan ikili dosyalar ek lisanslama seçeneklerine sahiptir | Kapalı kaynak; Fiddler Everywhere EULA altında nesne kodu olarak dağıtılır |
+| **Yakalama ve kurulum** | Mac uygulamaları, çalışma zamanları, iOS aygıtları ve Simülatör için yönlendirmeli kuruluma sahip yerel sistem proxy'si | Mac uygulamaları, çalışma zamanları ve mobil cihazlar için otomatik kurulum | MacOS, iOS ve platformlar arası kurulum kılavuzlarıyla yerel proxy | Normal, yerel süreç, WireGuard, ters, şeffaf ve diğer yakalama modları | Tarayıcılar, çalışma zamanları, kapsayıcılar ve mobil cihazlar için hedefli ve manuel proxy müdahalesi | Sistem, ağ, tarayıcı, terminal, açık ve uzak cihaz yakalama modları |
+| **Değiştirin ve taklit edin** | Kesme noktaları, Map Local/Remote, başlık kuralları, engelleme ve gecikme kuralları | Kesme noktaları, Map Local/Remote, engelleme listeleri, ağ koşulları ve JavaScript kuralları | Kesme noktaları, Yeniden Yazma, Map Local/Remote, engelleme ve azaltma | Map Local/Remote, gövde/başlık değişikliği, engelleme ve sunucunun yeniden oynatılması | Kesme noktalarının yanı sıra kural tabanlı yeniden yazma, yönlendirme, taklit ve hata ekleme; bazı otomasyonlar planla sınırlıdır | Kurallar, kesme noktaları, yönlendirmeler, yanıt değişikliği ve taklit |
+| **Tekrar oynatın ve karşılaştırın** | Oluşturma/tekrar oynatmanın yanı sıra yerel yan yana istek, başlık ve gövde karşılaştırması | Oluşturun, Tekrarlayın ve Fark Edin | İstekleri tekrarlayın ve düzenleyin | İstemci tarafı ve sunucu tarafı tekrarı | İstek oluşturmak ve göndermek için yerleşik HTTP istemcisi | API Oluşturucu, trafiğin tekrar oynatılması ve trafik karşılaştırması beta olarak belgelendi |
+| **WebSocket iş akışları** | Sınırlı Protobuf buluşsal yöntemle metin/ikili çerçeve incelemesi | WS/WSS denetimi; komut dosyaları, mesajları değil, el sıkışma URL'sini/başlıklarını değiştirebilir | WebSocket desteği resmi sürüm geçmişinde belgelenmiştir | WebSocket müdahale ve komut dosyası oluşturma; WebSocket tekrar oynatma desteklenmiyor | WebSocket denetimi artı WebSocket'ye özgü kurallar | WebSocket yakalama ve inceleme |
+| **Komut dosyası oluşturma ve genişletilebilirlik** | Sınırlı API ve yürütme zaman aşımına sahip korumalı alan JavaScriptCore kancaları | JavaScript istek/yanıt komut dosyası oluşturma | Kuralları yeniden yazma ve bir kontrol Web Arayüzü; genel JavaScript komut dosyası oluşturma özelliği belgelenmemiştir | Python eklentileri ve komut satırı otomasyonu | Kural tabanlı otomasyonun yanı sıra genel kaynak ve proxy kitaplıkları | Kural tabanlı otomasyon; birinci taraf genel komut dosyası oluşturma özelliği belgelenmemiştir |
+| **Yukarı yönde yönlendirme** | [HTTP/HTTPS yukarı akış proxy'si ve PAC URL yönlendirmesi](docs/features/upstream-proxy.mdx); Topluluk ilkesi, proxy kimlik doğrulamasını ve SOCKS5'yi devre dışı bırakır ve atlama kurallarını üç | Baypas kurallarıyla harici HTTP/HTTPS/SOCKS ve PAC yönlendirme | Kimlik doğrulama ve atlama kurallarına sahip harici HTTP/HTTPS/SOCKS proxy'ler | HTTP/HTTPS yukarı akış modu artı ters ve SOCKS dinleyici modları | Sistem, HTTP, HTTPS ve SOCKS yukarı akış ayarları; plan sınırları geçerli olabilir | Sistem proxy'lerine otomatik zincirleme artı ters proxy yakalama |
+| **AI ve MCP** | [Uygulama İçi Yapay Zeka Asistanı](docs/features/ai-assistant.mdx) ve [yerleşik yerel MCP](docs/features/mcp.mdx), 10 salt okunur araç, belirteç kimlik doğrulaması ve varsayılan olarak düzeltme açık | Trafik okumaları ve uygulama/kural kontrolleri de dahil olmak üzere harici AI istemcileri için yerleşik MCP | Belgelenmemiş | Belgelenmemiş | Mevcut resmi kaynakta paketlenmiş bir yerel MCP köprüsü mevcuttur; uygulama içi asistan belgelenmedi | Yerleşik MCP artı mevcut belgeleri, yakalanan trafik ayrıntılarının sohbete yapıştırılmasını gerektiren Profesyonel Düzeyde Hata Ayıklama Asistanı |
+
+### Bitişik müdahale araçları
+
+Bu ürünler Rockxy ile anlamlı bir şekilde örtüşmektedir ancak güvenlik testlerine öncülük etmektedir.
+aynı genel amaçlı kullanım yerine tarayıcı kuralları veya API istemci iş akışları
+yerel hata ayıklama-proxy odağı.
+
+| **Ürün** | **Neden bitişiktir** | **Kaynak ve derleme modeli** | **İlgili örtüşme** | **AI ve MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Engelleyici proxy içeren web güvenliği test paketi | Kapalı kaynak uygulaması; EULA, kullanıcıların uygulama kaynağına erişim hakkına sahip olmadığını belirtir. Uzantılar ayrı lisanslar kullanabilir | Proxy müdahalesi ve eşleştirme/değiştirme, Tekrarlayıcı, WebSocket'ler, yukarı akış/SOCKS proxy oluşturma ve geniş bir uzantı ekosistemi | Burp AI Tekrarlayıcı'da mevcuttur; PortSwigger ayrıca harici AI istemcileri için genel bir MCP Sunucu uzantısına sahiptir |
+| **ZAP** | Güvenlik tarayıcısı ve engelleyici proxy | Genel Apache-2.0 kaynağı; kaynaktan üretilebilir | Durdurma/düzenleme, manuel yeniden gönderme, WebSocket kesme noktaları ve komut dosyaları, çok dilli komut dosyası oluşturma, eklentiler ve otomasyon | Resmi MCP Entegrasyonu ve isteğe bağlı LLM Destek eklentileri |
+| **Requestly HTTP Interceptor** | Tarayıcı uzantısı ve platformlar arası masaüstü önleyici/sahte aracı | Genel AGPL masaüstü önleyici kaynağı; ayrı İstek API İstemcisi, genel topluluk deposu bildirimine göre tescillidir | Sistem genelinde/tarayıcı yakalama, yönlendirme, Map Local/Remote, başlık/gövde değişikliği, JavaScript dönüşümleri, taklitler ve gecikme/hata simülasyonu | Ayrı bir resmi MCP sunucusu, kuralları ve grupları yönetir; uygulama içi trafik analizi asistanı belgelenmedi |
+
+Özellik kullanılabilirliği sürüme, plana, platforma veya eklentiye göre değişebilir.
+"Belgelenmemiş", resmi birinci taraf hizmetinde bir yeteneğin bulunmadığı anlamına gelir
+2026-08-22'de incelenen kaynaklar; yeteneğin bulunmadığının kanıtı değildir.
+Yukarıdaki ürün ve özellik bildirimleri satıcı belgelerine göre kontrol edildi,
+satıcı tarafından tutulan kaynak depoları veya o tarihteki satıcı lisans koşulları ve
+değişebilir. Ürün adları ve ticari markalar ilgili sahiplerine aittir;
+Rockxy onlara bağlı değildir veya onlar tarafından desteklenmemektedir. Düzeltmeler memnuniyetle karşılanır
+Rockxy sorun izleyici aracılığıyla.
+
+Yol haritasında: protokole duyarlı daha derin kurallar, daha güvenli düzeltilmiş kanıt paketleri, daha güçlü tekrar ve karşılaştırma iş akışları, daha kapsamlı Geliştirici Kurulumu rehberliği ve devam eden HTTP/2 ve HTTP/3 araştırması.
 
 ## Güvenlik
 

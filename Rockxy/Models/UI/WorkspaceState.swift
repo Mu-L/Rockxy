@@ -10,9 +10,24 @@ enum ContextDockTab: Equatable {
     case aiAssistant
 }
 
+// MARK: - TrafficSelectionIndexEntry
+
 struct TrafficSelectionIndexEntry {
     let transaction: HTTPTransaction
     let rowIndex: Int
+}
+
+// MARK: - TrafficRevealRequest
+
+/// One-shot request for the AppKit request table to scroll a specific transaction into view.
+///
+/// The `generation` is a strictly increasing per-workspace token so the table can distinguish a
+/// brand-new reveal from a value it has already consumed — even when the same `transactionID` is
+/// targeted repeatedly (e.g. jumping to Last twice in a row on an unchanged view). Equatable
+/// identity therefore hinges on `generation`, never on `transactionID` alone.
+struct TrafficRevealRequest: Equatable {
+    let transactionID: UUID
+    let generation: Int
 }
 
 // MARK: - WorkspaceState
@@ -90,6 +105,11 @@ final class WorkspaceState: Identifiable {
     var selectedLogEntry: LogEntry?
     var selectedTransactionIDs: Set<UUID> = []
 
+    /// One-shot request for the request table to scroll a transaction into view. Published by the
+    /// coordinator's Jump-to-First/Last commands and consumed by the AppKit table, which tracks its
+    /// last applied generation. Reset with the rest of the workspace selection state.
+    var trafficRevealRequest: TrafficRevealRequest?
+
     /// Opt-in live-tail mode for this workspace. New visible traffic becomes the primary
     /// selection until the user deliberately selects a row, at which point the mode yields.
     /// Owned per-workspace so an inactive workspace can keep advancing independently.
@@ -136,6 +156,18 @@ final class WorkspaceState: Identifiable {
         focusSets.first { $0.id == activeFocusSetID }
     }
 
+    /// Publishes a fresh reveal request for `transactionID`, advancing the monotonic generation so
+    /// the value differs from any previously consumed request — including a repeat of the same
+    /// endpoint. The counter is never reset for the workspace's lifetime, guaranteeing one-shot
+    /// identity even across session clears.
+    func publishTrafficRevealRequest(for transactionID: UUID) {
+        trafficRevealGeneration += 1
+        trafficRevealRequest = TrafficRevealRequest(
+            transactionID: transactionID,
+            generation: trafficRevealGeneration
+        )
+    }
+
     func reset() {
         filteredTransactions.removeAll()
         filteredRows.removeAll()
@@ -147,6 +179,7 @@ final class WorkspaceState: Identifiable {
         selectedTransaction = nil
         selectedLogEntry = nil
         selectedTransactionIDs.removeAll()
+        trafficRevealRequest = nil
         debugAssistantState = .idle
         modelInvestigationState = .idle
         debugAssistantProductHelpState = .idle
@@ -177,4 +210,10 @@ final class WorkspaceState: Identifiable {
         appNodeIndexMap.removeAll()
         appGroupingIndex.removeAll()
     }
+
+    // MARK: Private
+
+    /// Monotonic backing counter for `trafficRevealRequest`. Deliberately never reset so reveal
+    /// generations stay strictly increasing across the workspace's lifetime.
+    @ObservationIgnored private var trafficRevealGeneration = 0
 }

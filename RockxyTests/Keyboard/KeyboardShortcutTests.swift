@@ -65,6 +65,8 @@ struct KeyboardShortcutTests {
         let contextDock = try Self.projectFile(named: "Rockxy/Views/Inspector/ContextDockView.swift")
 
         #expect(Self.occurrences(of: #".keyboardShortcut("u", modifiers: [.command, .option])"#, in: app) == 1)
+        #expect(Self.occurrences(of: #".keyboardShortcut("r", modifiers: [.command, .option])"#, in: app) == 1)
+        #expect(!app.contains(#".keyboardShortcut("p", modifiers: [.command])"#))
         #expect(!contextDock.contains(#".keyboardShortcut("k", modifiers: .command)"#))
     }
 
@@ -88,13 +90,22 @@ struct KeyboardShortcutTests {
         let commandBar = try Self.projectFile(named: "Rockxy/Views/Toolbar/TrafficCommandBar.swift")
 
         #expect(!commandBar.contains(".keyboardShortcut"))
-        #expect(Self.occurrences(
-            of: #".keyboardShortcut(.downArrow, modifiers: [.command])"#,
-            in: app
-        ) == 1)
+        #expect(!app.contains(#".keyboardShortcut(.upArrow, modifiers: [.command])"#))
+        #expect(!app.contains(#".keyboardShortcut(.downArrow, modifiers: [.command])"#))
+        #expect(commandBar.contains("Jump to First Request"))
+        #expect(commandBar.contains("Jump to Last Request"))
         #expect(KeyboardShortcutCatalog.allShortcuts.contains {
             $0.action == "Follow the newest visible request" && $0.shortcut == "⇧⌘L"
         })
+    }
+
+    @Test("Recording has one visible command-bar owner instead of an overflow duplicate")
+    func recordingDoesNotRemainInTrafficActions() throws {
+        let commandBar = try Self.projectFile(named: "Rockxy/Views/Toolbar/TrafficCommandBar.swift")
+
+        #expect(commandBar.contains("private var recordingButton"))
+        #expect(Self.occurrences(of: "actions.toggleRecording()", in: commandBar) == 1)
+        #expect(!commandBar.contains("bolt.circle"))
     }
 
     @Test("Session and row commands have one truthful owner")

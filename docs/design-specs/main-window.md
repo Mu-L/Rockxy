@@ -349,10 +349,10 @@ The primary application window — a 3-column developer debugging interface foll
 
 | Action | Shortcut | Context |
 |--------|----------|---------|
-| Start Proxy | ⌘⇧R | Global |
+| Start Proxy | — | Toolbar or Tools menu |
 | Stop Proxy | ⌘. | Global |
 | Clear Session | ⌘K | Global |
-| Toggle Recording | ⌘⇧E | Global |
+| Pause/Resume Recording | ⌥⌘R | Main capture window |
 | Toggle Inspector | ⌘I | Main window |
 | Navigate rows | ↑↓ | Table focused |
 | Copy URL | ⌘C | Row selected |

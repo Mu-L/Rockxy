@@ -213,6 +213,7 @@ struct CenterContentView: View {
             isAppendOnly: coordinator.activeWorkspace.lastDeriveWasAppendOnly,
             appendChainOrigin: coordinator.activeWorkspace.appendChainOriginToken,
             selectionIndex: coordinator.activeWorkspace.trafficSelectionIndex,
+            revealRequest: coordinator.trafficRevealRequest,
             selectedIDs: $selectedIDs,
             onSelectionChanged: { ids, primaryID in
                 coordinator.userDidNavigateTrafficHistory()
