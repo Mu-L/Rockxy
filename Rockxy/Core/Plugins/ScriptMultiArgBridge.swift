@@ -144,7 +144,8 @@ enum ScriptMultiArgBridge {
             httpVersion: original.httpVersion,
             headers: newHeaders,
             body: newBody,
-            contentType: ContentTypeDetector.detect(headers: newHeaders, body: newBody)
+            contentType: ContentTypeDetector.detect(headers: newHeaders, body: newBody),
+            captureContext: original.captureContext
         )
     }
 

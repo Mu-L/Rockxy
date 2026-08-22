@@ -3,6 +3,12 @@ import UniformTypeIdentifiers
 // Declares the Uniform Type Identifiers for Rockxy session and HAR files.
 
 extension UTType {
+    /// Portable, configuration-only Project document (`.rockxyproject`).
+    static let rockxyProject = UTType(
+        exportedAs: RockxyIdentity.current.projectUTTypeIdentifier,
+        conformingTo: .json
+    )
+
     /// Native Rockxy session file format (`.rockxysession`).
     /// Conforms to `public.json` since the underlying format is JSON.
     static let rockxySession = UTType(

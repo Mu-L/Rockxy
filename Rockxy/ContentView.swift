@@ -58,6 +58,16 @@ struct ContentView: View {
         } workspace: {
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
+                    if let warning = coordinator.projectPersistenceWarningMessage {
+                        SystemProxyWarningBanner(
+                            message: warning,
+                            primaryActionTitle: String(localized: "Repair Projects…"),
+                            onPrimaryAction: {
+                                coordinator.isProjectRecoveryPresented = true
+                            }
+                        )
+                    }
+
                     if let warning = coordinator.systemProxyWarning {
                         SystemProxyWarningBanner(
                             message: warning.message,
@@ -128,6 +138,12 @@ struct ContentView: View {
             // contention between the app's loadInitialRules and test suites.
             guard managesLifecycle, !ProcessInfo.processInfo.isTestHost else {
                 return
+            }
+            await coordinator.hydrateProjectsOnLaunch()
+            if case .failed = coordinator.projectStore.loadState {
+                coordinator.isProjectRecoveryPresented = true
+            } else {
+                RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
             }
             coordinator.readiness.startObserving()
             coordinator.setupRulesObserver()
@@ -207,6 +223,39 @@ struct ContentView: View {
                 },
                 onCancel: { coordinator.gistPublishContext = nil }
             )
+        }
+        .sheet(item: Binding(
+            get: {
+                coordinator.isProjectManagerPresented ? nil : coordinator.projectNameEditorContext
+            },
+            set: { coordinator.projectNameEditorContext = $0 }
+        )) { context in
+            ProjectNameEditorSheet(context: context, coordinator: coordinator)
+        }
+        .sheet(isPresented: $coordinator.isProjectManagerPresented) {
+            ProjectManagerSheet(coordinator: coordinator)
+        }
+        .sheet(isPresented: $coordinator.isProjectRecoveryPresented) {
+            ProjectRecoverySheet(coordinator: coordinator)
+        }
+        .alert(
+            String(localized: "Project Operation Failed"),
+            isPresented: Binding(
+                get: { coordinator.lastProjectOperationError != nil },
+                set: {
+                    if !$0 {
+                        coordinator.lastProjectOperationError = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: "OK")) {
+                coordinator.lastProjectOperationError = nil
+            }
+        } message: {
+            if let message = coordinator.projectOperationErrorMessage {
+                Text(message)
+            }
         }
         .appUIDisplayMetrics(displayMetrics)
     }

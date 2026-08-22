@@ -64,7 +64,7 @@ struct HistoryRetentionTests {
             TestFixtures.makeTransaction(url: "https://api\(index % 20).example.com/events/\(index)")
         }
 
-        coordinator.processBatch(batch, generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch(batch)
 
         #expect(coordinator.transactions.count == 1_000)
         #expect(coordinator.filteredRows.count == 1_000)
@@ -85,10 +85,7 @@ struct HistoryRetentionTests {
         let hidden = TestFixtures.makeTransaction(url: "https://hidden.example.com/first")
         let firstVisible = TestFixtures.makeTransaction(url: "https://visible.example.com/one")
         let latestVisible = TestFixtures.makeTransaction(url: "https://visible.example.com/two")
-        coordinator.processBatch(
-            [hidden, firstVisible, latestVisible],
-            generation: coordinator.sessionGeneration
-        )
+        coordinator.processActiveProjectTestBatch([hidden, firstVisible, latestVisible])
 
         #expect(coordinator.isFollowingLiveTraffic)
         #expect(coordinator.selectedTransaction?.id == latestVisible.id)
@@ -106,7 +103,7 @@ struct HistoryRetentionTests {
         coordinator.setFollowingLiveTraffic(true)
 
         let hidden = TestFixtures.makeTransaction(url: "https://hidden.example.com/new")
-        coordinator.processBatch([hidden], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([hidden])
 
         #expect(coordinator.selectedTransaction?.id == existing.id)
         #expect(coordinator.isFollowingLiveTraffic)
@@ -186,12 +183,12 @@ struct HistoryRetentionTests {
 
         // Anchor a manual selection on the active, non-following workspace.
         let anchor = TestFixtures.makeTransaction(url: "https://anchor.example.com/keep")
-        coordinator.processBatch([anchor], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([anchor])
         active.selectedTransaction = anchor
         active.selectedTransactionIDs = [anchor.id]
 
         let latest = TestFixtures.makeTransaction(url: "https://live.example.com/new")
-        coordinator.processBatch([latest], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([latest])
 
         // The inactive follower advanced to the newest batch transaction.
         #expect(follower.selectedTransaction?.id == latest.id)
@@ -210,7 +207,7 @@ struct HistoryRetentionTests {
         let alpha = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
         let betaOld = TestFixtures.makeTransaction(url: "https://beta.example.com/1")
         let betaNew = TestFixtures.makeTransaction(url: "https://beta.example.com/2")
-        coordinator.processBatch([alpha, betaOld, betaNew], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([alpha, betaOld, betaNew])
 
         coordinator.setFollowingLiveTraffic(true)
         #expect(coordinator.selectedTransaction?.id == betaNew.id)
@@ -233,7 +230,7 @@ struct HistoryRetentionTests {
         coordinator.isRecording = true
 
         let alpha = TestFixtures.makeTransaction(url: "https://alpha.example.com/1")
-        coordinator.processBatch([alpha], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([alpha])
         coordinator.setFollowingLiveTraffic(true)
         #expect(coordinator.selectedTransaction?.id == alpha.id)
 
@@ -256,7 +253,7 @@ struct HistoryRetentionTests {
 
         let firstByTime = TestFixtures.makeTransaction(url: "https://aaa.example.com/first")
         let newestByTime = TestFixtures.makeTransaction(url: "https://zzz.example.com/second")
-        coordinator.processBatch([firstByTime, newestByTime], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([firstByTime, newestByTime])
 
         // Display order (URL ascending) puts the older `firstByTime` first, but Follow Live must
         // still choose the chronological newest, `newestByTime`.
@@ -383,7 +380,7 @@ struct HistoryRetentionTests {
                 return
             }
             Task { @MainActor in
-                coordinator.processBatch(batch, generation: generation)
+                coordinator.processActiveProjectTestBatch(batch, generation: generation)
             }
         }
         await coordinator.sessionManager.setMaxBufferSize(retainedCount)
@@ -569,7 +566,7 @@ struct HistoryRetentionTests {
                 return
             }
             Task { @MainActor in
-                coordinator.processBatch(batch, generation: generation)
+                coordinator.processActiveProjectTestBatch(batch, generation: generation)
             }
         }
         await coordinator.sessionManager.startBatchTimer()
@@ -641,7 +638,7 @@ struct HistoryRetentionTests {
                 return
             }
             Task { @MainActor in
-                coordinator.processBatch(batch, generation: generation)
+                coordinator.processActiveProjectTestBatch(batch, generation: generation)
             }
         }
         // Align the actor-side cap with the coordinator policy so the eviction
@@ -695,9 +692,11 @@ struct HistoryRetentionTests {
 
         let stale = TestFixtures.makeTransaction(url: "https://stale-during-clear.com")
         let fresh = TestFixtures.makeTransaction(url: "https://fresh-during-clear.com")
+        stale.assignCaptureContextIfMissing(coordinator.activeCaptureContext)
 
         await coordinator.sessionManager.setOnBeginNewSession { generation in
             await MainActor.run {
+                fresh.assignCaptureContextIfMissing(coordinator.activeCaptureContext)
                 coordinator.processBatch([stale], generation: generation &- 1)
                 coordinator.processBatch([fresh], generation: generation)
             }

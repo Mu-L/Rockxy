@@ -10,7 +10,7 @@ The primary application window — a 3-column developer debugging interface foll
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│ ◉ ◉ ◉    [▶ Start] [⏺ Record] [🗑 Clear]  |  [⊞] [⊟]       Rockxy | Listening    │  ← Toolbar (38pt)
+│ ◉ ◉ ◉  [Sidebar] │ [📁 Checkout API ▾]       ● Listening        [▶] [Inspector]  │  ← Toolbar
 ├────────────┬────────────────────────────────────────────┬───────────────────────────┤
 │            │ [All][HTTP][HTTPS][WS][GQL]..│[2xx][3xx].. │                           │  ← Filter Bar (28pt)
 │  SIDEBAR   ├────────────────────────────────────────────┤    INSPECTOR PANEL        │
@@ -51,8 +51,7 @@ The primary application window — a 3-column developer debugging interface foll
 
 ### Layout
 ```
-[▶ Start/Stop] [⏺ Record] [🗑 Clear]  |  [⊞ Inspector] [⊟ Orientation]    {Rockxy | Listening on 127.0.0.1:9090}
-← primaryAction placement ───────────────────────────────────────────────→    ← principal placement (centered) ──→
+[Sidebar] │ [📁 Active Project ▾]     {● Listening on 127.0.0.1:9090}     [▶ Start/Stop] [Inspector] [Context Dock]
 ```
 
 ### Controls
@@ -65,9 +64,14 @@ The primary application window — a 3-column developer debugging interface foll
 | Inspector | `rectangle.split.1x2` | Toggle visibility | — | Medium |
 | Orientation | `rectangle.split.2x1` | Toggle H/V split | — | Low |
 
+### Project Selector (Leading)
+- Appears immediately after the sidebar tracking separator.
+- Shows the active local Project name and opens switching/management actions.
+- Sizes to the active Project name within a 104–240 pt band; short names stay compact and long names truncate without displacing the centered status.
+
 ### Status Indicator (Center)
 - Circle: 8pt diameter, `NSColor.systemGreen` (running) / `NSColor.secondaryLabelColor` (stopped)
-- Text: `"Rockxy | Listening on 127.0.0.1:9090"` or `"Rockxy | Not Running"`
+- Text: `"Listening on 127.0.0.1:9090"` or `"Not Running"`
 - Font: `.systemFont(ofSize: 12)`, `NSColor.secondaryLabelColor`
 
 ### Styling

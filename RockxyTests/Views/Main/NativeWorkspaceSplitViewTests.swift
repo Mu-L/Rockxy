@@ -151,10 +151,14 @@ struct NativeWorkspaceSplitViewTests {
         let trackingSeparatorIndex = identifiers.firstIndex(
             of: NativeWorkspaceToolbar.sidebarTrackingSeparatorIdentifier
         )
+        let projectSelectorIndex = identifiers.firstIndex(
+            of: NativeWorkspaceToolbar.projectSelectorIdentifier
+        )
 
         #expect(identifiers.first == .flexibleSpace)
         #expect(toggleIndex != nil)
         #expect(trackingSeparatorIndex == toggleIndex.map { $0 + 1 })
+        #expect(projectSelectorIndex == trackingSeparatorIndex.map { $0 + 1 })
         #expect(!identifiers.contains {
             $0.rawValue.hasSuffix(".toolbar.workspaceTitle")
         })
@@ -163,6 +167,19 @@ struct NativeWorkspaceSplitViewTests {
                 toolbar.managedToolbar.items[trackingSeparatorIndex]
                     is NSTrackingSeparatorToolbarItem
             )
+        }
+        if let projectSelectorIndex,
+           let selectorView = toolbar.managedToolbar.items[projectSelectorIndex].view
+        {
+            let width = selectorView.fittingSize.width
+            let expectedInnerWidth = ProjectToolbarSelectorMetrics.preferredWidth(
+                for: coordinator.projectStore.activeProject.name
+            )
+            #expect(width >= expectedInnerWidth)
+            #expect(width >= ProjectToolbarSelectorMetrics.minimumWidth)
+            #expect(width <= ProjectToolbarSelectorMetrics.maximumWidth)
+        } else {
+            Issue.record("Project selector toolbar item was not hosted")
         }
     }
 
@@ -192,6 +209,80 @@ struct NativeWorkspaceSplitViewTests {
 
         NSApp.sendAction(action, to: toggleItem.target, from: toggleItem)
         #expect(controller.isSidebarPresented)
+    }
+
+    // MARK: - Project selector sizing metrics
+
+    @Test("Project selector preferred width stays within its metric bounds")
+    func projectSelectorPreferredWidthWithinBounds() {
+        let names = [
+            "",
+            "QA",
+            "My Project",
+            "Checkout Service API",
+            String(repeating: "Extremely Long Project Name ", count: 8),
+        ]
+
+        for name in names {
+            let width = ProjectToolbarSelectorMetrics.preferredWidth(for: name)
+            #expect(width >= ProjectToolbarSelectorMetrics.minimumWidth)
+            #expect(width <= ProjectToolbarSelectorMetrics.maximumWidth)
+        }
+    }
+
+    @Test("Project selector width grows monotonically and clamps at both extremes")
+    func projectSelectorPreferredWidthMonotonicAndClamped() {
+        let shortWidth = ProjectToolbarSelectorMetrics.preferredWidth(for: "QA")
+        let mediumWidth = ProjectToolbarSelectorMetrics.preferredWidth(for: "Checkout Service API")
+        let longWidth = ProjectToolbarSelectorMetrics.preferredWidth(
+            for: String(repeating: "Extremely Long Project Name ", count: 8)
+        )
+
+        #expect(shortWidth <= mediumWidth)
+        #expect(mediumWidth <= longWidth)
+
+        #expect(shortWidth == ProjectToolbarSelectorMetrics.minimumWidth)
+        #expect(longWidth == ProjectToolbarSelectorMetrics.maximumWidth)
+
+        #expect(mediumWidth > ProjectToolbarSelectorMetrics.minimumWidth)
+        #expect(mediumWidth < ProjectToolbarSelectorMetrics.maximumWidth)
+    }
+
+    @Test("Hosted Project selector responds to the active Project name")
+    func hostedProjectSelectorRespondsToProjectName() throws {
+        let shortCoordinator = MainContentCoordinator()
+        try shortCoordinator.projectStore.renameProject(
+            id: shortCoordinator.projectStore.activeProjectID,
+            to: "QA"
+        )
+        let longCoordinator = MainContentCoordinator()
+        try longCoordinator.projectStore.renameProject(
+            id: longCoordinator.projectStore.activeProjectID,
+            to: String(repeating: "Long Project ", count: 6)
+        )
+
+        let shortView = NSHostingView(
+            rootView: ProjectToolbarSelectorView(coordinator: shortCoordinator)
+        )
+        let longView = NSHostingView(
+            rootView: ProjectToolbarSelectorView(coordinator: longCoordinator)
+        )
+
+        #expect(shortView.fittingSize.width == ProjectToolbarSelectorMetrics.minimumWidth)
+        #expect(longView.fittingSize.width == ProjectToolbarSelectorMetrics.maximumWidth)
+        #expect(shortView.fittingSize.width < longView.fittingSize.width)
+    }
+
+    @Test("Project manager adopts useful resizable tool-window geometry")
+    func projectManagerToolWindowGeometry() {
+        let hostingView = NSHostingView(
+            rootView: ProjectManagerSheet(coordinator: MainContentCoordinator())
+        )
+        let size = hostingView.fittingSize
+
+        #expect(size.width >= 720)
+        #expect(size.height >= 500)
+        #expect(size.width > size.height)
     }
 
     // MARK: - Startup geometry readiness

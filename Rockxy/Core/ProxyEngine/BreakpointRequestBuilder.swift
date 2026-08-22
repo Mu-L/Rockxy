@@ -133,7 +133,8 @@ enum BreakpointRequestBuilder {
             httpVersion: originalRequestData.httpVersion,
             headers: resolvedHeaders,
             body: body,
-            contentType: originalRequestData.contentType
+            contentType: originalRequestData.contentType,
+            captureContext: originalRequestData.captureContext
         )
 
         return Result(head: head, requestData: requestData)

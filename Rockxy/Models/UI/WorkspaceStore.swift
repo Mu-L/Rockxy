@@ -11,7 +11,7 @@ final class WorkspaceStore {
         maxWorkspaces: Int = 8,
         layoutPreferences: WorkspaceLayoutPreferences = WorkspaceLayoutPreferences()
     ) {
-        self.maxWorkspaces = max(maxWorkspaces, 1)
+        self.maxWorkspaces = Self.clampCreationCapacity(maxWorkspaces)
         self.layoutPreferences = layoutPreferences
         let defaultWorkspace = Self.makeWorkspace(
             title: String(localized: "All Traffic"),
@@ -25,7 +25,10 @@ final class WorkspaceStore {
 
     // MARK: Internal
 
-    let maxWorkspaces: Int
+    /// Effective tab *creation* capacity. Gates new/duplicated tabs only; it never
+    /// truncates hydrated tabs, which are retained up to the structural upper bound.
+    /// Refreshable at runtime via ``refreshCapacity(maxWorkspaces:)``.
+    private(set) var maxWorkspaces: Int
 
     var workspaces: [WorkspaceState]
     var activeWorkspaceID: UUID
@@ -40,6 +43,15 @@ final class WorkspaceStore {
 
     var canCreateWorkspace: Bool {
         workspaces.count < maxWorkspaces
+    }
+
+    /// Re-sets the effective tab *creation* capacity at runtime. Existing tabs are
+    /// never closed or truncated by a lower limit; only future create/duplicate
+    /// actions observe the new bound. Clamped into the structural tab range so a
+    /// bad or expanded policy can never authorize creating more live tabs than the
+    /// structural upper bound (which snapshot persistence would later truncate).
+    func refreshCapacity(maxWorkspaces newValue: Int) {
+        maxWorkspaces = Self.clampCreationCapacity(newValue)
     }
 
     @discardableResult
@@ -192,6 +204,58 @@ final class WorkspaceStore {
         workspace.title = newTitle
     }
 
+    // MARK: Project snapshot seams
+
+    /// Captures the durable, bounded configuration of the current traffic tabs.
+    /// Live transactions, rows, selections, sort descriptors, sidebar indexes,
+    /// logs, and assistant state are intentionally excluded.
+    func captureTabSnapshots() -> [ProjectTabSnapshot] {
+        workspaces.map { ProjectTabSnapshot(capturing: $0) }
+    }
+
+    /// Replaces all traffic tabs with hydrated snapshots for a Project switch.
+    /// Always restores at least one non-closable default tab and a valid active
+    /// ID, even if given an empty or malformed set. Hydration retains up to the
+    /// structural tab upper bound — not the lower creation limit — so a Project
+    /// carrying more tabs than the current creation capacity is restored intact.
+    func applyTabSnapshots(_ snapshots: [ProjectTabSnapshot], activeTabID: UUID) {
+        var hydrated = snapshots.map { $0.hydrateWorkspaceState() }
+
+        if hydrated.isEmpty {
+            hydrated = [Self.makeWorkspace(
+                title: String(localized: "All Traffic"),
+                isClosable: false,
+                filter: .empty,
+                layoutPreferences: layoutPreferences
+            )]
+        } else if !hydrated.contains(where: { !$0.isClosable }) {
+            hydrated.insert(
+                Self.makeWorkspace(
+                    title: String(localized: "All Traffic"),
+                    isClosable: false,
+                    filter: .empty,
+                    layoutPreferences: layoutPreferences
+                ),
+                at: 0
+            )
+        }
+
+        let retentionCap = ProjectStructuralLimits.tabCountRange.upperBound
+        if hydrated.count > retentionCap {
+            // Bound only by the structural upper limit: keep the non-closable
+            // default and the earliest tabs. The creation limit never truncates
+            // retained tabs here.
+            let defaultIndex = hydrated.firstIndex { !$0.isClosable } ?? 0
+            let keeper = hydrated.remove(at: defaultIndex)
+            hydrated = [keeper] + hydrated.prefix(retentionCap - 1)
+        }
+
+        workspaces = hydrated
+        activeWorkspaceID = hydrated.contains { $0.id == activeTabID }
+            ? activeTabID
+            : hydrated[0].id
+    }
+
     func rememberBottomInspectorVisibility(_ isVisible: Bool) {
         layoutPreferences.rememberBottomInspectorVisibility(isVisible)
     }
@@ -203,14 +267,26 @@ final class WorkspaceStore {
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "WorkspaceStore")
+
     private let layoutPreferences: WorkspaceLayoutPreferences
+
+    /// Clamps a requested tab creation capacity into the structural tab range
+    /// (`ProjectStructuralLimits.tabCountRange`). Both the lower and upper bound are
+    /// enforced: at least one tab is always creatable, and never more than the
+    /// structural upper bound that durable snapshots retain.
+    private static func clampCreationCapacity(_ value: Int) -> Int {
+        let range = ProjectStructuralLimits.tabCountRange
+        return min(max(value, range.lowerBound), range.upperBound)
+    }
 
     private static func makeWorkspace(
         title: String,
         isClosable: Bool,
         filter: FilterCriteria,
         layoutPreferences: WorkspaceLayoutPreferences
-    ) -> WorkspaceState {
+    )
+        -> WorkspaceState
+    {
         let preferredBottomVisibility = layoutPreferences.preferredBottomInspectorVisibility
         return WorkspaceState(
             title: title,

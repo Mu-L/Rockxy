@@ -134,7 +134,9 @@ final class MainContentCoordinator {
         assistantRuntime: any AssistantProviderRuntimeProtocol = AssistantProviderRuntime.shared,
         assistantSettingsProvider: @escaping @MainActor () -> AppSettings = {
             AppSettingsManager.shared.settings
-        }
+        },
+        projectCatalogRepository: ProjectCatalogPersisting? = nil,
+        projectTabAutosaveDebounce: Duration = .milliseconds(500)
     ) {
         self.policy = policy
         self.assistantRuntime = assistantRuntime
@@ -143,12 +145,21 @@ final class MainContentCoordinator {
             maxWorkspaces: policy.maxWorkspaceTabs,
             layoutPreferences: workspaceLayoutPreferences
         )
+        // A `nil` repository keeps the Project store fully in-memory (and immediately
+        // ready) so tests and previews do no Application Support I/O; the app injects
+        // the concrete repository later. The store shares this coordinator's policy.
+        self.projectStore = ProjectStore(policy: policy, repository: projectCatalogRepository)
+        self.projectTabAutosaveDebounce = projectTabAutosaveDebounce
+        self.liveHistoryLimit = policy.maxLiveHistoryEntries
+        refreshCaptureContextSnapshot()
     }
 
     deinit {
         for handle in debugAssistantTasks.values {
             handle.task.cancel()
         }
+        projectTabAutosaveTask?.cancel()
+        projectHydrationTask?.cancel()
         if let rulesObserver {
             NotificationCenter.default.removeObserver(rulesObserver)
         }
@@ -225,7 +236,9 @@ final class MainContentCoordinator {
     var activeProxyPort = AppSettingsManager.shared.settings.proxyPort
     var isRecording = true
     var sessionGeneration: UInt = 0
+    var liveHistoryLimit: Int
     var isClearingSession = false
+    var clearingProjectID: UUID?
     var clearingTargetGeneration: UInt?
     var deferredSessionBatches: [DeferredBatch] = []
     var proxyError: String?
@@ -283,6 +296,50 @@ final class MainContentCoordinator {
     var previewTabStore = PreviewTabStore()
     var headerColumnStore = HeaderColumnStore()
     var filterPresetStore = FilterPresetStore()
+
+    // MARK: - Projects
+
+    /// Durable owner of the Project → traffic-tab configuration. Non-visual
+    /// orchestration lives in `MainContentCoordinator+Projects`; user messaging and
+    /// sheets are owned by the app layer.
+    let projectStore: ProjectStore
+
+    /// Thread-safe request-start routing snapshot consumed by SwiftNIO handlers.
+    let captureContextStore = TrafficCaptureContextStore()
+
+    /// In-memory capture histories are isolated per Project while `transactions`
+    /// remains the active Project's observable UI projection.
+    @ObservationIgnored var transactionsByProjectID: [UUID: [HTTPTransaction]] = [:]
+    @ObservationIgnored var logEntriesByProjectID: [UUID: [LogEntry]] = [:]
+    @ObservationIgnored var sessionProvenanceByProjectID: [UUID: SessionProvenance] = [:]
+    @ObservationIgnored var captureGenerationByProjectID: [UUID: UInt64] = [:]
+    @ObservationIgnored var nextSequenceNumberByProjectID: [UUID: Int] = [:]
+
+    /// The last non-fatal Project operation error, exposed for the app layer to
+    /// surface. Reset on the next successful operation. Not a presentation state.
+    var lastProjectOperationError: ProjectMutationError?
+
+    var projectNameEditorContext: ProjectNameEditorContext?
+    var projectDeletionRequest: ProjectDeletionRequest?
+    var isProjectManagerPresented = false
+    var isProjectRecoveryPresented = false
+
+    /// Debounce window that coalesces rapid traffic-tab edits into a single durable
+    /// autosave. Injectable so tests can shorten it.
+    @ObservationIgnored let projectTabAutosaveDebounce: Duration
+    /// The single in-flight debounced autosave, replaced/cancelled on each change so
+    /// the coordinator never accumulates unbounded persistence tasks.
+    @ObservationIgnored var projectTabAutosaveTask: Task<Void, Never>?
+    /// Coalesces concurrent startup hydration attempts so the catalog loads once.
+    @ObservationIgnored var projectHydrationTask: Task<Void, Never>?
+    /// True once the active Project's tabs have been applied to the workspace store.
+    @ObservationIgnored var hasHydratedProjects = false
+    /// True while Observation-driven autosave is armed (only after a ready load).
+    @ObservationIgnored var isObservingProjectTabs = false
+    /// Suppresses autosave scheduling while a Project snapshot is being applied to
+    /// the workspace store, so hydration/switches never write back through the same
+    /// observation seam mid-application.
+    @ObservationIgnored var isApplyingProjectSnapshot = false
 
     // MARK: - UI State — Import/Export
 

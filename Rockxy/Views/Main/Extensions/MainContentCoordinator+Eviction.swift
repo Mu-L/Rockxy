@@ -14,6 +14,7 @@ extension MainContentCoordinator {
         let removedIDs = Set(transactions.prefix(removeCount).map(\.id))
 
         transactions.removeFirst(removeCount)
+        transactionsByProjectID[projectStore.activeProjectID] = transactions
         rebuildObservedDomainsByApp()
         recomputeErrorCount()
         evictFromAllWorkspaces(removedIDs: removedIDs)

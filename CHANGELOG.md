@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added local Projects with Project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only `.rockxyproject` import and export.
 - Added nearby iPhone transfers as a dedicated iOS workspace so the current Mac traffic remains available.
 - Kept the nearby-transfer receiver discoverable while Rockxy is running, even when macOS restores the app without a main window.
 - Added AI traffic inspection for recognized model API traffic, including provider/model hints, streaming state, usage fields when present, tool-call summaries, retrieval hints, and warnings for unavailable fields.
