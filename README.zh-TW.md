@@ -339,24 +339,49 @@ open Rockxy.xcodeproj
 
 如果您想在安裝後將 Rockxy 連接到本機 MCP 用戶端，請參閱 [MCP 整合指南](docs/features/mcp.mdx).
 
-## Rockxy 與替代品
+## Rockxy 與替代方案
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **專案模型** | AGPL-3.0 開源專案 | 專有商業應用程式 | 專有商業應用程式 |
-| **原始碼** | 公開、可審計、可分叉 | 閉源 | 閉源 |
-| **從原始碼構建** | 免費使用此儲存庫中的 Xcode | 無法從公開原始碼取得 | 無法從公開原始碼取得 |
-| **原生 macOS 基礎** | Swift + SwiftNIO + SwiftUI/AppKit | 閉源原生 macOS 應用程式 | 閉源跨平台應用程式 |
-| **本地優先捕獲** | 本機代理程式、憑證、幫助程式和擷取資料保留在您的 Mac 上 | 桌面代理應用程式 | 桌面代理應用程式 |
-| **開發人員設定工作流程** | 適用於運行時、客戶端、設備、框架和環境的內建開發人員設定中心 | 內建自動設定以及平台與執行時指南 | 平台特定設定指南 |
-| **外部代理+PAC路由** | HTTP/HTTPS 上游代理、PAC 自動設定和繞過規則 | 商業上游代理與 PAC 支援 | 商業上游代理設定 |
-| **MCP 整合** | [內建本機 MCP](docs/features/mcp.mdx)：10 個唯讀工具，用於流量、狀態、憑證、規則檢查與 cURL 匯出；以 token 驗證；預設開啟 redaction | 內建本機 MCP：流量檢查以及規則、session、憑證、設定與 app 控制工具；僅限 localhost；每個 session 的 token 驗證；敏感資料 redaction | 在 2026-08-13 審閱的[官方文件](https://www.charlesproxy.com/documentation/)中未發現第一方 MCP 整合 |
-| **原生 AI Assistant** | 內建，用於在 Rockxy 內進行選定 request 與多 request 流量分析 | 未知 | 未知 |
-| **開放貢獻路徑** | 公開原始碼、issues、discussions、roadmap 和 PR | 公開 issue 追蹤器；應用程式原始碼與發布由供應商控制 | 供應商文件與支援；應用程式原始碼與發布由供應商控制 |
+主要矩陣涵蓋通用網路調試代理。安全測試
+套件和麵向瀏覽器/API 的攔截器具有大量工作流程重疊
+單獨列出，因此不同的產品不能互換。
+封包分析器和僅 API 的用戶端不在此比較範圍內。
 
-以上競品能力已於 2026-08-13 對照官方產品文件核實，發布後可能變更。
+### 直接網路偵錯代理
 
-路線圖方向：更深入的協定感知規則、更安全的編輯證據包、更強的 replay 與 comparison workflow、更廣泛的 Developer Setup 指南，以及持續研究 HTTP/2 和 HTTP/3。
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **產品形態** | 原生 macOS 偵錯代理 | 原生 macOS 應用程式；Windows/Linux 版本以 Electron 為基礎 | 跨平台桌面偵錯代理 | 跨平台 CLI/TUI 與 Web UI 代理工具組 | 跨平台 Electron 桌面代理與 HTTP 用戶端 | 跨平台桌面偵錯代理 |
+| **原始碼與建置模式** | Community 原始碼依 AGPL-3.0-or-later 公開，可用 Xcode 建置；官方 DMG 另含非公開 downstream 元件 | 閉源；在已審閱的官方資料中未發現公開的應用程式原始碼 | 閉源；在已審閱的官方資料中未發現公開的應用程式原始碼 | MIT 授權的公開原始碼，可從原始碼建置 | AGPL 公開桌面原始碼，可從原始碼建置；發佈的 binary 另有授權選項 | 閉源；依 Fiddler Everywhere EULA 以 object code 發佈 |
+| **擷取與設定** | 本機系統代理，為 Mac 應用程式、runtime、iOS 裝置及 Simulator 提供引導式設定 | 自動設定 Mac 應用程式、runtime 與行動裝置 | 本機代理，提供 macOS、iOS 及跨平台設定指南 | regular、local-process、WireGuard、reverse、transparent 等擷取模式 | 面向瀏覽器、runtime、container 與行動裝置的 targeted/manual proxy interception | system、network、browser、terminal、explicit 及 remote-device 擷取模式 |
+| **修改與 Mock** | Breakpoint、Map Local/Remote、header rule、blocking 與 latency rule | Breakpoint、Map Local/Remote、block list、network condition 與 JavaScript rule | Breakpoint、Rewrite、Map Local/Remote、blocking 與 throttling | Map Local/Remote、body/header 修改、blocking 與 server replay | Breakpoint 及 rule-based rewrite、redirect、mock、error injection；部分 automation 受方案限制 | rule、Breakpoint、redirect、response 修改與 mock |
+| **重播與比較** | Compose/replay，並在本機並排比較 request、header 與 body | Compose、Repeat、Diff | Repeat 並編輯 request | client-side 與 server-side replay | 內建 HTTP 用戶端用於編寫及傳送 request | API Composer、traffic replay 與 traffic comparison 標示為 beta |
+| **WebSocket 工作流程** | 檢查 text/binary frame，並採用有界 Protobuf heuristic | 檢查 WS/WSS；script 可修改 handshake URL/header，但不能修改 message | WebSocket 支援記錄於官方版本歷史 | WebSocket interception 與 scripting；不支援 WebSocket replay | WebSocket 檢查及專用 rule | WebSocket capture 與 inspection |
+| **腳本與擴充性** | sandboxed JavaScriptCore hook，API 有界並設有執行 timeout | JavaScript request/response scripting | Rewrite rule 與 Control Web Interface；未記錄通用 JavaScript scripting 功能 | Python add-on 與 command-line automation | rule-based automation，以及公開原始碼與 proxy library | rule-based automation；未記錄 first-party 通用 scripting 功能 |
+| **上游路由** | [HTTP/HTTPS upstream proxy 與 PAC URL routing](docs/features/upstream-proxy.mdx)；Community 停用 proxy authentication 與 SOCKS5，bypass rule 最多 3 條 | external HTTP/HTTPS/SOCKS 與 PAC routing，支援 bypass rule | external HTTP/HTTPS/SOCKS proxy，支援 authentication 與 bypass rule | HTTP/HTTPS upstream mode，以及 reverse 與 SOCKS listener mode | system、HTTP、HTTPS、SOCKS upstream 設定；可能受方案限制 | 自動串接 system proxy，並支援 reverse-proxy capture |
+| **AI 與 MCP** | [應用程式內 AI Assistant](docs/features/ai-assistant.mdx)與[內建本機 MCP](docs/features/mcp.mdx)：10 個 read-only tool、token authentication，預設啟用 redaction | 面向外部 AI client 的內建 MCP，包括 traffic read 與 app/rule control | 未記錄 | 未記錄 | 目前官方原始碼含 bundled local MCP bridge；未記錄應用程式內 assistant | 內建 MCP 與 Pro-tier Debugging Assistant；目前文件要求將已擷取的 traffic details 貼到 chat |
+
+### 相鄰攔截工具
+
+這些產品與 Rockxy 有意義地重疊，但在安全測試方面處於領先地位，
+瀏覽器規則，或 API 用戶端工作流程，而不是相同的通用目的
+本機調試代理焦點。
+
+| **產品** | **為何屬於相鄰工具** | **原始碼與建置模式** | **相關重疊能力** | **AI 與 MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | 具 intercepting proxy 的 Web 安全測試套件 | 閉源應用程式；EULA 聲明使用者無權取得應用程式原始碼；extension 可採用個別授權 | proxy interception、match/replace、Repeater、WebSocket、upstream/SOCKS proxy 與大型 extension ecosystem | Repeater 提供 Burp AI；PortSwigger 亦維護面向外部 AI client 的公開 MCP Server extension |
+| **ZAP** | 安全 scanner 與 intercepting proxy | Apache-2.0 公開原始碼，可從原始碼建置 | intercept/edit、manual resend、WebSocket breakpoint 與 script、多語言 scripting、add-on 與 automation | 官方 MCP Integration add-on 與選用 LLM Support add-on |
+| **Requestly HTTP Interceptor** | browser extension 與跨平台 desktop interceptor/mock tool | desktop interceptor 為 AGPL 公開原始碼；依公開 community repository 說明，獨立 API Client 為 proprietary | system-wide/browser capture、redirect、Map Local/Remote、header/body 修改、JavaScript transform、mock、delay/error simulation | 獨立的官方 MCP server 管理 rule 與 group；未記錄應用程式內 traffic-analysis assistant |
+
+功能可用性可能會因版本、計劃、平台或附加元件而異。
+「未記錄」表示在官方第一方中找不到該功能
+2026-08-22 上審查的來源；這並不能證明該能力不存在。
+上述產品和功能聲明已根據供應商文件進行檢查，
+供應商維護的來源儲存庫，或該日期的供應商授權條款，以及
+可能會改變。產品名稱和商標屬於其各自所有者；
+Rockxy 不隸屬於他們，也不受他們認可。歡迎指正
+透過 Rockxy 問題追蹤器。
+
+路線圖包括：更深入的協定感知規則、更安全的編輯證據包、更強大的重播和比較工作流程、更廣泛的開發人員設定指南以及持續的 HTTP/2 和 HTTP/3 研究。
 
 ## 安全性
 

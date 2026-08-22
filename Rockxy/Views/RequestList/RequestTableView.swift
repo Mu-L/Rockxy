@@ -8,6 +8,48 @@ import SwiftUI
 
 // MARK: - RequestTableView
 
+enum RequestTableBoundaryNavigation: Equatable {
+    case first
+    case last
+
+    static func resolve(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags
+    ) -> Self? {
+        let relevantModifiers = modifierFlags.intersection([.command, .option, .control, .shift])
+        guard relevantModifiers == .command else {
+            return nil
+        }
+
+        switch keyCode {
+        case 126:
+            return .first // Up Arrow
+        case 125:
+            return .last // Down Arrow
+        default:
+            return nil
+        }
+    }
+}
+
+/// Owns request-table-only key equivalents. Keeping these commands on the AppKit table means
+/// Command-Up/Down retain their standard behavior everywhere else, including editable fields.
+final class NavigableRequestTableView: NSTableView {
+    var onBoundaryNavigation: ((RequestTableBoundaryNavigation) -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        guard let navigation = RequestTableBoundaryNavigation.resolve(
+            keyCode: event.keyCode,
+            modifierFlags: event.modifierFlags
+        ) else {
+            super.keyDown(with: event)
+            return
+        }
+
+        onBoundaryNavigation?(navigation)
+    }
+}
+
 /// AppKit `NSTableView` wrapped in `NSViewRepresentable` for the main request list.
 /// Uses NSTableView instead of SwiftUI List because SwiftUI List cannot handle 100k+ rows
 /// with acceptable scroll performance — NSTableView provides native virtual scrolling,
@@ -21,6 +63,7 @@ struct RequestTableView: NSViewRepresentable {
     let isAppendOnly: Bool
     var appendChainOrigin: Int?
     var selectionIndex: [UUID: TrafficSelectionIndexEntry] = [:]
+    var revealRequest: TrafficRevealRequest?
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
@@ -37,7 +80,7 @@ struct RequestTableView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
 
-        let tableView = NSTableView()
+        let tableView = NavigableRequestTableView()
         tableView.style = .plain
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.allowsMultipleSelection = true
@@ -49,6 +92,16 @@ struct RequestTableView: NSViewRepresentable {
         tableView.delegate = context.coordinator
         tableView.target = context.coordinator
         tableView.doubleAction = #selector(Coordinator.handleDoubleClick(_:))
+        tableView.onBoundaryNavigation = { [weak coordinator = context.coordinator] navigation in
+            MainActor.assumeIsolated {
+                switch navigation {
+                case .first:
+                    coordinator?.mainCoordinator?.selectFirstFilteredTransaction()
+                case .last:
+                    coordinator?.mainCoordinator?.selectLastFilteredTransaction()
+                }
+            }
+        }
 
         let menu = NSMenu()
         menu.delegate = context.coordinator
@@ -163,6 +216,11 @@ struct RequestTableView: NSViewRepresentable {
 
         coordinator.syncHeaderColumns(in: tableView)
         coordinator.syncSelection(to: selectedIDs, in: tableView)
+        coordinator.syncRevealRequest(
+            revealRequest,
+            workspaceID: workspaceID,
+            in: tableView
+        )
 
         // Re-apply HeaderColumnStore visibility on every update (single source of truth)
         if let store = mainCoordinator?.headerColumnStore {
@@ -404,6 +462,8 @@ extension RequestTableView {
         private var pendingContextSelectionIDs: Set<UUID>?
         private var pendingContextPrimaryID: UUID?
         private var userScrollObserver: NSObjectProtocol?
+        private var lastAppliedRevealWorkspaceID: UUID?
+        private var lastAppliedRevealGeneration: Int?
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -1205,6 +1265,29 @@ extension RequestTableView {
                 scrollView.contentView.scroll(to: visibleOrigin)
                 scrollView.reflectScrolledClipView(scrollView.contentView)
             }
+        }
+
+        /// Applies an explicit Jump reveal once per workspace generation. This is intentionally
+        /// separate from selection syncing: ordinary selection updates preserve the user's scroll,
+        /// while Jump commands always reveal their target even when it was already selected.
+        func syncRevealRequest(
+            _ request: TrafficRevealRequest?,
+            workspaceID: UUID,
+            in tableView: NSTableView
+        ) {
+            guard let request,
+                  lastAppliedRevealWorkspaceID != workspaceID
+                    || lastAppliedRevealGeneration != request.generation,
+                  let rowIndex = parent.selectionIndex[request.transactionID]?.rowIndex,
+                  rows.indices.contains(rowIndex),
+                  rows[rowIndex].id == request.transactionID else
+            {
+                return
+            }
+
+            tableView.scrollRowToVisible(rowIndex)
+            lastAppliedRevealWorkspaceID = workspaceID
+            lastAppliedRevealGeneration = request.generation
         }
 
         func contextSelectionIDs(

@@ -339,24 +339,49 @@ Compilez et ex&eacute;cutez dans Xcode. La fen&ecirc;tre de bienvenue vous guide
 
 Si vous souhaitez connecter Rockxy &agrave; un client MCP local apr&egrave;s l'installation, consultez le [guide d'int&eacute;gration MCP](docs/features/mcp.mdx).
 
-## Rockxy vs. Alternatives
+## Rockxy par rapport aux alternatives
 
-|  | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Mod&egrave;le de projet** | Projet open-source AGPL-3.0 | App commerciale propri&eacute;taire | App commerciale propri&eacute;taire |
-| **Code source** | Public, auditable, forkable | Source ferm&eacute;e | Source ferm&eacute;e |
-| **Compilation depuis la source** | Gratuite avec Xcode depuis ce repo | Non disponible depuis une source publique | Non disponible depuis une source publique |
-| **Base native macOS** | Swift + SwiftNIO + SwiftUI/AppKit | App macOS native &agrave; source ferm&eacute;e | App multiplateforme &agrave; source ferm&eacute;e |
-| **Capture local-first** | Proxy local, certificats, helper et donn&eacute;es de capture restent sur votre Mac | App proxy desktop | App proxy desktop |
-| **Workflow de setup d&eacute;veloppeur** | Developer Setup Hub int&eacute;gr&eacute; pour runtimes, clients, appareils, frameworks et environnements | Setup automatique int&eacute;gr&eacute; plus guides plateforme et runtime | Guides de setup propres &agrave; la plateforme |
-| **Proxy externe + routage PAC** | Proxy amont HTTP/HTTPS, auto-configuration PAC et r&egrave;gles de bypass | Proxy amont commercial et support PAC | Configuration de proxy amont commercial |
-| **Int&eacute;gration MCP** | [MCP local int&eacute;gr&eacute;](docs/features/mcp.mdx) : 10 outils en lecture seule pour le trafic, le statut, les certificats, l'inspection des r&egrave;gles et l'export cURL ; authentifi&eacute; par token ; masquage activ&eacute; par d&eacute;faut | MCP local int&eacute;gr&eacute; : inspection du trafic plus outils de r&egrave;gles, session, certificat, setup et contr&ocirc;le d'app ; localhost uniquement ; authentification par token par session ; masquage des donn&eacute;es sensibles | Aucune int&eacute;gration MCP first-party trouv&eacute;e dans la [documentation officielle](https://www.charlesproxy.com/documentation/) consult&eacute;e le 2026-08-13 |
-| **AI Assistant natif** | Int&eacute;gr&eacute; pour l'analyse du trafic sur requ&ecirc;te s&eacute;lectionn&eacute;e et multi-requ&ecirc;tes dans Rockxy | Inconnu | Inconnu |
-| **Chemin de contribution ouvert** | Source publique, issues, discussions, roadmap et PRs | Suivi d'issues public ; source de l'application et releases contr&ocirc;l&eacute;es par le fournisseur | Documentation et support du fournisseur ; source de l'application et releases contr&ocirc;l&eacute;es par le fournisseur |
+La matrice principale couvre les proxys de débogage Web à usage général. Tests de sécurité
+suites et intercepteurs orientés navigateur/API avec un chevauchement substantiel des flux de travail
+sont répertoriés séparément, de sorte que les produits différents ne sont pas présentés comme interchangeables.
+Les analyseurs de paquets et les clients API uniquement ne sont pas inclus dans cette comparaison.
 
-Les capacit&eacute;s des concurrents ci-dessus ont &eacute;t&eacute; v&eacute;rifi&eacute;es par rapport &agrave; la documentation produit officielle le 2026-08-13 et peuvent changer apr&egrave;s publication.
+### Proxys de débogage Web directs
 
-Sur la feuille de route : r&egrave;gles protocol-aware plus profondes, bundles d'evidence redig&eacute;e plus s&ucirc;rs, workflows de replay et comparaison renforc&eacute;s, guides Developer Setup plus larges et recherche continue sur HTTP/2 et HTTP/3.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Forme du produit** | Proxy de débogage natif macOS | Application macOS native ; Éditions Windows/Linux basées sur Electron | Proxy de débogage de bureau multiplateforme | Boîte à outils proxy multiplateforme CLI/TUI et interface utilisateur Web | Proxy de bureau multiplateforme Electron et client HTTP | Proxy de débogage de bureau multiplateforme |
+| **Modèle source et build** | Source communautaire publique sous AGPL-3.0-or-later ; constructible avec Xcode. Le DMG officiel contient également des composants en aval non publics | Source fermée ; aucune source de candidature publique identifiée dans les documents officiels examinés | Source fermée ; aucune source de candidature publique identifiée dans les documents officiels examinés | Source publique sous licence MIT ; constructible à partir de la source | Source de bureau publique AGPL ; constructible à partir de la source ; les binaires publiés disposent d'options de licence supplémentaires | Source fermée ; distribué sous forme de code objet sous le Fiddler Everywhere EULA |
+| **Capture et configuration** | Proxy système local avec configuration guidée pour les applications Mac, les environnements d'exécution, les appareils iOS et le simulateur | Configuration automatique pour les applications Mac, les environnements d'exécution et les appareils mobiles | Proxy local avec les guides de configuration macOS, iOS et multiplateforme | Modes de capture régulier, processus local, WireGuard, inversé, transparent et autres | Interception de proxy ciblée et manuelle pour les navigateurs, les environnements d'exécution, les conteneurs et les appareils mobiles | Modes de capture système, réseau, navigateur, terminal, explicite et périphérique distant |
+| **Modifier et simuler** | Points d'arrêt, Map Local/Remote, règles d'en-tête, règles de blocage et de latence | Points d'arrêt, Map Local/Remote, listes de blocage, conditions réseau et règles JavaScript | Points d'arrêt, réécriture, Map Local/Remote, blocage et limitation | Map Local/Remote, modification du corps/en-tête, blocage et relecture du serveur | Points d'arrêt ainsi que réécriture, redirection, simulation et injection d'erreurs basées sur des règles ; certaines automatisations sont limitées au plan | Règles, points d'arrêt, redirections, modification de réponse et moquerie |
+| **Rejouez et comparez** | Composer/rejouer plus une requête locale côte à côte, une comparaison d'en-tête et de corps | Composer, répéter et comparer | Répéter et modifier les demandes | Relecture côté client et côté serveur | Client HTTP intégré pour la rédaction et l'envoi de requêtes | API Composer, relecture du trafic et comparaison du trafic documentés en version bêta |
+| **Flux de travail WebSocket** | Inspection de cadre texte/binaire avec l'heuristique limitée Protobuf | Inspection WS/WSS ; les scripts peuvent modifier les URL/en-têtes de négociation, pas les messages | La prise en charge de WebSocket est documentée dans l'historique des versions officielles | Interception et script WebSocket ; La relecture WebSocket n'est pas prise en charge | Inspection WebSocket plus règles spécifiques à la WebSocket | Capture et inspection WebSocket |
+| **Script et extensibilité** | Hooks JavaScriptCore en bac à sable avec un API limité et un délai d'exécution | JavaScript Script de requête/réponse | Règles de réécriture et interface Web de contrôle ; aucune fonctionnalité de script générale JavaScript documentée | Addons Python et automatisation en ligne de commande | Automatisation basée sur des règles et bibliothèques publiques de sources et de proxy | Automatisation basée sur des règles ; aucune fonctionnalité de script générale de première partie n'est documentée |
+| **Routage amont** | [Proxy amont HTTP/HTTPS et routage URL PAC](docs/features/upstream-proxy.mdx) ; La politique communautaire désactive l'authentification proxy et SOCKS5 et limite les règles de contournement à trois | Routage externe HTTP/HTTPS/SOCKS et PAC avec règles de contournement | Proxy externes HTTP/HTTPS/SOCKS avec règles d'authentification et de contournement | Mode amont HTTP/HTTPS plus modes d'écoute inversé et SOCKS | Paramètres en amont du système, HTTP, HTTPS et SOCKS ; des limites du régime peuvent s'appliquer | Chaînage automatique aux proxys système et capture de proxy inverse |
+| **AI et MCP** | [Assistant IA intégré à l'application](docs/features/ai-assistant.mdx) et [MCP local intégré](docs/features/mcp.mdx) avec 10 outils en lecture seule, authentification par jeton et rédaction activée par défaut | MCP intégré pour les clients IA externes, y compris les lectures de trafic et les contrôles d'applications/règles | Non documenté | Non documenté | Un pont local MCP groupé est présent dans la source officielle actuelle ; aucun assistant intégré à l'application n'est documenté | MCP intégré plus un assistant de débogage de niveau professionnel dont la documentation actuelle nécessite que les détails du trafic capturés soient collés dans le chat |
+
+### Outils d'interception adjacents
+
+Ces produits chevauchent de manière significative le Rockxy mais sont en tête des tests de sécurité,
+règles de navigateur ou workflows client API plutôt que les mêmes règles à usage général
+focus proxy de débogage natif.
+
+| **Produit** | **Pourquoi est-il adjacent** | **Modèle source et build** | **Chevauchement pertinent** | **AI et MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Suite de tests de sécurité Web avec un proxy d'interception | Application fermée ; son EULA indique que les utilisateurs n'ont aucun droit sur la source de l'application. Les extensions peuvent utiliser des licences distinctes | Interception et correspondance/remplacement de proxy, répéteur, WebSocket, proxy en amont/SOCKS et un vaste écosystème d'extensions | Burp AI est disponible dans Repeater ; PortSwigger gère également une extension de serveur publique MCP pour les clients IA externes |
+| **ZAP** | Scanner de sécurité et proxy d'interception | Source publique Apache-2.0 ; constructible à partir de la source | Interception/édition, renvoi manuel, points d'arrêt et scripts WebSocket, scripts multilingues, modules complémentaires et automatisation | Intégration officielle du MCP et modules complémentaires de support LLM en option |
+| **Requestly HTTP Interceptor** | Extension de navigateur et outil d'interception/simulation de bureau multiplateforme | Source publique d'intercepteur de bureau AGPL ; le client Requestly API séparé est propriétaire selon son avis de référentiel communautaire public | Capture à l'échelle du système/navigateur, redirection, Map Local/Remote, modification d'en-tête/corps, transformations JavaScript, simulations et simulation de retard/erreur | Un serveur MCP officiel distinct gère les règles et les groupes ; aucun assistant d'analyse du trafic intégré à l'application n'est documenté |
+
+La disponibilité des fonctionnalités peut varier selon l'édition, le plan, la plateforme ou le module complémentaire.
+« Non documenté » signifie qu'une fonctionnalité n'a pas été trouvée dans la version officielle officielle.
+sources examinées sur 2026-08-22 ; cela ne prouve pas que cette capacité est absente.
+Les déclarations de produits et de fonctionnalités ci-dessus ont été vérifiées par rapport à la documentation du fournisseur,
+référentiels sources gérés par le fournisseur, ou les conditions de licence du fournisseur à cette date et
+peut changer. Les noms de produits et les marques déposées appartiennent à leurs propriétaires respectifs ;
+Rockxy n’est ni affilié ni approuvé par eux. Les corrections sont les bienvenues
+via le système de suivi des problèmes Rockxy.
+
+Au programme : des règles plus approfondies tenant compte des protocoles, des ensembles de preuves rédigées plus sûres, des flux de travail de relecture et de comparaison plus solides, des conseils de configuration plus larges pour les développeurs et une recherche continue sur HTTP/2 et HTTP/3.
 
 ## S&eacute;curit&eacute;
 

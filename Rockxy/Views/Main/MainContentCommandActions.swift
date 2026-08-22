@@ -24,6 +24,10 @@ struct MainContentCommandActions {
         coordinator.isProxyRunning
     }
 
+    var isRecording: Bool {
+        coordinator.isRecording
+    }
+
     var hasSelectedTransaction: Bool {
         coordinator.selectedTransaction != nil
     }

@@ -339,24 +339,49 @@ Construiți și rulați în Xcode. Fereastra Bun venit vă ghidează prin config
 
 Dacă doriți să conectați Rockxy la un client MCP local după instalare, consultați [Ghid de integrare MCP](docs/features/mcp.mdx).
 
-## Rockxy vs Alternative
+## Rockxy vs. Alternative
 
-|    | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **Model de proiect** | Proiect open-source AGPL-3.0 | Aplicație comercială proprietară | Aplicație comercială proprietară |
-| **Cod sursă** | Public, auditabil, forkable | Sursă închisă | Sursă închisă |
-| **Construiți din sursă** | Gratuit cu Xcode din acest depozit | Nu este disponibil din sursa publică | Nu este disponibil din sursa publică |
-| **Fundație nativă macOS** | Swift + SwiftNIO + SwiftUI/AppKit | Aplicație macOS nativă cu sursă închisă | Aplicație multiplatformă cu sursă închisă |
-| **Captură locală mai întâi** | Proxy-ul local, certificatele, helperul și datele de captare rămân pe Mac | Aplicație proxy desktop | Aplicație proxy desktop |
-| **Flux de lucru pentru configurarea dezvoltatorului** | Hub de configurare pentru dezvoltatori încorporat pentru runtime, clienți, dispozitive, cadre și medii | Configurare automată încorporată plus ghiduri de platformă și runtime | Ghiduri de configurare specifice platformei |
-| **Proxy extern + rutare PAC** | Proxy în amonte HTTP/HTTPS, auto-configurare PAC și reguli de ocolire | Proxy comercial în amonte și suport PAC | Configurare comercială proxy în amonte |
-| **Integrare MCP** | [MCP local încorporat](docs/features/mcp.mdx): 10 instrumente doar-citire pentru trafic, stare, certificate, inspecția regulilor și export cURL; autentificat prin token; redactare activată implicit | MCP local încorporat: inspecția traficului plus instrumente pentru reguli, sesiune, certificate, configurare și control al aplicației; doar localhost; autentificare prin token per sesiune; redactarea datelor sensibile | Nicio integrare MCP first-party găsită în [documentația oficială](https://www.charlesproxy.com/documentation/) verificată la 2026-08-13 |
-| **AI Assistant nativ** | Încorporat pentru analiza traficului pentru cerere selectată și multi-cerere în Rockxy | Necunoscut | Necunoscut |
-| **Cale de contribuție deschisă** | Sursă publică, issues, discuții, foaie de parcurs și PR-uri | Tracker public de issue-uri; sursa aplicației și lansările sunt controlate de furnizor | Documentație și suport ale furnizorului; sursa aplicației și lansările sunt controlate de furnizor |
+Matricea principală acoperă proxy-uri de depanare web de uz general. Testare de securitate
+suite și browser/interceptoare orientate spre API, cu suprapunere substanțială a fluxului de lucru
+sunt enumerate separat, astfel încât, spre deosebire de produsele, nu sunt prezentate ca interschimbabile.
+Analizatoarele de pachete și clienții numai pentru API sunt în afara acestei comparații.
 
-Capacitățile concurenților de mai sus au fost verificate față de documentația oficială a produsului la 2026-08-13 și se pot schimba după publicare.
+### Proxy direct de depanare web
 
-Pe roadmap: reguli protocol-aware mai profunde, bundle-uri de dovezi redactate mai sigure, workflow-uri replay și comparison mai puternice, ghiduri Developer Setup mai ample și cercetare continuă pentru HTTP/2 și HTTP/3.
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **Forma produsului** | Proxy nativ de depanare macOS | Aplicație nativă macOS; Ediții Windows/Linux bazate pe Electron | Proxy de depanare desktop multiplatformă | CLI/TUI multiplatformă și set de instrumente proxy pentru interfața de utilizare web | Proxy desktop Electron multiplatformă și client HTTP | Proxy de depanare desktop multiplatformă |
+| **Sursă și model de construcție** | Sursa comunității publice sub AGPL-3.0-or-later; construibil cu Xcode. DMG oficial conține și componente non-publice din aval | Sursă închisă; nicio sursă de aplicare publică identificată în materialele oficiale analizate | Sursă închisă; nicio sursă de aplicare publică identificată în materialele oficiale analizate | Sursă publică cu licență MIT; construibil din sursa | Sursă desktop publică AGPL; construibil de la sursă; binarele publicate au opțiuni suplimentare de licențiere | Sursă închisă; distribuit ca cod obiect sub Fiddler Everywhere EULA |
+| **Capturare și configurare** | Proxy de sistem local cu configurare ghidată pentru aplicații Mac, runtime, dispozitive iOS și Simulator | Configurare automată pentru aplicații Mac, timpi de execuție și dispozitive mobile | Proxy local cu ghiduri de configurare pentru macOS, iOS și multiplatforme | Modul obișnuit, cu proces local, WireGuard, invers, transparent și alte moduri de captură | Interceptare manuală și direcționată proxy pentru browsere, timpi de execuție, containere și dispozitive mobile | Moduri de captare sistem, rețea, browser, terminal, explicit și la distanță |
+| **Modifică și batjocorește** | Puncte de întrerupere, Map Local/Remote, reguli de antet, reguli de blocare și latență | Puncte de întrerupere, Map Local/Remote, liste de blocare, condiții de rețea și reguli JavaScript | Puncte de întrerupere, rescriere, Map Local/Remote, blocare și accelerare | Map Local/Remote, modificarea corpului/antetului, blocarea și reluarea serverului | Puncte de întrerupere plus rescriere bazată pe reguli, redirecționare, simulare și injectare de erori; unele automatizări sunt limitate în plan | Reguli, puncte de întrerupere, redirecționări, modificare a răspunsului și batjocură |
+| **Reda și compara** | Compune/reluare plus cerere locală alăturată, antet și comparație de corp | Compune, repetă și diferență | Repetați și editați solicitările | Reluare pe partea client și pe partea server | Client HTTP încorporat pentru compunerea și trimiterea cererilor | API Composer, reluare a traficului și comparare a traficului documentate ca beta |
+| **WebSocket fluxuri de lucru** | Inspecție text/cadru binar cu euristică Protobuf delimitată | inspecție WS/WSS; scripturile pot modifica URL-ul/anteturile de handshake, nu mesajele | Suportul WebSocket este documentat în istoricul versiunilor oficiale | WebSocket interceptare și scripting; Reluarea WebSocket nu este acceptată | Inspecție WebSocket plus reguli specifice WebSocket | WebSocket captare și inspecție |
+| **Scriptare și extensibilitate** | Cârlige JavaScriptCore cu nisip cu un API delimitat și timeout de execuție | JavaScript scriptare cerere/răspuns | Rescrierea regulilor și o interfață web de control; nicio caracteristică generală de scripting JavaScript documentată | Python suplimente și automatizare linie de comandă | Automatizare bazată pe reguli plus biblioteci surse publice și proxy | Automatizare bazată pe reguli; nicio caracteristică generală de scriptare primară nu este documentată |
+| **Dirutare în amonte** | [HTTP/HTTPS proxy în amonte și rutare URL PAC](docs/features/upstream-proxy.mdx); Politica comunitară dezactivează autentificarea proxy și SOCKS5 și limitează regulile de ocolire la trei | Rutare externă HTTP/HTTPS/SOCKS și PAC cu reguli de ocolire | Proxy-uri externe HTTP/HTTPS/SOCKS cu reguli de autentificare și ocolire | HTTP/HTTPS modul amonte plus modurile de ascultare inversă și SOCKS | Setări de sistem, HTTP, HTTPS și SOCKS în amonte; se pot aplica limite ale planului | Înlănțuire automată la proxy-urile de sistem plus capturarea proxy inversă |
+| **AI și MCP** | [Asistent AI în aplicație](docs/features/ai-assistant.mdx) și [MCP local încorporat](docs/features/mcp.mdx) cu ​​10 instrumente numai pentru citire, autentificare cu simbol și redactare activate în mod implicit | MCP încorporat pentru clienții AI externi, inclusiv citirile de trafic și controalele aplicației/regulilor | Nedocumentat | Nedocumentat | Un pod MCP local este prezent în sursa oficială curentă; nici un asistent în aplicație documentat | MCP încorporat plus un asistent de depanare de nivel profesional a cărui documentație actuală necesită ca detaliile de trafic capturate să fie lipite în chat |
+
+### Instrumente de interceptare adiacente
+
+Aceste produse se suprapun în mod semnificativ cu Rockxy, dar conduc cu teste de securitate,
+regulile browserului sau fluxurile de lucru pentru client API, mai degrabă decât același scop general
+focus nativ de depanare-proxy.
+
+| **Produs** | **De ce este adiacent** | **Sursă și model de construcție** | **Suprapunere relevantă** | **AI și MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | Suită de testare a securității web cu un proxy de interceptare | Aplicație cu sursă închisă; EULA afirmă că utilizatorii nu au niciun drept la sursa aplicației. Extensiile pot folosi licențe separate | Interceptare proxy și potrivire/înlocuire, Repeater, WebSocket, proxy în amonte/SOCKS și un ecosistem extins de extindere | Burp AI este disponibil în Repeater; PortSwigger menține, de asemenea, o extensie publică de server MCP pentru clienți externi AI |
+| **ZAP** | Scaner de securitate și interceptare proxy | Sursa publică Apache-2.0; construibil din sursa | Interceptare/editare, retrimitere manuală, puncte de întrerupere și scripturi WebSocket, scripting în mai multe limbi, suplimente și automatizare | Integrare oficială MCP și suplimente opționale de asistență LLM |
+| **Requestly HTTP Interceptor** | Extensie de browser și instrument de interceptare/modificare desktop multiplatformă | Sursă publică AGPL desktop-interceptor; clientul separat Requestly API este proprietar conform notificării sale publice privind depozitul comunității | Captură la nivelul întregului sistem/browser, redirecționare, Map Local/Remote, modificare antet/corp, transformări JavaScript, simulare de întârziere/erori | Un server oficial separat MCP gestionează regulile și grupurile; nu este documentat niciun asistent de analiză a traficului în aplicație |
+
+Disponibilitatea caracteristicilor poate varia în funcție de ediție, plan, platformă sau supliment.
+„Nedocumentat” înseamnă că o capacitate nu a fost găsită în prima parte oficială
+surse revizuite pe 2026-08-22; nu este dovada că capacitatea este absentă.
+Declarațiile despre produse și caracteristici de mai sus au fost verificate cu documentația furnizorului,
+arhivele sursă întreținute de furnizor sau termenii licenței furnizorului la acea dată și
+se poate schimba. Numele produselor și mărcile comerciale aparțin proprietarilor respectivi;
+Rockxy nu este afiliat sau susținut de ei. Corecțiile sunt binevenite
+prin intermediul instrumentului de urmărire a problemelor Rockxy.
+
+Pe foaia de parcurs: reguli mai profunde care cunoaște protocolul, pachete de dovezi redactate mai sigure, fluxuri de lucru mai puternice de reluare și comparare, îndrumări mai ample de configurare pentru dezvoltatori și cercetare continuă HTTP/2 și HTTP/3.
 
 ## Securitate
 

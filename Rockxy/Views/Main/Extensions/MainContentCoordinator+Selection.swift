@@ -58,12 +58,15 @@ extension MainContentCoordinator {
     /// Enables or disables live-tail selection on the active workspace. Enabling immediately
     /// reveals the newest request already visible in the active workspace so the control has an
     /// observable result even before another capture batch arrives; on an empty view it stays armed.
+    ///
+    /// Follow Live is deliberately chronological, so enabling reconciles against the active
+    /// workspace's `filteredTransactions` (received order) rather than the display-sorted jump path.
     func setFollowingLiveTraffic(_ isEnabled: Bool) {
         isFollowingLiveTraffic = isEnabled
         guard isEnabled else {
             return
         }
-        selectLastFilteredTransaction()
+        reconcileFollowLiveSelection(for: activeWorkspace)
     }
 
     func toggleFollowingLiveTraffic() {
@@ -267,19 +270,40 @@ extension MainContentCoordinator {
         deleteTransactions(selected)
     }
 
-    func selectFirstFilteredTransaction() {
-        guard let first = filteredTransactions.first else {
-            return
-        }
-        selectedTransactionIDs = [first.id]
-        selectTransaction(first)
+    /// One-shot reveal request published by the active workspace's Jump commands for the AppKit
+    /// request table to consume. Read-only forwarding — the table tracks its last applied generation.
+    var trafficRevealRequest: TrafficRevealRequest? {
+        activeWorkspace.trafficRevealRequest
     }
 
+    /// Jumps to the first row in the current display order (after any active sort), selects its
+    /// transaction, and publishes a fresh reveal request for the table. Uses `filteredRows`, not the
+    /// chronological `filteredTransactions`, so the endpoint matches what the user actually sees.
+    func selectFirstFilteredTransaction() {
+        revealDisplayEndpoint(activeWorkspace.filteredRows.first)
+    }
+
+    /// Jumps to the last row in the current display order (after any active sort). Follow Live is
+    /// unaffected — this is a manual navigation command, not a live-tail toggle.
     func selectLastFilteredTransaction() {
-        guard let last = filteredTransactions.last else {
+        revealDisplayEndpoint(activeWorkspace.filteredRows.last)
+    }
+
+    /// Resolves a display-order endpoint row through `trafficSelectionIndex`, applies it as the
+    /// active-workspace selection, and publishes a one-shot reveal request. Fails safely — no
+    /// selection change, no reveal — when the view is empty or the selection index is stale/missing
+    /// for the endpoint row. Never touches `isFollowingLiveTraffic`.
+    private func revealDisplayEndpoint(_ row: RequestListRow?) {
+        let workspace = activeWorkspace
+        guard let row,
+              let entry = workspace.trafficSelectionIndex[row.id],
+              workspace.filteredRows.indices.contains(entry.rowIndex),
+              workspace.filteredRows[entry.rowIndex].id == row.id else
+        {
             return
         }
-        selectedTransactionIDs = [last.id]
-        selectTransaction(last)
+        selectedTransactionIDs = [entry.transaction.id]
+        selectTransaction(entry.transaction)
+        workspace.publishTrafficRevealRequest(for: entry.transaction.id)
     }
 }

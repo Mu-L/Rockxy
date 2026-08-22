@@ -339,24 +339,49 @@ Xcode でビルドして実行。ウェルカムウィンドウがルート CA �
 
 インストール後に Rockxy をローカル MCP クライアントへ接続したい場合は、[MCP 連携ガイド](docs/features/mcp.mdx)を参照してください。
 
-## Rockxy vs. 他のツール
+## Rockxy と代替品
 
-|  | **Rockxy** | **Proxyman** | **Charles Proxy** |
-|---|---|---|---|
-| **プロジェクトモデル** | AGPL-3.0 オープンソースプロジェクト | プロプライエタリな商用アプリ | プロプライエタリな商用アプリ |
-| **ソースコード** | 公開、監査可能、fork 可能 | クローズドソース | クローズドソース |
-| **ソースからのビルド** | このリポジトリから Xcode で無料ビルド | 公開ソースからは利用不可 | 公開ソースからは利用不可 |
-| **ネイティブ macOS 基盤** | Swift + SwiftNIO + SwiftUI/AppKit | クローズドソースのネイティブ macOS アプリ | クローズドソースのクロスプラットフォームアプリ |
-| **Local-first キャプチャ** | ローカルプロキシ、証明書、ヘルパー、キャプチャデータは Mac 上に保持 | デスクトッププロキシアプリ | デスクトッププロキシアプリ |
-| **開発者セットアップワークフロー** | runtime、client、device、framework、environment 向けの Developer Setup Hub を内蔵 | 内蔵の自動セットアップに加えプラットフォーム/ランタイム別ガイド | プラットフォーム固有のセットアップガイド |
-| **外部プロキシ + PAC ルーティング** | HTTP/HTTPS アップストリームプロキシ、PAC 自動設定、bypass ルール | 商用アップストリームプロキシと PAC サポート | 商用アップストリームプロキシ設定 |
-| **MCP 連携** | [内蔵ローカル MCP](docs/features/mcp.mdx)：トラフィック、ステータス、証明書、ルール検査、cURL エクスポート向けの 10 個の読み取り専用ツール；トークン認証；redaction デフォルト有効 | 内蔵ローカル MCP：トラフィック検査に加えルール、セッション、証明書、セットアップ、アプリ制御ツール；localhost のみ；セッションごとのトークン認証；機微データ redaction | 2026-08-13 に確認した[公式ドキュメント](https://www.charlesproxy.com/documentation/)ではファーストパーティの MCP 連携は見つかりませんでした |
-| **ネイティブ AI Assistant** | Rockxy 内で選択 request・複数 request のトラフィック分析向けに内蔵 | 不明 | 不明 |
-| **オープンな貢献経路** | 公開ソース、issues、discussions、roadmap、PR | 公開 issue トラッカー；アプリのソースとリリースはベンダー管理 | ベンダーのドキュメントとサポート；アプリのソースとリリースはベンダー管理 |
+メイン マトリックスでは、汎用 Web デバッグ プロキシについて説明します。セキュリティテスト
+実質的なワークフローが重複するスイートとブラウザ/API 指向のインターセプタ
+個別にリストされているため、異なる製品は互換性があるものとしては表示されません。
+パケット アナライザーと API 専用クライアントは、この比較の対象外です。
 
-上記の競合機能は 2026-08-13 に公式製品ドキュメントと照合して確認しており、公開後に変更される可能性があります。
+### 直接 Web デバッグ プロキシ
 
-ロードマップの方向性: より深い protocol-aware rules、安全な redacted evidence bundle、強化された replay/comparison workflow、幅広い Developer Setup guide、HTTP/2・HTTP/3 の継続研究。
+|  | **Rockxy** | **Proxyman** | **Charles Proxy** | **mitmproxy** | **HTTP Toolkit** | **Fiddler Everywhere** |
+|---|---|---|---|---|---|---|
+| **製品形態** | macOS ネイティブのデバッグプロキシ | macOS ネイティブアプリ。Windows/Linux 版は Electron ベース | クロスプラットフォームのデスクトップデバッグプロキシ | クロスプラットフォームの CLI/TUI および Web UI プロキシツールキット | クロスプラットフォームの Electron デスクトッププロキシ兼 HTTP クライアント | クロスプラットフォームのデスクトップデバッグプロキシ |
+| **ソースとビルドモデル** | Community のソースは AGPL-3.0-or-later で公開され、Xcode でビルド可能。公式 DMG には非公開のダウンストリームコンポーネントも含まれる | クローズドソース。確認した公式資料では公開アプリケーションソースを特定できず | クローズドソース。確認した公式資料では公開アプリケーションソースを特定できず | MIT ライセンスの公開ソース。ソースからビルド可能 | AGPL の公開デスクトップソース。ソースからビルド可能。配布バイナリには追加のライセンス選択肢あり | クローズドソース。Fiddler Everywhere EULA に基づきオブジェクトコードとして配布 |
+| **キャプチャとセットアップ** | Mac アプリ、ランタイム、iOS デバイス、Simulator 向けのガイド付きローカルシステムプロキシ設定 | Mac アプリ、ランタイム、モバイルデバイスの自動設定 | macOS、iOS、各種プラットフォーム向けガイドを備えたローカルプロキシ | regular、local-process、WireGuard、reverse、transparent などのキャプチャモード | ブラウザ、ランタイム、コンテナ、モバイル向けの対象指定および手動プロキシインターセプト | system、network、browser、terminal、explicit、remote-device の各キャプチャモード |
+| **変更とモック** | Breakpoint、Map Local/Remote、ヘッダールール、ブロック、遅延ルール | Breakpoint、Map Local/Remote、ブロックリスト、ネットワーク条件、JavaScript ルール | Breakpoint、Rewrite、Map Local/Remote、ブロック、スロットリング | Map Local/Remote、body/header 変更、ブロック、server replay | Breakpoint とルールベースの rewrite、redirect、mock、error injection。一部の自動化はプラン制限あり | ルール、Breakpoint、redirect、response 変更、mock |
+| **リプレイと比較** | Compose/replay と、request・header・body のローカル横並び比較 | Compose、Repeat、Diff | request の Repeat と編集 | client-side および server-side replay | request を作成・送信する内蔵 HTTP クライアント | API Composer、traffic replay、traffic comparison は beta と記載 |
+| **WebSocket ワークフロー** | text/binary frame の検査と、制限付き Protobuf heuristic | WS/WSS 検査。script は handshake URL/header を変更できるが message は変更不可 | WebSocket 対応は公式 version history に記載 | WebSocket interception と scripting。WebSocket replay は非対応 | WebSocket 検査と専用ルール | WebSocket の capture と inspection |
+| **スクリプトと拡張性** | 制限付き API と実行 timeout を備えた sandboxed JavaScriptCore hook | JavaScript による request/response scripting | Rewrite rule と Control Web Interface。汎用 JavaScript scripting 機能は公式資料に記載なし | Python addon と command-line automation | ルールベースの automation、公開ソース、proxy library | ルールベースの automation。first-party の汎用 scripting 機能は記載なし |
+| **アップストリームルーティング** | [HTTP/HTTPS upstream proxy と PAC URL routing](docs/features/upstream-proxy.mdx)。Community では proxy authentication と SOCKS5 が無効で、bypass rule は 3 件まで | external HTTP/HTTPS/SOCKS と PAC routing、bypass rule | authentication と bypass rule を備えた external HTTP/HTTPS/SOCKS proxy | HTTP/HTTPS upstream mode、reverse mode、SOCKS listener mode | system、HTTP、HTTPS、SOCKS upstream 設定。プラン制限が適用される場合あり | system proxy への自動 chaining と reverse-proxy capture |
+| **AI と MCP** | [アプリ内 AI Assistant](docs/features/ai-assistant.mdx) と [内蔵ローカル MCP](docs/features/mcp.mdx)。read-only tool 10 個、token authentication、default-on redaction | 外部 AI client 向け内蔵 MCP。traffic read と app/rule control を含む | 記載なし | 記載なし | 現行の公式ソースに bundled local MCP bridge あり。アプリ内 assistant は記載なし | 内蔵 MCP と Pro-tier Debugging Assistant。現行資料では capture 済み traffic details を chat に貼り付ける必要あり |
+
+### 隣接する傍受ツール
+
+これらの製品は Rockxy と大幅に重複しますが、セキュリティ テストをリードします。
+同じ汎用ではなく、ブラウザー ルール、または API クライアント ワークフロー
+ネイティブ デバッグ プロキシに焦点を当てます。
+
+| **製品** | **隣接製品とする理由** | **ソースとビルドモデル** | **関連する重複機能** | **AI と MCP** |
+|---|---|---|---|---|
+| **Burp Suite** | intercepting proxy を備えた Web セキュリティテストスイート | クローズドソース。EULA は利用者にアプリケーションソースへの権利がないと規定。extension は別ライセンスを使用可能 | proxy interception、match/replace、Repeater、WebSocket、upstream/SOCKS proxy、大規模な extension ecosystem | Repeater で Burp AI を利用可能。PortSwigger は外部 AI client 向けの公開 MCP Server extension も保守 |
+| **ZAP** | セキュリティスキャナ兼 intercepting proxy | Apache-2.0 の公開ソース。ソースからビルド可能 | intercept/edit、manual resend、WebSocket breakpoint と script、多言語 scripting、add-on、automation | 公式 MCP Integration add-on と任意の LLM Support add-on |
+| **Requestly HTTP Interceptor** | browser extension とクロスプラットフォーム desktop interceptor/mock tool | desktop interceptor は AGPL の公開ソース。別製品の API Client は公開 community repository の通知上 proprietary | system-wide/browser capture、redirect、Map Local/Remote、header/body 変更、JavaScript transform、mock、delay/error simulation | 別の公式 MCP server が rule と group を管理。アプリ内 traffic-analysis assistant は記載なし |
+
+利用できる機能は、エディション、プラン、プラットフォーム、またはアドオンによって異なります。
+「文書化されていない」とは、機能が公式のファーストパーティで見つからなかったことを意味します
+2026-08-22 でレビューされた情報源。それは能力が存在しないことを証明するものではありません。
+上記の製品および機能に関する説明は、ベンダーのドキュメントと照合して確認されました。
+ベンダーが管理するソース リポジトリ、またはその日付のベンダー ライセンス条項、および
+変更される可能性があります。製品名および商標はそれぞれの所有者に帰属します。
+Rockxy は、それらと提携または承認されていません。修正は大歓迎です
+Rockxy 問題トラッカーを通じて。
+
+ロードマップ: より深いプロトコル対応ルール、より安全な編集された証拠バンドル、より強力な再生および比較ワークフロー、広範な開発者セットアップ ガイダンス、および HTTP/2 および HTTP/3 の継続的な研究。
 
 ## セキュリティ
 
