@@ -83,18 +83,25 @@ struct TrafficCommandDescriptorTests {
         #expect(!descriptor.isEnabled)
     }
 
-    @Test("Recording stays an overflow action with explicit stopped, recording, and paused states")
-    func recordingOverflowContract() {
+    @Test("Recording control exposes explicit stopped, recording, and paused states")
+    func recordingControlContract() {
         let stopped = TrafficRecordingCommandPresentation.make(isProxyRunning: false, isRecording: true)
         let recording = TrafficRecordingCommandPresentation.make(isProxyRunning: true, isRecording: true)
         let paused = TrafficRecordingCommandPresentation.make(isProxyRunning: true, isRecording: false)
 
         #expect(!stopped.isEnabled)
         #expect(recording.title == "Pause Recording")
-        #expect(recording.systemImage == "pause.fill")
+        #expect(recording.systemImage == "pause.circle")
         #expect(paused.title == "Resume Recording")
         #expect(paused.systemImage == "record.circle")
-        #expect([stopped, recording, paused].allSatisfy { $0.help.contains("⌘P") })
+        #expect([stopped, recording, paused].allSatisfy { $0.help.contains("⌥⌘R") })
+    }
+
+    @Test("Traffic actions use the standard trailing More affordance")
+    func trafficActionsMenuContract() {
+        #expect(TrafficActionsMenuPresentation.systemImage == "ellipsis.circle")
+        #expect(TrafficActionsMenuPresentation.help == "More traffic actions")
+        #expect(TrafficActionsMenuPresentation.accessibilityLabel == "More Traffic Actions")
     }
 
     @Test("Request actions expose distinct local state without inventing shortcuts")
@@ -194,7 +201,7 @@ struct TrafficCommandDescriptorTests {
         let toolIDs = Set((layout.commandBar + layout.footer).map(\.rawValue))
 
         #expect(toolIDs.isDisjoint(with: ["clearSession", "followLive"]))
-        // Recording stays in the overflow menu — it is not a quick tool.
+        // Recording is a dedicated command-bar control — it is not a customizable quick tool.
         #expect(!toolIDs.contains("proxyOverride"))
     }
 
