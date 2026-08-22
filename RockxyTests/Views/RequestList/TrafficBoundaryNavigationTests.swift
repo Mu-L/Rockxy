@@ -74,6 +74,48 @@ struct TrafficBoundaryNavigationTests {
         #expect(scrollView.contentView.bounds.origin.y > 0)
     }
 
+    @Test("Jump reveal remains consumed after switching away from and back to a workspace")
+    func jumpRevealConsumptionPersistsAcrossWorkspaceSwitches() {
+        let firstWorkspaceID = UUID()
+        let secondWorkspaceID = UUID()
+        let transactions = TestFixtures.makeBulkTransactions(count: 100)
+        let rows = transactions.map { RequestListRow(from: $0, sslState: .insecure) }
+        let target = transactions[99]
+        let selectionIndex = [
+            target.id: TrafficSelectionIndexEntry(transaction: target, rowIndex: 99)
+        ]
+        var selectedIDs: Set<UUID> = [target.id]
+        let parent = RequestTableView(
+            workspaceID: firstWorkspaceID,
+            rows: rows,
+            refreshToken: 0,
+            isAppendOnly: false,
+            selectionIndex: selectionIndex,
+            selectedIDs: Binding(
+                get: { selectedIDs },
+                set: { selectedIDs = $0 }
+            )
+        )
+        let coordinator = RequestTableView.Coordinator(parent: parent)
+        coordinator.rows = rows
+        let tableView = makeTableView(rowCount: rows.count, coordinator: coordinator)
+        let scrollView = makeScrollView(documentView: tableView)
+        let request = TrafficRevealRequest(transactionID: target.id, generation: 1)
+
+        coordinator.syncRevealRequest(request, workspaceID: firstWorkspaceID, in: tableView)
+        #expect(scrollView.contentView.bounds.origin.y > 0)
+
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        coordinator.syncRevealRequest(request, workspaceID: secondWorkspaceID, in: tableView)
+        #expect(scrollView.contentView.bounds.origin.y > 0)
+
+        scrollView.contentView.scroll(to: .zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        coordinator.syncRevealRequest(request, workspaceID: firstWorkspaceID, in: tableView)
+        #expect(scrollView.contentView.bounds.origin.y == 0)
+    }
+
     // MARK: Private
 
     private func makeScrollView(documentView: NSTableView) -> NSScrollView {

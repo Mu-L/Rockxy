@@ -462,8 +462,7 @@ extension RequestTableView {
         private var pendingContextSelectionIDs: Set<UUID>?
         private var pendingContextPrimaryID: UUID?
         private var userScrollObserver: NSObjectProtocol?
-        private var lastAppliedRevealWorkspaceID: UUID?
-        private var lastAppliedRevealGeneration: Int?
+        private var lastAppliedRevealGenerationByWorkspace: [UUID: Int] = [:]
 
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
@@ -1276,8 +1275,7 @@ extension RequestTableView {
             in tableView: NSTableView
         ) {
             guard let request,
-                  lastAppliedRevealWorkspaceID != workspaceID
-                    || lastAppliedRevealGeneration != request.generation,
+                  request.generation > (lastAppliedRevealGenerationByWorkspace[workspaceID] ?? 0),
                   let rowIndex = parent.selectionIndex[request.transactionID]?.rowIndex,
                   rows.indices.contains(rowIndex),
                   rows[rowIndex].id == request.transactionID else
@@ -1286,8 +1284,7 @@ extension RequestTableView {
             }
 
             tableView.scrollRowToVisible(rowIndex)
-            lastAppliedRevealWorkspaceID = workspaceID
-            lastAppliedRevealGeneration = request.generation
+            lastAppliedRevealGenerationByWorkspace[workspaceID] = request.generation
         }
 
         func contextSelectionIDs(
