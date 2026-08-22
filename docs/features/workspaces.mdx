@@ -1,17 +1,17 @@
 ---
-title: "Workspaces"
-description: "Native macOS tabs that split a single capture into independently filtered, sorted, and inspected views."
+title: "Traffic Tabs"
+description: "Project-owned tabs that present one Project capture through independent filters and inspector layouts."
 ---
 
-# Workspaces
+# Traffic Tabs
 
-A workspace is an independent view onto the same live traffic stream. Each tab keeps its own filter, sort, sidebar selection, inspector tab, and inspector layout — but every tab is reading the **same underlying capture**, so traffic shows up in all of them at once. Workspaces are native macOS tabs at the window level: drag, reorder, rename in place, and `Cmd`-click as expected.
+A Traffic Tab is an independent view onto its Project's traffic history. Each tab keeps its own filters and inspector layout, but every tab in that Project reads the **same underlying Project capture**. Switching tabs never changes where traffic is recorded.
 
 <Frame caption="Multiple workspace tabs in the main window">
   <img src="/images/features/DemoMultipleTabWorkingSpace.png" alt="Workspace tabs" />
 </Frame>
 
-## Why workspaces
+## Why Traffic Tabs
 
 A single capture often serves several investigations at once:
 
@@ -19,11 +19,11 @@ A single capture often serves several investigations at once:
 - a tab dedicated to the request you are about to replay, with the inspector docked to the right
 - a tab kept on **Logs** with a process filter while the main tab stays on **Traffic**
 
-Without workspaces, every change to filter or layout would clobber the previous setup. Workspaces let multiple investigations stay parked side-by-side.
+Without Traffic Tabs, every change to filter or layout would clobber the previous setup. Tabs let multiple investigations stay parked side-by-side, while Projects keep related tabs together across launches.
 
 ## What's per-tab vs. shared
 
-Per-tab state (each workspace owns its own copy):
+Per-tab runtime state:
 
 - Filter criteria and the visible filter bar
 - Active main tab (`Traffic` / `Logs`)
@@ -33,13 +33,16 @@ Per-tab state (each workspace owns its own copy):
 - Per-workspace sort descriptors
 - Per-workspace domain tree, app nodes, and grouping index
 
-Shared across all workspaces:
+Shared by the Traffic Tabs inside one Project:
 
-- The proxy capture itself — bodies, headers, timing
+- The Project's live traffic history — bodies, headers, and timing
+
+Shared app-wide:
+
 - Recording state, rules, certificates, plugins
 - Favorites, allow list, SSL proxying list, MCP server state
 
-In other words, you cannot "stop recording" in one tab and "keep recording" in another. The proxy is the proxy. Workspaces only change what you are *looking at*.
+In other words, you cannot "stop recording" in one tab and "keep recording" in another. There is one proxy listener, while request-start ownership determines which Project receives each completed transaction.
 
 ## Tab management
 
@@ -57,7 +60,7 @@ Up to **8 tabs** can be open at a time (`AppPolicy.maxWorkspaceTabs`). Hitting t
 
 ## Default tab
 
-Every new window starts with a single, non-closable workspace titled **All Traffic**. Its filter is `.empty`, so it always shows the full capture. Treat it as your unfiltered baseline — close other tabs to come back to it.
+Every new Project starts with a single, non-closable Traffic Tab titled **All Traffic**. Its filter is `.empty`, so it always shows the full capture. Treat it as your unfiltered baseline.
 
 ## Workflow examples
 
@@ -79,14 +82,14 @@ Sorting is a workspace preference, not a window preference. Sort the **Errors** 
 
 ## Eviction and per-tab views
 
-When the in-memory ring buffer overflows (50k transactions by default), the oldest entries are evicted from every workspace at once. Filter state is preserved; only the underlying rows go away. The sidebar indexes (domain tree + app tree) rebuild automatically per workspace after an eviction — see `MainContentCoordinator+Eviction` for the exact path.
+When a Project's in-memory history reaches its configured cap, its oldest entries are evicted from every Traffic Tab in that Project at once. Other Projects keep their own histories. Filter state is preserved; only the underlying rows go away.
 
 ## Limits and gotchas
 
 - The **All Traffic** tab cannot be closed by design. <kbd>Cmd</kbd>+<kbd>W</kbd> when it is the only tab is a no-op.
-- Workspaces share the proxy. There is no per-tab "start" or "stop".
+- Projects and Traffic Tabs share one proxy listener and recording control. There is no per-tab "start" or "stop".
 - Selection is per-tab, but the inspector window scenes (Compose, Diff, Map Local editor, etc.) are app-level — opening one from any tab shows the same draft state.
-- The 8-tab cap is a `Community` policy value (`AppPolicy.maxWorkspaceTabs`); a future Pro tier may raise it.
+- The 8-tab cap is the current `AppPolicy.maxWorkspaceTabs` value.
 
 ## Next Steps
 
@@ -95,6 +98,6 @@ When the in-memory ring buffer overflows (50k transactions by default), the olde
     All workspace and inspector shortcuts in one table.
   </Card>
   <Card title="Sessions and Export" icon="floppy-disk" href="/features/sessions">
-    Save, load, and export the underlying capture that workspaces share.
+    Save, load, and export the active Project's captured traffic.
   </Card>
 </CardGroup>

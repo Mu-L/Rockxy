@@ -99,6 +99,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         bypassProxyManager: BypassProxyManager = .shared,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
+        tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
@@ -113,6 +115,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         self.bypassProxyManager = bypassProxyManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.captureContextProvider = captureContextProvider
+        self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
@@ -142,7 +146,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         state: TransactionState,
         sourcePort: UInt16?,
         measuredDuration: TimeInterval? = nil,
-        isTLSFailure: Bool = false
+        isTLSFailure: Bool = false,
+        captureContext: TrafficCaptureContext? = nil
     )
         -> HTTPTransaction
     {
@@ -167,7 +172,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 state: state,
                 sourcePort: sourcePort,
                 measuredDuration: measuredDuration,
-                isTLSFailure: isTLSFailure
+                isTLSFailure: isTLSFailure,
+                captureContext: captureContext
             )
         }
         let requestData = HTTPRequestData(
@@ -176,7 +182,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
             httpVersion: "1.1",
             headers: [],
             body: nil,
-            contentType: nil
+            contentType: nil,
+            captureContext: captureContext
         )
         let transaction = HTTPTransaction(
             request: requestData,
@@ -236,6 +243,28 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         return config
     }
 
+    nonisolated static func initialTunnelMode(
+        host: String,
+        sslProxyingManager: SSLProxyingManager,
+        bypassProxyManager: BypassProxyManager
+    )
+        -> InitialTunnelMode
+    {
+        if bypassProxyManager.isHostBypassed(host) {
+            return .rawTunnel(.bypassProxyList)
+        }
+
+        if !sslProxyingManager.shouldIntercept(host) {
+            return .rawTunnel(.noSSLProxyingRule)
+        }
+
+        if sslProxyingManager.isAutoPassthrough(host) {
+            return .rawTunnel(.autoPassthrough)
+        }
+
+        return .intercept
+    }
+
     nonisolated func handlerAdded(context: ChannelHandlerContext) {
         setupTLSPipeline(context: context)
     }
@@ -261,6 +290,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     private let bypassProxyManager: BypassProxyManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
+    private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
@@ -346,26 +377,6 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         }
     }
 
-    nonisolated static func initialTunnelMode(
-        host: String,
-        sslProxyingManager: SSLProxyingManager,
-        bypassProxyManager: BypassProxyManager
-    ) -> InitialTunnelMode {
-        if bypassProxyManager.isHostBypassed(host) {
-            return .rawTunnel(.bypassProxyList)
-        }
-
-        if !sslProxyingManager.shouldIntercept(host) {
-            return .rawTunnel(.noSSLProxyingRule)
-        }
-
-        if sslProxyingManager.isAutoPassthrough(host) {
-            return .rawTunnel(.autoPassthrough)
-        }
-
-        return .intercept
-    }
-
     nonisolated private func installTLSHandlers(
         context: ChannelHandlerContext,
         identity: CustomTLSIdentity,
@@ -395,6 +406,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 sslProxyingManager: self.sslProxyingManager,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
+                captureContextProvider: self.captureContextProvider,
+                tunnelCaptureContext: self.tunnelCaptureContext,
                 clientSourcePort: self.clientSourcePort,
                 onTransactionComplete: callback,
                 onBreakpointHit: breakpointHit
@@ -493,7 +506,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                             statusMessage: "Connection Established",
                             state: .completed,
                             sourcePort: self.clientSourcePort,
-                            measuredDuration: self.tunnelElapsedDuration()
+                            measuredDuration: self.tunnelElapsedDuration(),
+                            captureContext: self.tunnelCaptureContext
                         )
                     )
                 } onFailure: { error in
@@ -537,6 +551,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         sslProxyingManager: SSLProxyingManager,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
+        tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
@@ -549,6 +565,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         self.sslProxyingManager = sslProxyingManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.captureContextProvider = captureContextProvider
+        self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
@@ -574,6 +592,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                 connectionLimiter: connectionLimiter,
                 customCertificateManager: customCertificateManager,
                 upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
+                captureContextProvider: captureContextProvider,
                 clientSourcePort: clientSourcePort,
                 onTransactionComplete: onTransactionComplete,
                 onBreakpointHit: onBreakpointHit
@@ -640,7 +659,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                 state: .failed,
                 sourcePort: clientSourcePort,
                 measuredDuration: tunnelElapsedDuration(),
-                isTLSFailure: true
+                isTLSFailure: true,
+                captureContext: tunnelCaptureContext
             )
         )
 
@@ -655,7 +675,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
             statusMessage: "Connection Established",
             state: .completed,
             sourcePort: clientSourcePort,
-            measuredDuration: tunnelElapsedDuration()
+            measuredDuration: tunnelElapsedDuration(),
+            captureContext: tunnelCaptureContext
         )
     }
 
@@ -675,6 +696,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     private let sslProxyingManager: SSLProxyingManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
+    private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (

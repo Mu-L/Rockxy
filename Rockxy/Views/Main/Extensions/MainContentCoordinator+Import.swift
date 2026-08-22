@@ -158,13 +158,21 @@ extension MainContentCoordinator {
             let importedTransactions = try importer.importData(data)
 
             await clearSession()
+            let captureContext = activeCaptureContext
 
             for transaction in importedTransactions {
+                transaction.assignCaptureContextIfMissing(captureContext)
                 transaction.sequenceNumber = nextSequenceNumber
                 nextSequenceNumber += 1
                 transactions.append(transaction)
                 updateDomainTree(for: transaction)
                 updateAppNodes(for: transaction)
+            }
+            transactionsByProjectID[projectStore.activeProjectID] = transactions
+            nextSequenceNumberByProjectID[projectStore.activeProjectID] = nextSequenceNumber
+            let overflow = max(0, transactions.count - liveHistoryLimit)
+            if overflow > 0 {
+                evictOldestTransactions(count: overflow)
             }
             rebuildObservedDomainsByApp()
             recomputeFilteredTransactions()
@@ -177,6 +185,7 @@ extension MainContentCoordinator {
                 logEntryCount: 0,
                 importedAt: Date()
             )
+            sessionProvenanceByProjectID[projectStore.activeProjectID] = sessionProvenance
 
             activeToast = ToastMessage(
                 style: .success,
@@ -199,20 +208,33 @@ extension MainContentCoordinator {
             let session = try SessionSerializer.deserialize(from: data)
 
             await clearSession()
+            let captureContext = activeCaptureContext
 
             for codableTransaction in session.transactions {
                 let transaction = codableTransaction.toLiveModel()
+                transaction.assignCaptureContextIfMissing(captureContext)
                 transaction.sequenceNumber = nextSequenceNumber
                 nextSequenceNumber += 1
                 transactions.append(transaction)
                 updateDomainTree(for: transaction)
                 updateAppNodes(for: transaction)
             }
+            transactionsByProjectID[projectStore.activeProjectID] = transactions
+            nextSequenceNumberByProjectID[projectStore.activeProjectID] = nextSequenceNumber
+            let overflow = max(0, transactions.count - liveHistoryLimit)
+            if overflow > 0 {
+                evictOldestTransactions(count: overflow)
+            }
             rebuildObservedDomainsByApp()
 
             if let codableLogEntries = session.logEntries {
                 logEntries = codableLogEntries.map { $0.toLiveModel() }
             }
+            let maxLogs = AppSettingsStorage.load().maxLogBufferSize
+            if logEntries.count > maxLogs {
+                logEntries.removeFirst(logEntries.count - maxLogs)
+            }
+            logEntriesByProjectID[projectStore.activeProjectID] = logEntries
 
             recomputeFilteredTransactions()
             headerColumnStore.updateDiscoveredHeaders(from: transactions)
@@ -224,6 +246,7 @@ extension MainContentCoordinator {
                 logEntryCount: session.logEntries?.count ?? 0,
                 importedAt: Date()
             )
+            sessionProvenanceByProjectID[projectStore.activeProjectID] = sessionProvenance
 
             activeToast = ToastMessage(
                 style: .success,

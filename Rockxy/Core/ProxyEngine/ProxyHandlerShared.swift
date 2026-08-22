@@ -119,11 +119,10 @@ enum ProxyHandlerShared {
         let components = URLComponents(url: requestData.url, resolvingAgainstBaseURL: false)
         let encodedPath = components?.percentEncodedPath ?? requestData.url.path
         let path = encodedPath.isEmpty ? "/" : encodedPath
-        let uri: String
-        if let query = components?.percentEncodedQuery, !query.isEmpty {
-            uri = "\(path)?\(query)"
+        let uri: String = if let query = components?.percentEncodedQuery, !query.isEmpty {
+            "\(path)?\(query)"
         } else {
-            uri = path
+            path
         }
 
         var headers = HTTPHeaders(requestData.headers.map { ($0.name, $0.value) })
@@ -194,12 +193,15 @@ enum ProxyHandlerShared {
         var modifiedHead = originalHead
         modifiedHead.uri = uri
 
-        let hostHeaderValue: String
-        if configuration.preserveHostHeader {
-            hostHeaderValue = originalHead.headers.first(name: "Host")
-                ?? hostHeader(host: originalURL.host() ?? fallbackHost, port: originalURL.port ?? fallbackPort, scheme: originalScheme)
+        let hostHeaderValue: String = if configuration.preserveHostHeader {
+            originalHead.headers.first(name: "Host")
+                ?? hostHeader(
+                    host: originalURL.host() ?? fallbackHost,
+                    port: originalURL.port ?? fallbackPort,
+                    scheme: originalScheme
+                )
         } else {
-            hostHeaderValue = hostHeader(host: upstreamHost, port: upstreamPort, scheme: scheme)
+            hostHeader(host: upstreamHost, port: upstreamPort, scheme: scheme)
         }
         modifiedHead.headers.replaceOrAdd(name: "Host", value: NetworkValidator.sanitizeHeaderValue(hostHeaderValue))
 
@@ -218,7 +220,8 @@ enum ProxyHandlerShared {
             httpVersion: requestData.httpVersion,
             headers: modifiedHead.headers.map { HTTPHeader(name: $0.name, value: $0.value) },
             body: requestData.body,
-            contentType: requestData.contentType
+            contentType: requestData.contentType,
+            captureContext: requestData.captureContext
         )
 
         return MapRemoteRewrite(
@@ -304,7 +307,8 @@ enum ProxyHandlerShared {
 
     private static func defaultPort(for scheme: String) -> Int {
         switch scheme.lowercased() {
-        case "https", "wss":
+        case "https",
+             "wss":
             443
         default:
             80

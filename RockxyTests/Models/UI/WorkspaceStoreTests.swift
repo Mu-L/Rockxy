@@ -322,4 +322,90 @@ struct WorkspaceStoreTests {
         let store = WorkspaceStore()
         #expect(store.maxWorkspaces == 8)
     }
+
+    // MARK: - Hydration retention vs creation capacity
+
+    @Test("hydration retains tabs above the creation limit up to the structural bound")
+    func hydrationRetainsOverCreationCapacity() {
+        let store = WorkspaceStore(maxWorkspaces: 8)
+        let base = ProjectTabSnapshot.makeDefaultAllTraffic()
+        let extras = (0 ..< 12).map { ProjectTabSnapshot(title: "Tab \($0)", isClosable: true) }
+
+        store.applyTabSnapshots([base] + extras, activeTabID: base.id)
+
+        // 13 tabs exceed the creation limit of 8 but sit under the structural bound,
+        // so every one is retained rather than truncated to the creation limit.
+        #expect(store.workspaces.count == 13)
+        #expect(store.workspaces.count > store.maxWorkspaces)
+        #expect(store.activeWorkspaceID == base.id)
+    }
+
+    @Test("hydration never exceeds the structural tab upper bound")
+    func hydrationClampsToStructuralBound() {
+        let store = WorkspaceStore(maxWorkspaces: 8)
+        let base = ProjectTabSnapshot.makeDefaultAllTraffic()
+        let extras = (0 ..< 40).map { ProjectTabSnapshot(title: "Tab \($0)", isClosable: true) }
+
+        store.applyTabSnapshots([base] + extras, activeTabID: base.id)
+
+        #expect(store.workspaces.count == ProjectStructuralLimits.tabCountRange.upperBound)
+        #expect(store.workspaces.contains { !$0.isClosable })
+    }
+
+    // MARK: - Runtime capacity refresh
+
+    @Test("lowering capacity at runtime keeps existing tabs and only blocks new creation")
+    func refreshCapacityDecreaseRetainsTabs() {
+        let store = WorkspaceStore(maxWorkspaces: 8)
+        _ = store.createWorkspace(title: "Tab 1")
+        _ = store.createWorkspace(title: "Tab 2")
+        #expect(store.workspaces.count == 3)
+
+        store.refreshCapacity(maxWorkspaces: 2)
+
+        #expect(store.maxWorkspaces == 2)
+        // No hydrated/created tab is closed by a lower limit.
+        #expect(store.workspaces.count == 3)
+        #expect(!store.canCreateWorkspace)
+        let extra = store.createWorkspace(title: "Blocked")
+        #expect(store.workspaces.count == 3)
+        #expect(extra.title != "Blocked")
+    }
+
+    @Test("raising capacity at runtime re-enables creation")
+    func refreshCapacityIncreaseReenablesCreation() {
+        let store = WorkspaceStore(maxWorkspaces: 1)
+        #expect(!store.canCreateWorkspace)
+
+        store.refreshCapacity(maxWorkspaces: 3)
+
+        #expect(store.maxWorkspaces == 3)
+        #expect(store.canCreateWorkspace)
+        _ = store.createWorkspace(title: "Now Allowed")
+        #expect(store.workspaces.count == 2)
+    }
+
+    @Test("capacity refresh clamps to at least one")
+    func refreshCapacityClampsToMinimum() {
+        let store = WorkspaceStore(maxWorkspaces: 4)
+        store.refreshCapacity(maxWorkspaces: 0)
+        #expect(store.maxWorkspaces == 1)
+    }
+
+    @Test("construction clamps into the structural tab range above and below")
+    func constructionClampsIntoStructuralRange() {
+        #expect(WorkspaceStore(maxWorkspaces: 0).maxWorkspaces == ProjectStructuralLimits.tabCountRange.lowerBound)
+        #expect(
+            WorkspaceStore(maxWorkspaces: 10_000).maxWorkspaces == ProjectStructuralLimits.tabCountRange.upperBound
+        )
+    }
+
+    @Test("capacity refresh clamps into the structural tab range above and below")
+    func refreshCapacityClampsIntoStructuralRange() {
+        let store = WorkspaceStore(maxWorkspaces: 4)
+        store.refreshCapacity(maxWorkspaces: 10_000)
+        #expect(store.maxWorkspaces == ProjectStructuralLimits.tabCountRange.upperBound)
+        store.refreshCapacity(maxWorkspaces: -3)
+        #expect(store.maxWorkspaces == ProjectStructuralLimits.tabCountRange.lowerBound)
+    }
 }

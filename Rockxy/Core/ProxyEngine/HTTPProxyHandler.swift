@@ -34,6 +34,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         connectionLimiter: ConnectionLimiter,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
     ) {
@@ -43,6 +44,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.connectionLimiter = connectionLimiter
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.captureContextProvider = captureContextProvider
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
     }
@@ -62,6 +64,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             requestHead = head
             requestBody = context.channel.allocator.buffer(capacity: 0)
             requestStartTime = .now()
+            requestCaptureContext = captureContextProvider()
             requestBodyLimitState.reset()
             if clientSourcePort == nil, let port = context.channel.remoteAddress?.port {
                 clientSourcePort = UInt16(port)
@@ -75,6 +78,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                 sendErrorResponse(context: context, status: 413, requestData: buildRequestData(from: head))
                 requestHead = nil
                 requestBody = nil
+                requestCaptureContext = nil
                 return
             }
             requestBody?.writeImmutableBuffer(buffer)
@@ -86,6 +90,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             processRequest(context: context, head: head)
             requestHead = nil
             requestBody = nil
+            requestCaptureContext = nil
         }
     }
 
@@ -107,6 +112,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private let connectionLimiter: ConnectionLimiter
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -118,6 +124,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
     private var requestStartTime: DispatchTime?
+    private var requestCaptureContext: TrafficCaptureContext?
     private var clientSourcePort: UInt16?
     private var requestBodyLimitState = RequestBodyLimitState()
 
@@ -194,7 +201,11 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                         break
                     }
                 }
-                self.handleConnect(context: context, head: head)
+                self.handleConnect(
+                    context: context,
+                    head: head,
+                    requestData: requestData
+                )
                 return
             }
 
@@ -307,7 +318,8 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             httpVersion: "\(head.version.major).\(head.version.minor)",
             headers: headers,
             body: body,
-            contentType: contentType
+            contentType: contentType,
+            captureContext: requestCaptureContext
         )
     }
 
@@ -588,11 +600,12 @@ extension HTTPProxyHandler {
     /// TLS termination with a per-host certificate.
     nonisolated func handleConnect(
         context: ChannelHandlerContext,
-        head: HTTPRequestHead
+        head: HTTPRequestHead,
+        requestData: HTTPRequestData
     ) {
         guard let parsed = try? HostPortParser.parse(head.uri) else {
             proxyHandlerLogger.warning("SECURITY: Malformed CONNECT URI")
-            sendErrorResponse(context: context, status: 400, requestData: buildRequestData(from: head))
+            sendErrorResponse(context: context, status: 400, requestData: requestData)
             return
         }
         let host = parsed.host
@@ -619,6 +632,8 @@ extension HTTPProxyHandler {
                 bypassProxyManager: .shared,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
+                captureContextProvider: self.captureContextProvider,
+                tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
                 onTransactionComplete: self.onTransactionComplete,
                 onBreakpointHit: self.onBreakpointHit

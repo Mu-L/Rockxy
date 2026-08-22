@@ -398,7 +398,7 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
         )
         state.identity = identity
         Task { @MainActor [weak coordinator] in
-            coordinator?.registerBabylonCapture(identity: identity)
+            await coordinator?.registerBabylonCapture(identity: identity)
         }
     }
 

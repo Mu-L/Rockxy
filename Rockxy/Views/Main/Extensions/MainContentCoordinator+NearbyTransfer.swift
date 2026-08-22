@@ -7,6 +7,9 @@ extension MainContentCoordinator {
     )
         async throws
     {
+        guard await ensureProjectCatalogReadyForDataIntake() else {
+            throw RockxyNearbyTransferError.projectCatalogUnavailable
+        }
         let importedTransactions = try session.transactions.map(Self.makeNearbyTransaction)
         guard !importedTransactions.isEmpty else {
             throw RockxyNearbyTransferError.emptyTransfer
@@ -21,13 +24,21 @@ extension MainContentCoordinator {
             activeWorkspace
         }
 
+        let captureContext = activeCaptureContext
         for transaction in importedTransactions {
+            transaction.assignCaptureContextIfMissing(captureContext)
             transaction.sequenceNumber = nextSequenceNumber
             nextSequenceNumber += 1
             transactions.append(transaction)
             updateDomainGroupingIndex(for: transaction, in: destinationWorkspace)
             updateAppNodes(for: transaction, in: destinationWorkspace)
         }
+        let overflow = max(0, transactions.count - liveHistoryLimit)
+        if overflow > 0 {
+            evictOldestTransactions(count: overflow)
+        }
+        transactionsByProjectID[projectStore.activeProjectID] = transactions
+        nextSequenceNumberByProjectID[projectStore.activeProjectID] = nextSequenceNumber
         refreshDomainTree(for: destinationWorkspace)
         destinationWorkspace.filteredTransactions = importedTransactions.filter { !$0.isTLSFailure }
         destinationWorkspace.lastDeriveWasAppendOnly = false
@@ -43,6 +54,7 @@ extension MainContentCoordinator {
             logEntryCount: 0,
             importedAt: Date()
         )
+        sessionProvenanceByProjectID[projectStore.activeProjectID] = sessionProvenance
         activeToast = ToastMessage(
             style: .success,
             text: String(localized: "Added \(importedTransactions.count) iOS requests from \(safeDeviceName)")

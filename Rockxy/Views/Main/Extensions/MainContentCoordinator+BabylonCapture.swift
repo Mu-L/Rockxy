@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 extension MainContentCoordinator {
     func configureBabylonCaptureIntake() {
@@ -21,17 +22,28 @@ extension MainContentCoordinator {
                 }
             }
             let settings = AppSettingsStorage.load()
-            await manager.setMaxBufferSize(min(settings.maxBufferSize, policy.maxLiveHistoryEntries))
+            let effectiveBufferSize = min(settings.maxBufferSize, policy.maxLiveHistoryEntries)
+            liveHistoryLimit = max(1, effectiveBufferSize)
+            await manager.setMaxBufferSize(effectiveBufferSize)
             await manager.setProxyPort(activeProxyPort)
             await manager.startBatchTimer()
         }
     }
 
     func receiveBabylonTransaction(_ transaction: HTTPTransaction) async {
+        guard await ensureProjectCatalogReadyForDataIntake() else {
+            Self.logger.error("Dropped Babylon traffic because the Project catalog is unavailable")
+            return
+        }
+        transaction.assignCaptureContextIfMissing(activeCaptureContext)
         await sessionManager.addTransaction(transaction)
     }
 
-    func registerBabylonCapture(identity: BabylonCaptureIdentity) {
+    func registerBabylonCapture(identity: BabylonCaptureIdentity) async {
+        guard await ensureProjectCatalogReadyForDataIntake() else {
+            Self.logger.error("Skipped Babylon workspace because the Project catalog is unavailable")
+            return
+        }
         guard BabylonCaptureWorkspaceRegistry.shared.register(identity) else {
             return
         }

@@ -13,6 +13,11 @@ enum ImportSizePolicy {
     static let maxHARFileSize: UInt64 = 100 * 1_024 * 1_024 // 100 MB
     static let maxSessionFileSize: UInt64 = 200 * 1_024 * 1_024 // 200 MB
 
+    /// Portable Project configuration files carry only view intent (names, filter
+    /// and layout preferences) — never captured traffic — so a tight 1 MiB cap is
+    /// ample and bounds hostile/corrupt allocation on import.
+    static let maxProjectConfigFileSize: UInt64 = 1 * 1_024 * 1_024 // 1 MiB
+
     static func validateFileSize(at url: URL, maxSize: UInt64) -> Result<Void, ImportSizeError> {
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)

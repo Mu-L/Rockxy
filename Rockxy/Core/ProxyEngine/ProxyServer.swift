@@ -92,6 +92,7 @@ actor ProxyServer {
         ruleEngine: RuleEngine = RuleEngine(),
         scriptPluginManager: ScriptPluginManager? = nil,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void = { _ in },
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
     ) {
@@ -100,6 +101,7 @@ actor ProxyServer {
         self.ruleEngine = ruleEngine
         self.scriptPluginManager = scriptPluginManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.captureContextProvider = captureContextProvider
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
     }
@@ -124,6 +126,7 @@ actor ProxyServer {
         let scriptMgr = scriptPluginManager
         let limiter = connectionLimiter
         let callback = onTransactionComplete
+        let captureProvider = captureContextProvider
         let breakpointHit = onBreakpointHit
         refreshUpstreamProxySnapshot()
         let upstreamProxyProvider: @Sendable () -> UpstreamProxyResolvedConfiguration? = {
@@ -159,6 +162,7 @@ actor ProxyServer {
                         scriptPluginManager: scriptMgr,
                         connectionLimiter: limiter,
                         upstreamProxySnapshotProvider: upstreamProxyProvider,
+                        captureContextProvider: captureProvider,
                         onTransactionComplete: callback,
                         onBreakpointHit: breakpointHit
                     )
@@ -226,6 +230,7 @@ actor ProxyServer {
     private let ruleEngine: RuleEngine
     private let scriptPluginManager: ScriptPluginManager?
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let connectionLimiter = ConnectionLimiter()
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (

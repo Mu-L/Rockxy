@@ -8,6 +8,7 @@ struct AppPolicyTests {
     func defaultValues() {
         let policy = DefaultAppPolicy()
         #expect(policy.maxWorkspaceTabs == 8)
+        #expect(policy.maxProjects == 3)
         #expect(policy.maxDomainFavorites == 5)
         #expect(policy.maxActiveRulesPerTool == 10)
         #expect(policy.maxEnabledScripts == 10)
@@ -34,6 +35,13 @@ struct AppPolicyTests {
         let coordinator = MainContentCoordinator(policy: custom)
         #expect(coordinator.policy.maxWorkspaceTabs == 3)
         #expect(coordinator.policy.maxDomainFavorites == 2)
+    }
+
+    @Test("maxProjects falls back to the public default via the protocol extension")
+    func maxProjectsExtensionDefault() {
+        // TestPolicy does not set maxProjects, so it resolves through the default.
+        #expect(TestPolicy().maxProjects == ProjectStructuralLimits.defaultProjectCapacity)
+        #expect(TestPolicy().maxProjects == 3)
     }
 }
 

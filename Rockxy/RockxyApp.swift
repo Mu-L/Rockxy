@@ -23,7 +23,10 @@ struct RockxyApp: App {
 
     @MainActor
     init() {
-        let coordinator = MainContentCoordinator()
+        let projectRepository: ProjectCatalogPersisting? = RockxyIdentity.isRunningTests
+            ? nil
+            : ProjectCatalogRepository()
+        let coordinator = MainContentCoordinator(projectCatalogRepository: projectRepository)
         _mainCoordinator = State(initialValue: coordinator)
 
         // Nearby transfer belongs to the app lifecycle, not the main-window
@@ -439,9 +442,13 @@ private struct DetachedInspectorWindowScene: Scene {
 /// Certificate identities are managed in a focused utility window with
 /// predictable geometry rather than restoring a stale, oversized workspace.
 private struct CustomCertificatesWindowScene: Scene {
+    // MARK: Internal
+
     var body: some Scene {
         customCertificatesWindow
     }
+
+    // MARK: Private
 
     private var customCertificatesWindow: some Scene {
         let base = Window(String(localized: "Custom Certificates"), id: "customCertificates") {
@@ -706,6 +713,7 @@ struct RockxyMenuCommands: Commands {
         appMenu
         fileMenu
         editMenu
+        projectMenu
         viewMenu
         flowMenu
         toolsMenu
@@ -838,6 +846,59 @@ struct RockxyMenuCommands: Commands {
                 actions?.focusSearchField()
             }
             .keyboardShortcut("f", modifiers: [.command])
+        }
+    }
+
+    private var projectMenu: some Commands {
+        CommandMenu(String(localized: "Project")) {
+            Button(String(localized: "New Project…")) {
+                actions?.newProject()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(actions?.canCreateProject != true)
+
+            Button(String(localized: "Rename Project…")) {
+                actions?.renameActiveProject()
+            }
+            .disabled(actions?.canEditProjects != true)
+
+            Button(String(localized: "Manage Projects…")) {
+                actions?.manageProjects()
+            }
+
+            Divider()
+
+            Button(String(localized: "Export Project Configuration…")) {
+                actions?.exportProjectConfiguration()
+            }
+            .disabled(actions?.canEditProjects != true)
+
+            Button(String(localized: "Import Project Configuration…")) {
+                actions?.importProjectConfiguration()
+            }
+            .disabled(actions?.canCreateProject != true)
+
+            Divider()
+
+            ForEach(actions?.projects ?? []) { project in
+                Button {
+                    actions?.switchProject(id: project.id)
+                } label: {
+                    if project.id == actions?.activeProjectID {
+                        Label(project.name, systemImage: "checkmark")
+                    } else {
+                        Text(project.name)
+                    }
+                }
+                .disabled(actions?.canEditProjects != true)
+            }
+
+            if actions?.projectsNeedRecovery == true {
+                Divider()
+                Button(String(localized: "Repair Projects…")) {
+                    actions?.showProjectRecovery()
+                }
+            }
         }
     }
 

@@ -24,6 +24,13 @@ extension MainContentCoordinator {
                 isProxyStarting = false
             }
 
+            guard await ensureProjectCatalogReadyForDataIntake() else {
+                proxyError = String(
+                    localized: "Projects could not be loaded. Repair Projects before starting capture."
+                )
+                return
+            }
+
             let settings = AppSettingsStorage.load()
             do {
                 try await certificateManager.ensureRootCA()
@@ -256,44 +263,76 @@ extension MainContentCoordinator {
         // Mark the rollover intent synchronously so batches delivered while the
         // main actor is suspended can be classified deterministically.
         let targetGeneration = sessionGeneration &+ 1
+        let activeProjectID = projectStore.activeProjectID
+        captureGenerationByProjectID[activeProjectID, default: 0] &+= 1
+        refreshCaptureContextSnapshot()
         isClearingSession = true
+        clearingProjectID = activeProjectID
         clearingTargetGeneration = targetGeneration
         deferredSessionBatches.removeAll()
 
         // Advance the actor-side generation first so any traffic arriving while
         // the main actor is suspended joins the new session instead of being
         // stamped with an old generation.
-        let resolvedGeneration = await sessionManager.beginNewSession()
+        let rollover = await sessionManager.beginNewSessionPreservingPending()
+        let resolvedGeneration = rollover.generation
 
         // Validate that this clear is still the authoritative in-flight clear
         // after the suspension. A different generation here would mean state
         // has been reset out from under us; abandon the rest of the clear.
         guard clearingTargetGeneration == targetGeneration else {
+            clearingProjectID = nil
+            clearingTargetGeneration = nil
+            deferredSessionBatches.removeAll()
+            isClearingSession = false
             return
         }
         sessionGeneration = resolvedGeneration
 
-        transactions.removeAll()
-        rebuildObservedDomainsByApp()
-        logEntries.removeAll()
-        errorCount = 0
-        sessionProvenance = nil
-        importPreview = nil
-        exportScopeContext = nil
-        activeToast = nil
-        clearAllWorkspaces()
-        resetTrafficMetrics()
+        // Defer everything that had completed before the rollover. Per-Project
+        // ownership and generations are the authoritative stale check after clear:
+        // old target-Project work is dropped, unchanged inactive-Project work is
+        // retained, and newly stamped target-Project work is accepted.
+        if !rollover.pending.isEmpty {
+            deferredSessionBatches.append(
+                .init(transactions: rollover.pending, generation: resolvedGeneration)
+            )
+        }
 
-        // Advance nextSequenceNumber past highest assigned to any remaining persisted favorite
-        if persistedFavorites.isEmpty {
-            nextSequenceNumber = 0
+        transactionsByProjectID[activeProjectID] = []
+        nextSequenceNumberByProjectID[activeProjectID] = 0
+        logEntriesByProjectID[activeProjectID] = []
+        sessionProvenanceByProjectID.removeValue(forKey: activeProjectID)
+
+        // Normal UI paths serialize Project transitions while clearing. Keep this
+        // identity check as a second line of defense so a future direct store
+        // mutation cannot clear another Project's active projection.
+        if projectStore.activeProjectID == activeProjectID {
+            transactions.removeAll()
+            rebuildObservedDomainsByApp()
+            logEntries.removeAll()
+            errorCount = 0
+            sessionProvenance = nil
+            importPreview = nil
+            exportScopeContext = nil
+            activeToast = nil
+            clearAllWorkspaces()
+            resetTrafficMetrics()
+
+            // Advance nextSequenceNumber past highest assigned to any remaining persisted favorite
+            if persistedFavorites.isEmpty {
+                nextSequenceNumber = 0
+            } else {
+                let maxSeq = persistedFavorites.map(\.sequenceNumber).max() ?? 0
+                nextSequenceNumber = maxSeq + 1
+            }
         } else {
-            let maxSeq = persistedFavorites.map(\.sequenceNumber).max() ?? 0
-            nextSequenceNumber = maxSeq + 1
+            Self.logger.error("Active Project changed during clear; protected the new projection")
         }
 
         let deferredBatches = deferredSessionBatches
         deferredSessionBatches.removeAll()
+        clearingProjectID = nil
         clearingTargetGeneration = nil
         isClearingSession = false
 
@@ -329,6 +368,7 @@ extension MainContentCoordinator {
         )
 
         let bpManager = breakpointManager
+        refreshCaptureContextSnapshot()
         // Ensure scripts are loaded before the proxy starts accepting connections,
         // so the first captured request sees the same script state as every later one.
         // After the first call this is a fast no-op.
@@ -340,6 +380,9 @@ extension MainContentCoordinator {
             ruleEngine: RuleEngine.shared,
             scriptPluginManager: PluginManager.shared.scriptManager,
             upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
+            captureContextProvider: { [captureContextStore] in
+                captureContextStore.snapshot()
+            },
             onTransactionComplete: { transaction in
                 Task {
                     await manager.addTransaction(transaction)
@@ -367,6 +410,7 @@ extension MainContentCoordinator {
             }
         }
         let effectiveBufferSize = min(settings.maxBufferSize, policy.maxLiveHistoryEntries)
+        liveHistoryLimit = max(1, effectiveBufferSize)
         await sessionManager.setMaxBufferSize(effectiveBufferSize)
         await sessionManager.setProxyPort(resolvedPort)
         await sessionManager.startBatchTimer()
@@ -378,18 +422,19 @@ extension MainContentCoordinator {
 
     func processBatch(_ batch: [HTTPTransaction], generation: UInt) {
         if isClearingSession {
-            guard generation == clearingTargetGeneration else {
-                Self.logger.debug("Batch of \(batch.count) dropped — stale clear-session generation")
+            guard let targetGeneration = clearingTargetGeneration else {
+                Self.logger.error("Dropped batch because clear state had no target generation")
                 return
             }
 
-            deferredSessionBatches.append(.init(transactions: batch, generation: generation))
+            // Restamp only the batch-delivery generation. Immutable per-Project
+            // ownership still decides which transactions survive after the clear.
+            deferredSessionBatches.append(.init(transactions: batch, generation: targetGeneration))
             return
         }
 
-        guard generation == sessionGeneration else {
-            Self.logger.debug("Batch of \(batch.count) dropped — stale session generation")
-            return
+        if generation != sessionGeneration {
+            Self.logger.debug("Evaluating an older delivery batch by its Project ownership")
         }
         guard isRecording else {
             Self.logger.debug("Batch of \(batch.count) dropped — recording paused")
@@ -407,39 +452,76 @@ extension MainContentCoordinator {
             return
         }
 
-        // Report only accepted transactions back to the actor for buffer accounting.
-        // This ensures paused/filtered batches do not consume the live-history budget.
-        // The generation tag prevents stale reports from a pre-clear batch affecting
-        // post-clear accounting.
-        let acceptedCount = filteredBatch.count
-        Task { await sessionManager.reportAcceptedCount(acceptedCount, generation: generation) }
-
-        recordTrafficMetrics(for: filteredBatch)
-
-        Self.logger
-            .info(
-                "Processing batch of \(filteredBatch.count) transactions (total: \(self.transactions.count + filteredBatch.count))"
-            )
+        // Tests, startup restoration, and bounded local integrations may seed the
+        // active projection directly before the first routed proxy batch. Adopt
+        // that history once so the first completion appends instead of replacing it.
+        seedActiveProjectCaptureStateIfNeeded()
+        let knownProjectIDs = Set(projectStore.projects.map(\.id))
+        var routedBatches: [UUID: [HTTPTransaction]] = [:]
 
         for transaction in filteredBatch {
-            transaction.sequenceNumber = nextSequenceNumber
-            nextSequenceNumber += 1
-            transactions.append(transaction)
-
-            if let statusCode = transaction.response?.statusCode, statusCode >= 400 {
-                errorCount += 1
+            guard let context = transaction.captureContext else {
+                Self.logger.error("Dropped transaction without request-start Project ownership")
+                continue
             }
+            guard knownProjectIDs.contains(context.projectID),
+                  context.sessionID == context.projectID,
+                  context.generation == captureGenerationByProjectID[context.projectID, default: 0] else
+            {
+                Self.logger.debug("Dropped transaction with stale or unknown Project capture route")
+                continue
+            }
+            routedBatches[context.projectID, default: []].append(transaction)
         }
-        appendToDebugAssistantTrafficIndex(filteredBatch)
-        appendObservedDomainsByApp(from: filteredBatch)
 
-        updateAllWorkspaces(with: filteredBatch)
-        followLatestVisibleTransaction(from: filteredBatch)
+        for (projectID, projectBatch) in routedBatches {
+            var history = transactionsByProjectID[projectID] ?? []
+            var sequence = nextSequenceNumberByProjectID[projectID]
+                ?? ((history.map(\.sequenceNumber).max() ?? -1) + 1)
+            for transaction in projectBatch {
+                transaction.sequenceNumber = sequence
+                sequence += 1
+                history.append(transaction)
+            }
+            nextSequenceNumberByProjectID[projectID] = sequence
 
-        headerColumnStore.updateDiscoveredHeaders(fromBatch: filteredBatch)
+            let overflow = max(0, history.count - liveHistoryLimit)
+            if overflow > 0 {
+                history.removeFirst(overflow)
+            }
+            transactionsByProjectID[projectID] = history
+
+            guard projectID == projectStore.activeProjectID else {
+                Self.logger.debug("Routed \(projectBatch.count) late transaction(s) to an inactive Project")
+                continue
+            }
+
+            transactions = history
+            nextSequenceNumber = sequence
+            if overflow > 0 {
+                rebuildObservedDomainsByApp()
+                debugAssistantTransactionsByHost.removeAll()
+                debugAssistantIndexedTransactionIDs.removeAll()
+                debugAssistantIndexedLiveCount = 0
+                debugAssistantTrafficIndexGeneration &+= 1
+                appendToDebugAssistantTrafficIndex(history)
+                rebuildAllWorkspacesForCaptureReplacement()
+            } else {
+                updateAllWorkspaces(with: projectBatch)
+                appendToDebugAssistantTrafficIndex(projectBatch)
+                appendObservedDomainsByApp(from: projectBatch)
+            }
+
+            recordTrafficMetrics(for: projectBatch)
+            recomputeErrorCount()
+            followLatestVisibleTransaction(from: projectBatch)
+            headerColumnStore.updateDiscoveredHeaders(fromBatch: projectBatch)
+        }
     }
 
     func handleClientAppEnrichment(_ enrichedTransactions: [HTTPTransaction]) {
+        let activeIDs = Set(transactions.map(\.id))
+        let enrichedTransactions = enrichedTransactions.filter { activeIDs.contains($0.id) }
         guard !enrichedTransactions.isEmpty else {
             return
         }
@@ -516,7 +598,7 @@ extension MainContentCoordinator {
     private func workspaceUsesClientDependentOrderingOrFiltering(_ workspace: WorkspaceState) -> Bool {
         if workspace.filterCriteria.sidebarApp != nil
             || workspace.filterCriteria.isSearchEnabled
-                && workspace.filterCriteria.searchField == .clientApp
+            && workspace.filterCriteria.searchField == .clientApp
             || workspace.activeSortDescriptors.contains(where: { $0.key == "client" })
             || workspace.activeFocusSet != nil
             || !workspace.mutedTrafficSources.isEmpty

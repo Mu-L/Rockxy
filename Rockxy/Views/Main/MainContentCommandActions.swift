@@ -76,6 +76,35 @@ struct MainContentCommandActions {
         coordinator.workspaceStore.workspaces.contains { $0.id == coordinator.workspaceStore.activeWorkspaceID }
     }
 
+    var projects: [Project] {
+        coordinator.projectStore.projects
+    }
+
+    var activeProjectID: UUID {
+        coordinator.projectStore.activeProjectID
+    }
+
+    var canCreateProject: Bool {
+        coordinator.projectStore.canCreateProject && !coordinator.isClearingSession
+    }
+
+    var canEditProjects: Bool {
+        coordinator.projectStore.isMutable && !coordinator.isClearingSession
+    }
+
+    var projectsNeedRecovery: Bool {
+        if case .failed = coordinator.projectStore.loadState {
+            return true
+        }
+        return false
+    }
+
+    // MARK: - View
+
+    var isFollowingLiveTraffic: Bool {
+        coordinator.isFollowingLiveTraffic
+    }
+
     func startProxy() {
         coordinator.startProxy()
     }
@@ -172,18 +201,12 @@ struct MainContentCommandActions {
         coordinator.setHighlight(color, for: transaction)
     }
 
-    // MARK: - View
-
-    var isFollowingLiveTraffic: Bool {
-        coordinator.isFollowingLiveTraffic
-    }
-
     func setFollowingLiveTraffic(_ isEnabled: Bool) {
         coordinator.setFollowingLiveTraffic(isEnabled)
     }
 
     func toggleSourceList() {
-        withAnimation(.smooth(duration: 0.18)) {
+        _ = withAnimation(.smooth(duration: 0.18)) {
             NSApp.keyWindow?.firstResponder?.tryToPerform(
                 #selector(NSSplitViewController.toggleSidebar(_:)),
                 with: nil
@@ -280,6 +303,42 @@ struct MainContentCommandActions {
 
     func nextWorkspaceTab() {
         RockxyWorkspaceWindowManager.shared.selectNextWorkspaceTab(coordinator: coordinator)
+    }
+
+    // MARK: - Projects
+
+    func newProject() {
+        coordinator.presentNewProjectEditor()
+    }
+
+    func renameActiveProject() {
+        coordinator.presentRenameProjectEditor(id: coordinator.projectStore.activeProjectID)
+    }
+
+    func manageProjects() {
+        coordinator.isProjectManagerPresented = true
+    }
+
+    func showProjectRecovery() {
+        coordinator.isProjectRecoveryPresented = true
+    }
+
+    func exportProjectConfiguration() {
+        _ = coordinator.exportActiveProjectConfiguration()
+    }
+
+    func importProjectConfiguration() {
+        guard coordinator.importProjectConfiguration() else {
+            return
+        }
+        RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
+    }
+
+    func switchProject(id: UUID) {
+        guard coordinator.switchToProject(id: id) else {
+            return
+        }
+        RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
     }
 }
 

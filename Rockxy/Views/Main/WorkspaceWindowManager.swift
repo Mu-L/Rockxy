@@ -50,6 +50,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
 
     func registerPrimaryWindow(_ window: NSWindow, coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
+        terminationCoordinator = coordinator
         primaryWindow = window
         configure(window)
         installObserversIfNeeded(for: window)
@@ -127,7 +128,17 @@ final class RockxyWorkspaceWindowManager: NSObject {
     }
 
     func updateWindowTitles(coordinator: MainContentCoordinator) {
-        primaryWindow?.title = coordinator.workspaceStore.activeWorkspace.title
+        primaryWindow?.title = coordinator.projectStore.activeProject.name
+    }
+
+    func projectDidChange(coordinator: MainContentCoordinator) {
+        self.coordinator = coordinator
+        updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
+        updateWindowTitles(coordinator: coordinator)
+    }
+
+    func flushProjectStateForTermination() async {
+        await terminationCoordinator?.flushProjectStateForTermination()
     }
 
     func beginRenameForActiveWorkspace(coordinator: MainContentCoordinator) {
@@ -158,6 +169,9 @@ final class RockxyWorkspaceWindowManager: NSObject {
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "WorkspaceTabs")
 
     private weak var coordinator: MainContentCoordinator?
+    /// Survives primary-window closure so AppDelegate can still force the final
+    /// debounced Project snapshot to disk while the app remains running.
+    private weak var terminationCoordinator: MainContentCoordinator?
     private(set) weak var primaryWindow: NSWindow?
     private var accessoryControllers: [ObjectIdentifier: WorkspaceTabBarAccessoryController] = [:]
     private var observersByWindow: [ObjectIdentifier: [NSObjectProtocol]] = [:]
@@ -295,10 +309,11 @@ final class RockxyWorkspaceWindowManager: NSObject {
 
     fileprivate func renameWorkspace(_ workspaceID: UUID, to title: String) {
         guard let coordinator,
-              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }) else {
+              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }),
+              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(title) else {
             return
         }
-        coordinator.workspaceStore.renameWorkspace(id: workspaceID, to: title)
+        coordinator.workspaceStore.renameWorkspace(id: workspaceID, to: normalizedTitle)
         updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
         updateWindowTitles(coordinator: coordinator)
     }

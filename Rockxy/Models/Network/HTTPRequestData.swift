@@ -15,6 +15,27 @@ struct HTTPRequestData: Sendable {
     var headers: [HTTPHeader]
     var body: Data?
     var contentType: ContentType?
+    /// Logical Project/session ownership captured at request start. It is runtime
+    /// routing metadata and is deliberately excluded from HAR/session serializers.
+    let captureContext: TrafficCaptureContext?
+
+    init(
+        method: String,
+        url: URL,
+        httpVersion: String,
+        headers: [HTTPHeader],
+        body: Data? = nil,
+        contentType: ContentType? = nil,
+        captureContext: TrafficCaptureContext? = nil
+    ) {
+        self.method = method
+        self.url = url
+        self.httpVersion = httpVersion
+        self.headers = headers
+        self.body = body
+        self.contentType = contentType
+        self.captureContext = captureContext
+    }
 
     var host: String {
         url.host() ?? ""

@@ -91,13 +91,23 @@ actor TrafficSessionManager {
     /// can align its own generation tag with the actor's. Use this for production session
     /// rollovers where the callback must run before the new generation is observed.
     func beginNewSession() async -> UInt {
+        let rollover = await beginNewSessionPreservingPending()
+        return rollover.generation
+    }
+
+    /// Atomically advances the global delivery generation while returning the
+    /// pending transactions that had already completed. Project-scoped clear uses
+    /// this to retain only explicitly routed transactions owned by other Projects;
+    /// unowned and active-Project pending work is still discarded.
+    func beginNewSessionPreservingPending() async -> (generation: UInt, pending: [HTTPTransaction]) {
+        let pending = pendingUpdates
         pendingUpdates.removeAll()
         totalBuffered = 0
         generation &+= 1
         if let onBeginNewSession {
             await onBeginNewSession(generation)
         }
-        return generation
+        return (generation, pending)
     }
 
     func reportAcceptedCount(_ count: Int, generation: UInt) {

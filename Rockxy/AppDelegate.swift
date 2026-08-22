@@ -91,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
 
         Self.logger.info("Rockxy terminating — cleaning up system proxy")
         Task {
+            await RockxyWorkspaceWindowManager.shared.flushProjectStateForTermination()
             Self.logger.info("Quit: starting proxy restore")
             do {
                 try await SystemProxyManager.shared.disableSystemProxy()
