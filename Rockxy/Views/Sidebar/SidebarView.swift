@@ -203,11 +203,17 @@ struct SidebarView: View {
     }
 
     private var navigatorPicker: some View {
-        Picker(String(localized: "Navigator"), selection: navigatorModeBinding) {
-            ForEach(FocusNavigatorMode.allCases) { mode in
-                Text(mode.title).tag(mode)
-            }
-        }
+        WorkspaceModeSegmentedControl(
+            selection: navigatorModeBinding,
+            segments: FocusNavigatorMode.allCases.map { mode in
+                WorkspaceModeSegment(
+                    value: mode,
+                    title: mode.title,
+                    systemImage: mode.systemImage
+                )
+            },
+            accessibilityLabel: String(localized: "Navigator")
+        )
         .workspaceModeSwitcherStyle()
     }
 
@@ -404,7 +410,7 @@ struct SidebarView: View {
                         .font(.caption.weight(.medium))
                 }
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .foregroundStyle(.secondary)
             .help(actionLabel)

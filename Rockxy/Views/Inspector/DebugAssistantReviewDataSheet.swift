@@ -245,7 +245,7 @@ struct DebugAssistantReviewDataSheet: View {
                 }
             } else {
                 Button(String(localized: "Include Excluded Traffic Once"), action: onOverride)
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                     .controlSize(.small)
                     .accessibilityLabel(String(localized: "Include Excluded Traffic Once"))
                     .help(String(localized: "Focus and Noise settings will not change."))

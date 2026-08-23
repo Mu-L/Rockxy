@@ -327,7 +327,6 @@ struct WelcomeView: View {
             .rockxyGlassButtonStyle(prominent: true)
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
-            .rockxyGlassButtonStyle(prominent: true)
             .disabled(!viewModel.canGetStarted || viewModel.isBusy)
         }
     }

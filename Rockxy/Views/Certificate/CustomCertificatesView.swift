@@ -266,7 +266,7 @@ struct CustomCertificatesView: View {
             Button(viewModel.primaryDestructiveTitle, role: .destructive) {
                 viewModel.requestPrimaryDeletion()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .disabled(!viewModel.canPerformPrimaryDestructive || viewModel.isBusy)
 
             if viewModel.isBusy {
@@ -286,7 +286,7 @@ struct CustomCertificatesView: View {
             Button(String(localized: "Preview")) {
                 presentPreview()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .disabled(!viewModel.canPreview || viewModel.isBusy)
 
             if let helpURL = Self.helpURL {

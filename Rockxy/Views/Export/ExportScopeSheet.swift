@@ -211,7 +211,7 @@ struct ExportScopeSheet: View {
                 Text(String(localized: "Cancel"))
                     .frame(width: footerActionWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .frame(minHeight: toolMetrics.formControlHeight)
             .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("exportScope.cancelButton")
@@ -225,7 +225,6 @@ struct ExportScopeSheet: View {
             .rockxyGlassButtonStyle(prominent: true)
             .frame(minHeight: toolMetrics.formControlHeight)
             .keyboardShortcut(.defaultAction)
-            .rockxyGlassButtonStyle(prominent: true)
             .disabled(!context.isEnabled(selectedScope))
             .accessibilityIdentifier("exportScope.exportButton")
         }

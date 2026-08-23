@@ -90,7 +90,7 @@ struct SearchFilterBar: View {
                     Image(systemName: "plus")
                 }
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .help(String(localized: "Add a compound filter rule"))
             .accessibilityLabel(String(localized: "Add Filter"))
@@ -106,7 +106,7 @@ struct SearchFilterBar: View {
                         .font(.caption2)
                 }
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .help(isAdvancedFilterVisible
                 ? String(localized: "Hide compound filters")

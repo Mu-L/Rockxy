@@ -153,14 +153,12 @@ struct ToolWindowReadabilityTests {
     @Test("Assistant dock follows Appearance typography and keeps protocol summaries monospaced")
     func assistantDockUsesDisplayMetrics() throws {
         let source = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
-        let sidebarSource = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")
-        let switcherStyleSource = try readProjectFile("Rockxy/Views/Common/UtilitySegmentedHeader.swift")
 
         #expect(source.contains("@Environment(\\.appUIDisplayMetrics)"))
         // UI/prose uses explicit proportional .system(size:) roles derived from Appearance metrics,
         // no longer routed through swiftUIFont (which could force all prose monospaced). Technical
-        // data (request summaries, model IDs) stays explicitly monospaced. Restored switcher labels
-        // (Details / AI Assistant) are asserted in ContextDockPresentationTests.
+        // data (request summaries, model IDs) stays explicitly monospaced. The native icon switcher
+        // keeps Details / AI Assistant in help and accessibility labels.
         #expect(!source.contains("swiftUIFont"))
         #expect(source.contains("assistantFont(appMetrics."))
         #expect(source.contains("monospaced: true"))
@@ -170,12 +168,6 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains(".disabled(isBusy || primaryTransaction == nil)"))
         #expect(!source.contains(".disabled(conversationIsEmpty && !isBusy)"))
         #expect(source.contains("Ask Rockxy AI Assistant…"))
-        #expect(source.contains("ContextDetailsView(coordinator: coordinator)"))
-        #expect(source.contains("AIAssistantDockView("))
-        #expect(source.contains(".workspaceModeSwitcherStyle()"))
-        #expect(sidebarSource.contains(".workspaceModeSwitcherStyle()"))
-        #expect(switcherStyleSource.contains(".controlSize(.regular)"))
-        #expect(switcherStyleSource.contains("metrics.workspaceTabFontSize"))
     }
 
     @Test("Assistant dock uses a compact native hierarchy with progressive disclosure")

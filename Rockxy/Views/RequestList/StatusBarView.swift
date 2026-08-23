@@ -252,34 +252,35 @@ enum FooterMutationIndicatorBuilder {
 
 // MARK: - FooterToolingButton
 
-/// Shared capsule launcher rendered identically in the top command bar and the footer. This is the
-/// single visual source of truth for Quick Tools chrome — never fork a top-only variant.
+/// Shared native launcher for the top command bar and footer. Quick Tools are product-specific,
+/// so their names remain visible instead of requiring new users to learn an icon vocabulary.
+/// Native button styles still own bezel, hover, pressed, focused, disabled, and active treatment.
 struct FooterToolingButton: View {
     // MARK: Internal
 
     let descriptor: FooterActionDescriptor
+    var controlSize: ControlSize = .small
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Label(descriptor.title, systemImage: descriptor.systemImage)
-                .modifier(FooterToolingChrome(
-                    isActive: descriptor.isActive,
-                    isEnabled: descriptor.isEnabled,
-                    isHovered: isHovered
-                ))
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 2)
         }
-        .buttonStyle(.plain)
+        .controlSize(controlSize)
+        .rockxyGlassButtonStyle(prominent: descriptor.isActive)
         .disabled(!descriptor.isEnabled)
         .help(descriptor.help)
         .accessibilityLabel(descriptor.title)
         .accessibilityValue(descriptor.isActive ? String(localized: "Active") : "")
-        .onHover { isHovered = $0 }
     }
 
     // MARK: Private
 
-    @State private var isHovered = false
+    @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
 // MARK: - FooterMutationIndicatorButton
@@ -296,18 +297,17 @@ private struct FooterMutationIndicatorButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            chip
-        }
-        .buttonStyle(.plain)
+        Button(action: action) { label }
+        .controlSize(.small)
+        .rockxyGlassButtonStyle()
+        .tint(indicatorColor)
         .help(indicator.help)
         .accessibilityLabel(indicator.accessibilityLabel)
-        .onHover { isHovered = $0 }
+        .accessibilityValue(String(localized: "\(indicator.count) active rules"))
     }
 
     // MARK: Private
 
-    @State private var isHovered = false
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var indicatorColor: Color {
@@ -320,7 +320,7 @@ private struct FooterMutationIndicatorButton: View {
         }
     }
 
-    private var chip: some View {
+    private var label: some View {
         HStack(spacing: 4) {
             Image(systemName: indicator.systemImage)
             if showsTitle {
@@ -331,9 +331,6 @@ private struct FooterMutationIndicatorButton: View {
         }
         .font(.system(size: metrics.badgeFontSize, weight: .semibold))
         .lineLimit(1)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 2)
-        .rockxyChipStyle(tint: indicatorColor, isActive: true, isHovered: isHovered)
     }
 }
 
@@ -348,7 +345,7 @@ private struct FooterProxyOverrideButton: View {
     let onSwitchOff: () -> Void
 
     var body: some View {
-        FooterToolingButton(descriptor: descriptor) {
+        FooterToolingButton(descriptor: descriptor, controlSize: .regular) {
             showPopover.toggle()
         }
         .popover(isPresented: $showPopover, arrowEdge: .bottom) {
@@ -407,33 +404,6 @@ private struct FooterProxyOverridePopover: View {
     private var statusText: String {
         String(localized: "System Proxy is Overridden by Rockxy (IP=\(proxyHost) Port=\(proxyPort)) (Toggle by: ⌥⌘O)")
     }
-}
-
-// MARK: - FooterToolingChrome
-
-struct FooterToolingChrome: ViewModifier {
-    // MARK: Internal
-
-    let isActive: Bool
-    let isEnabled: Bool
-    let isHovered: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .rockxyChipStyle(
-                isActive: isActive,
-                isHovered: isHovered,
-                isEnabled: isEnabled
-            )
-    }
-
-    // MARK: Private
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
 // MARK: - StatusBarRequestSummary
@@ -500,11 +470,14 @@ struct StatusBarView: View {
         WorkspaceFooterBar(horizontalPadding: 12) {
             HStack(spacing: 0) {
                 quickTools
+                    .layoutPriority(0)
                 mutationIndicators
-                Spacer(minLength: 24)
+                Spacer(minLength: 12)
                 centerStatus
-                Spacer(minLength: 24)
+                    .layoutPriority(3)
+                Spacer(minLength: 12)
                 rightStats
+                    .layoutPriority(3)
             }
         }
     }
@@ -639,25 +612,38 @@ struct StatusBarView: View {
             }
         }
         .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
-    private var quickTools: some View {
-        HStack(spacing: 6) {
-            ForEach(FooterActionDescriptor.toolingActions(
-                isAllowListActive: isAllowListActive,
-                quickTools: quickToolsLayout.footer
-            )) { descriptor in
-                FooterToolingButton(descriptor: descriptor) {
+    @ViewBuilder private var quickTools: some View {
+        let descriptors = FooterActionDescriptor.toolingActions(
+            isAllowListActive: isAllowListActive,
+            quickTools: quickToolsLayout.footer
+        )
+        ViewThatFits(in: .horizontal) {
+            labeledQuickToolsRow(descriptors)
+            quickToolsMenu(descriptors)
+        }
+    }
+
+    private func labeledQuickToolsRow(_ descriptors: [FooterActionDescriptor]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(descriptors) { descriptor in
+                FooterToolingButton(descriptor: descriptor, controlSize: .regular) {
                     performAction(descriptor.id)
                 }
             }
             Button {
                 isCustomizingQuickTools.toggle()
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "ellipsis")
+                    .frame(width: metrics.chromeBadgeHeight, height: metrics.chromeBadgeHeight)
             }
-            .buttonStyle(.plain)
+            .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+            .controlSize(.regular)
+            .rockxyGlassButtonStyle()
             .help(String(localized: "Customize Quick Tools"))
+            .accessibilityLabel(String(localized: "Customize Quick Tools"))
             .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
                 QuickToolsEditor(
                     layout: quickToolsLayout,
@@ -666,6 +652,45 @@ struct StatusBarView: View {
                     onDone: { isCustomizingQuickTools = false }
                 )
             }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func quickToolsMenu(_ descriptors: [FooterActionDescriptor]) -> some View {
+        Menu {
+            ForEach(descriptors) { descriptor in
+                Button {
+                    performAction(descriptor.id)
+                } label: {
+                    Label(descriptor.title, systemImage: descriptor.systemImage)
+                }
+            }
+            Divider()
+            Button(String(localized: "Customize Quick Tools…")) {
+                DispatchQueue.main.async {
+                    isCustomizingQuickTools = true
+                }
+            }
+        } label: {
+            Label(String(localized: "Quick Tools"), systemImage: "hammer")
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 2)
+        }
+        .menuStyle(.button)
+        .menuIndicator(.visible)
+        .controlSize(.regular)
+        .rockxyGlassButtonStyle()
+        .help(String(localized: "Open Quick Tools"))
+        .accessibilityLabel(String(localized: "Quick Tools"))
+        .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
+            QuickToolsEditor(
+                layout: quickToolsLayout,
+                onSave: { quickToolsLayoutRaw = $0.encoded },
+                onReset: { quickToolsLayoutRaw = QuickToolsLayout.default.encoded },
+                onDone: { isCustomizingQuickTools = false }
+            )
         }
     }
 
@@ -694,17 +719,14 @@ struct StatusBarView: View {
                 }
             }
         } label: {
-            Label(
-                "\(indicators.reduce(0) { $0 + $1.count })",
-                systemImage: "bolt.horizontal.circle"
-            )
-            .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .rockxyChipStyle(tint: Color(nsColor: .systemOrange), isActive: true)
+            Label("\(indicators.reduce(0) { $0 + $1.count })", systemImage: "bolt.horizontal.circle")
+                .font(.system(size: metrics.badgeFontSize, weight: .semibold))
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
         .menuIndicator(.hidden)
+        .controlSize(.small)
+        .rockxyGlassButtonStyle()
+        .tint(Color(nsColor: .systemOrange))
         .fixedSize()
         .help(String(localized: "Active mutation rules"))
         .accessibilityLabel(String(localized: "Active mutation rules"))
@@ -749,14 +771,20 @@ struct WorkspaceFooterBar<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        content()
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: metrics.statusBarHeight)
-            .rockxyFunctionalBar()
-            .overlay(alignment: .top) {
-                Divider()
-            }
+        RockxyGlassEffectGroup(spacing: Theme.Glass.footerOuterHorizontalPadding) {
+            content()
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, horizontalPadding)
+                .frame(height: metrics.statusBarHeight)
+                .rockxyGlassEffect(
+                    in: RoundedRectangle(
+                        cornerRadius: Theme.Glass.footerCornerRadius,
+                        style: .continuous
+                    )
+                )
+        }
+        .padding(.horizontal, Theme.Glass.footerOuterHorizontalPadding)
+        .padding(.vertical, Theme.Glass.footerOuterVerticalPadding)
     }
 
     // MARK: Private

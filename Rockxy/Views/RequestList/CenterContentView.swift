@@ -70,6 +70,16 @@ struct CenterContentView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+                RadialGradient(
+                    colors: [
+                        Color.cyan.opacity(Theme.Glass.ambientSecondaryOpacity),
+                        Color.accentColor.opacity(Theme.Glass.ambientSecondaryOpacity * 0.45),
+                        Color.clear,
+                    ],
+                    center: .bottomTrailing,
+                    startRadius: 0,
+                    endRadius: 520
+                )
             }
         }
         .onChange(of: coordinator.selectedTransaction?.id) { _, newID in

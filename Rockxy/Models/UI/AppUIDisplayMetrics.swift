@@ -707,10 +707,15 @@ struct AppUIDisplayMetricsProvider<Content: View>: View {
     var body: some View {
         content
             .appUIDisplayMetrics(AppUIDisplayMetrics(settings: settingsManager.appUI))
+            .environment(
+                \.colorScheme,
+                settingsManager.appTheme.resolvedColorScheme(inheriting: inheritedColorScheme)
+            )
     }
 
     // MARK: Private
 
+    @Environment(\.colorScheme) private var inheritedColorScheme
     private let settingsManager = AppSettingsManager.shared
 }
 

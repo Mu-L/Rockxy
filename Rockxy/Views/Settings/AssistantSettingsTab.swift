@@ -134,6 +134,7 @@ struct AssistantSettingsTab: View {
                 .font(settingsMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)
 
                 ollamaRuntimeStatus
 
@@ -197,7 +198,7 @@ struct AssistantSettingsTab: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: settingsMetrics.fieldWidth(520), alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -213,6 +214,7 @@ struct AssistantSettingsTab: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .layoutPriority(1)
 
             Spacer(minLength: 12)
 
@@ -260,7 +262,7 @@ struct AssistantSettingsTab: View {
                 Button(String(localized: "Download & Use")) {
                     viewModel.installCustomModel()
                 }
-                .rockxyGlassButtonStyle(prominent: true)
+                .rockxyGlassButtonStyle()
                 .disabled(!viewModel.canInstallCustomModel)
             }
             Text(String(localized: "Enter an exact model tag from the Ollama model library."))
@@ -615,8 +617,10 @@ struct AssistantSettingsTab: View {
                         .font(settingsMetrics.metadataFont(monospaced: true))
                         .foregroundStyle(.tertiary)
                 }
+                .layoutPriority(1)
                 Spacer(minLength: 12)
                 modelAction(model)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
             if viewModel.modelInstallID == model.id {
@@ -654,24 +658,28 @@ struct AssistantSettingsTab: View {
                     .font(settingsMetrics.metadataFont(monospaced: true))
                     .foregroundStyle(.tertiary)
             }
+            .layoutPriority(1)
             Spacer(minLength: 12)
-            if viewModel.isGlobalModel(model.id) {
-                Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
-                    .font(settingsMetrics.metadataFont(weight: .medium))
-                    .foregroundStyle(.green)
-            } else {
-                Button(String(localized: "Use Globally")) {
-                    viewModel.useGlobally(model)
+            HStack(spacing: 8) {
+                if viewModel.isGlobalModel(model.id) {
+                    Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
+                        .font(settingsMetrics.metadataFont(weight: .medium))
+                        .foregroundStyle(.green)
+                } else {
+                    Button(String(localized: "Use Globally")) {
+                        viewModel.useGlobally(model)
+                    }
+                    .controlSize(.small)
                 }
-                .controlSize(.small)
+                Button(role: .destructive) {
+                    pendingModelRemoval = model
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .help(String(localized: "Remove model from Ollama"))
+                .disabled(viewModel.modelRemovalID != nil || viewModel.modelInstallID != nil)
             }
-            Button(role: .destructive) {
-                pendingModelRemoval = model
-            } label: {
-                Image(systemName: "trash")
-            }
-            .help(String(localized: "Remove model from Ollama"))
-            .disabled(viewModel.modelRemovalID != nil || viewModel.modelInstallID != nil)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Divider() }
@@ -694,7 +702,7 @@ struct AssistantSettingsTab: View {
                 viewModel.installAndUse(model)
             }
             .controlSize(.small)
-            .rockxyGlassButtonStyle(prominent: true)
+            .rockxyGlassButtonStyle()
             .disabled(viewModel.modelInstallID != nil)
         }
     }

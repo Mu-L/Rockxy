@@ -257,7 +257,7 @@ struct BreakpointTemplateWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

@@ -194,7 +194,7 @@ struct GitHubSettingsTab: View {
                         Image(systemName: "questionmark")
                             .font(settingsMetrics.font(weight: .semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                     .buttonBorderShape(.circle)
                     .controlSize(.small)
                     .help(String(localized: "Open Publish to Gist documentation"))

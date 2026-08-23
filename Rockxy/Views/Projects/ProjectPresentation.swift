@@ -681,7 +681,7 @@ struct ProjectManagerSheet: View {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
-            .rockxyGlassButtonStyle(prominent: true)
+            .rockxyGlassButtonStyle()
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)

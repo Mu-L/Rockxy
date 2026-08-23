@@ -598,7 +598,7 @@ struct BlockListWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

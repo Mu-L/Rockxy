@@ -582,7 +582,7 @@ struct AllowListWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

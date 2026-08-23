@@ -138,7 +138,7 @@ struct PluginDetailView: View {
                 } label: {
                     Label(String(localized: "Reinstall"), systemImage: "arrow.triangle.2.circlepath")
                 }
-                .rockxyGlassButtonStyle(prominent: true)
+                .rockxyGlassButtonStyle()
             }
 
             if !plugin.isBuiltIn {

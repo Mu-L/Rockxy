@@ -354,7 +354,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Beautify"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .fixedSize()
 
             Button {
@@ -362,7 +362,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Insert Header Example"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .fixedSize()
         }
     }
@@ -384,7 +384,7 @@ struct ScriptEditorWindowView: View {
                 .frame(minHeight: footerLabelHeight)
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -417,7 +417,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Validate"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .keyboardShortcut("r", modifiers: .command)
             .fixedSize()
 
@@ -487,7 +487,7 @@ struct ScriptEditorWindowView: View {
                 .font(toolMetrics.font(weight: .medium))
                 .frame(minHeight: toolMetrics.formControlHeight)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
 
         let preview = Group {

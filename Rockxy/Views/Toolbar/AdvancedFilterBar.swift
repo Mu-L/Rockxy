@@ -150,7 +150,7 @@ struct AdvancedFilterBar: View {
                 Image(systemName: "minus")
                     .font(.system(size: metrics.controlFontSize, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button {
@@ -159,7 +159,7 @@ struct AdvancedFilterBar: View {
                 Image(systemName: "plus")
                     .font(.system(size: metrics.controlFontSize, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             if isFirst {

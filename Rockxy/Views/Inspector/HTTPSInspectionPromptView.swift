@@ -65,7 +65,7 @@ struct HTTPSInspectionPromptView: View {
                     .lineLimit(1)
                     .frame(minWidth: promptActionLabelWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .fixedSize()
             .help(String(localized: "Open HTTPS Decryption Settings"))
@@ -236,7 +236,7 @@ struct HTTPSInspectionPromptView: View {
                     .lineLimit(1)
                     .frame(minWidth: promptActionLabelWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .fixedSize()
             .help(scope.actionDescription)

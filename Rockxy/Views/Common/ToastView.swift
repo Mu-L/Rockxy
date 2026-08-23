@@ -27,11 +27,6 @@ struct ToastView: View {
         .rockxyGlassEffect(
             in: RoundedRectangle(cornerRadius: Theme.Glass.toastCornerRadius, style: .continuous)
         )
-        .shadow(
-            color: .black.opacity(Theme.Glass.toastShadowOpacity),
-            radius: Theme.Glass.toastShadowRadius,
-            y: Theme.Glass.toastShadowY
-        )
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .onAppear {
             dismissTask = Task { @MainActor in

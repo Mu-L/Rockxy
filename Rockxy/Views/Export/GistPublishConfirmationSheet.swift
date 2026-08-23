@@ -283,7 +283,7 @@ struct GistPublishConfirmationSheet: View {
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .keyboardShortcut(.cancelAction)
             .disabled(isPublishing)
             .accessibilityIdentifier("gistPublish.cancelButton")

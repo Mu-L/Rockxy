@@ -180,6 +180,17 @@ struct SettingsWindowReadabilityTests {
         #expect(!pluginsSource.contains(".padding(.horizontal, settingsMetrics.contentPadding)"))
     }
 
+    @Test("Assistant local model library uses the available Settings width")
+    func assistantModelLibraryUsesAvailableWidth() throws {
+        let source = try readProjectFile("Rockxy/Views/Settings/AssistantSettingsTab.swift")
+
+        #expect(source.contains(".frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)"))
+        #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+        #expect(source.components(separatedBy: "settingsMetrics.fieldWidth(520)").count - 1 == 1)
+        #expect(source.components(separatedBy: ".layoutPriority(1)").count - 1 >= 3)
+        #expect(source.contains("modelAction(model)\n                    .fixedSize(horizontal: true, vertical: false)"))
+    }
+
     @Test("MCP configuration remains readable without wrapping long paths")
     func mcpConfigurationUsesScrollableCodeSurface() throws {
         let source = try readProjectFile("Rockxy/Views/Settings/MCPSettingsTab.swift")

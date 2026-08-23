@@ -5,8 +5,9 @@ import SwiftUI
 /// The top-level functional layer for traffic commands and filtering.
 ///
 /// Liquid Glass belongs to this shared navigation/control surface, while the request table below
-/// remains an opaque, high-density content layer. Child controls deliberately avoid their own
-/// glass backgrounds so the shelf never becomes glass-on-glass.
+/// remains an opaque, high-density content layer. Every native and custom glass control lives in
+/// one `GlassEffectContainer`, giving nearby elements a shared sampling region instead of painting
+/// opaque capsules over the functional layer.
 struct TrafficControlShelf: View {
     // MARK: Internal
 
@@ -17,96 +18,102 @@ struct TrafficControlShelf: View {
     var body: some View {
         RockxyGlassEffectGroup(spacing: Theme.Glass.shelfSectionSpacing) {
             VStack(spacing: Theme.Glass.shelfSectionSpacing) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Theme.Layout.controlSpacing) {
-                        trafficCommandBar
+                shelfSurface {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: Theme.Layout.controlSpacing) {
+                            trafficCommandBar
 
-                        Divider()
-                            .frame(height: 22)
+                            Divider()
+                                .frame(height: 22)
 
-                        searchFilterBar
-                            .layoutPriority(1)
-                    }
+                            searchFilterBar
+                                .layoutPriority(1)
+                        }
 
-                    VStack(spacing: Theme.Glass.shelfSectionSpacing) {
-                        trafficCommandBar
-                        shelfSeparator
-                        searchFilterBar
+                        VStack(spacing: 0) {
+                            trafficCommandBar
+                            Divider()
+                                .opacity(Theme.Glass.separatorOpacity)
+                            searchFilterBar
+                        }
                     }
                 }
 
-                shelfSeparator
-
-                ProtocolFilterBar(
-                    activeFilters: Binding(
-                        get: { coordinator.filterCriteria.activeProtocolFilters },
-                        set: {
-                            coordinator.filterCriteria.activeProtocolFilters = $0
-                            coordinator.recomputeFilteredTransactions()
-                        }
-                    ),
-                    isEmbeddedInControlShelf: true
-                )
-
-                if coordinator.isFilterBarVisible {
-                    shelfSeparator
-
-                    AdvancedFilterBar(
-                        rules: Binding(
-                            get: { coordinator.filterRules },
+                shelfSurface {
+                    ProtocolFilterBar(
+                        activeFilters: Binding(
+                            get: { coordinator.filterCriteria.activeProtocolFilters },
                             set: {
-                                coordinator.filterRules = $0
+                                coordinator.filterCriteria.activeProtocolFilters = $0
                                 coordinator.recomputeFilteredTransactions()
                             }
                         ),
-                        presetStore: coordinator.filterPresetStore,
                         isEmbeddedInControlShelf: true
                     )
+                }
+
+                if coordinator.isFilterBarVisible {
+                    shelfSurface {
+                        AdvancedFilterBar(
+                            rules: Binding(
+                                get: { coordinator.filterRules },
+                                set: {
+                                    coordinator.filterRules = $0
+                                    coordinator.recomputeFilteredTransactions()
+                                }
+                            ),
+                            presetStore: coordinator.filterPresetStore,
+                            isEmbeddedInControlShelf: true
+                        )
+                    }
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                ActiveFilterSummaryBar(
-                    coordinator: coordinator,
-                    isEmbeddedInControlShelf: true
-                )
+                if hasActiveFilterSummary {
+                    shelfSurface {
+                        ActiveFilterSummaryBar(
+                            coordinator: coordinator,
+                            isEmbeddedInControlShelf: true
+                        )
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
-            .padding(Theme.Glass.shelfInset)
+        }
+        .padding(.horizontal, Theme.Glass.shelfOuterPadding)
+        .padding(.top, Theme.Glass.shelfOuterPadding)
+        .padding(.bottom, 4)
+        .animation(.easeInOut(duration: 0.18), value: coordinator.isFilterBarVisible)
+        .animation(.easeInOut(duration: 0.18), value: hasActiveFilterSummary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: Private
+
+    private var hasActiveFilterSummary: Bool {
+        coordinator.activeWorkspace.activeTrafficSignal != nil
+            || coordinator.activeWorkspace.activeFocusSet != nil
+            || !coordinator.activeWorkspace.mutedTrafficSources.isEmpty
+            || coordinator.filterCriteria.sidebarDomain != nil
+            || coordinator.filterCriteria.sidebarPathPrefix != nil
+            || coordinator.filterCriteria.sidebarApp != nil
+            || coordinator.filterCriteria.sidebarScope == .saved
+            || coordinator.filterCriteria.sidebarScope == .pinned
+            || coordinator.filterCriteria.sidebarScope == .notes
+    }
+
+    private func shelfSurface<Content: View>(
+        @ViewBuilder content: () -> Content
+    )
+        -> some View
+    {
+        content()
             .rockxyGlassEffect(
                 in: RoundedRectangle(
                     cornerRadius: Theme.Glass.shelfCornerRadius,
                     style: .continuous
                 )
             )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: Theme.Glass.shelfCornerRadius,
-                    style: .continuous
-                )
-                .strokeBorder(
-                    Color.primary.opacity(Theme.Glass.shelfStrokeOpacity),
-                    lineWidth: 0.75
-                )
-                .allowsHitTesting(false)
-            }
-            .shadow(
-                color: Color.black.opacity(Theme.Glass.shelfShadowOpacity),
-                radius: Theme.Glass.shelfShadowRadius,
-                x: 0,
-                y: Theme.Glass.shelfShadowY
-            )
-        }
-        .padding(.horizontal, Theme.Glass.shelfOuterPadding)
-        .padding(.top, Theme.Glass.shelfOuterPadding)
-        .padding(.bottom, Theme.Glass.shelfOuterPadding - 2)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // MARK: Private
-
-    private var shelfSeparator: some View {
-        Divider()
-            .opacity(Theme.Glass.separatorOpacity)
-            .padding(.horizontal, Theme.Layout.contentPadding)
     }
 
     private var trafficCommandBar: some View {

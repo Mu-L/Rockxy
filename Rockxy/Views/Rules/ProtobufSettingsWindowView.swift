@@ -223,7 +223,7 @@ struct ProtobufSettingsWindowView: View {
             Button(String(localized: "Local Schemas…")) {
                 openWindow(id: "protobufSchemaList")
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             moreMenu
         }
     }
@@ -303,7 +303,7 @@ struct ProtobufSettingsWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

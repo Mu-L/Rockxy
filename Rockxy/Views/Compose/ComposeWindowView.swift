@@ -178,7 +178,7 @@ struct ComposeWindowView: View {
                 Text(String(localized: "Cancel"))
                     .frame(width: sendControlWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.regular)
             .frame(height: toolMetrics.formControlHeight)
             .keyboardShortcut(".", modifiers: .command)
@@ -229,7 +229,7 @@ struct ComposeWindowView: View {
                     Button(String(localized: "Use Empty Body")) {
                         viewModel.replaceUnavailableBody(with: "")
                     }
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                 }
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)

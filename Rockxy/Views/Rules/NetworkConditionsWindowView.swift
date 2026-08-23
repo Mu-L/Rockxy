@@ -994,7 +994,7 @@ struct NetworkConditionsWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

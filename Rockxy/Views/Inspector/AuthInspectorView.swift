@@ -22,7 +22,7 @@ struct AuthInspectorView: View {
                             } label: {
                                 Label(String(localized: "Preview JWT"), systemImage: "key.viewfinder")
                             }
-                            .buttonStyle(.bordered)
+                            .rockxyGlassButtonStyle()
                             .controlSize(.small)
                             .popover(isPresented: $isJWTPreviewPresented, arrowEdge: .bottom) {
                                 if let jwtPreview {

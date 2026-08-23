@@ -40,6 +40,18 @@ enum LiquidGlassRenderingPolicy {
     }
 }
 
+// MARK: - LiquidGlassAppearanceIdentity
+
+/// Identity for native glass instances whose sampled tone is retained by AppKit across an
+/// in-place appearance transition. Changing any appearance input deliberately recreates the
+/// native effect instead of letting a Light material survive inside a Dark hierarchy (or vice
+/// versa).
+struct LiquidGlassAppearanceIdentity: Hashable {
+    let isDark: Bool
+    let reduceTransparency: Bool
+    let increaseContrast: Bool
+}
+
 // MARK: - RockxyGlassEffectGroup
 
 /// Availability-safe grouping for nearby Liquid Glass controls.
@@ -61,6 +73,7 @@ struct RockxyGlassEffectGroup<Content: View>: View {
             GlassEffectContainer(spacing: spacing) {
                 content
             }
+            .id(appearanceIdentity)
         } else {
             content
         }
@@ -70,6 +83,18 @@ struct RockxyGlassEffectGroup<Content: View>: View {
 
     private let spacing: CGFloat?
     private let content: Content
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    private var appearanceIdentity: LiquidGlassAppearanceIdentity {
+        LiquidGlassAppearanceIdentity(
+            isDark: colorScheme == .dark,
+            reduceTransparency: reduceTransparency,
+            increaseContrast: colorSchemeContrast == .increased
+        )
+    }
 }
 
 // MARK: - Liquid Glass compatibility
@@ -92,19 +117,8 @@ extension View {
 
     /// Uses the native Liquid Glass button family on macOS 26 and standard bordered controls on
     /// older supported systems. Callers retain their existing control size and accessibility.
-    @ViewBuilder
     func rockxyGlassButtonStyle(prominent: Bool = false) -> some View {
-        if #available(macOS 26.0, *) {
-            if prominent {
-                buttonStyle(.glassProminent)
-            } else {
-                buttonStyle(.glass)
-            }
-        } else if prominent {
-            buttonStyle(.borderedProminent)
-        } else {
-            buttonStyle(.bordered)
-        }
+        modifier(RockxyGlassButtonStyleModifier(prominent: prominent))
     }
 
     /// Applies Rockxy's readable semantic-chip treatment. Chips intentionally remain a tinted,
@@ -126,11 +140,102 @@ extension View {
         ))
     }
 
-    /// Gives an edge-attached header or footer the native macOS bar material. This is for fixed
-    /// functional chrome around opaque tables/editors; it deliberately does not create a custom
-    /// floating glass container or add padding that could disturb tool-window geometry.
+    /// Gives a compact header or footer the native macOS floating functional material. On macOS 26
+    /// this is real Liquid Glass, so shared feature-window chrome gains refraction and specular
+    /// response instead of remaining a flat `.bar` blur.
+    /// Accessibility preferences and earlier macOS releases retain the deterministic fallbacks
+    /// used by every other Rockxy glass surface.
     func rockxyFunctionalBar() -> some View {
-        background(.bar)
+        modifier(RockxyFunctionalBarModifier())
+    }
+}
+
+// MARK: - RockxyFunctionalBarModifier
+
+/// Turns the dozens of compact feature-window bars into one coherent floating functional layer.
+/// The small outer inset lets surrounding content remain visible beneath the glass. Native glass
+/// owns its optical edge and elevation; adding a painted stroke or shadow here would flatten the
+/// adaptive highlight that distinguishes Liquid Glass from a translucent rounded rectangle.
+private struct RockxyFunctionalBarModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(
+            cornerRadius: Theme.Glass.functionalBarCornerRadius,
+            style: .continuous
+        )
+
+        content
+            .rockxyGlassRendering(
+                LiquidGlassRenderingPolicy.resolve(
+                    liquidGlassAvailable: Self.isLiquidGlassAvailable,
+                    reduceTransparency: reduceTransparency,
+                    increaseContrast: colorSchemeContrast == .increased
+                ),
+                tint: nil,
+                interactive: false,
+                in: shape
+            )
+            .id(appearanceIdentity)
+            .padding(.horizontal, Theme.Glass.functionalBarHorizontalInset)
+            .padding(.vertical, Theme.Glass.functionalBarVerticalInset)
+    }
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    private var appearanceIdentity: LiquidGlassAppearanceIdentity {
+        LiquidGlassAppearanceIdentity(
+            isDark: colorScheme == .dark,
+            reduceTransparency: reduceTransparency,
+            increaseContrast: colorSchemeContrast == .increased
+        )
+    }
+
+    private static var isLiquidGlassAvailable: Bool {
+        if #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
+}
+
+// MARK: - RockxyGlassButtonStyleModifier
+
+/// Native glass controls can retain their previous sampled tone through an in-place app theme
+/// change. Keying the styled control to the live appearance inputs keeps buttons aligned with the
+/// surrounding glass surface without changing their state or accessibility contract otherwise.
+private struct RockxyGlassButtonStyleModifier: ViewModifier {
+    let prominent: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            if prominent {
+                content
+                    .buttonStyle(.glassProminent)
+                    .id(appearanceIdentity)
+            } else {
+                content
+                    .buttonStyle(.glass)
+                    .id(appearanceIdentity)
+            }
+        } else if prominent {
+            content.buttonStyle(.borderedProminent)
+        } else {
+            content.buttonStyle(.bordered)
+        }
+    }
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    private var appearanceIdentity: LiquidGlassAppearanceIdentity {
+        LiquidGlassAppearanceIdentity(
+            isDark: colorScheme == .dark,
+            reduceTransparency: reduceTransparency,
+            increaseContrast: colorSchemeContrast == .increased
+        )
     }
 }
 
@@ -206,6 +311,7 @@ private struct RockxyGlassEffectModifier<S: InsettableShape>: ViewModifier {
             interactive: interactive,
             in: shape
         )
+        .id(appearanceIdentity)
     }
 
     // MARK: Private
@@ -218,7 +324,16 @@ private struct RockxyGlassEffectModifier<S: InsettableShape>: ViewModifier {
     }
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    private var appearanceIdentity: LiquidGlassAppearanceIdentity {
+        LiquidGlassAppearanceIdentity(
+            isDark: colorScheme == .dark,
+            reduceTransparency: reduceTransparency,
+            increaseContrast: colorSchemeContrast == .increased
+        )
+    }
 }
 
 // MARK: - Rendering treatments

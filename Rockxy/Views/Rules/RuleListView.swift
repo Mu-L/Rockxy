@@ -79,7 +79,7 @@ struct RuleListView: View {
             } label: {
                 Label(String(localized: "Add Rule"), systemImage: "plus")
             }
-            .rockxyGlassButtonStyle(prominent: true)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button {
@@ -91,7 +91,7 @@ struct RuleListView: View {
             } label: {
                 Label(String(localized: "Remove"), systemImage: "minus")
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .disabled(selectedRuleID == nil)
 
@@ -193,13 +193,13 @@ struct RuleListView: View {
             Button(String(localized: "Import")) {
                 importRules()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button(String(localized: "Export")) {
                 exportRules()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .disabled(rules.isEmpty)
 

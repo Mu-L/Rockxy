@@ -130,6 +130,36 @@ struct NativeWorkspaceSplitViewTests {
         #expect(window.toolbarStyle == .unified)
     }
 
+    @Test("Project changes and late scene updates cannot duplicate the selector")
+    func projectChangesDoNotRenderAWindowTitle() {
+        let coordinator = MainContentCoordinator()
+        let window = NSWindow()
+        let manager = RockxyWorkspaceWindowManager.shared
+        window.title = RockxyIdentity.current.displayName
+
+        manager.registerPrimaryWindow(window, coordinator: coordinator)
+        defer {
+            manager.handleWindowWillClose(window)
+        }
+
+        #expect(window.title == RockxyIdentity.current.displayName)
+        #expect(window.titleVisibility == .hidden)
+
+        // Simulate the old Project-title assignment followed by a delayed SwiftUI
+        // reconciliation. The window manager owns a persistent invariant instead
+        // of repairing only the synchronous Project-switch callback.
+        window.title = "New Project 3"
+        window.titleVisibility = .visible
+
+        #expect(window.title == RockxyIdentity.current.displayName)
+        #expect(window.titleVisibility == .hidden)
+
+        manager.projectDidChange(coordinator: coordinator)
+
+        #expect(window.title == RockxyIdentity.current.displayName)
+        #expect(window.titleVisibility == .hidden)
+    }
+
     @Test("Main toolbar places the sidebar toggle before its tracking separator")
     func nativeSidebarToolbarChrome() {
         let controller = makeController(sidebarPresented: true, inspectorPresented: true)

@@ -190,7 +190,7 @@ struct ImportReviewSheetTests {
         let source = try readProjectFile("Rockxy/Views/Import/ImportReviewSheet.swift")
 
         // Native controls, no custom plain destructive button.
-        #expect(source.contains(".buttonStyle(.bordered)"))
+        #expect(source.contains(".rockxyGlassButtonStyle()"))
         #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(source.contains("Button(role: .destructive)"))
         #expect(source.contains("exclamationmark.triangle.fill"))

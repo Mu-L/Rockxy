@@ -259,7 +259,7 @@ struct TrafficCommandBar: View {
         } label: {
             commandLabel(title: presentation.title, systemImage: presentation.systemImage)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .disabled(!presentation.isEnabled)
         .help(presentation.help)
@@ -291,7 +291,7 @@ struct TrafficCommandBar: View {
         } label: {
             commandLabel(title: descriptor.title, systemImage: descriptor.systemImage)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .disabled(!descriptor.isEnabled)
         .help(descriptor.help)
@@ -306,7 +306,7 @@ struct TrafficCommandBar: View {
             commandLabel(title: descriptor.title, systemImage: descriptor.systemImage)
                 .foregroundStyle(.primary)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .overlay {
             if descriptor.isActive {

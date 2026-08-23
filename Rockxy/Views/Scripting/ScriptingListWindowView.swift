@@ -515,7 +515,7 @@ struct ScriptingListWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .frame(minHeight: toolMetrics.footerControlHeight)
         .fixedSize()
     }
