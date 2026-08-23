@@ -11,14 +11,17 @@ struct InspectorTabButton: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: metrics.controlFontSize, weight: isActive ? .bold : .regular))
-                .foregroundStyle(isActive ? Theme.Inspector.tabActive : Theme.Inspector.tabInactive)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 6)
+                .frame(minHeight: max(18, metrics.inspectorTabHeight - 4))
+                .rockxyChipStyle(isActive: isActive, isHovered: isHovered)
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
         .frame(minHeight: metrics.inspectorTabHeight)
+        .onHover { isHovered = $0 }
     }
 
     @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var isHovered = false
 }

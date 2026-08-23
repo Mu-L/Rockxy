@@ -208,8 +208,8 @@ struct SSLProxyingListView: View {
         return canInterceptHTTPS ? .green : .orange
     }
 
-    private var statusCapsuleUsesWhiteText: Bool {
-        viewModel.isSSLProxyingEnabled && canInterceptHTTPS && viewModel.enabledDecryptCount > 0
+    private var statusCapsuleIsActive: Bool {
+        viewModel.isSSLProxyingEnabled && viewModel.enabledDecryptCount > 0
     }
 
     private var importConfirmationMessage: String {
@@ -269,6 +269,7 @@ struct SSLProxyingListView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     // MARK: - Info Banner
@@ -409,14 +410,13 @@ struct SSLProxyingListView: View {
 
             Text(statusCapsuleText)
                 .font(toolMetrics.metadataFont(weight: .semibold))
-                .foregroundStyle(statusCapsuleUsesWhiteText ? Color.white : statusCapsuleColor)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                .background(statusCapsuleColor.opacity(statusCapsuleUsesWhiteText ? 1 : 0.14))
-                .clipShape(Capsule())
+                .rockxyChipStyle(tint: statusCapsuleColor, isActive: statusCapsuleIsActive)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {

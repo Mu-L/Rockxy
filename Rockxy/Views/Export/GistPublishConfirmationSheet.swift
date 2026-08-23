@@ -301,8 +301,8 @@ struct GistPublishConfirmationSheet: View {
                 .frame(width: footerActionWidth)
                 .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(isPublishing)
             .accessibilityIdentifier("gistPublish.publishButton")
         }

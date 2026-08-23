@@ -20,63 +20,11 @@ struct CenterContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TrafficCommandBar(coordinator: coordinator, onOpenToolWindow: onOpenToolWindow)
-
-            ProtocolFilterBar(
-                activeFilters: Binding(
-                    get: { coordinator.filterCriteria.activeProtocolFilters },
-                    set: {
-                        coordinator.filterCriteria.activeProtocolFilters = $0
-                        coordinator.recomputeFilteredTransactions()
-                    }
-                )
+            TrafficControlShelf(
+                coordinator: coordinator,
+                advancedRuleCount: advancedRuleCount,
+                onOpenToolWindow: onOpenToolWindow
             )
-
-            SearchFilterBar(
-                searchText: Binding(
-                    get: { coordinator.filterCriteria.searchText },
-                    set: {
-                        coordinator.filterCriteria.searchText = $0
-                        coordinator.recomputeFilteredTransactions()
-                    }
-                ),
-                filterField: Binding(
-                    get: { coordinator.filterCriteria.searchField },
-                    set: {
-                        coordinator.filterCriteria.searchField = $0
-                        coordinator.recomputeFilteredTransactions()
-                    }
-                ),
-                isEnabled: Binding(
-                    get: { coordinator.filterCriteria.isSearchEnabled },
-                    set: {
-                        coordinator.filterCriteria.isSearchEnabled = $0
-                        coordinator.recomputeFilteredTransactions()
-                    }
-                ),
-                isAdvancedFilterVisible: coordinator.isFilterBarVisible,
-                advancedFilterCount: advancedRuleCount,
-                onAddFilter: coordinator.addAdvancedFilterRule,
-                onToggleAdvancedFilters: {
-                    coordinator.isFilterBarVisible.toggle()
-                    coordinator.recomputeFilteredTransactions()
-                }
-            )
-
-            if coordinator.isFilterBarVisible {
-                AdvancedFilterBar(
-                    rules: Binding(
-                        get: { coordinator.filterRules },
-                        set: {
-                            coordinator.filterRules = $0
-                            coordinator.recomputeFilteredTransactions()
-                        }
-                    ),
-                    presetStore: coordinator.filterPresetStore
-                )
-            }
-
-            ActiveFilterSummaryBar(coordinator: coordinator)
 
             inspectorWorkspace
 
@@ -109,6 +57,20 @@ struct CenterContentView: View {
                 },
                 onOpenToolWindow: onOpenToolWindow
             )
+        }
+        .background {
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                LinearGradient(
+                    colors: [
+                        Color.accentColor.opacity(Theme.Glass.ambientAccentOpacity),
+                        Color.cyan.opacity(Theme.Glass.ambientSecondaryOpacity),
+                        Color.clear,
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
         }
         .onChange(of: coordinator.selectedTransaction?.id) { _, newID in
             // Only sync single selection to multi-selection IDs when not actively multi-selecting

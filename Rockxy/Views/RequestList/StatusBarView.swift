@@ -330,15 +330,10 @@ private struct FooterMutationIndicatorButton: View {
                 .monospacedDigit()
         }
         .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-        .foregroundStyle(indicatorColor)
         .lineLimit(1)
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
-        .background(indicatorColor.opacity(isHovered ? 0.24 : 0.14), in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(indicatorColor.opacity(isHovered ? 0.55 : 0.32), lineWidth: 0.5)
-        }
+        .rockxyChipStyle(tint: indicatorColor, isActive: true, isHovered: isHovered)
     }
 }
 
@@ -426,27 +421,19 @@ struct FooterToolingChrome: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .foregroundStyle(Color.white)
             .lineLimit(1)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .background(backgroundColor, in: Capsule())
-            .opacity(isEnabled ? 1 : 0.45)
+            .rockxyChipStyle(
+                isActive: isActive,
+                isHovered: isHovered,
+                isEnabled: isEnabled
+            )
     }
 
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var backgroundColor: Color {
-        if isActive {
-            return Color.accentColor
-        }
-        if isHovered, isEnabled {
-            return Color(nsColor: .secondaryLabelColor).opacity(0.86)
-        }
-        return Color(nsColor: .tertiaryLabelColor)
-    }
 }
 
 // MARK: - StatusBarRequestSummary
@@ -712,10 +699,9 @@ struct StatusBarView: View {
                 systemImage: "bolt.horizontal.circle"
             )
             .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .foregroundStyle(Color(nsColor: .systemOrange))
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .background(Color(nsColor: .systemOrange).opacity(0.14), in: Capsule())
+            .rockxyChipStyle(tint: Color(nsColor: .systemOrange), isActive: true)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -727,11 +713,10 @@ struct StatusBarView: View {
     private func statusPill(_ title: String, color: Color) -> some View {
         Text(title)
             .font(.system(size: metrics.badgeFontSize, weight: .semibold))
-            .foregroundStyle(.white)
             .lineLimit(1)
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
-            .background(color, in: Capsule())
+            .rockxyChipStyle(tint: color, isActive: true)
     }
 
     private func formattedSpeed(_ bytesPerSecond: Int64) -> String {
@@ -768,7 +753,7 @@ struct WorkspaceFooterBar<Content: View>: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, horizontalPadding)
             .frame(height: metrics.statusBarHeight)
-            .background(Theme.StatusBar.background)
+            .rockxyFunctionalBar()
             .overlay(alignment: .top) {
                 Divider()
             }

@@ -474,11 +474,14 @@ struct ContextDockInvestigationReportTests {
     @Test("Mode switcher shows Details / AI Assistant, not Context / Investigate")
     func modeSwitcherUsesRestoredLabels() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let dockHeader = try #require(dock.components(separatedBy: "Divider()").first)
         #expect(dock.contains("Text(String(localized: \"Details\")).tag(ContextDockTab.details)"))
         #expect(dock.contains("Text(String(localized: \"AI Assistant\")).tag(ContextDockTab.aiAssistant)"))
         #expect(!dock.contains("Text(String(localized: \"Context\")).tag"))
         #expect(!dock.contains("Text(String(localized: \"Investigate\")).tag"))
         #expect(dock.contains("Picker(String(localized: \"Inspector\")"))
+        #expect(dockHeader.contains(".workspaceModeSwitcherStyle()"))
+        #expect(!dockHeader.contains(".rockxyFunctionalBar()"))
         #expect(dock.contains(".accessibilityLabel(String(localized: \"Inspector\"))"))
         // Stable internal enum cases are unchanged.
         #expect(dock.contains("ContextDockTab.details"))

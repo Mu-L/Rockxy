@@ -56,10 +56,9 @@ struct BreakpointRuleRow: View {
         }()
         return Text(label)
             .font(.system(size: toolMetrics.smallIconFontSize, weight: .bold, design: .monospaced))
-            .foregroundStyle(.white)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(Color.purple, in: Capsule())
+            .rockxyChipStyle(tint: .purple, isActive: true, isEnabled: true)
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {

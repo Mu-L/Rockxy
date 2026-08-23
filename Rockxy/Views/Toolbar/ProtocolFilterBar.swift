@@ -16,6 +16,8 @@ struct ProtocolFilterBar: View {
 
     @Binding var activeFilters: Set<ProtocolFilter>
 
+    var isEmbeddedInControlShelf = false
+
     var body: some View {
         // Widest tier first; `ViewThatFits` keeps the first that fits. Tier 5 (`.all` + overflow +
         // icon Clear All) is the always-fitting fallback. Kept in sync with `inlinePillTiers`.
@@ -29,8 +31,16 @@ struct ProtocolFilterBar: View {
         }
         .padding(.horizontal, Theme.Layout.contentPadding)
         .padding(.vertical, max(4, (metrics.fontSize - 10) / 3))
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) { Divider() }
+        .background {
+            if !isEmbeddedInControlShelf {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !isEmbeddedInControlShelf {
+                Divider()
+            }
+        }
         .fixedSize(horizontal: false, vertical: true)
     }
 

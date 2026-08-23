@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Project Presentation Models
+// MARK: - ProjectNameEditorContext
 
 struct ProjectNameEditorContext: Identifiable, Equatable {
     enum Mode: Equatable {
@@ -32,14 +32,18 @@ struct ProjectNameEditorContext: Identifiable, Equatable {
     }
 }
 
+// MARK: - ProjectDeletionRequest
+
 struct ProjectDeletionRequest: Identifiable, Equatable {
     let projectID: UUID
     let projectName: String
 
-    var id: UUID { projectID }
+    var id: UUID {
+        projectID
+    }
 }
 
-// MARK: - ProjectToolbarSelectorView
+// MARK: - ProjectToolbarSelectorMetrics
 
 enum ProjectToolbarSelectorMetrics {
     static let minimumWidth: CGFloat = 104
@@ -59,7 +63,11 @@ enum ProjectToolbarSelectorMetrics {
     }
 }
 
+// MARK: - ProjectToolbarSelectorView
+
 struct ProjectToolbarSelectorView: View {
+    // MARK: Internal
+
     @Bindable var coordinator: MainContentCoordinator
 
     var body: some View {
@@ -116,6 +124,8 @@ struct ProjectToolbarSelectorView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .contentShape(.rect)
         }
         .menuIndicator(.hidden)
@@ -126,6 +136,8 @@ struct ProjectToolbarSelectorView: View {
         .accessibilityLabel(String(localized: "Active Project"))
         .accessibilityValue(coordinator.projectStore.activeProject.name)
     }
+
+    // MARK: Private
 
     private var preferredWidth: CGFloat {
         ProjectToolbarSelectorMetrics.preferredWidth(
@@ -147,7 +159,8 @@ struct ProjectToolbarSelectorView: View {
             "folder.badge.questionmark"
         case .loading:
             "folder"
-        case .idle, .ready:
+        case .idle,
+             .ready:
             "folder.fill"
         }
     }
@@ -163,12 +176,16 @@ struct ProjectToolbarSelectorView: View {
 // MARK: - ProjectNameEditorSheet
 
 struct ProjectNameEditorSheet: View {
+    // MARK: Lifecycle
+
     init(context: ProjectNameEditorContext, coordinator: MainContentCoordinator) {
         self.context = context
         self.coordinator = coordinator
         _name = State(initialValue: context.initialName)
         _operationErrorMessage = State(initialValue: nil)
     }
+
+    // MARK: Internal
 
     let context: ProjectNameEditorContext
     let coordinator: MainContentCoordinator
@@ -219,6 +236,7 @@ struct ProjectNameEditorSheet: View {
                     submit()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(validationMessage != nil)
             }
             .padding(.horizontal, 18)
@@ -226,6 +244,8 @@ struct ProjectNameEditorSheet: View {
         }
         .frame(width: 460)
     }
+
+    // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -287,10 +307,14 @@ struct ProjectNameEditorSheet: View {
 // MARK: - ProjectManagerSheet
 
 struct ProjectManagerSheet: View {
+    // MARK: Lifecycle
+
     init(coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
         _selection = State(initialValue: coordinator.projectStore.activeProjectID)
     }
+
+    // MARK: Internal
 
     let coordinator: MainContentCoordinator
 
@@ -324,7 +348,9 @@ struct ProjectManagerSheet: View {
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: { _ in
             Text(
-                String(localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration.")
+                String(
+                    localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration."
+                )
                     + " "
                     + String(localized: "Manually saved session files, rules, and favorites are not deleted.")
             )
@@ -339,6 +365,8 @@ struct ProjectManagerSheet: View {
             selection = activeProjectID
         }
     }
+
+    // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -362,6 +390,23 @@ struct ProjectManagerSheet: View {
 
     private var canExportSelectedProject: Bool {
         canTransitionProjects && selectedProject != nil
+    }
+
+    private var canDeleteSelectedProject: Bool {
+        canTransitionProjects
+            && selectedProject != nil
+            && coordinator.projectStore.projects.count > 1
+    }
+
+    private var deleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { coordinator.projectDeletionRequest != nil },
+            set: {
+                if !$0 {
+                    coordinator.projectDeletionRequest = nil
+                }
+            }
+        )
     }
 
     private var projectSidebar: some View {
@@ -438,8 +483,7 @@ struct ProjectManagerSheet: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    @ViewBuilder
-    private var detail: some View {
+    @ViewBuilder private var detail: some View {
         if let project = selectedProject {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
@@ -587,15 +631,11 @@ struct ProjectManagerSheet: View {
         }
     }
 
-    private var canDeleteSelectedProject: Bool {
-        canTransitionProjects
-            && selectedProject != nil
-            && coordinator.projectStore.projects.count > 1
-    }
-
     private var infoBanner: some View {
         Label(
-            String(localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic."),
+            String(
+                localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic."
+            ),
             systemImage: "info.circle"
         )
         .font(toolMetrics.secondaryFont())
@@ -641,6 +681,7 @@ struct ProjectManagerSheet: View {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
@@ -658,17 +699,6 @@ struct ProjectManagerSheet: View {
             return String(localized: "\(count), Active Project")
         }
         return count
-    }
-
-    private var deleteConfirmation: Binding<Bool> {
-        Binding(
-            get: { coordinator.projectDeletionRequest != nil },
-            set: {
-                if !$0 {
-                    coordinator.projectDeletionRequest = nil
-                }
-            }
-        )
     }
 
     private func open(_ project: Project) {
@@ -712,6 +742,8 @@ struct ProjectManagerSheet: View {
 // MARK: - ProjectRecoverySheet
 
 struct ProjectRecoverySheet: View {
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
 
     var body: some View {
@@ -724,7 +756,9 @@ struct ProjectRecoverySheet: View {
                     Text(String(localized: "Projects Could Not Be Loaded"))
                         .font(.headline)
                     Text(
-                        String(localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data.")
+                        String(
+                            localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data."
+                        )
                     )
                     .foregroundStyle(.secondary)
                     Text(coordinator.projectStore.loadFailureMessage ?? String(localized: "Unknown catalog error"))
@@ -752,6 +786,7 @@ struct ProjectRecoverySheet: View {
                     retry()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
             .padding(.horizontal, 20)
             .frame(height: 56)
@@ -769,6 +804,8 @@ struct ProjectRecoverySheet: View {
             )
         }
     }
+
+    // MARK: Private
 
     @State private var confirmsReset = false
 

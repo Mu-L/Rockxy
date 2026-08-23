@@ -131,7 +131,7 @@ struct ExportScopeTests {
 
         #expect(source.contains(".pickerStyle(.radioGroup)"))
         #expect(source.contains(".buttonStyle(.bordered)"))
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(source.contains(".keyboardShortcut(.cancelAction)"))
         #expect(source.contains(".keyboardShortcut(.defaultAction)"))
         #expect(source.contains("ToolWindowDisplayMetrics"))

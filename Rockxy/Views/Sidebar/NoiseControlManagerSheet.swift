@@ -238,6 +238,7 @@ struct NoiseControlManagerSheet: View {
             .disabled(allSources.isEmpty)
             Button(String(localized: "Done")) { dismiss() }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
         }
         .padding(.horizontal, 18)
         .frame(height: 52)

@@ -427,6 +427,7 @@ struct BreakpointRulesWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -574,6 +575,7 @@ struct BreakpointRulesWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var compactAddRemoveControl: some View {
@@ -669,22 +671,9 @@ struct BreakpointRulesWindowView: View {
     private var statusCapsule: some View {
         Text(statusText)
             .font(toolMetrics.secondaryFont(weight: .semibold))
-            .foregroundStyle(viewModel.isBreakpointToolEnabled ? Color.accentColor : Color.secondary)
             .padding(.horizontal, 9)
             .frame(height: toolMetrics.footerControlHeight)
-            .background(
-                (viewModel.isBreakpointToolEnabled ? Color.accentColor : Color.secondary)
-                    .opacity(0.1)
-            )
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(
-                        (viewModel.isBreakpointToolEnabled ? Color.accentColor : Color.secondary)
-                            .opacity(0.25),
-                        lineWidth: 1
-                    )
-            }
+            .rockxyChipStyle(isActive: viewModel.isBreakpointToolEnabled)
     }
 
     private var enableDisableLabel: String {

@@ -100,7 +100,7 @@ struct AssistantConversationContextMismatchBanner: View {
                     .controlSize(.small)
 
                 Button(String(localized: "New Conversation"), action: onStartNew)
-                    .buttonStyle(.borderedProminent)
+                    .rockxyGlassButtonStyle(prominent: true)
                     .controlSize(.small)
             }
         }

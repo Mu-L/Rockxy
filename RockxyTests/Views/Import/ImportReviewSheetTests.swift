@@ -191,7 +191,7 @@ struct ImportReviewSheetTests {
 
         // Native controls, no custom plain destructive button.
         #expect(source.contains(".buttonStyle(.bordered)"))
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(source.contains("Button(role: .destructive)"))
         #expect(source.contains("exclamationmark.triangle.fill"))
         #expect(!source.contains(".buttonStyle(.plain)"))

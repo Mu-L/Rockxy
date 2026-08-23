@@ -242,6 +242,7 @@ struct QuickToolsEditor: View {
                     onDone()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
         }
         .padding(16)

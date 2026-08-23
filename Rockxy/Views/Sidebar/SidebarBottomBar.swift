@@ -6,6 +6,8 @@ import SwiftUI
 // MARK: - SidebarBottomBar
 
 struct SidebarBottomBar: View {
+    // MARK: Internal
+
     @Binding var filterText: String
     @Binding var isAddFavoritePresented: Bool
 
@@ -48,9 +50,9 @@ struct SidebarBottomBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.clear)
-        .overlay(alignment: .top) { Divider() }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }

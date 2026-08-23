@@ -219,6 +219,7 @@ struct BabylonRuntimeView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var searchField: some View {
@@ -485,6 +486,7 @@ struct BabylonRuntimeView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private func kindCell(for event: BabylonRuntimeEvent) -> some View {

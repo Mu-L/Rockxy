@@ -11,6 +11,7 @@ struct ActiveFilterSummaryBar: View {
     // MARK: Internal
 
     let coordinator: MainContentCoordinator
+    var isEmbeddedInControlShelf = false
 
     var body: some View {
         if hasActiveFilters {
@@ -88,46 +89,6 @@ struct ActiveFilterSummaryBar: View {
                         }
                     }
 
-                    if coordinator.filterCriteria.isSearchEnabled,
-                       !coordinator.filterCriteria.searchText.isEmpty
-                    {
-                        let field = coordinator.filterCriteria.searchField.displayName
-                        let text = coordinator.filterCriteria.searchText
-                        FilterChip(
-                            label: "\(field): \(text)",
-                            onRemove: {
-                                coordinator.filterCriteria.searchText = ""
-                                coordinator.recomputeFilteredTransactions()
-                            }
-                        )
-                    }
-
-                    ForEach(
-                        ProtocolFilterSelection.summaryFilters(in: coordinator.filterCriteria.activeProtocolFilters),
-                        id: \.self
-                    ) { filter in
-                        FilterChip(
-                            label: filter.displayName,
-                            onRemove: {
-                                coordinator.filterCriteria.activeProtocolFilters.remove(filter)
-                                coordinator.recomputeFilteredTransactions()
-                            }
-                        )
-                    }
-
-                    if coordinator.isFilterBarVisible,
-                       coordinator.filterRules.contains(where: { $0.isEnabled && !$0.value.isEmpty })
-                    {
-                        let count = coordinator.filterRules.filter { $0.isEnabled && !$0.value.isEmpty }.count
-                        FilterChip(
-                            label: String(localized: "\(count) rules active"),
-                            onRemove: {
-                                coordinator.isFilterBarVisible = false
-                                coordinator.recomputeFilteredTransactions()
-                            }
-                        )
-                    }
-
                     Button(String(localized: "Clear All")) {
                         coordinator.clearAllWorkspaceFilters()
                     }
@@ -138,8 +99,16 @@ struct ActiveFilterSummaryBar: View {
                 .padding(.horizontal, 8)
             }
             .frame(height: metrics.filterBarHeight)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-            .overlay(alignment: .bottom) { Divider() }
+            .background {
+                if !isEmbeddedInControlShelf {
+                    Color(nsColor: .controlBackgroundColor).opacity(0.5)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !isEmbeddedInControlShelf {
+                    Divider()
+                }
+            }
         }
     }
 
@@ -157,10 +126,6 @@ struct ActiveFilterSummaryBar: View {
             || coordinator.filterCriteria.sidebarScope == .saved
             || coordinator.filterCriteria.sidebarScope == .pinned
             || coordinator.filterCriteria.sidebarScope == .notes
-            || (coordinator.filterCriteria.isSearchEnabled && !coordinator.filterCriteria.searchText.isEmpty)
-            || !coordinator.filterCriteria.activeProtocolFilters.isEmpty
-            || (coordinator.isFilterBarVisible
-                && coordinator.filterRules.contains(where: { $0.isEnabled && !$0.value.isEmpty }))
     }
 }
 
@@ -168,6 +133,8 @@ struct ActiveFilterSummaryBar: View {
 
 /// Removable pill displaying a single active filter with an X button.
 private struct FilterChip: View {
+    // MARK: Internal
+
     let label: String
     let onRemove: () -> Void
 
@@ -186,15 +153,10 @@ private struct FilterChip: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                )
-        )
+        .rockxyChipStyle(isActive: true)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }

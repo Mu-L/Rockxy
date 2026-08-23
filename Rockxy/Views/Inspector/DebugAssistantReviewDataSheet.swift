@@ -180,8 +180,8 @@ struct DebugAssistantReviewDataSheet: View {
                 .keyboardShortcut(.cancelAction)
 
             Button(primaryActionTitle, action: onSend)
-                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!canSend)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)

@@ -454,7 +454,7 @@ struct DeveloperSetupWindowView: View {
                 Button(String(localized: "Share Certificate")) {
                     shareRootCAForSelectedTarget()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
 
                 Button(String(localized: "Open Certificate Guide")) {
                     openWindow(id: "certificateSetup")
@@ -571,7 +571,7 @@ struct DeveloperSetupWindowView: View {
         Button(String(localized: "Start Check")) {
             viewModel.startValidation()
         }
-        .buttonStyle(.borderedProminent)
+        .rockxyGlassButtonStyle(prominent: true)
         .disabled(!viewModel.toolbarVerifyEnabled || viewModel.activeIssue != nil)
         .keyboardShortcut("r", modifiers: .command)
 

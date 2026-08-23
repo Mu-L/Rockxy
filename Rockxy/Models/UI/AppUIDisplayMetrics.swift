@@ -4,11 +4,15 @@ import SwiftUI
 // MARK: - AppUIDisplayMetrics
 
 struct AppUIDisplayMetrics: Equatable {
-    let settings: AppUISettings
+    // MARK: Lifecycle
 
     init(settings: AppUISettings = .default) {
         self.settings = settings
     }
+
+    // MARK: Internal
+
+    let settings: AppUISettings
 
     var fontSize: CGFloat {
         CGFloat(settings.fontSize)
@@ -165,7 +169,9 @@ struct AppUIDisplayMetrics: Equatable {
         size: CGFloat,
         weight: Font.Weight = .regular,
         monospaced: Bool = false
-    ) -> Font {
+    )
+        -> Font
+    {
         if monospaced || settings.useMonospacedFont {
             return .system(size: size, weight: weight, design: .monospaced)
         }
@@ -220,11 +226,15 @@ struct BottomInspectorLayoutMetrics: Equatable {
 // MARK: - DeveloperSetupDisplayMetrics
 
 struct DeveloperSetupDisplayMetrics: Equatable {
-    let appMetrics: AppUIDisplayMetrics
+    // MARK: Lifecycle
 
     init(appMetrics: AppUIDisplayMetrics = AppUIDisplayMetrics()) {
         self.appMetrics = appMetrics
     }
+
+    // MARK: Internal
+
+    let appMetrics: AppUIDisplayMetrics
 
     var titleFontSize: CGFloat {
         max(15, appMetrics.primaryFontSize + 5)
@@ -296,11 +306,15 @@ struct DeveloperSetupDisplayMetrics: Equatable {
 // MARK: - ToolWindowDisplayMetrics
 
 struct ToolWindowDisplayMetrics: Equatable {
-    let appMetrics: AppUIDisplayMetrics
+    // MARK: Lifecycle
 
     init(appMetrics: AppUIDisplayMetrics = AppUIDisplayMetrics()) {
         self.appMetrics = appMetrics
     }
+
+    // MARK: Internal
+
+    let appMetrics: AppUIDisplayMetrics
 
     var bodyFontSize: CGFloat {
         appMetrics.primaryFontSize
@@ -485,35 +499,34 @@ struct SettingsDisplayMetrics: Equatable {
     // panes stay usable at 13 / 20 / 28pt without clipping or forcing a tiny sidebar.
 
     var sidebarMinWidth: CGFloat {
-        max(196, bodyFontSize * 6 + 118)
+        max(200, bodyFontSize * 5 + 130)
     }
 
     var sidebarIdealWidth: CGFloat {
-        sidebarMinWidth
+        max(220, sidebarMinWidth)
     }
 
     var sidebarMaxWidth: CGFloat {
-        sidebarMinWidth + 96
+        max(280, sidebarIdealWidth + 60)
     }
 
     var contentMinWidth: CGFloat {
-        // Accommodates the widest shared label + 420pt field row, section
-        // insets, and the standalone 640pt GitHub guidance block.
-        max(700, labelWidth + 16 + 420 + contentPadding * 2 + 24)
+        // Rows reflow vertically when a label plus control no longer fits.
+        // Keep the same compact working width as Developer Setup instead of
+        // forcing every Settings pane to accommodate its widest field.
+        max(600, bodyFontSize * 8 + 496)
     }
 
     var windowMinWidth: CGFloat {
-        sidebarMinWidth + contentMinWidth
+        max(820, sidebarMinWidth + contentMinWidth)
     }
 
     var windowIdealWidth: CGFloat {
-        windowMinWidth + 132
+        max(1_000, windowMinWidth + 140)
     }
 
     var windowMinHeight: CGFloat {
-        // Panes scroll vertically, so the minimum stays usable on compact
-        // displays even when Rockxy's app font is set to 28pt.
-        max(500, bodyFontSize * 6 + 382)
+        max(560, bodyFontSize * 5 + 430)
     }
 
     var windowIdealHeight: CGFloat {
@@ -539,11 +552,15 @@ struct SettingsDisplayMetrics: Equatable {
     }
 
     var contentPadding: CGFloat {
-        28
+        20
+    }
+
+    var contentMaxWidth: CGFloat {
+        max(820, bodyFontSize * 10 + 680)
     }
 
     var labelWidth: CGFloat {
-        max(160, bodyFontSize * 8 + 56)
+        max(136, bodyFontSize * 6 + 58)
     }
 
     var wideLabelWidth: CGFloat {
@@ -551,7 +568,11 @@ struct SettingsDisplayMetrics: Equatable {
     }
 
     var rowLeading: CGFloat {
-        labelWidth + 16
+        labelWidth + fieldSpacing
+    }
+
+    var fieldSpacing: CGFloat {
+        14
     }
 
     var controlHeight: CGFloat {
@@ -590,18 +611,16 @@ struct SettingsDisplayMetrics: Equatable {
         }
         return .system(size: metadataFontSize, weight: weight)
     }
+
+    func sectionTitleFont() -> Font {
+        font(weight: .semibold)
+    }
 }
 
 // MARK: - InspectorTextEditorSettings
 
 struct InspectorTextEditorSettings: Equatable, Sendable {
-    var fontSize: Int = AppUISettings.defaultFontSize
-    var tabWidth: Int = AppUISettings.defaultTabWidth
-    var useMonospacedFont = false
-    var wordWrap = true
-    var showInvisibles = false
-    var showMinimap = false
-    var scrollBeyondLastLine = false
+    // MARK: Lifecycle
 
     init(
         fontSize: Int = AppUISettings.defaultFontSize,
@@ -632,6 +651,16 @@ struct InspectorTextEditorSettings: Equatable, Sendable {
             scrollBeyondLastLine: appUI.bodyScrollBeyondLastLine
         )
     }
+
+    // MARK: Internal
+
+    var fontSize: Int = AppUISettings.defaultFontSize
+    var tabWidth: Int = AppUISettings.defaultTabWidth
+    var useMonospacedFont = false
+    var wordWrap = true
+    var showInvisibles = false
+    var showMinimap = false
+    var scrollBeyondLastLine = false
 
     var cgFontSize: CGFloat {
         CGFloat(fontSize)
@@ -671,16 +700,16 @@ extension View {
 // MARK: - AppUIDisplayMetricsProvider
 
 struct AppUIDisplayMetricsProvider<Content: View>: View {
-    let content: Content
+    // MARK: Internal
 
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
         content
             .appUIDisplayMetrics(AppUIDisplayMetrics(settings: settingsManager.appUI))
     }
+
+    // MARK: Private
 
     private let settingsManager = AppSettingsManager.shared
 }
@@ -688,11 +717,7 @@ struct AppUIDisplayMetricsProvider<Content: View>: View {
 // MARK: - ToolWindowDisplayMetricsProvider
 
 struct ToolWindowDisplayMetricsProvider<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+    @ViewBuilder let content: Content
 
     var body: some View {
         AppUIDisplayMetricsProvider {
@@ -703,17 +728,19 @@ struct ToolWindowDisplayMetricsProvider<Content: View>: View {
     }
 }
 
-private struct ToolWindowReadableContent<Content: View>: View {
-    let content: Content
+// MARK: - ToolWindowReadableContent
 
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+private struct ToolWindowReadableContent<Content: View>: View {
+    // MARK: Internal
+
+    @ViewBuilder let content: Content
 
     var body: some View {
         content
             .font(toolMetrics.font())
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

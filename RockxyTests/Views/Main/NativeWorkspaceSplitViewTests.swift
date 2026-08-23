@@ -127,6 +127,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(window.styleMask.contains(.fullSizeContentView))
         #expect(window.titlebarAppearsTransparent)
         #expect(window.titleVisibility == .hidden)
+        #expect(window.toolbarStyle == .unified)
     }
 
     @Test("Main toolbar places the sidebar toggle before its tracking separator")

@@ -154,6 +154,7 @@ struct CustomCertificatesView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     @ViewBuilder private var content: some View {
@@ -294,6 +295,7 @@ struct CustomCertificatesView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var importMenu: some View {

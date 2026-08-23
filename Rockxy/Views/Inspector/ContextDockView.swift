@@ -361,7 +361,7 @@ private struct AIAssistantDockView: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: max(36, appMetrics.primaryFontSize + 20))
-        .background(Color.clear)
+        .rockxyFunctionalBar()
     }
 
     private var conversationSwitcher: some View {
@@ -734,7 +734,7 @@ private struct AIAssistantDockView: View {
                         .font(assistantFont(appMetrics.controlFontSize, weight: .semibold))
                         .frame(width: 16, height: 16)
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.small)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!canSendDraft)
@@ -821,7 +821,7 @@ private struct AIAssistantDockView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.clear)
+        .rockxyFunctionalBar()
     }
 
     private func suggestionCard(_ recipe: DebugAssistantRecipe) -> some View {

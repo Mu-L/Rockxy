@@ -69,6 +69,7 @@ struct PreviewerTabSettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -147,6 +148,7 @@ struct PreviewerTabSettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private func centeredToggle(for mode: PreviewRenderMode, panel: PreviewPanel) -> some View {

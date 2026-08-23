@@ -116,6 +116,7 @@ struct DiffWindowView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var contextBadge: some View {
@@ -129,11 +130,7 @@ struct DiffWindowView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(Capsule())
-        .overlay {
-            Capsule().stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        }
+        .rockxyChipStyle()
         .help(String(localized: "Comparison runs on your captured transactions and never modifies live traffic."))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(String(localized: "Local, read-only comparison"))

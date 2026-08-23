@@ -255,6 +255,7 @@ struct ScriptingListWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     // MARK: - Info banner
@@ -398,6 +399,7 @@ struct ScriptingListWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {
@@ -521,29 +523,16 @@ struct ScriptingListWindowView: View {
     private var statusCapsule: some View {
         Text(statusText)
             .font(toolMetrics.secondaryFont(weight: .semibold))
-            .foregroundStyle(.primary)
             .padding(.horizontal, 9)
             .frame(height: toolMetrics.footerControlHeight)
-            .background(statusCapsuleBackground)
-            .clipShape(Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(statusCapsuleStroke, lineWidth: 1)
-            }
+            .rockxyChipStyle(tint: statusCapsuleTint, isActive: viewModel.toolEnabled)
     }
 
-    private var statusCapsuleBackground: Color {
+    private var statusCapsuleTint: Color {
         if !viewModel.toolEnabled {
-            return Color.secondary.opacity(0.1)
+            return .secondary
         }
-        return activeScriptCount == 0 ? Color.orange.opacity(0.12) : Color.green.opacity(0.12)
-    }
-
-    private var statusCapsuleStroke: Color {
-        if !viewModel.toolEnabled {
-            return Color.secondary.opacity(0.25)
-        }
-        return activeScriptCount == 0 ? Color.orange.opacity(0.3) : Color.green.opacity(0.35)
+        return activeScriptCount == 0 ? .orange : .green
     }
 
     private func enabledCell(for row: ScriptListDisplayRow) -> some View {

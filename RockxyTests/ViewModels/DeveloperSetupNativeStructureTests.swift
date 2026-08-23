@@ -108,6 +108,8 @@ struct DeveloperSetupNativeStructureTests {
             #expect(source.contains("ScrollView"))
             #expect(source.contains("minWidth:"))
             #expect(source.contains("setupMetrics.font"))
+            #expect(source.contains(".safeAreaBar(edge: .top, spacing: 0)"))
+            #expect(source.contains(".safeAreaBar(edge: .bottom, spacing: 0)"))
             #expect(source.contains(".font(.system") == false)
             // Fixed content-size framing forbids resize; must not be present.
             #expect(source.contains(".frame(width: 780, height: 540)") == false)

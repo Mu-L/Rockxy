@@ -326,6 +326,7 @@ struct AdvancedProxySettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     // MARK: - System Routing
@@ -696,6 +697,7 @@ struct AdvancedProxySettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var restoreDefaultsButton: some View {
@@ -731,6 +733,7 @@ struct AdvancedProxySettingsView: View {
             footerButtonLabel(String(localized: "Apply"))
         }
         .keyboardShortcut(.defaultAction)
+        .rockxyGlassButtonStyle(prominent: true)
         .disabled(!isDirty || !draft.canApply)
     }
 

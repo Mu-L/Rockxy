@@ -16,6 +16,7 @@ struct SearchFilterBar: View {
     let advancedFilterCount: Int
     let onAddFilter: () -> Void
     let onToggleAdvancedFilters: () -> Void
+    var isEmbeddedInControlShelf = false
 
     var body: some View {
         // Widest tier first; `ViewThatFits` keeps the first that fits. The search field carries a
@@ -28,8 +29,16 @@ struct SearchFilterBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, max(4, (metrics.fontSize - 10) / 3))
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) { Divider() }
+        .background {
+            if !isEmbeddedInControlShelf {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !isEmbeddedInControlShelf {
+                Divider()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .focusMainSearchField)) { _ in
             isEnabled = true
             isSearchFocused = true
@@ -97,7 +106,7 @@ struct SearchFilterBar: View {
                         .font(.caption2)
                 }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
             .controlSize(.small)
             .help(isAdvancedFilterVisible
                 ? String(localized: "Hide compound filters")

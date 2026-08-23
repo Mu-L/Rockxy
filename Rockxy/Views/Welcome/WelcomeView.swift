@@ -317,15 +317,17 @@ struct WelcomeView: View {
                 Button(String(localized: "Debug My App…")) {
                     finish(openDeveloperSetup: true)
                 }
+                .rockxyGlassButtonStyle()
                 .controlSize(.large)
             }
 
             Button(String(localized: "Get Started")) {
                 finish(openDeveloperSetup: false)
             }
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle(prominent: true)
             .controlSize(.large)
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(!viewModel.canGetStarted || viewModel.isBusy)
         }
     }

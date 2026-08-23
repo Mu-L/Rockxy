@@ -118,6 +118,7 @@ struct ProtobufSettingsWindowView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var rulesTable: some View {
@@ -205,6 +206,7 @@ struct ProtobufSettingsWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var footerLeadingContent: some View {
@@ -688,6 +690,7 @@ private struct ProtobufRuleEditorSheet: View {
                     footerButtonLabel(sessionButtonTitle)
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
         }
         .padding(.horizontal, toolMetrics.formHorizontalPadding)

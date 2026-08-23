@@ -98,6 +98,7 @@ struct AddAllowListRuleSheet: View {
                     footerButtonLabel(primaryButtonTitle)
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(trimmedURL.isEmpty || validationMessage != nil)
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)

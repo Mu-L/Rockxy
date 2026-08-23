@@ -13,17 +13,7 @@ struct DeveloperSetupAutomaticWindowView: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                Divider()
-                terminalSection
-                footer
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
+        setupLayout
         .frame(minWidth: 620, minHeight: 440)
         .background(Color(nsColor: .windowBackgroundColor))
         .font(setupMetrics.font())
@@ -51,6 +41,39 @@ struct DeveloperSetupAutomaticWindowView: View {
         viewModel.selectedTerminalApp == .custom
             ? String(localized: "Copy Setup Command")
             : String(localized: "Open Prepared Terminal…")
+    }
+
+    @ViewBuilder private var setupLayout: some View {
+        if #available(macOS 26.0, *) {
+            ScrollView {
+                terminalSection
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .safeAreaBar(edge: .top, spacing: 0) {
+                header
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            }
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                footer
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    Divider()
+                    terminalSection
+                    footer
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
     }
 
     private var header: some View {
@@ -137,8 +160,8 @@ struct DeveloperSetupAutomaticWindowView: View {
         Button(openTerminalTitle) {
             Task { await viewModel.openPreparedTerminal() }
         }
-        .buttonStyle(.borderedProminent)
         .keyboardShortcut(.defaultAction)
+        .rockxyGlassButtonStyle(prominent: true)
     }
 
     private var footer: some View {

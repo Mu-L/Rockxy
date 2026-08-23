@@ -79,7 +79,7 @@ struct HTTPSInspectionPromptView: View {
                 onAction(action)
             }
         }
-        .buttonStyle(.borderedProminent)
+        .rockxyGlassButtonStyle(prominent: true)
         .controlSize(.small)
         .accessibilityHint(String(localized: "Installs and trusts the Rockxy root certificate"))
     }

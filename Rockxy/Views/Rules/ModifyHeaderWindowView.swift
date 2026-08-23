@@ -404,6 +404,7 @@ struct ModifyHeaderWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     @ViewBuilder private var content: some View {
@@ -542,11 +543,9 @@ struct ModifyHeaderWindowView: View {
                     : String(localized: "MODIFY HEADERS OFF")
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
-            .foregroundStyle(viewModel.isToolEnabled ? Color.white : Color.secondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(viewModel.isToolEnabled ? Color.green : Color.secondary.opacity(0.14))
-            .clipShape(Capsule())
+            .rockxyChipStyle(tint: .green, isActive: viewModel.isToolEnabled)
             .accessibilityLabel(
                 viewModel.isToolEnabled
                     ? String(localized: "\(viewModel.activeRuleCount) active Modify Header rules")
@@ -555,6 +554,7 @@ struct ModifyHeaderWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     @ViewBuilder private var contextMenuItems: some View {
@@ -806,6 +806,7 @@ private struct ModifyHeaderEditSheet: View {
                     )
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!isValid || isSaving)
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)

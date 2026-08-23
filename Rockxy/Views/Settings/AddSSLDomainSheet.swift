@@ -111,6 +111,7 @@ struct AddSSLDomainSheet: View {
                     )
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!isValid)
             }
             .padding(.horizontal, 24)

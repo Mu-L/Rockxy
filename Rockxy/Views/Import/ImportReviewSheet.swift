@@ -315,8 +315,8 @@ struct ImportReviewSheet: View {
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .accessibilityIdentifier("importReview.actionButton")
         }
     }

@@ -136,32 +136,7 @@ struct SidebarView: View {
     let coordinator: MainContentCoordinator
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker(String(localized: "Navigator"), selection: navigatorModeBinding) {
-                ForEach(FocusNavigatorMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .workspaceModeSwitcherStyle()
-
-            Divider()
-
-            Group {
-                switch coordinator.focusNavigatorMode {
-                case .browse:
-                    browseList
-                case .focus:
-                    focusList
-                case .library:
-                    libraryList
-                }
-            }
-
-            SidebarBottomBar(
-                filterText: $sidebarFilterText,
-                isAddFavoritePresented: $isAddFavoritePresented
-            )
-        }
+        navigatorChrome
         .sheet(isPresented: $isAddFavoritePresented) {
             AddFavoriteView(
                 coordinator: coordinator,
@@ -204,6 +179,56 @@ struct SidebarView: View {
     @State private var expandedAppNames: Set<String> = []
     @State private var expandedDomainNodeIDs: Set<String> = []
     @Environment(\.appUIDisplayMetrics) private var metrics
+
+    @ViewBuilder
+    private var navigatorChrome: some View {
+        if #available(macOS 26.0, *) {
+            navigatorList
+                .scrollEdgeEffectStyle(.soft, for: .vertical)
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    navigatorPicker
+                }
+                .safeAreaBar(edge: .bottom, spacing: 0) {
+                    sidebarBottomBar
+                }
+        } else {
+            VStack(spacing: 0) {
+                navigatorPicker
+                Divider()
+                navigatorList
+                Divider()
+                sidebarBottomBar
+            }
+        }
+    }
+
+    private var navigatorPicker: some View {
+        Picker(String(localized: "Navigator"), selection: navigatorModeBinding) {
+            ForEach(FocusNavigatorMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .workspaceModeSwitcherStyle()
+    }
+
+    @ViewBuilder
+    private var navigatorList: some View {
+        switch coordinator.focusNavigatorMode {
+        case .browse:
+            browseList
+        case .focus:
+            focusList
+        case .library:
+            libraryList
+        }
+    }
+
+    private var sidebarBottomBar: some View {
+        SidebarBottomBar(
+            filterText: $sidebarFilterText,
+            isAddFavoritePresented: $isAddFavoritePresented
+        )
+    }
 
     private var sidebarBinding: Binding<SidebarItem?> {
         Binding(

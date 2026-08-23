@@ -110,9 +110,45 @@ enum Theme {
 
     enum FilterPill {
         static let activeBackground = Color.accentColor.opacity(0.15)
-        static let activeForeground = Color.accentColor
+        static let activeForeground = Color.primary
         static let inactiveBackground = Color.clear
         static let inactiveForeground = Color.secondary
+    }
+
+    // MARK: - Liquid Glass
+
+    /// Shared geometry and fallback treatments for the top-level functional layer.
+    /// Keep these values centralized so custom glass surfaces remain visually related
+    /// and their macOS 14/accessibility fallbacks don't drift apart.
+    enum Glass {
+        static let shelfCornerRadius: CGFloat = 16
+        static let shelfInset: CGFloat = 6
+        static let shelfOuterPadding: CGFloat = 10
+        static let shelfSectionSpacing: CGFloat = 2
+        static let fallbackTintOpacity = 0.15
+        static let fallbackStrokeOpacity = 0.28
+        static let neutralStrokeOpacity = 0.10
+        static let activeStrokeOpacity = 0.55
+        static let activeFillOpacity = 0.13
+        static let neutralFillOpacity = 0.06
+        static let hoverFillOpacity = 0.10
+        static let semanticFillOpacity = 0.14
+        static let semanticHoverFillOpacity = 0.20
+        static let semanticStrokeOpacity = 0.34
+        static let semanticHoverStrokeOpacity = 0.52
+        static let ambientAccentOpacity = 0.20
+        static let ambientSecondaryOpacity = 0.08
+        static let separatorOpacity = 0.55
+        static let shelfStrokeOpacity = 0.20
+        static let shelfShadowOpacity = 0.24
+        static let shelfShadowRadius: CGFloat = 12
+        static let shelfShadowY: CGFloat = 4
+        static let toastCornerRadius: CGFloat = 14
+        static let toastHorizontalPadding: CGFloat = 16
+        static let toastVerticalPadding: CGFloat = 10
+        static let toastShadowOpacity = 0.14
+        static let toastShadowRadius: CGFloat = 10
+        static let toastShadowY: CGFloat = 3
     }
 
     // MARK: - Status Bar
