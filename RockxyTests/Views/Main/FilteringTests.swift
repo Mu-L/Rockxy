@@ -843,7 +843,7 @@ struct FilteringTests {
         }
 
         let fresh = TestFixtures.makeTransaction(url: "https://fresh.example.net/new")
-        coordinator.processBatch([fresh], generation: coordinator.sessionGeneration)
+        coordinator.processActiveProjectTestBatch([fresh])
 
         #expect(firstWorkspace.filteredTransactions.map(\.id) == [fresh.id])
         #expect(secondWorkspace.filteredTransactions.map(\.id) == [fresh.id])

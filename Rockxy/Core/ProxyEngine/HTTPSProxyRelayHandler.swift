@@ -29,6 +29,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         connectionLimiter: ConnectionLimiter,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
@@ -40,6 +41,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         self.connectionLimiter = connectionLimiter
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.captureContextProvider = captureContextProvider
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
@@ -70,6 +72,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             requestHead = head
             requestBody = context.channel.allocator.buffer(capacity: 0)
             requestStartTime = .now()
+            requestCaptureContext = captureContextProvider()
             requestBodyLimitState.reset()
 
         case let .body(buffer):
@@ -85,6 +88,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 )
                 requestHead = nil
                 requestBody = nil
+                requestCaptureContext = nil
                 return
             }
             requestBody?.writeImmutableBuffer(buffer)
@@ -96,6 +100,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             forwardHTTPSRequest(context: context, head: head)
             requestHead = nil
             requestBody = nil
+            requestCaptureContext = nil
         }
     }
 
@@ -117,6 +122,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     private let connectionLimiter: ConnectionLimiter
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let clientSourcePort: UInt16?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
@@ -129,6 +135,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
     private var requestStartTime: DispatchTime?
+    private var requestCaptureContext: TrafficCaptureContext?
     private var requestBodyLimitState = RequestBodyLimitState()
 
     nonisolated private func makeTransactionCallback(
@@ -275,10 +282,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     nonisolated private func buildRequestData(from head: HTTPRequestHead) -> HTTPRequestData {
         let headers = head.headers.map { HTTPHeader(name: $0.name, value: $0.value) }
         let body: Data? = if let buffer = requestBody, buffer.readableBytes > 0,
-                            let bytes = buffer.getBytes(
-                                at: buffer.readerIndex,
-                                length: buffer.readableBytes
-                            )
+                             let bytes = buffer.getBytes(
+                                 at: buffer.readerIndex,
+                                 length: buffer.readableBytes
+                             )
         {
             Data(bytes)
         } else {
@@ -294,7 +301,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             httpVersion: "\(head.version.major).\(head.version.minor)",
             headers: headers,
             body: body,
-            contentType: ContentTypeDetector.detect(headers: headers, body: body)
+            contentType: ContentTypeDetector.detect(headers: headers, body: body),
+            captureContext: requestCaptureContext
         )
     }
 

@@ -1,0 +1,67 @@
+---
+title: "Projects"
+description: "Organize Project-scoped live traffic and durable Traffic Tab layouts in a bounded, local-first workspace."
+---
+
+# Projects
+
+Projects are the top-level organization unit in Rockxy. A Project owns its in-memory traffic history and the durable names, filters, and layout of its Traffic Tabs.
+
+Use the Project selector beside the sidebar control in the main toolbar to switch Projects. There is still one app-wide proxy listener. A request is assigned to the active Project when its request head begins, so an in-flight request or WebSocket does not jump Projects during a switch.
+
+## Project → Traffic Tabs
+
+Each Project stores a bounded set of Traffic Tab configurations:
+
+- tab name and active tab
+- search, protocol, status, domain, and advanced filters
+- Traffic or Logs surface
+- inspector placement and Context Dock selection
+- Focus Navigator references and muted-source view settings
+
+Captured headers, bodies, cookies, logs, selections, rendered rows, sort descriptors, and assistant payloads are deliberately excluded from the durable Project catalog. Traffic history remains separated in memory while Rockxy is running.
+
+## Capture behavior
+
+Switching Projects never starts or stops the proxy:
+
+- new requests start in the newly active Project
+- in-flight requests and WebSockets finish in their request-start Project
+- switching back restores the earlier Project's retained in-memory history
+- **Clear** clears only the active Project and invalidates its older in-flight generation
+- every Traffic Tab inside a Project sees that same Project history through its own filters
+
+Proxy, certificate and recording state, rules, favorites, scripts, plugins, Focus Set definitions, and MCP state remain app-wide in this release. Project-specific rule/network profiles are not implied by switching Projects.
+
+## Manage Projects
+
+Choose **Project → Manage Projects…** to create, open, rename, or delete Projects and inspect their Traffic Tabs. Deleting a Project removes that Project's local tab configuration and in-memory history; it does not delete manually saved session files, rules, or favorites.
+
+The management window also provides **Import…** and **Export…** actions. Export uses the Project selected in the sidebar, even when it is not currently open; a successful import creates and opens a new Project.
+
+Project names are normalized, limited to 80 characters, and unique without regard to case, accents, or full-width forms.
+
+## Local save and transfer
+
+Project and Traffic Tab configuration auto-saves locally. **Project → Export Project Configuration…** creates a config-only `.rockxyproject` file, and import always creates a new Project with fresh identifiers. It includes allowlisted tab names, user-authored filter text, host/path patterns, and layout preferences—never captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text can itself be sensitive, so review the file before sharing it.
+
+Traffic is intentionally not embedded in the Project catalog or `.rockxyproject` file. Use **Save Session** for the active Project when you need a durable traffic artifact across app relaunches. Session import is assigned to the Project that is active at import time.
+
+## Capacity and storage safety
+
+The Community app supports up to **3 local Projects**. Each Project supports up to 8 Traffic Tabs under the current public policy. Independent structural safety ceilings remain higher so corrupt or future documents are bounded before allocation.
+
+The catalog is stored at a constant local Application Support path. Rockxy bounds it to 2 MiB, writes atomically, uses restrictive filesystem permissions, rejects symbolic links and malformed/newer schemas, and refuses to overwrite a catalog it cannot validate.
+
+If loading fails, Project edits remain disabled until you retry or explicitly reset. Reset preserves a bounded regular catalog as `catalog.recovery.json` before creating a fresh default. Portable Project imports are capped at 1 MiB, reject symbolic links and malformed/newer formats, and never replace an existing Project.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Traffic Tabs" icon="table-columns" href="/features/workspaces">
+    Build independent filtered views inside each Project.
+  </Card>
+  <Card title="Sessions and Export" icon="floppy-disk" href="/features/sessions">
+    Save or share the captured traffic that Projects view.
+  </Card>
+</CardGroup>

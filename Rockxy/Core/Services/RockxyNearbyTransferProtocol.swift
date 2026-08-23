@@ -57,6 +57,7 @@ enum RockxyNearbyTransferError: LocalizedError {
     case transferTooLarge
     case emptyTransfer
     case invalidTransaction
+    case projectCatalogUnavailable
 
     // MARK: Internal
 
@@ -80,6 +81,8 @@ enum RockxyNearbyTransferError: LocalizedError {
             "The transferred session contains no requests."
         case .invalidTransaction:
             "The transferred session contains an invalid request."
+        case .projectCatalogUnavailable:
+            "Projects could not be loaded, so Rockxy did not import the transferred session."
         }
     }
 }

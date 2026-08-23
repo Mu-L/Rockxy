@@ -64,6 +64,33 @@ struct WorkspaceStoreCapacityTests {
         #expect(store.maxWorkspaces == 1)
         #expect(store.workspaces.count == 1)
     }
+
+    @Test("construction clamps above the structural tab upper bound")
+    @MainActor
+    func constructionClampsAboveStructuralBound() {
+        let store = WorkspaceStore(maxWorkspaces: 10_000)
+        #expect(store.maxWorkspaces == ProjectStructuralLimits.tabCountRange.upperBound)
+    }
+
+    @Test("runtime refresh clamps above the structural tab upper bound")
+    @MainActor
+    func refreshClampsAboveStructuralBound() {
+        let store = WorkspaceStore(maxWorkspaces: 4)
+        store.refreshCapacity(maxWorkspaces: 10_000)
+        #expect(store.maxWorkspaces == ProjectStructuralLimits.tabCountRange.upperBound)
+    }
+
+    @Test("an expanded policy cannot authorize more live tabs than the structural bound")
+    @MainActor
+    func expandedPolicyCappedAtStructuralBound() {
+        let store = WorkspaceStore(maxWorkspaces: Int.max)
+        let upperBound = ProjectStructuralLimits.tabCountRange.upperBound
+        for index in 1 ..< (upperBound + 5) {
+            _ = store.createWorkspace(title: "Tab \(index)")
+        }
+        #expect(store.workspaces.count == upperBound)
+        #expect(!store.canCreateWorkspace)
+    }
 }
 
 // MARK: - SmallPolicy

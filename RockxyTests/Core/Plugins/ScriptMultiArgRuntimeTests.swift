@@ -65,6 +65,43 @@ struct ScriptMultiArgRuntimeTests {
         #expect(modified.url.host == "example.com")
     }
 
+    @Test("Multi-arg onRequest preserves request-start ownership")
+    func multiArgRequestPreservesCaptureContext() async throws {
+        let runtime = ScriptRuntime()
+        let script = """
+        function onRequest(context, url, request) {
+          request.path = "/mutated";
+          return request;
+        }
+        """
+        let plugin = try makeTempPlugin(id: "test.multiarg.capture-context", script: script)
+        try await runtime.loadPlugin(plugin)
+        let route = TrafficCaptureContext(projectID: UUID(), sessionID: UUID(), generation: 5)
+        let req = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "https://example.com/original")),
+            httpVersion: "HTTP/1.1",
+            headers: [],
+            body: nil,
+            contentType: nil,
+            captureContext: route
+        )
+
+        let outcome = try await runtime.callOnRequest(
+            pluginID: plugin.id,
+            context: ScriptRequestContext(from: req),
+            behavior: ScriptBehavior.defaults(),
+            originalRequest: req
+        )
+        guard case let .forward(modified) = outcome else {
+            Issue.record("expected .forward")
+            return
+        }
+
+        #expect(modified.url.path == "/mutated")
+        #expect(modified.captureContext == route)
+    }
+
     @Test("Multi-arg onRequest preserves duplicate query parameter values")
     func multiArgRequestPreservesDuplicateQueries() async throws {
         let runtime = ScriptRuntime()

@@ -207,7 +207,8 @@ struct ScriptRequestContext {
             httpVersion: request.httpVersion,
             headers: newHeaders,
             body: newBody,
-            contentType: request.contentType
+            contentType: request.contentType,
+            captureContext: request.captureContext
         )
     }
 

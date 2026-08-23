@@ -275,13 +275,13 @@ Save sessions, import/export HAR for cross-tool handoff, copy any request as cUR
 
 `.rockxysession` · `HAR Import / Export` · `Copy as cURL` · `Copy as JSON` · `Raw HTTP` · `Secret Redaction` · `Token Sanitize` · `Privacy-Safe Share`
 
-### Multi-Tab Workspaces
+### Projects & Traffic Tabs
 
 <img src="docs/images/features/DemoMultipleTabWorkingSpace.png" alt="Rockxy multi-tab workspaces showing independently filtered views of the same live capture" width="820" />
 
-Keep independent investigation views side-by-side on the same live capture — one tab for staging traffic, one for production, and one for an iOS device flow. Each tab has its own filters, sorting, selection, sidebar scope, and inspector state while sharing the proxy and captured transactions.
+Group work into local Projects — one Project for checkout, another for authentication, each with tabs for errors, devices, or environments. New requests are assigned to the active Project when they begin; switching back restores that Project's in-memory traffic and durable tab setup.
 
-`Shared Live Capture` · `Per-Tab Filters & Sort` · `Per-Tab Inspector` · `Compare Environments` · `Mac & iOS Together` · `Detach & Rename`
+`3 Local Projects` · `Project-Scoped Traffic` · `Durable Tab Filters` · `Per-Tab Inspector` · `Config Import / Export` · `No Captured Bodies in Catalog`
 
 ### JavaScript Scripting
 

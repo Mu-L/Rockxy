@@ -41,6 +41,7 @@
           "features/graphql",
           "core-features/logs-and-timeline",
           "features/request-replay",
+          "features/projects",
           "features/workspaces",
           "features/sessions"
         ]

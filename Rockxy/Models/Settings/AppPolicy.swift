@@ -9,9 +9,12 @@ import Foundation
 /// engines stay reusable and edition-neutral.
 protocol AppPolicy: Sendable {
     var maxWorkspaceTabs: Int { get }
+    var maxProjects: Int { get }
     var maxDomainFavorites: Int { get }
     var maxActiveRulesPerTool: Int { get }
     var maxEnabledScripts: Int { get }
+    /// Maximum in-memory traffic history retained independently by each Project.
+    /// The overall bound is this value multiplied by the bounded Project capacity.
     var maxLiveHistoryEntries: Int { get }
     var upstreamProxyAllowsSOCKS5: Bool { get }
     var upstreamProxyAllowsAuthentication: Bool { get }
@@ -21,6 +24,13 @@ protocol AppPolicy: Sendable {
 }
 
 extension AppPolicy {
+    /// Public default project capacity. Clamped to the repository's structural
+    /// range (``ProjectStructuralLimits/projectCountRange``) by ``ProjectStore``.
+    /// Capacity is product policy; structural safety limits are not.
+    var maxProjects: Int {
+        ProjectStructuralLimits.defaultProjectCapacity
+    }
+
     var upstreamProxyAllowsSOCKS5: Bool {
         false
     }
@@ -48,6 +58,7 @@ extension AppPolicy {
 /// and represent the baseline experience.
 struct DefaultAppPolicy: AppPolicy {
     let maxWorkspaceTabs = 8
+    let maxProjects = 3
     let maxDomainFavorites = 5
     let maxActiveRulesPerTool = 10
     let maxEnabledScripts = 10

@@ -36,6 +36,7 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         self.graphQLInfo = graphQLInfo
         self.web3RPCInfo = web3RPCInfo
         self.x402Info = x402Info
+        captureContext = request.captureContext
     }
 
     // MARK: Internal
@@ -64,6 +65,10 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     var matchedRuleActionSummary: String?
     var matchedRulePattern: String?
 
+    /// Runtime-only ownership. Portable session files intentionally omit this so
+    /// an imported capture is assigned to the destination Project chosen by the user.
+    private(set) var captureContext: TrafficCaptureContext?
+
     /// Request-list ordering metadata. Tracks the order this transaction was received by
     /// the coordinator, independent of `timestamp`. Used only for the request-list "row #"
     /// column sort. Must not be used by export, persistence, inspector, or replay.
@@ -84,6 +89,15 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         matchedRuleName = rule.name
         matchedRuleActionSummary = rule.action.matchedRuleActionSummary
         matchedRulePattern = rule.matchCondition.urlPattern
+    }
+
+    /// Assigns ownership to locally-created/imported transactions while preserving
+    /// a proxy-captured request's immutable request-start route.
+    func assignCaptureContextIfMissing(_ context: TrafficCaptureContext) {
+        guard captureContext == nil else {
+            return
+        }
+        captureContext = context
     }
 }
 

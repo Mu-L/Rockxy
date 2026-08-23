@@ -13,13 +13,15 @@ extension MainContentCoordinator {
 
     func startLogCapture() {
         Self.logger.info("Starting log capture")
+        let contextStore = captureContextStore
         Task {
             await logEngine.setOnLogEntry { [weak self] entry in
                 guard let self else {
                     return
                 }
+                let captureContext = contextStore.snapshot()
                 Task { @MainActor in
-                    self.addLogEntry(entry)
+                    self.addLogEntry(entry, captureContext: captureContext)
                 }
             }
 
@@ -38,26 +40,57 @@ extension MainContentCoordinator {
     // MARK: - Log Entry Processing
 
     func addLogEntry(_ entry: LogEntry) {
+        addLogEntry(entry, captureContext: activeCaptureContext)
+    }
+
+    /// Routes and correlates a log using the Project ownership captured when the
+    /// log engine delivered it, not whichever Project is active after the main-
+    /// actor hop. Stale, deleted, or cleared Project generations fail closed.
+    func addLogEntry(_ entry: LogEntry, captureContext: TrafficCaptureContext?) {
         guard isRecording else {
+            return
+        }
+        guard let captureContext,
+              captureContext.sessionID == captureContext.projectID,
+              projectStore.projects.contains(where: { $0.id == captureContext.projectID }),
+              captureContext.generation
+                == captureGenerationByProjectID[captureContext.projectID, default: 0] else
+        {
+            Self.logger.debug("Dropped log entry with stale or unknown Project ownership")
             return
         }
 
         var mutableEntry = entry
         let settings = AppSettingsStorage.load()
+        let projectID = captureContext.projectID
+        let projectTransactions = if projectID == projectStore.activeProjectID {
+            transactions
+        } else {
+            transactionsByProjectID[projectID] ?? []
+        }
+        var projectLogs = if projectID == projectStore.activeProjectID {
+            logEntries
+        } else {
+            logEntriesByProjectID[projectID] ?? []
+        }
 
         if let correlatedId = LogCorrelator.correlate(
             logEntry: entry,
-            with: transactions
+            with: projectTransactions
         ) {
             mutableEntry.correlatedTransactionId = correlatedId
         }
 
-        logEntries.append(mutableEntry)
+        projectLogs.append(mutableEntry)
 
-        if logEntries.count > settings.maxLogBufferSize {
-            let excess = logEntries.count - settings.maxLogBufferSize
-            logEntries.removeFirst(excess)
+        if projectLogs.count > settings.maxLogBufferSize {
+            let excess = projectLogs.count - settings.maxLogBufferSize
+            projectLogs.removeFirst(excess)
             Self.logger.debug("Evicted \(excess) oldest log entries")
+        }
+        logEntriesByProjectID[projectID] = projectLogs
+        if projectID == projectStore.activeProjectID {
+            logEntries = projectLogs
         }
     }
 }

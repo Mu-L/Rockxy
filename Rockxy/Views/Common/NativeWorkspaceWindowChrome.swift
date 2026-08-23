@@ -74,6 +74,9 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     static let proxyStatusIdentifier = NSToolbarItem.Identifier(
         "\(RockxyIdentity.current.logSubsystem).toolbar.proxyStatus"
     )
+    static let projectSelectorIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.projectSelector"
+    )
     static let actionGroupIdentifier = NSToolbarItem.Identifier(
         "\(RockxyIdentity.current.logSubsystem).toolbar.actions"
     )
@@ -111,6 +114,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             .flexibleSpace,
             Self.sidebarToggleIdentifier,
             Self.sidebarTrackingSeparatorIdentifier,
+            Self.projectSelectorIdentifier,
             .flexibleSpace,
             Self.proxyStatusIdentifier,
             .flexibleSpace,
@@ -138,6 +142,15 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                 splitView: splitViewController.splitView,
                 dividerIndex: 0
             )
+        case Self.projectSelectorIdentifier:
+            let item = hostingItem(
+                identifier: itemIdentifier,
+                rootView: AnyView(ProjectToolbarSelectorView(coordinator: coordinator))
+            )
+            item.label = String(localized: "Project")
+            item.paletteLabel = item.label
+            item.visibilityPriority = .high
+            return item
         case Self.proxyStatusIdentifier:
             return hostingItem(
                 identifier: itemIdentifier,

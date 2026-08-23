@@ -6,7 +6,7 @@ import Testing
 @Suite("Babylon capture coordinator")
 struct BabylonCaptureCoordinatorTests {
     @Test("Connection identity creates source-filtered workspace once")
-    func createsSourceWorkspaceOnce() {
+    func createsSourceWorkspaceOnce() async {
         let coordinator = MainContentCoordinator()
         let sessionID = UUID().uuidString
         let identity = BabylonCaptureIdentity(
@@ -18,8 +18,8 @@ struct BabylonCaptureCoordinatorTests {
             deviceModel: "iPhone"
         )
 
-        coordinator.registerBabylonCapture(identity: identity)
-        coordinator.registerBabylonCapture(identity: identity)
+        await coordinator.registerBabylonCapture(identity: identity)
+        await coordinator.registerBabylonCapture(identity: identity)
 
         #expect(coordinator.workspaceStore.workspaces.count == 2)
         #expect(coordinator.activeWorkspace.title == "Checkout • Test iPhone")
