@@ -280,23 +280,34 @@ actor ProjectCatalogRepository: ProjectCatalogPersisting {
         guard let type = fileType(at: fileURL) else {
             return
         }
-        if let recoveryType = fileType(at: recoveryBackupURL) {
+        // Validate the live node before touching the prior recovery copy. A
+        // malformed live directory must not destroy the last usable backup.
+        guard type == .typeRegular || type == .typeSymbolicLink else {
+            throw ProjectCatalogRepositoryError.notRegularFile
+        }
+        let recoveryType = fileType(at: recoveryBackupURL)
+        if let recoveryType {
             guard recoveryType == .typeRegular || recoveryType == .typeSymbolicLink else {
                 throw ProjectCatalogRepositoryError.notRegularFile
             }
-            try fileManager.removeItem(at: recoveryBackupURL)
         }
         if type == .typeSymbolicLink {
-            // Explicit reset may remove the link itself, but never follows it.
+            // Explicit reset may remove the live link itself, but never follows it.
+            // Keep a prior regular recovery file because this path cannot create
+            // a replacement from the unsafe live node. A recovery symlink is not
+            // usable evidence and can be removed without following its target.
+            if recoveryType == .typeSymbolicLink {
+                try fileManager.removeItem(at: recoveryBackupURL)
+            }
             try fileManager.removeItem(at: fileURL)
             return
-        }
-        guard type == .typeRegular else {
-            throw ProjectCatalogRepositoryError.notRegularFile
         }
         let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
         if let size = attributes[.size] as? Int, size > Self.maxCatalogByteSize {
             throw ProjectCatalogRepositoryError.fileTooLarge(bytes: size)
+        }
+        if recoveryType != nil {
+            try fileManager.removeItem(at: recoveryBackupURL)
         }
         try fileManager.moveItem(at: fileURL, to: recoveryBackupURL)
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recoveryBackupURL.path)

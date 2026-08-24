@@ -7,8 +7,8 @@ description: "Project-owned tabs that present one Project capture through indepe
 
 A Traffic Tab is an independent view onto its Project's traffic history. Each tab keeps its own filters and inspector layout, but every tab in that Project reads the **same underlying Project capture**. Switching tabs never changes where traffic is recorded.
 
-<Frame caption="Multiple workspace tabs in the main window">
-  <img src="/images/features/DemoMultipleTabWorkingSpace.png" alt="Workspace tabs" />
+<Frame caption="Multiple Traffic Tabs in the main window">
+  <img src="/images/features/DemoMultipleTabWorkingSpace.png" alt="Traffic Tabs" />
 </Frame>
 
 ## Why Traffic Tabs
@@ -30,8 +30,8 @@ Per-tab runtime state:
 - Sidebar selection (domain, app, or favorite)
 - Inspector tab and layout (right / bottom / hidden)
 - Selected request and selected log entry
-- Per-workspace sort descriptors
-- Per-workspace domain tree, app nodes, and grouping index
+- Per-Traffic-Tab sort descriptors
+- Per-Traffic-Tab domain tree, app nodes, and grouping index
 
 Shared by the Traffic Tabs inside one Project:
 
@@ -74,11 +74,11 @@ Keep your default **All Traffic** tab unchanged. In a second tab, set a filter r
 
 ### Replay and compare
 
-When focusing on a specific app or domain, use the sidebar context menu **Open in New Tab** to spawn a fresh workspace filtered to that source. The replayed flow then lands next to its source request rather than buried in the global list.
+When focusing on a specific app or domain, use the sidebar context menu **Open in New Tab** to create a fresh Traffic Tab filtered to that source. The replayed flow then lands next to its source request rather than buried in the global list.
 
 ## Per-tab sort
 
-Sorting is a workspace preference, not a window preference. Sort the **Errors** tab by `Duration ↓` to surface the worst offenders, leave the default tab sorted by `Time ↑`, and the two views stay independent. Sorts persist across `Clear Session` so you do not have to re-pick every time.
+Sorting is a Traffic Tab preference, not a window preference. Sort the **Errors** tab by `Duration ↓` to surface the worst offenders, leave the default tab sorted by `Time ↑`, and the two views stay independent. Sorts persist across `Clear Session` so you do not have to re-pick every time.
 
 ## Eviction and per-tab views
 
@@ -95,7 +95,7 @@ When a Project's in-memory history reaches its configured cap, its oldest entrie
 
 <CardGroup cols={2}>
   <Card title="Keyboard Shortcuts" icon="keyboard" href="/customization/keyboard-shortcuts">
-    All workspace and inspector shortcuts in one table.
+    All Traffic Tab and inspector shortcuts in one table.
   </Card>
   <Card title="Sessions and Export" icon="floppy-disk" href="/features/sessions">
     Save, load, and export the active Project's captured traffic.

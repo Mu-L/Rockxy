@@ -39,5 +39,8 @@ enum ProjectStructuralLimits {
     static let defaultProjectName = "My Project"
 
     /// Title of the guaranteed non-closable default tab.
-    static let defaultTabTitle = "All Traffic"
+    static let defaultTabTitle: String = {
+        let localized = String(localized: "All Traffic")
+        return (try? ProjectNormalization.normalizedDisplayName(localized)) ?? "All Traffic"
+    }()
 }

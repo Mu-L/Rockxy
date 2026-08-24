@@ -179,6 +179,7 @@ struct ScriptEditorWindowView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var testMatchRow: some View {
@@ -342,7 +343,7 @@ struct ScriptEditorWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .rockxyFunctionalBar()
     }
 
     private var secondaryActionControls: some View {
@@ -353,7 +354,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Beautify"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .fixedSize()
 
             Button {
@@ -361,7 +362,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Insert Header Example"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .fixedSize()
         }
     }
@@ -383,7 +384,7 @@ struct ScriptEditorWindowView: View {
                 .frame(minHeight: footerLabelHeight)
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -416,7 +417,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Validate"))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .keyboardShortcut("r", modifiers: .command)
             .fixedSize()
 
@@ -425,7 +426,7 @@ struct ScriptEditorWindowView: View {
             } label: {
                 footerActionLabel(String(localized: "Save & Activate"), weight: .semibold)
             }
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle(prominent: true)
             .keyboardShortcut("s", modifiers: .command)
             .disabled(viewModel.isSaving)
             .fixedSize()
@@ -486,7 +487,7 @@ struct ScriptEditorWindowView: View {
                 .font(toolMetrics.font(weight: .medium))
                 .frame(minHeight: toolMetrics.formControlHeight)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
 
         let preview = Group {

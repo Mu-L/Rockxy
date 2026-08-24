@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 // Application entry point. Declares the main window scene with `ContentView`,
-// the macOS `Settings` scene, and the full set of custom menu bar commands.
+// the native Settings utility window, and the full set of custom menu bar commands.
 
 // MARK: - AppLifecycleState
 
@@ -97,6 +97,8 @@ struct RockxyApp: App {
 
         developerSetupWindow
 
+        settingsWindow
+
         macCertificateSetupGuideWindow
 
         customCertificatesWindow
@@ -131,6 +133,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Map Local Editor"), id: "mapLocalEditor") {
             ToolWindowDisplayMetricsProvider {
@@ -141,6 +144,7 @@ struct RockxyApp: App {
         .defaultSize(width: 960, height: 640)
         .defaultPosition(.center)
         .windowResizability(.contentSize)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Map Remote"), id: "mapRemote") {
             ToolWindowDisplayMetricsProvider {
@@ -161,6 +165,7 @@ struct RockxyApp: App {
         .defaultSize(width: 834, height: 584)
         .defaultPosition(.center)
         .windowResizability(.contentSize)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Block List"), id: "blockList") {
             ToolWindowDisplayMetricsProvider {
@@ -180,6 +185,7 @@ struct RockxyApp: App {
         .commandsRemoved()
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+        .windowToolbarStyle(.unifiedCompact)
 
         Window(String(localized: "Network Conditions"), id: "networkConditions") {
             ToolWindowDisplayMetricsProvider {
@@ -362,14 +368,6 @@ struct RockxyApp: App {
         composeWindow
 
         detachedInspectorWindow
-
-        Settings {
-            AppUIDisplayMetricsProvider {
-                SettingsView()
-            }
-        }
-        .windowResizability(.contentMinSize)
-        .windowToolbarStyle(.unifiedCompact)
     }
 
     // MARK: Private
@@ -382,6 +380,10 @@ struct RockxyApp: App {
 
     private var developerSetupWindow: some Scene {
         DeveloperSetupWindowScene(coordinator: mainCoordinator)
+    }
+
+    private var settingsWindow: some Scene {
+        SettingsWindowScene()
     }
 
     private var macCertificateSetupGuideWindow: some Scene {
@@ -741,7 +743,7 @@ struct RockxyMenuCommands: Commands {
             }
         }
 
-        CommandGroup(before: .appSettings) {
+        CommandGroup(replacing: .appSettings) {
             Button(String(localized: "Check for Updates…")) {
                 updater.checkForUpdates()
             }
@@ -754,6 +756,11 @@ struct RockxyMenuCommands: Commands {
             }
 
             Divider()
+
+            Button(String(localized: "Settings…")) {
+                openWindow(id: "settings")
+            }
+            .keyboardShortcut(",", modifiers: .command)
         }
     }
 

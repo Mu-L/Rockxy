@@ -227,20 +227,20 @@ struct AssistantRuntimeSetupSheet: View {
                 Button(String(localized: "Done")) {
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             case .failed where viewModel.ollamaApplicationURL != nil:
                 Button(String(localized: "Open & Check Again")) {
                     viewModel.retryInstalledOllamaRuntime()
                 }
-                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             default:
                 Button(String(localized: "Install")) {
                     viewModel.installOllamaRuntime()
                 }
-                .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(viewModel.runtimeSetupState.isBusy)
             }
         }

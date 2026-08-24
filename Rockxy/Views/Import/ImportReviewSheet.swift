@@ -288,7 +288,7 @@ struct ImportReviewSheet: View {
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .keyboardShortcut(.cancelAction)
             .accessibilityIdentifier("importReview.cancelButton")
 
@@ -305,7 +305,7 @@ struct ImportReviewSheet: View {
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .accessibilityIdentifier("importReview.actionButton")
         } else {
             Button {
@@ -315,8 +315,8 @@ struct ImportReviewSheet: View {
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
-            .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .accessibilityIdentifier("importReview.actionButton")
         }
     }

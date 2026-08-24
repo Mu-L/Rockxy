@@ -96,6 +96,7 @@ struct DeveloperSetupWindowView: View {
 
     @Environment(\.openWindow) private var openWindow
     @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @Environment(\.colorScheme) private var colorScheme
     @State private var viewModel: DeveloperSetupViewModel
     @State private var routeStore = DeveloperSetupRouteStore.shared
     @StateObject private var caShareController = CAShareController()
@@ -154,7 +155,7 @@ struct DeveloperSetupWindowView: View {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            Menu(String(localized: "Set Up…")) {
+            Menu {
                 Button(String(localized: "Open Setup Guide…")) {
                     openManualSetup()
                 }
@@ -163,14 +164,37 @@ struct DeveloperSetupWindowView: View {
                         openAutomaticSetup()
                     }
                 }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(String(localized: "Set Up…"))
+                    Image(systemName: "chevron.down")
+                        .font(setupMetrics.secondaryFont(weight: .semibold))
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 36)
             }
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.plain)
+            .fixedSize()
+            .rockxyGlassEffect(
+                tint: toolbarGlassTint,
+                interactive: true,
+                in: Capsule(style: .continuous)
+            )
             .help(String(localized: "Open a guided or configured setup for this target"))
 
             Button {
                 inspectorPresented.toggle()
             } label: {
                 Image(systemName: "sidebar.trailing")
+                    .frame(width: 42, height: 36)
             }
+            .buttonStyle(.plain)
+            .rockxyGlassEffect(
+                tint: toolbarGlassTint,
+                interactive: true,
+                in: Capsule(style: .continuous)
+            )
             .help(String(localized: "Toggle the readiness inspector"))
             .accessibilityLabel(String(localized: "Toggle readiness inspector"))
         }
@@ -291,27 +315,78 @@ struct DeveloperSetupWindowView: View {
     }
 
     private var segmentedTabPicker: some View {
-        tabPickerBase
-            .pickerStyle(.segmented)
-            .frame(minWidth: 380)
+        HStack(spacing: 0) {
+            ForEach(SetupDetailTab.allCases) { tab in
+                Button {
+                    viewModel.selectTab(tab)
+                } label: {
+                    Text(tab.title)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 8)
+                        .frame(height: 32)
+                        .background {
+                            if viewModel.selectedTab == tab {
+                                Capsule(style: .continuous)
+                                    .fill(toolbarSelectionFill)
+                            }
+                        }
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(viewModel.selectedTab == tab ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .frame(minWidth: 380)
+        .rockxyGlassEffect(
+            tint: toolbarGlassTint,
+            interactive: true,
+            in: Capsule(style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "Section"))
     }
 
     private var menuTabPicker: some View {
-        tabPickerBase
-            .pickerStyle(.menu)
-            .fixedSize()
+        Menu {
+            ForEach(SetupDetailTab.allCases) { tab in
+                Button {
+                    viewModel.selectTab(tab)
+                } label: {
+                    if viewModel.selectedTab == tab {
+                        Label(tab.title, systemImage: "checkmark")
+                    } else {
+                        Text(tab.title)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(viewModel.selectedTab.title)
+                Image(systemName: "chevron.down")
+                    .font(setupMetrics.secondaryFont(weight: .semibold))
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+        }
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .rockxyGlassEffect(
+            tint: toolbarGlassTint,
+            interactive: true,
+            in: Capsule(style: .continuous)
+        )
+        .accessibilityLabel(String(localized: "Section"))
     }
 
-    private var tabPickerBase: some View {
-        Picker(String(localized: "Section"), selection: Binding(
-            get: { viewModel.selectedTab },
-            set: { viewModel.selectTab($0) }
-        )) {
-            ForEach(SetupDetailTab.allCases) { tab in
-                Text(tab.title).tag(tab)
-            }
-        }
-        .labelsHidden()
+    private var toolbarGlassTint: Color? {
+        colorScheme == .light ? Color.white.opacity(0.28) : nil
+    }
+
+    private var toolbarSelectionFill: Color {
+        Color.primary.opacity(colorScheme == .light ? 0.10 : 0.14)
     }
 
     private var centerContent: some View {
@@ -454,7 +529,7 @@ struct DeveloperSetupWindowView: View {
                 Button(String(localized: "Share Certificate")) {
                     shareRootCAForSelectedTarget()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle()
 
                 Button(String(localized: "Open Certificate Guide")) {
                     openWindow(id: "certificateSetup")
@@ -571,7 +646,7 @@ struct DeveloperSetupWindowView: View {
         Button(String(localized: "Start Check")) {
             viewModel.startValidation()
         }
-        .buttonStyle(.borderedProminent)
+        .rockxyGlassButtonStyle(prominent: true)
         .disabled(!viewModel.toolbarVerifyEnabled || viewModel.activeIssue != nil)
         .keyboardShortcut("r", modifiers: .command)
 

@@ -603,9 +603,7 @@ struct ProjectStoreTests {
         let store = ProjectStore(repository: repo, now: { Self.fixedDate })
         await store.loadPersistedCatalog()
         _ = try store.createProject(name: "Staging")
-        for _ in 0 ..< 1_000 where store.persistenceStatus != .saved {
-            await Task.yield()
-        }
+        await store.waitForPendingPersistence()
         #expect(await repo.lastSaved?.revision == 2)
         #expect(store.persistenceStatus == .saved)
     }
@@ -616,9 +614,7 @@ struct ProjectStoreTests {
         let store = ProjectStore(repository: repo, now: { Self.fixedDate })
         await store.loadPersistedCatalog()
         _ = try store.createProject(name: "Staging")
-        for _ in 0 ..< 1_000 where store.persistenceStatus == .saving || store.persistenceStatus == .idle {
-            await Task.yield()
-        }
+        await store.waitForPendingPersistence()
         #expect(store.persistenceStatus == .failed(String(describing: FakeError.boom)))
     }
 
@@ -705,9 +701,7 @@ private actor FakeCatalogRepository: ProjectCatalogPersisting {
 
     func reset() async throws -> ProjectCatalog {
         resetCount += 1
-        let fresh = ProjectCatalog.makeDefault(now: Date(timeIntervalSince1970: 1_000_000))
-        savedCatalogs.append(fresh)
-        return fresh
+        return ProjectCatalog.makeDefault(now: Date(timeIntervalSince1970: 1_000_000))
     }
 
     // MARK: Private

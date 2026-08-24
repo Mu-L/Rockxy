@@ -3,6 +3,16 @@ import Foundation
 import Testing
 
 struct FocusNavigatorStateTests {
+    @Test("Navigator modes expose distinct native symbols and localized help titles")
+    func navigatorModePresentation() {
+        let modes = FocusNavigatorMode.allCases
+
+        #expect(Set(modes.map(\.title)).count == modes.count)
+        #expect(modes.allSatisfy { !$0.title.isEmpty })
+        #expect(Set(modes.map(\.systemImage)).count == modes.count)
+        #expect(modes.allSatisfy { !$0.systemImage.isEmpty })
+    }
+
     @Test("Errors include HTTP failures but exclude redirects and intentional blocks")
     func errorSignalMatching() {
         let clientError = TestFixtures.makeTransaction(statusCode: 404)

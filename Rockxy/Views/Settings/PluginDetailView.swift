@@ -92,9 +92,11 @@ struct PluginDetailView: View {
                         .font(settingsMetrics.secondaryFont(weight: .medium))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Theme.Plugin.badgeColor(for: type).opacity(0.15))
-                        .foregroundStyle(Theme.Plugin.badgeColor(for: type))
-                        .clipShape(Capsule())
+                        .rockxyChipStyle(
+                            tint: Theme.Plugin.badgeColor(for: type),
+                            isActive: true,
+                            isEnabled: true
+                        )
                 }
             }
 
@@ -105,9 +107,11 @@ struct PluginDetailView: View {
                             .font(settingsMetrics.secondaryFont())
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.gray.opacity(0.15))
-                            .foregroundStyle(.secondary)
-                            .clipShape(Capsule())
+                            .rockxyChipStyle(
+                                tint: .secondary,
+                                isActive: true,
+                                isEnabled: true
+                            )
                     }
                 }
             }
@@ -134,7 +138,7 @@ struct PluginDetailView: View {
                 } label: {
                     Label(String(localized: "Reinstall"), systemImage: "arrow.triangle.2.circlepath")
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle()
             }
 
             if !plugin.isBuiltIn {

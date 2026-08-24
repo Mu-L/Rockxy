@@ -247,7 +247,7 @@ struct SoftwareUpdatePanelView: View {
     private var appIcon: some View {
         Image(nsImage: AppIconProvider.appIcon)
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: appIconSize, height: appIconSize)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
@@ -272,6 +272,7 @@ struct SoftwareUpdatePanelView: View {
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 14)
+        .rockxyFunctionalBar()
     }
 
     @ViewBuilder private var footerLeadingContent: some View {
@@ -333,6 +334,7 @@ struct SoftwareUpdatePanelView: View {
                             performAvailablePrimaryAction(context)
                         }
                         .keyboardShortcut(.defaultAction)
+                        .rockxyGlassButtonStyle(prominent: true)
                         .controlSize(.large)
                     }
                 }
@@ -353,6 +355,7 @@ struct SoftwareUpdatePanelView: View {
                     performAvailablePrimaryAction(context)
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
             }
 
@@ -383,6 +386,7 @@ struct SoftwareUpdatePanelView: View {
                         controller.chooseInstall()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .rockxyGlassButtonStyle(prominent: true)
                     .controlSize(.large)
                 }
             } else {
@@ -399,6 +403,7 @@ struct SoftwareUpdatePanelView: View {
                     controller.chooseInstall()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
             }
 
@@ -419,6 +424,7 @@ struct SoftwareUpdatePanelView: View {
                 controller.acknowledgeAndDismiss()
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .controlSize(.large)
 
         case .error:
@@ -431,6 +437,7 @@ struct SoftwareUpdatePanelView: View {
                 controller.acknowledgeAndDismiss()
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .controlSize(.large)
 
         case .hidden:

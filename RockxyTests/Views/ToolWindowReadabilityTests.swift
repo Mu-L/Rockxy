@@ -80,12 +80,12 @@ struct ToolWindowReadabilityTests {
             labelWidth: CGFloat,
             controlHeight: CGFloat
         )] = [
-            (10, 196, 896, 500, 160, 24),
-            (12, 196, 896, 500, 160, 24),
-            (13, 196, 896, 500, 160, 25),
-            (14, 202, 902, 500, 168, 26),
-            (20, 238, 970, 502, 216, 32),
-            (28, 286, 1_082, 550, 280, 40),
+            (10, 200, 820, 560, 136, 24),
+            (12, 200, 820, 560, 136, 24),
+            (13, 200, 820, 560, 136, 25),
+            (14, 200, 820, 560, 142, 26),
+            (20, 230, 886, 560, 178, 32),
+            (28, 270, 990, 570, 226, 40),
         ]
         // swiftlint:enable large_tuple
 
@@ -100,18 +100,18 @@ struct ToolWindowReadabilityTests {
 
             // Adaptive, bounded window geometry replaces the pinned 820x600 shell.
             #expect(metrics.sidebarMinWidth == item.sidebarMin)
-            #expect(metrics.sidebarIdealWidth == item.sidebarMin)
-            #expect(metrics.sidebarMaxWidth == item.sidebarMin + 96)
-            #expect(metrics.contentMinWidth == item.minWidth - item.sidebarMin)
+            #expect(metrics.sidebarIdealWidth == max(220, item.sidebarMin))
+            #expect(metrics.sidebarMaxWidth == max(280, max(220, item.sidebarMin) + 60))
+            #expect(metrics.contentMinWidth == max(600, CGFloat(item.fontSize) * 8 + 496))
             #expect(metrics.windowMinWidth == item.minWidth)
-            #expect(metrics.windowIdealWidth == item.minWidth + 132)
+            #expect(metrics.windowIdealWidth == max(1_000, item.minWidth + 140))
             #expect(metrics.windowMinHeight == item.minHeight)
             #expect(metrics.windowIdealHeight == item.minHeight + 96)
 
             // Field labels/indents adapt with font size (identical at the 13pt default).
             #expect(metrics.labelWidth == item.labelWidth)
             #expect(metrics.wideLabelWidth == item.labelWidth + 22)
-            #expect(metrics.rowLeading == item.labelWidth + 16)
+            #expect(metrics.rowLeading == item.labelWidth + 14)
             #expect(metrics.controlHeight == item.controlHeight)
             #expect(metrics.fieldWidth(200) >= 200)
             #expect(metrics.menuWidth(120) >= 120)
@@ -121,9 +121,13 @@ struct ToolWindowReadabilityTests {
     @Test("Settings scene and tabs use display metrics")
     func settingsSceneAndTabsUseDisplayMetrics() throws {
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let sceneSource = try readProjectFile("Rockxy/Views/Settings/SettingsWindowScene.swift")
+        #expect(appSource.contains("SettingsWindowScene()"))
+        #expect(sceneSource.contains("struct SettingsWindowScene: Scene"))
+        #expect(sceneSource.contains("Window(String(localized: \"Settings\"), id: \"settings\")"))
         #expect(
-            appSource.contains("Settings {\n            AppUIDisplayMetricsProvider"),
-            "Settings scene must inherit Appearance display metrics"
+            sceneSource.contains("AppUIDisplayMetricsProvider {\n                SettingsView()"),
+            "Settings window must inherit Appearance display metrics"
         )
 
         let files = [
@@ -149,14 +153,12 @@ struct ToolWindowReadabilityTests {
     @Test("Assistant dock follows Appearance typography and keeps protocol summaries monospaced")
     func assistantDockUsesDisplayMetrics() throws {
         let source = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
-        let sidebarSource = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")
-        let switcherStyleSource = try readProjectFile("Rockxy/Views/Common/UtilitySegmentedHeader.swift")
 
         #expect(source.contains("@Environment(\\.appUIDisplayMetrics)"))
         // UI/prose uses explicit proportional .system(size:) roles derived from Appearance metrics,
         // no longer routed through swiftUIFont (which could force all prose monospaced). Technical
-        // data (request summaries, model IDs) stays explicitly monospaced. Restored switcher labels
-        // (Details / AI Assistant) are asserted in ContextDockPresentationTests.
+        // data (request summaries, model IDs) stays explicitly monospaced. The native icon switcher
+        // keeps Details / AI Assistant in help and accessibility labels.
         #expect(!source.contains("swiftUIFont"))
         #expect(source.contains("assistantFont(appMetrics."))
         #expect(source.contains("monospaced: true"))
@@ -166,12 +168,6 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains(".disabled(isBusy || primaryTransaction == nil)"))
         #expect(!source.contains(".disabled(conversationIsEmpty && !isBusy)"))
         #expect(source.contains("Ask Rockxy AI Assistant…"))
-        #expect(source.contains("ContextDetailsView(coordinator: coordinator)"))
-        #expect(source.contains("AIAssistantDockView("))
-        #expect(source.contains(".workspaceModeSwitcherStyle()"))
-        #expect(sidebarSource.contains(".workspaceModeSwitcherStyle()"))
-        #expect(switcherStyleSource.contains(".controlSize(.regular)"))
-        #expect(switcherStyleSource.contains("metrics.workspaceTabFontSize"))
     }
 
     @Test("Assistant dock uses a compact native hierarchy with progressive disclosure")
@@ -229,7 +225,7 @@ struct ToolWindowReadabilityTests {
         let source = try readProjectFile("Rockxy/Views/Settings/AssistantSettingsTab.swift")
         let components = try readProjectFile("Rockxy/Views/Settings/SettingsSectionComponents.swift")
 
-        #expect(source.components(separatedBy: "SettingsSectionCard(").count - 1 == 4)
+        #expect(source.components(separatedBy: "SettingsSection(").count - 1 == 4)
         #expect(source.contains("SettingsFieldRow"))
         #expect(source.contains("SettingsIndentedContent"))
         #expect(source.contains("1. Local Model Setup"))
@@ -242,11 +238,13 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains("Button(String(localized: \"Fetch Models\"))"))
         #expect(!source.contains("LazyVGrid("))
         #expect(components.contains("SettingsDisplayMetrics"))
-        // SettingsSectionCard is a restrained native GroupBox, and field rows/indents
-        // adapt with the Appearance font size instead of a fixed inset card.
-        #expect(components.contains("GroupBox"))
+        // Settings sections share Developer Setup's flat hierarchy and rows
+        // reflow instead of preserving an artificial fixed label gutter.
+        #expect(!components.contains("GroupBox"))
+        #expect(components.contains("ViewThatFits(in: .horizontal)"))
         #expect(components.contains("settingsMetrics.labelWidth"))
-        #expect(components.contains("settingsMetrics.rowLeading"))
+        #expect(components.contains("settingsMetrics.fieldSpacing"))
+        #expect(!components.contains("Color.clear.frame(width: settingsMetrics.rowLeading)"))
         #expect(!components.contains("separatorColor).opacity(0.62)"))
     }
 
@@ -395,7 +393,7 @@ struct ToolWindowReadabilityTests {
         #expect(!windowSource.contains("arrow.up.left.and.arrow.down.right"))
 
         // Primary Send action keeps a clear loading state and honest disabled logic.
-        #expect(windowSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(windowSource.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(windowSource.contains("cancelActiveSend"))
         #expect(windowSource.contains(#".keyboardShortcut(".", modifiers: .command)"#))
         #expect(windowSource.contains("viewModel.url.isEmpty || viewModel.isUnsupportedForReplay"))
@@ -1007,7 +1005,7 @@ struct ToolWindowReadabilityTests {
 
         // Info banner + status capsule + native empty state.
         #expect(source.contains(#"Image(systemName: "pause.circle")"#))
-        #expect(source.contains(".clipShape(Capsule())"))
+        #expect(source.contains(".rockxyChipStyle("))
         #expect(source.contains("ACTIVE"))
         #expect(source.contains("BREAKPOINTS OFF"))
         #expect(source.contains("ContentUnavailableView"))
@@ -1204,7 +1202,7 @@ struct ToolWindowReadabilityTests {
         // Status capsule + semantic card surfaces.
         #expect(source.contains("SCRIPTING OFF"))
         #expect(source.contains("ACTIVE"))
-        #expect(source.contains(".clipShape(Capsule())"))
+        #expect(source.contains(".rockxyChipStyle("))
         #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
         #expect(source.contains("RoundedRectangle(cornerRadius: 6)"))
         #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))

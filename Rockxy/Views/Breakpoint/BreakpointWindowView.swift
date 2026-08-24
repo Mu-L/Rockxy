@@ -206,6 +206,7 @@ struct BreakpointWindowView: View {
         .frame(minHeight: toolMetrics.footerControlHeight)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
+        .rockxyFunctionalBar()
     }
 
     private var editor: some View {
@@ -245,14 +246,14 @@ struct BreakpointWindowView: View {
                     .frame(minWidth: 180)
             }
             .keyboardShortcut(.return, modifiers: .command)
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle(prominent: true)
             .help(applyButtonHelp)
             .disabled(!canApplySelection)
         }
         .controlSize(.regular)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .rockxyFunctionalBar()
     }
 
     private var moreMenu: some View {

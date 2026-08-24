@@ -12,7 +12,7 @@ struct ToolsSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "Request Behavior")) {
+            SettingsSection(String(localized: "Request Behavior")) {
                 SettingsIndentedContent {
                     Toggle(
                         String(localized: "Disable caching (No-Cache headers)"),

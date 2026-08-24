@@ -177,6 +177,7 @@ struct BypassProxyListView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var behaviorNotice: some View {
@@ -307,16 +308,13 @@ struct BypassProxyListView: View {
 
             Text(activeStatusText)
                 .font(toolMetrics.metadataFont(weight: .semibold))
-                .foregroundStyle(activeCount == 0 ? Color.secondary : Color.blue)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 4)
-                .background(
-                    (activeCount == 0 ? Color.secondary : Color.blue).opacity(0.12)
-                )
-                .clipShape(Capsule())
+                .rockxyChipStyle(tint: .blue, isActive: activeCount > 0)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.bottom, toolMetrics.footerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {

@@ -216,6 +216,7 @@ struct FocusSetEditorSheet: View {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(trimmedName.isEmpty || draft.ruleCount == 0)
         }
         .padding(.horizontal, 18)

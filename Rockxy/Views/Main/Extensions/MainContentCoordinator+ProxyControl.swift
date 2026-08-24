@@ -486,8 +486,16 @@ extension MainContentCoordinator {
             nextSequenceNumberByProjectID[projectID] = sequence
 
             let overflow = max(0, history.count - liveHistoryLimit)
+            let evictionCount: Int
             if overflow > 0 {
-                history.removeFirst(overflow)
+                let evictionHeadroom = min(
+                    liveHistoryLimit,
+                    max(2, min(100, (liveHistoryLimit + 9) / 10))
+                )
+                evictionCount = min(history.count, max(overflow, evictionHeadroom))
+                history.removeFirst(evictionCount)
+            } else {
+                evictionCount = 0
             }
             transactionsByProjectID[projectID] = history
 
@@ -498,7 +506,7 @@ extension MainContentCoordinator {
 
             transactions = history
             nextSequenceNumber = sequence
-            if overflow > 0 {
+            if evictionCount > 0 {
                 rebuildObservedDomainsByApp()
                 debugAssistantTransactionsByHost.removeAll()
                 debugAssistantIndexedTransactionIDs.removeAll()

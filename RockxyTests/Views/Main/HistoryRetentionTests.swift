@@ -73,6 +73,27 @@ struct HistoryRetentionTests {
         #expect(coordinator.observedDomainsByApp[String(localized: "Unknown")]?.count == 20)
     }
 
+    @Test("Saturated capture evicts with headroom instead of rebuilding every batch")
+    @MainActor
+    func saturatedCaptureUsesEvictionHeadroom() {
+        let coordinator = MainContentCoordinator(policy: SmallHistoryPolicy())
+        coordinator.isRecording = true
+        coordinator.processActiveProjectTestBatch((0 ..< 10).map {
+            TestFixtures.makeTransaction(url: "https://example.com/\($0)")
+        })
+
+        coordinator.processActiveProjectTestBatch([
+            TestFixtures.makeTransaction(url: "https://example.com/10"),
+        ])
+        #expect(coordinator.transactions.count == 9)
+
+        coordinator.processActiveProjectTestBatch([
+            TestFixtures.makeTransaction(url: "https://example.com/11"),
+        ])
+        #expect(coordinator.transactions.count == 10)
+        #expect(coordinator.activeWorkspace.lastDeriveWasAppendOnly)
+    }
+
     @Test("Follow Live selects the newest request that survives the active view")
     @MainActor
     func followLiveSelectsNewestVisibleRequest() {

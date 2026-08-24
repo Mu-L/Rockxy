@@ -15,7 +15,7 @@ struct AdvancedSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "System Proxy")) {
+            SettingsSection(String(localized: "System Proxy")) {
                 settingsRow(label: String(localized: "Proxy Helper Tool:")) {
                     VStack(alignment: .leading, spacing: 10) {
                         // Zone A: Summary
@@ -175,11 +175,11 @@ struct AdvancedSettingsTab: View {
                 }
             }
 
-            SettingsSectionCard(String(localized: "Software Update")) {
+            SettingsSection(String(localized: "Software Update")) {
                 updatesSection
             }
 
-            SettingsSectionCard(String(localized: "Behavior")) {
+            SettingsSection(String(localized: "Behavior")) {
                 checkboxRow(
                     title: String(localized: "Show alert when quitting Rockxy"),
                     isOn: $showAlertOnQuit
@@ -339,164 +339,152 @@ struct AdvancedSettingsTab: View {
         }
     }
 
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: updater.supportsManualChecks ? "checkmark.shield.fill" : "icloud.slash")
+                        .font(.system(size: max(16, settingsMetrics.bodyFontSize + 3)))
+                        .foregroundStyle(updater.supportsManualChecks ? Color.accentColor : Color.secondary)
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(localized: "Update Controls"))
+                            .font(settingsMetrics.font(weight: .medium))
+                        Text(updater.updateAvailabilitySummary)
+                            .font(settingsMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+                    GridRow {
+                        Text(String(localized: "Current:"))
+                            .font(settingsMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                        Text(updater.currentVersionSummary)
+                            .font(settingsMetrics.secondaryFont(monospaced: true))
+                    }
+                    GridRow {
+                        Text(String(localized: "Last Checked:"))
+                            .font(settingsMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                        Text(updater.lastCheckedDescription)
+                            .font(settingsMetrics.secondaryFont())
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button(String(localized: "Check for Updates…")) {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canInitiateUpdateCheck)
+
+                Button(String(localized: "Change Logs…")) {
+                    updater.openFullChangelog()
+                }
+
+                if updater.sessionInProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            Toggle(
+                String(localized: "Automatically check for updates"),
+                isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.setAutomaticallyChecksForUpdates($0) }
+                )
+            )
+            .toggleStyle(.checkbox)
+            .disabled(!updater.supportsAutomaticChecks)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(
+                    String(localized: "Automatically download updates in the background"),
+                    isOn: Binding(
+                        get: { updater.automaticallyDownloadsUpdates },
+                        set: { updater.setAutomaticallyDownloadsUpdates($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .disabled(
+                    !updater.supportsAutomaticChecks
+                        || !updater.automaticallyChecksForUpdates
+                        || !updater.allowsAutomaticUpdates
+                )
+
+                Text(
+                    String(
+                        localized: "When enabled, Rockxy downloads signed updates ahead of time so install prompts are faster."
+                    )
+                )
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            SettingsFieldRow(String(localized: "Check Frequency")) {
+                Picker(
+                    String(localized: "Check Frequency"),
+                    selection: Binding(
+                        get: { UpdateCheckIntervalOption.closest(to: updater.updateCheckInterval) },
+                        set: { updater.setUpdateCheckInterval($0.rawValue) }
+                    )
+                ) {
+                    ForEach(UpdateCheckIntervalOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: settingsMetrics.menuWidth(180))
+                .disabled(!updater.supportsAutomaticChecks || !updater.automaticallyChecksForUpdates)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(
+                    String(localized: "Send anonymous compatibility profile"),
+                    isOn: Binding(
+                        get: { updater.sendsSystemProfile },
+                        set: { updater.setSendsSystemProfile($0) }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .disabled(!updater.supportsAutomaticChecks)
+
+                Text(
+                    String(
+                        localized: """
+                        This shares basic macOS and hardware compatibility details with Sparkle so Rockxy can match the right update. It does not include captured traffic.
+                        """
+                    )
+                )
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private func settingsRow(
         label: String,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
-        HStack(alignment: .top, spacing: 0) {
-            Text(label)
-                .font(settingsMetrics.font(weight: .medium))
-                .frame(width: settingsMetrics.labelWidth, alignment: .trailing)
-                .padding(.trailing, 16)
-                .padding(.top, 2)
+        SettingsFieldRow(label) {
             content()
         }
     }
 
     private func checkboxRow(title: String, isOn: Binding<Bool>) -> some View {
-        HStack {
-            Color.clear.frame(width: settingsMetrics.rowLeading)
+        SettingsIndentedContent {
             Toggle(title, isOn: isOn)
                 .toggleStyle(.checkbox)
-        }
-    }
-
-    private var updatesSection: some View {
-        settingsRow(label: String(localized: "Software Update:")) {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: updater.supportsManualChecks ? "checkmark.shield.fill" : "icloud.slash")
-                            .font(.system(size: max(16, settingsMetrics.bodyFontSize + 3)))
-                            .foregroundStyle(updater.supportsManualChecks ? Color.accentColor : Color.secondary)
-                            .frame(width: 20)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "Update Controls"))
-                                .font(settingsMetrics.font(weight: .medium))
-                            Text(updater.updateAvailabilitySummary)
-                                .font(settingsMetrics.secondaryFont())
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
-                        GridRow {
-                            Text(String(localized: "Current:"))
-                                .font(settingsMetrics.secondaryFont())
-                                .foregroundStyle(.secondary)
-                            Text(updater.currentVersionSummary)
-                                .font(settingsMetrics.secondaryFont(monospaced: true))
-                        }
-                        GridRow {
-                            Text(String(localized: "Last Checked:"))
-                                .font(settingsMetrics.secondaryFont())
-                                .foregroundStyle(.secondary)
-                            Text(updater.lastCheckedDescription)
-                                .font(settingsMetrics.secondaryFont())
-                        }
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button(String(localized: "Check for Updates…")) {
-                        updater.checkForUpdates()
-                    }
-                    .disabled(!updater.canInitiateUpdateCheck)
-
-                    Button(String(localized: "Change Logs…")) {
-                        updater.openFullChangelog()
-                    }
-
-                    if updater.sessionInProgress {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-
-                Toggle(
-                    String(localized: "Automatically check for updates"),
-                    isOn: Binding(
-                        get: { updater.automaticallyChecksForUpdates },
-                        set: { updater.setAutomaticallyChecksForUpdates($0) }
-                    )
-                )
-                .toggleStyle(.checkbox)
-                .disabled(!updater.supportsAutomaticChecks)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(
-                        String(localized: "Automatically download updates in the background"),
-                        isOn: Binding(
-                            get: { updater.automaticallyDownloadsUpdates },
-                            set: { updater.setAutomaticallyDownloadsUpdates($0) }
-                        )
-                    )
-                    .toggleStyle(.checkbox)
-                    .disabled(
-                        !updater.supportsAutomaticChecks
-                            || !updater.automaticallyChecksForUpdates
-                            || !updater.allowsAutomaticUpdates
-                    )
-
-                    Text(
-                        String(
-                            localized: "When enabled, Rockxy downloads signed updates ahead of time so install prompts are faster."
-                        )
-                    )
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-
-                HStack(alignment: .top, spacing: 10) {
-                    Text(String(localized: "Check Frequency"))
-                        .font(settingsMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .frame(width: settingsMetrics.fieldWidth(120), alignment: .leading)
-
-                    Picker(
-                        String(localized: "Check Frequency"),
-                        selection: Binding(
-                            get: { UpdateCheckIntervalOption.closest(to: updater.updateCheckInterval) },
-                            set: { updater.setUpdateCheckInterval($0.rawValue) }
-                        )
-                    ) {
-                        ForEach(UpdateCheckIntervalOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: settingsMetrics.menuWidth(180))
-                    .disabled(!updater.supportsAutomaticChecks || !updater.automaticallyChecksForUpdates)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Toggle(
-                        String(localized: "Send anonymous compatibility profile"),
-                        isOn: Binding(
-                            get: { updater.sendsSystemProfile },
-                            set: { updater.setSendsSystemProfile($0) }
-                        )
-                    )
-                    .toggleStyle(.checkbox)
-                    .disabled(!updater.supportsAutomaticChecks)
-
-                    Text(
-                        String(
-                            localized: """
-                            This shares basic macOS and hardware compatibility details with Sparkle so Rockxy can match the right update. It does not include captured traffic.
-                            """
-                        )
-                    )
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-            }
         }
     }
 

@@ -1,56 +1,106 @@
+import AppKit
 import SwiftUI
 
-// Bottom toolbar for the sidebar, providing a filter text field and an add-favorite button.
-// Mirrors the compact bottom-bar pattern used in Finder and Proxyman sidebars.
+// Bottom toolbar for the sidebar, providing a native filter field and an add-favorite button.
+// Mirrors Xcode's navigator control bar: the add action stands apart from the expanding search field.
 
 // MARK: - SidebarBottomBar
 
 struct SidebarBottomBar: View {
+    // MARK: Internal
+
     @Binding var filterText: String
     @Binding var isAddFavoritePresented: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Button {
                 isAddFavoritePresented = true
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: metrics.fontSize))
+                    .font(.system(size: metrics.sidebarIconFontSize))
+                    .frame(width: 24, height: 28)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(String(localized: "Add favorite app or domain"))
             .help(String(localized: "Add favorite app or domain"))
 
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.system(size: metrics.secondaryFontSize))
-                    .foregroundStyle(.secondary)
-                TextField(
-                    String(localized: "Filter (\u{2318}\u{21E7}F)"),
-                    text: $filterText
-                )
-                .textFieldStyle(.plain)
-                .font(metrics.swiftUIFont())
-                if !filterText.isEmpty {
-                    Button {
-                        filterText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: metrics.badgeFontSize))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(Color(nsColor: .quaternaryLabelColor).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            NativeSidebarSearchField(
+                text: $filterText,
+                fontSize: metrics.sidebarNavigationFontSize
+            )
+            .frame(maxWidth: .infinity, minHeight: 28)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.clear)
-        .overlay(alignment: .top) { Divider() }
+        .padding(.vertical, 6)
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
+}
+
+// MARK: - NativeSidebarSearchField
+
+private struct NativeSidebarSearchField: NSViewRepresentable {
+    // MARK: Internal
+
+    @Binding var text: String
+    let fontSize: CGFloat
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let searchField = NSSearchField()
+        searchField.placeholderString = String(localized: "Filter")
+        searchField.toolTip = String(localized: "Filter sidebar items")
+        searchField.controlSize = .regular
+        searchField.focusRingType = .exterior
+        searchField.sendsWholeSearchString = false
+        searchField.sendsSearchStringImmediately = true
+        searchField.delegate = context.coordinator
+        searchField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        searchField.setAccessibilityLabel(String(localized: "Filter sidebar"))
+        configure(searchField)
+        return searchField
+    }
+
+    func updateNSView(_ searchField: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        if searchField.stringValue != text {
+            searchField.stringValue = text
+        }
+        configure(searchField)
+    }
+
+    // MARK: Private
+
+    private func configure(_ searchField: NSSearchField) {
+        searchField.font = .systemFont(ofSize: fontSize)
+        guard let searchCell = searchField.cell as? NSSearchFieldCell else { return }
+        searchCell.searchButtonCell?.image = NSImage(
+            systemSymbolName: "line.3.horizontal.decrease.circle",
+            accessibilityDescription: String(localized: "Filter")
+        )
+    }
+
+    // MARK: - Coordinator
+
+    @MainActor
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let searchField = notification.object as? NSSearchField else { return }
+            text.wrappedValue = searchField.stringValue
+        }
+    }
 }

@@ -1,9 +1,8 @@
-import AppKit
 import SwiftUI
 
-// Root settings window using a native macOS sidebar/content layout.
-// The sidebar lists the nine categories; the content column shows a compact
-// pane header followed by the selected category's existing settings pane.
+// Root Settings window using the same native sidebar/detail hierarchy as
+// Developer Setup. macOS owns the title bar, sidebar toggle, and navigation;
+// the detail column stays an opaque, high-contrast configuration surface.
 
 // MARK: - RockxySettingsTab
 
@@ -91,34 +90,44 @@ enum RockxySettingsTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+// MARK: - RockxySettingsSidebarSection
+
+private enum RockxySettingsSidebarSection: String, CaseIterable, Identifiable {
+    case application
+    case integrations
+    case system
+
+    // MARK: Internal
+
+    var id: Self {
+        self
+    }
+
+    var title: String {
+        switch self {
+        case .application: String(localized: "Application")
+        case .integrations: String(localized: "Integrations")
+        case .system: String(localized: "System")
+        }
+    }
+
+    var tabs: [RockxySettingsTab] {
+        switch self {
+        case .application: [.general, .appearance, .privacy]
+        case .integrations: [.assistant, .github, .plugins, .mcp]
+        case .system: [.tools, .advanced]
+        }
+    }
+}
+
 // MARK: - SettingsView
 
 struct SettingsView: View {
     // MARK: Internal
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(RockxySettingsTab.allCases, selection: selectionBinding) { tab in
-                Label {
-                    Text(tab.title)
-                } icon: {
-                    Image(systemName: tab.symbol)
-                }
-                .font(settingsMetrics.font())
-                .tag(tab)
-            }
-            .listStyle(.sidebar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear
-                    .frame(height: SettingsChromeMetrics.sidebarContentTopInset)
-                    .accessibilityHidden(true)
-            }
-            .navigationSplitViewColumnWidth(
-                min: settingsMetrics.sidebarMinWidth,
-                ideal: settingsMetrics.sidebarIdealWidth,
-                max: settingsMetrics.sidebarMaxWidth
-            )
-            .toolbar(removing: .sidebarToggle)
+        NavigationSplitView {
+            settingsSidebar
         } detail: {
             detailContent(for: selectedTab)
                 .font(settingsMetrics.font())
@@ -128,7 +137,7 @@ struct SettingsView: View {
                     maxHeight: .infinity
                 )
         }
-        .navigationSplitViewStyle(.balanced)
+        .navigationTitle(selectedTab.title)
         .onAppear {
             loadedTabs.insert(selectedTab)
         }
@@ -143,18 +152,12 @@ struct SettingsView: View {
             idealHeight: settingsMetrics.windowIdealHeight,
             maxHeight: .infinity
         )
-        .background {
-            SettingsWindowToolbarInstaller(
-                onToggleSidebar: toggleSidebar
-            )
-        }
     }
 
     // MARK: Private
 
     @AppStorage(RockxySettingsTab.defaultsKey) private var selectedTabID = RockxySettingsTab.general.rawValue
     @Environment(\.appUIDisplayMetrics) private var appMetrics
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var loadedTabs: Set<RockxySettingsTab> = []
 
     private var settingsMetrics: SettingsDisplayMetrics {
@@ -179,21 +182,43 @@ struct SettingsView: View {
         )
     }
 
-    private func toggleSidebar() {
-        withAnimation(.easeInOut(duration: 0.26)) {
-            columnVisibility = columnVisibility == .detailOnly
-                ? .all
-                : .detailOnly
-        }
+    private var loadedPaneTabs: [RockxySettingsTab] {
+        RockxySettingsTab.allCases.filter { loadedTabs.contains($0) || $0 == selectedTab }
     }
 
-    private func detailContent(for tab: RockxySettingsTab) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            paneHeader(for: tab)
-            Divider()
-            persistentPaneStack
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    @ViewBuilder private var settingsSidebar: some View {
+        let list = List(selection: selectionBinding) {
+            ForEach(RockxySettingsSidebarSection.allCases) { section in
+                Section(section.title) {
+                    ForEach(section.tabs) { tab in
+                        Label {
+                            Text(tab.title)
+                        } icon: {
+                            Image(systemName: tab.symbol)
+                        }
+                        .font(settingsMetrics.font(weight: selectedTab == tab ? .semibold : .regular))
+                        .tag(tab)
+                    }
+                }
+            }
         }
+        .listStyle(.sidebar)
+        .navigationSplitViewColumnWidth(
+            min: settingsMetrics.sidebarMinWidth,
+            ideal: settingsMetrics.sidebarIdealWidth,
+            max: settingsMetrics.sidebarMaxWidth
+        )
+        .accessibilityLabel(String(localized: "Settings categories"))
+
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            list.scrollEdgeEffectStyle(.soft, for: .vertical)
+        } else {
+            list
+        }
+        #else
+        list
+        #endif
     }
 
     /// Keeps panes alive after their first visit so sidebar navigation does not
@@ -214,22 +239,11 @@ struct SettingsView: View {
         }
     }
 
-    private var loadedPaneTabs: [RockxySettingsTab] {
-        RockxySettingsTab.allCases.filter { loadedTabs.contains($0) || $0 == selectedTab }
-    }
-
-    private func paneHeader(for tab: RockxySettingsTab) -> some View {
-        VStack(alignment: .leading, spacing: settingsMetrics.paneHeaderSpacing) {
-            Text(tab.title)
-                .font(settingsMetrics.font(weight: .semibold))
-            Text(tab.paneDescription)
-                .font(settingsMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, settingsMetrics.contentPadding)
-        .padding(.vertical, 14)
+    private func detailContent(for tab: RockxySettingsTab) -> some View {
+        persistentPaneStack
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .accessibilityLabel(tab.title)
     }
 
     /// A concrete switch keeps the pane types explicit without type erasure.
@@ -246,183 +260,5 @@ struct SettingsView: View {
         case .mcp: MCPSettingsTab()
         case .advanced: AdvancedSettingsTab()
         }
-    }
-}
-
-// MARK: - SettingsChromeMetrics
-
-private enum SettingsChromeMetrics {
-    static let sidebarContentTopInset: CGFloat = 14
-}
-
-// MARK: - SettingsWindowToolbarInstaller
-
-/// Installs the same native toolbar-item structure as Rockxy's main workspace:
-/// an icon-only sidebar item followed by AppKit's sidebar-tracking separator.
-private struct SettingsWindowToolbarInstaller: NSViewRepresentable {
-    // MARK: Internal
-
-    let onToggleSidebar: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onToggleSidebar: onToggleSidebar)
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        installToolbar(for: view, coordinator: context.coordinator)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.update(onToggleSidebar: onToggleSidebar)
-        installToolbar(for: nsView, coordinator: context.coordinator)
-    }
-
-    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-        coordinator.removeToolbar()
-    }
-
-    // MARK: Private
-
-    private func installToolbar(for view: NSView, coordinator: Coordinator) {
-        DispatchQueue.main.async { [weak view, weak coordinator] in
-            guard let window = view?.window,
-                  let coordinator
-            else {
-                return
-            }
-            coordinator.installToolbarIfNeeded(in: window)
-        }
-    }
-
-    // MARK: - Coordinator
-
-    @MainActor
-    final class Coordinator: NSObject {
-        // MARK: Lifecycle
-
-        init(onToggleSidebar: @escaping () -> Void) {
-            toolbar = SettingsWindowToolbar(onToggleSidebar: onToggleSidebar)
-            super.init()
-        }
-
-        // MARK: Internal
-
-        func update(onToggleSidebar: @escaping () -> Void) {
-            toolbar.onToggleSidebar = onToggleSidebar
-        }
-
-        func installToolbarIfNeeded(in window: NSWindow) {
-            guard installedWindow !== window || window.toolbar !== toolbar.managedToolbar else {
-                return
-            }
-
-            if installedWindow !== window {
-                previousToolbar = window.toolbar
-            }
-
-            window.styleMask.insert(.fullSizeContentView)
-            window.titlebarAppearsTransparent = true
-            window.toolbarStyle = .unifiedCompact
-            window.toolbar = toolbar.managedToolbar
-            installedWindow = window
-        }
-
-        func removeToolbar() {
-            if let installedWindow,
-               installedWindow.toolbar === toolbar.managedToolbar
-            {
-                installedWindow.toolbar = previousToolbar
-            }
-            installedWindow = nil
-            previousToolbar = nil
-        }
-
-        // MARK: Private
-
-        private let toolbar: SettingsWindowToolbar
-        private weak var installedWindow: NSWindow?
-        private var previousToolbar: NSToolbar?
-    }
-}
-
-// MARK: - SettingsWindowToolbar
-
-@MainActor
-private final class SettingsWindowToolbar: NSObject, NSToolbarDelegate {
-    // MARK: Lifecycle
-
-    init(onToggleSidebar: @escaping () -> Void) {
-        self.onToggleSidebar = onToggleSidebar
-        managedToolbar = NSToolbar(identifier: Self.toolbarIdentifier)
-        super.init()
-
-        managedToolbar.delegate = self
-        managedToolbar.displayMode = .iconOnly
-        managedToolbar.allowsUserCustomization = false
-        managedToolbar.autosavesConfiguration = false
-    }
-
-    // MARK: Internal
-
-    static let toolbarIdentifier = NSToolbar.Identifier(
-        "\(RockxyIdentity.current.logSubsystem).settings.toolbar"
-    )
-    static let sidebarToggleIdentifier = NSToolbarItem.Identifier(
-        "\(RockxyIdentity.current.logSubsystem).settings.toolbar.toggleSidebar"
-    )
-
-    let managedToolbar: NSToolbar
-    var onToggleSidebar: () -> Void
-
-    func toolbarDefaultItemIdentifiers(
-        _ toolbar: NSToolbar
-    ) -> [NSToolbarItem.Identifier] {
-        [
-            .flexibleSpace,
-            Self.sidebarToggleIdentifier,
-            .sidebarTrackingSeparator,
-            .flexibleSpace,
-        ]
-    }
-
-    func toolbarAllowedItemIdentifiers(
-        _ toolbar: NSToolbar
-    ) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar)
-    }
-
-    func toolbar(
-        _ toolbar: NSToolbar,
-        itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
-        willBeInsertedIntoToolbar flag: Bool
-    ) -> NSToolbarItem? {
-        guard itemIdentifier == Self.sidebarToggleIdentifier else {
-            return nil
-        }
-
-        let label = String(localized: "Toggle Settings Sidebar")
-        let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-        item.label = label
-        item.paletteLabel = label
-        item.toolTip = label
-        item.target = self
-        item.action = #selector(toggleSidebar(_:))
-        item.image = NSImage(
-            systemSymbolName: "sidebar.leading",
-            accessibilityDescription: label
-        )
-        // Keep the native toolbar item icon-only at rest. A bordered item adds
-        // a persistent bezel that visually overlaps the sidebar's rounded edge.
-        item.isBordered = false
-        return item
-    }
-
-    // MARK: Private
-
-    @objc
-    private func toggleSidebar(_ sender: Any?) {
-        onToggleSidebar()
     }
 }

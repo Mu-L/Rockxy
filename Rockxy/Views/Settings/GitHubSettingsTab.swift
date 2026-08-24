@@ -8,15 +8,15 @@ struct GitHubSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "Account")) {
+            SettingsSection(String(localized: "Account")) {
                 permissionSection
             }
 
-            SettingsSectionCard(String(localized: "Publishing Defaults")) {
+            SettingsSection(String(localized: "Publishing Defaults")) {
                 defaultsSection
             }
 
-            SettingsSectionCard(String(localized: "Access & Help")) {
+            SettingsSection(String(localized: "Access & Help")) {
                 advancedSection
             }
         }
@@ -40,11 +40,30 @@ struct GitHubSettingsTab: View {
     @AppStorage(RockxyIdentity.current.defaultsKey("github.gist.redactSensitiveData"))
     private var redactSensitiveData = true
 
-    @AppStorage(RockxyIdentity.current.defaultsKey("github.gist.openInBrowser"))
-    private var openInBrowser = true
+    @AppStorage(RockxyIdentity.current.defaultsKey("github.gist.openInBrowser")) private var openInBrowser = true
 
     @AppStorage(RockxyIdentity.current.defaultsKey("github.gist.copyURLToClipboard"))
     private var copyURLToClipboard = false
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var selectedGistVisibility: GitHubGistVisibility {
+        GitHubGistVisibility(rawValue: gistVisibility) ?? .secret
+    }
+
+    private var gistVisibilityBinding: Binding<GitHubGistVisibility> {
+        Binding(
+            get: { selectedGistVisibility },
+            set: { visibility in
+                gistVisibility = visibility.rawValue
+                AppSettingsManager.shared.updateGitHubGistVisibility(visibility)
+            }
+        )
+    }
+
+    private var settingsMetrics: SettingsDisplayMetrics {
+        SettingsDisplayMetrics(appMetrics: appMetrics)
+    }
 
     private var permissionSection: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -59,27 +78,12 @@ struct GitHubSettingsTab: View {
 
             alignedRow(label: "") {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 10) {
-                        Button(String(localized: viewModel.isConnected ? "Reconnect..." : "Authorize...")) {
-                            if viewModel.canUseOAuth {
-                                showDeviceCodeSheet = true
-                            } else {
-                                showPersonalAccessTokenSheet = true
-                            }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) {
+                            accountActions
                         }
-                        .controlSize(.regular)
-                        .frame(width: settingsMetrics.menuWidth(124))
-
-                        Button(String(localized: "Use Token...")) {
-                            showPersonalAccessTokenSheet = true
-                        }
-                        .controlSize(.regular)
-
-                        if viewModel.isConnected {
-                            Button(String(localized: "Disconnect")) {
-                                viewModel.disconnect()
-                            }
-                            .controlSize(.regular)
+                        VStack(alignment: .leading, spacing: 10) {
+                            accountActions
                         }
                     }
 
@@ -98,10 +102,14 @@ struct GitHubSettingsTab: View {
                     .frame(maxWidth: settingsMetrics.fieldWidth(640), alignment: .leading)
 
                     if !viewModel.canUseOAuth {
-                        Text(String(localized: "OAuth is not configured for this build. Personal access token fallback is available."))
-                            .font(settingsMetrics.secondaryFont())
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Text(
+                            String(
+                                localized: "OAuth is not configured for this build. Personal access token fallback is available."
+                            )
+                        )
+                        .font(settingsMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -112,27 +120,35 @@ struct GitHubSettingsTab: View {
         VStack(alignment: .leading, spacing: 20) {
             alignedRow(label: String(localized: "Publish as:")) {
                 VStack(alignment: .leading, spacing: 14) {
-                    radioRow(
-                        title: GitHubGistVisibility.secret.title,
-                        subtitle: GitHubGistVisibility.secret.sharingDescription,
-                        value: .secret
-                    )
-                    radioRow(
-                        title: GitHubGistVisibility.public.title,
-                        subtitle: GitHubGistVisibility.public.sharingDescription,
-                        value: .public
-                    )
+                    Picker(String(localized: "Publish as"), selection: gistVisibilityBinding) {
+                        ForEach(GitHubGistVisibility.allCases, id: \.self) { visibility in
+                            Text(visibility.title).tag(visibility)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+
+                    Text(selectedGistVisibility.sharingDescription)
+                        .font(settingsMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if GitHubGistVisibility(rawValue: gistVisibility) == .public {
-                        Text(String(localized: "Public Gists are discoverable. Review captured traffic before publishing."))
-                            .font(settingsMetrics.secondaryFont(weight: .medium))
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Text(
+                            String(
+                                localized: "Public Gists are discoverable. Review captured traffic before publishing."
+                            )
+                        )
+                        .font(settingsMetrics.secondaryFont(weight: .medium))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
 
                     checkboxWithHelp(
                         title: String(localized: "Automatic redact sensitive headers"),
-                        subtitle: String(localized: "Authorization, Cookies, Set-Cookies, ... are censored before publishing to Gist."),
+                        subtitle: String(
+                            localized: "Authorization, Cookies, Set-Cookies, ... are censored before publishing to Gist."
+                        ),
                         isOn: $redactSensitiveData,
                         onChange: AppSettingsManager.shared.updateGitHubGistRedactSensitiveData
                     )
@@ -176,55 +192,61 @@ struct GitHubSettingsTab: View {
                         viewModel.openHelp()
                     } label: {
                         Image(systemName: "questionmark")
-                            .font(.system(size: max(18, settingsMetrics.bodyFontSize + 5), weight: .bold))
-                            .frame(width: settingsMetrics.controlHeight + 14, height: settingsMetrics.controlHeight + 14)
+                            .font(settingsMetrics.font(weight: .semibold))
                     }
-                    .buttonStyle(.borderless)
-                    .background(Color(nsColor: .controlBackgroundColor), in: Circle())
+                    .rockxyGlassButtonStyle()
+                    .buttonBorderShape(.circle)
+                    .controlSize(.small)
                     .help(String(localized: "Open Publish to Gist documentation"))
                 }
             }
         }
     }
 
-    private func alignedRow<Content: View>(
-        label: String,
-        @ViewBuilder content: () -> Content
-    )
-        -> some View
-    {
-        HStack(alignment: .top, spacing: 18) {
-            Text(label)
-                .font(settingsMetrics.font(weight: .medium))
-                .frame(width: settingsMetrics.wideLabelWidth, alignment: .trailing)
-                .padding(.top, 2)
-            content()
+    @ViewBuilder private var accountActions: some View {
+        Button(
+            viewModel.isConnected
+                ? String(localized: "Reconnect...")
+                : String(localized: "Authorize...")
+        ) {
+            if viewModel.canUseOAuth {
+                showDeviceCodeSheet = true
+            } else {
+                showPersonalAccessTokenSheet = true
+            }
+        }
+        .rockxyGlassButtonStyle(prominent: true)
+        .controlSize(.regular)
+
+        Button(String(localized: "Use Token...")) {
+            showPersonalAccessTokenSheet = true
+        }
+        .controlSize(.regular)
+
+        if viewModel.isConnected {
+            Button(String(localized: "Disconnect")) {
+                viewModel.disconnect()
+            }
+            .controlSize(.regular)
         }
     }
 
-    private func radioRow(title: String, subtitle: String, value: GitHubGistVisibility) -> some View {
-        Button {
-            gistVisibility = value.rawValue
-            AppSettingsManager.shared.updateGitHubGistVisibility(value)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 12) {
-                    Image(systemName: GitHubGistVisibility(rawValue: gistVisibility) == value ? "largecircle.fill.circle" : "circle.fill")
-                        .font(.system(size: max(14, settingsMetrics.bodyFontSize + 1)))
-                        .foregroundStyle(GitHubGistVisibility(rawValue: gistVisibility) == value ? .blue : Color(nsColor: .controlColor))
-                    Text(title)
-                        .font(settingsMetrics.font())
-                        .foregroundStyle(.primary)
-                }
-                Text(subtitle)
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 33)
-                    .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private func alignedRow(
+        label: String,
+        @ViewBuilder content: () -> some View
+    )
+        -> some View
+    {
+        if label.isEmpty {
+            SettingsIndentedContent {
+                content()
             }
-            .contentShape(Rectangle())
+        } else {
+            SettingsFieldRow(label) {
+                content()
+            }
         }
-        .buttonStyle(.plain)
     }
 
     private func checkboxWithHelp(
@@ -249,12 +271,6 @@ struct GitHubSettingsTab: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var settingsMetrics: SettingsDisplayMetrics {
-        SettingsDisplayMetrics(appMetrics: appMetrics)
     }
 }
 
@@ -356,7 +372,8 @@ final class GitHubSettingsViewModel {
         let urlString = switch metadata?.method {
         case .deviceCode:
             "https://github.com/settings/applications"
-        case .personalAccessToken, nil:
+        case .personalAccessToken,
+             nil:
             "https://github.com/settings/tokens"
         }
         if let url = URL(string: urlString) {
@@ -379,8 +396,8 @@ final class GitHubSettingsViewModel {
 // MARK: - PersonalAccessTokenFallbackSheet
 
 private struct PersonalAccessTokenFallbackSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    // MARK: Internal
+
     @Bindable var viewModel: GitHubSettingsViewModel
 
     var body: some View {
@@ -422,6 +439,7 @@ private struct PersonalAccessTokenFallbackSheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(viewModel.personalAccessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -429,6 +447,11 @@ private struct PersonalAccessTokenFallbackSheet: View {
         .padding(settingsMetrics.contentPadding)
         .frame(width: settingsMetrics.fieldWidth(430))
     }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var settingsMetrics: SettingsDisplayMetrics {
         SettingsDisplayMetrics(appMetrics: appMetrics)
@@ -438,12 +461,9 @@ private struct PersonalAccessTokenFallbackSheet: View {
 // MARK: - GitHubDeviceCodeAuthorizationSheet
 
 private struct GitHubDeviceCodeAuthorizationSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    // MARK: Internal
+
     @Bindable var viewModel: GitHubSettingsViewModel
-    @State private var deviceCode: GitHubAuthService.DeviceCode?
-    @State private var isLoading = false
-    @State private var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -509,6 +529,18 @@ private struct GitHubDeviceCodeAuthorizationSheet: View {
         }
     }
 
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    @State private var deviceCode: GitHubAuthService.DeviceCode?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    private var settingsMetrics: SettingsDisplayMetrics {
+        SettingsDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private func start() async {
         isLoading = true
         defer { isLoading = false }
@@ -533,9 +565,5 @@ private struct GitHubDeviceCodeAuthorizationSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    private var settingsMetrics: SettingsDisplayMetrics {
-        SettingsDisplayMetrics(appMetrics: appMetrics)
     }
 }

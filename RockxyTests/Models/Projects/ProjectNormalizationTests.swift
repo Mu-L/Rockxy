@@ -35,6 +35,12 @@ struct ProjectNormalizationTests {
         #expect(throws: ProjectNameNormalizationError.containsControlCharacters) {
             _ = try ProjectNormalization.normalizedDisplayName("Stag\u{0007}ing")
         }
+        #expect(throws: ProjectNameNormalizationError.containsControlCharacters) {
+            _ = try ProjectNormalization.normalizedDisplayName("Stag\u{2028}ing")
+        }
+        #expect(throws: ProjectNameNormalizationError.containsControlCharacters) {
+            _ = try ProjectNormalization.normalizedDisplayName("Stag\u{2029}ing")
+        }
     }
 
     @Test("rejects unsafe invisible and directional formatting characters")

@@ -3,9 +3,11 @@ import SwiftUI
 
 /// Privacy settings showing honest disclosure about data storage, exports, and telemetry.
 struct PrivacySettingsTab: View {
+    // MARK: Internal
+
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "Data Storage")) {
+            SettingsSection(String(localized: "Data Storage")) {
                 VStack(alignment: .leading, spacing: 12) {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -51,7 +53,7 @@ struct PrivacySettingsTab: View {
                 }
             }
 
-            SettingsSectionCard(String(localized: "Exports & Sharing")) {
+            SettingsSection(String(localized: "Exports & Sharing")) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(localized: "Exports Contain Full Traffic Data"))
@@ -74,7 +76,7 @@ struct PrivacySettingsTab: View {
                 }
             }
 
-            SettingsSectionCard(String(localized: "Analytics & Telemetry")) {
+            SettingsSection(String(localized: "Analytics & Telemetry")) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -85,7 +87,7 @@ struct PrivacySettingsTab: View {
                                 .foregroundStyle(.green)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                .rockxyChipStyle(tint: .green, isActive: true)
                         }
                         Text(
                             String(
@@ -116,6 +118,8 @@ struct PrivacySettingsTab: View {
         }
         .font(settingsMetrics.font())
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

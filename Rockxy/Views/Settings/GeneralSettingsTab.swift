@@ -12,11 +12,11 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "Proxy")) {
+            SettingsSection(String(localized: "Proxy")) {
                 generalControlsSection
             }
 
-            SettingsSectionCard(String(localized: "Root CA Certificate")) {
+            SettingsSection(String(localized: "Root CA Certificate")) {
                 certificateSection
 
                 if case let .success(message) = certificateStatus {

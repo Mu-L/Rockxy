@@ -96,11 +96,11 @@ struct AssistantConversationContextMismatchBanner: View {
 
             HStack(spacing: 7) {
                 Button(String(localized: "Restore Traffic"), action: onRestore)
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                     .controlSize(.small)
 
                 Button(String(localized: "New Conversation"), action: onStartNew)
-                    .buttonStyle(.borderedProminent)
+                    .rockxyGlassButtonStyle(prominent: true)
                     .controlSize(.small)
             }
         }

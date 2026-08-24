@@ -289,6 +289,7 @@ struct AddSSLAppDomainSheet: View {
                 footerButtonLabel(addButtonTitle)
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(addButtonDisabled)
         }
         .padding(.horizontal, 16)

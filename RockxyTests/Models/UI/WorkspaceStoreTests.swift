@@ -28,6 +28,24 @@ struct WorkspaceStoreTests {
         #expect(ws.isClosable == true)
     }
 
+    @Test("Create workspace canonicalizes its title")
+    func createWorkspaceCanonicalizesTitle() {
+        let store = WorkspaceStore()
+        let workspace = store.createWorkspace(title: "  Cafe\u{0301}  ")
+
+        #expect(workspace.title == "Café")
+    }
+
+    @Test("Create workspace rejects an invalid title without changing tabs")
+    func createWorkspaceRejectsInvalidTitle() {
+        let store = WorkspaceStore()
+        let active = store.activeWorkspace
+        let returned = store.createWorkspace(title: "Bad\nTitle")
+
+        #expect(returned.id == active.id)
+        #expect(store.workspaces.count == 1)
+    }
+
     @Test("Create workspace with filter sets initial filter")
     func createWithFilter() {
         let store = WorkspaceStore()
@@ -251,6 +269,20 @@ struct WorkspaceStoreTests {
         #expect(store.activeWorkspaceID == copy.id)
     }
 
+    @Test("Duplicate keeps its generated title within the structural bound")
+    func duplicateWorkspaceBoundsGeneratedTitle() throws {
+        let store = WorkspaceStore()
+        let maximumTitle = String(
+            repeating: "a",
+            count: ProjectStructuralLimits.nameGraphemeRange.upperBound
+        )
+        let original = store.createWorkspace(title: maximumTitle)
+        let copy = try #require(store.duplicateWorkspace(id: original.id))
+
+        #expect(copy.title.count <= ProjectStructuralLimits.nameGraphemeRange.upperBound)
+        #expect(copy.title.hasSuffix(" Copy"))
+    }
+
     @Test("Duplicate inserts after source workspace")
     func duplicatePosition() throws {
         let store = WorkspaceStore()
@@ -289,11 +321,23 @@ struct WorkspaceStoreTests {
         #expect(ws.title == "New Name")
     }
 
+    @Test("Rename canonicalizes valid titles and rejects invalid titles")
+    func renameEnforcesTitleBoundary() {
+        let store = WorkspaceStore()
+        let workspace = store.createWorkspace(title: "Original")
+
+        store.renameWorkspace(id: workspace.id, to: "  Cafe\u{0301}  ")
+        #expect(workspace.title == "Café")
+
+        store.renameWorkspace(id: workspace.id, to: String(repeating: "x", count: 81))
+        #expect(workspace.title == "Café")
+    }
+
     @Test("Rename with invalid ID does nothing")
     func renameInvalid() {
         let store = WorkspaceStore()
         store.renameWorkspace(id: UUID(), to: "Ghost")
-        #expect(store.workspaces[0].title == String(localized: "All Traffic"))
+        #expect(store.workspaces[0].title == ProjectStructuralLimits.defaultTabTitle)
     }
 
     // MARK: - Active Workspace Computed Properties

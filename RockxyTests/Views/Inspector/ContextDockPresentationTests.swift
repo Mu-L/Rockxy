@@ -452,7 +452,7 @@ struct ContextDockInvestigationReportTests {
         #expect(dock.contains("Text(recipe.title)"))
         #expect(dock.contains(".lineLimit(2)"))
         #expect(dock.contains("HStack(spacing: 6)"))
-        #expect(dock.contains(".buttonStyle(.bordered)"))
+        #expect(dock.contains(".rockxyGlassButtonStyle()"))
         #expect(dock.contains(".controlSize(.small)"))
         #expect(!dock.contains("Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8)"))
         #expect(!dock.contains("RoundedRectangle(cornerRadius: 8)"))
@@ -471,14 +471,19 @@ struct ContextDockInvestigationReportTests {
         #expect(DebugAssistantRecipe.allCases.last == .prepareBugReport)
     }
 
-    @Test("Mode switcher shows Details / AI Assistant, not Context / Investigate")
-    func modeSwitcherUsesRestoredLabels() throws {
+    @Test("Mode switcher exposes Details and AI Assistant as native icon segments")
+    func modeSwitcherUsesNativeIconSegments() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
-        #expect(dock.contains("Text(String(localized: \"Details\")).tag(ContextDockTab.details)"))
-        #expect(dock.contains("Text(String(localized: \"AI Assistant\")).tag(ContextDockTab.aiAssistant)"))
-        #expect(!dock.contains("Text(String(localized: \"Context\")).tag"))
-        #expect(!dock.contains("Text(String(localized: \"Investigate\")).tag"))
-        #expect(dock.contains("Picker(String(localized: \"Inspector\")"))
+        let dockHeader = try #require(dock.components(separatedBy: "Divider()").first)
+        #expect(dock.contains("title: String(localized: \"Details\")"))
+        #expect(dock.contains("systemImage: \"doc.text.magnifyingglass\""))
+        #expect(dock.contains("title: String(localized: \"AI Assistant\")"))
+        #expect(dock.contains("systemImage: \"sparkles\""))
+        #expect(dock.components(separatedBy: "WorkspaceModeSegment(").count == 3)
+        #expect(dock.contains("WorkspaceModeSegmentedControl("))
+        #expect(dock.contains("accessibilityLabel: String(localized: \"Inspector\")"))
+        #expect(dockHeader.contains(".workspaceModeSwitcherStyle()"))
+        #expect(!dockHeader.contains(".rockxyFunctionalBar()"))
         #expect(dock.contains(".accessibilityLabel(String(localized: \"Inspector\"))"))
         // Stable internal enum cases are unchanged.
         #expect(dock.contains("ContextDockTab.details"))

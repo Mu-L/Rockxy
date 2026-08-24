@@ -334,6 +334,7 @@ struct MapRemoteWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -479,14 +480,13 @@ struct MapRemoteWindowView: View {
                     : String(localized: "MAP REMOTE OFF")
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
-            .foregroundStyle(viewModel.isToolEnabled ? Color.white : Color.secondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(viewModel.isToolEnabled ? Color.green : Color.secondary.opacity(0.14))
-            .clipShape(Capsule())
+            .rockxyChipStyle(tint: .green, isActive: viewModel.isToolEnabled)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {
@@ -569,7 +569,7 @@ struct MapRemoteWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -1004,6 +1004,7 @@ struct MapRemoteEditorWindowView: View {
                     )
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!viewModel.isSaveEnabled || viewModel.isSaving)
             }
         }

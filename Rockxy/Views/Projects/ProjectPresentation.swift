@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Project Presentation Models
+// MARK: - ProjectNameEditorContext
 
 struct ProjectNameEditorContext: Identifiable, Equatable {
     enum Mode: Equatable {
@@ -32,14 +32,18 @@ struct ProjectNameEditorContext: Identifiable, Equatable {
     }
 }
 
+// MARK: - ProjectDeletionRequest
+
 struct ProjectDeletionRequest: Identifiable, Equatable {
     let projectID: UUID
     let projectName: String
 
-    var id: UUID { projectID }
+    var id: UUID {
+        projectID
+    }
 }
 
-// MARK: - ProjectToolbarSelectorView
+// MARK: - ProjectToolbarSelectorMetrics
 
 enum ProjectToolbarSelectorMetrics {
     static let minimumWidth: CGFloat = 104
@@ -59,7 +63,11 @@ enum ProjectToolbarSelectorMetrics {
     }
 }
 
+// MARK: - ProjectToolbarSelectorView
+
 struct ProjectToolbarSelectorView: View {
+    // MARK: Internal
+
     @Bindable var coordinator: MainContentCoordinator
 
     var body: some View {
@@ -116,6 +124,8 @@ struct ProjectToolbarSelectorView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .contentShape(.rect)
         }
         .menuIndicator(.hidden)
@@ -126,6 +136,8 @@ struct ProjectToolbarSelectorView: View {
         .accessibilityLabel(String(localized: "Active Project"))
         .accessibilityValue(coordinator.projectStore.activeProject.name)
     }
+
+    // MARK: Private
 
     private var preferredWidth: CGFloat {
         ProjectToolbarSelectorMetrics.preferredWidth(
@@ -147,7 +159,8 @@ struct ProjectToolbarSelectorView: View {
             "folder.badge.questionmark"
         case .loading:
             "folder"
-        case .idle, .ready:
+        case .idle,
+             .ready:
             "folder.fill"
         }
     }
@@ -163,11 +176,16 @@ struct ProjectToolbarSelectorView: View {
 // MARK: - ProjectNameEditorSheet
 
 struct ProjectNameEditorSheet: View {
+    // MARK: Lifecycle
+
     init(context: ProjectNameEditorContext, coordinator: MainContentCoordinator) {
         self.context = context
         self.coordinator = coordinator
         _name = State(initialValue: context.initialName)
+        _operationErrorMessage = State(initialValue: nil)
     }
+
+    // MARK: Internal
 
     let context: ProjectNameEditorContext
     let coordinator: MainContentCoordinator
@@ -197,9 +215,12 @@ struct ProjectNameEditorSheet: View {
                     .font(.subheadline.weight(.medium))
                 TextField(String(localized: "For example: Checkout API"), text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text(validationMessage ?? String(localized: "1–80 characters. Names must be unique."))
+                    .onChange(of: name) { _, _ in
+                        operationErrorMessage = nil
+                    }
+                Text(editorMessage)
                     .font(.caption)
-                    .foregroundStyle(validationMessage == nil ? Color.secondary : Color.orange)
+                    .foregroundStyle(hasEditorError ? Color.orange : Color.secondary)
             }
             .padding(18)
 
@@ -215,6 +236,7 @@ struct ProjectNameEditorSheet: View {
                     submit()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(validationMessage != nil)
             }
             .padding(.horizontal, 18)
@@ -223,8 +245,23 @@ struct ProjectNameEditorSheet: View {
         .frame(width: 460)
     }
 
+    // MARK: Private
+
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
+    @State private var operationErrorMessage: String?
+
+    private var editorMessage: String {
+        validationMessage
+            ?? operationErrorMessage
+            ?? String(
+                localized: "1–\(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters. Names must be unique."
+            )
+    }
+
+    private var hasEditorError: Bool {
+        validationMessage != nil || operationErrorMessage != nil
+    }
 
     private var normalizedName: String? {
         try? ProjectNormalization.normalizedDisplayName(name)
@@ -258,6 +295,8 @@ struct ProjectNameEditorSheet: View {
             coordinator.renameProject(id: id, to: normalizedName)
         }
         guard succeeded else {
+            operationErrorMessage = coordinator.projectOperationErrorMessage
+                ?? String(localized: "The Project could not be updated. Try again.")
             return
         }
         RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
@@ -268,10 +307,14 @@ struct ProjectNameEditorSheet: View {
 // MARK: - ProjectManagerSheet
 
 struct ProjectManagerSheet: View {
+    // MARK: Lifecycle
+
     init(coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
         _selection = State(initialValue: coordinator.projectStore.activeProjectID)
     }
+
+    // MARK: Internal
 
     let coordinator: MainContentCoordinator
 
@@ -305,7 +348,9 @@ struct ProjectManagerSheet: View {
             Button(String(localized: "Cancel"), role: .cancel) {}
         } message: { _ in
             Text(
-                String(localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration.")
+                String(
+                    localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration."
+                )
                     + " "
                     + String(localized: "Manually saved session files, rules, and favorites are not deleted.")
             )
@@ -320,6 +365,8 @@ struct ProjectManagerSheet: View {
             selection = activeProjectID
         }
     }
+
+    // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -343,6 +390,23 @@ struct ProjectManagerSheet: View {
 
     private var canExportSelectedProject: Bool {
         canTransitionProjects && selectedProject != nil
+    }
+
+    private var canDeleteSelectedProject: Bool {
+        canTransitionProjects
+            && selectedProject != nil
+            && coordinator.projectStore.projects.count > 1
+    }
+
+    private var deleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { coordinator.projectDeletionRequest != nil },
+            set: {
+                if !$0 {
+                    coordinator.projectDeletionRequest = nil
+                }
+            }
+        )
     }
 
     private var projectSidebar: some View {
@@ -419,8 +483,7 @@ struct ProjectManagerSheet: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    @ViewBuilder
-    private var detail: some View {
+    @ViewBuilder private var detail: some View {
         if let project = selectedProject {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
@@ -529,6 +592,7 @@ struct ProjectManagerSheet: View {
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .help(String(localized: "New Project"))
+            .accessibilityLabel(String(localized: "New Project"))
             .disabled(!canCreateProject)
 
             Rectangle()
@@ -552,6 +616,7 @@ struct ProjectManagerSheet: View {
             }
             .buttonStyle(.plain)
             .help(String(localized: "Delete Project"))
+            .accessibilityLabel(String(localized: "Delete Project"))
             .disabled(!canDeleteSelectedProject)
         }
         .frame(
@@ -566,15 +631,11 @@ struct ProjectManagerSheet: View {
         }
     }
 
-    private var canDeleteSelectedProject: Bool {
-        canTransitionProjects
-            && selectedProject != nil
-            && coordinator.projectStore.projects.count > 1
-    }
-
     private var infoBanner: some View {
         Label(
-            String(localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic."),
+            String(
+                localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic."
+            ),
             systemImage: "info.circle"
         )
         .font(toolMetrics.secondaryFont())
@@ -620,6 +681,7 @@ struct ProjectManagerSheet: View {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle()
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
@@ -627,10 +689,8 @@ struct ProjectManagerSheet: View {
     }
 
     private func trafficTabCountText(_ count: Int) -> String {
-        if count == 1 {
-            return String(localized: "1 Traffic Tab")
-        }
-        return String(localized: "\(count) Traffic Tabs")
+        let inflected = AttributedString(localized: "^[\(count) Traffic Tab](inflect: true)")
+        return String(inflected.characters)
     }
 
     private func projectAccessibilityValue(_ project: Project) -> String {
@@ -639,17 +699,6 @@ struct ProjectManagerSheet: View {
             return String(localized: "\(count), Active Project")
         }
         return count
-    }
-
-    private var deleteConfirmation: Binding<Bool> {
-        Binding(
-            get: { coordinator.projectDeletionRequest != nil },
-            set: {
-                if !$0 {
-                    coordinator.projectDeletionRequest = nil
-                }
-            }
-        )
     }
 
     private func open(_ project: Project) {
@@ -693,6 +742,8 @@ struct ProjectManagerSheet: View {
 // MARK: - ProjectRecoverySheet
 
 struct ProjectRecoverySheet: View {
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
 
     var body: some View {
@@ -705,7 +756,9 @@ struct ProjectRecoverySheet: View {
                     Text(String(localized: "Projects Could Not Be Loaded"))
                         .font(.headline)
                     Text(
-                        String(localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data.")
+                        String(
+                            localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data."
+                        )
                     )
                     .foregroundStyle(.secondary)
                     Text(coordinator.projectStore.loadFailureMessage ?? String(localized: "Unknown catalog error"))
@@ -733,6 +786,7 @@ struct ProjectRecoverySheet: View {
                     retry()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
             .padding(.horizontal, 20)
             .frame(height: 56)
@@ -750,6 +804,8 @@ struct ProjectRecoverySheet: View {
             )
         }
     }
+
+    // MARK: Private
 
     @State private var confirmsReset = false
 

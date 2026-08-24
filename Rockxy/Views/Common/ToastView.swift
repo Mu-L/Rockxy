@@ -22,13 +22,11 @@ struct ToastView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color(nsColor: .labelColor))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.regularMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-        }
+        .padding(.horizontal, Theme.Glass.toastHorizontalPadding)
+        .padding(.vertical, Theme.Glass.toastVerticalPadding)
+        .rockxyGlassEffect(
+            in: RoundedRectangle(cornerRadius: Theme.Glass.toastCornerRadius, style: .continuous)
+        )
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .onAppear {
             dismissTask = Task { @MainActor in

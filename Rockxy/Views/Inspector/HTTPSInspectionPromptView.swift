@@ -65,7 +65,7 @@ struct HTTPSInspectionPromptView: View {
                     .lineLimit(1)
                     .frame(minWidth: promptActionLabelWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .fixedSize()
             .help(String(localized: "Open HTTPS Decryption Settings"))
@@ -79,7 +79,7 @@ struct HTTPSInspectionPromptView: View {
                 onAction(action)
             }
         }
-        .buttonStyle(.borderedProminent)
+        .rockxyGlassButtonStyle(prominent: true)
         .controlSize(.small)
         .accessibilityHint(String(localized: "Installs and trusts the Rockxy root certificate"))
     }
@@ -236,7 +236,7 @@ struct HTTPSInspectionPromptView: View {
                     .lineLimit(1)
                     .frame(minWidth: promptActionLabelWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .fixedSize()
             .help(scope.actionDescription)

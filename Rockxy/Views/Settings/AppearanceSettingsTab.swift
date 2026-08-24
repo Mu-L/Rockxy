@@ -1,16 +1,18 @@
 import SwiftUI
 
+// MARK: - AppearanceSettingsTab
+
 /// Application-wide appearance and readability settings.
 struct AppearanceSettingsTab: View {
     // MARK: Internal
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "App UI")) {
+            SettingsSection(String(localized: "App UI")) {
                 appUISection
             }
 
-            SettingsSectionCard(String(localized: "App Theme")) {
+            SettingsSection(String(localized: "App Theme")) {
                 themeSection
             }
 
@@ -21,6 +23,8 @@ struct AppearanceSettingsTab: View {
     }
 
     // MARK: Private
+
+    @State private var hoveredTheme: AppTheme?
 
     private let settingsManager = AppSettingsManager.shared
 
@@ -36,6 +40,24 @@ struct AppearanceSettingsTab: View {
         SettingsDisplayMetrics(appMetrics: AppUIDisplayMetrics(settings: settingsManager.appUI))
     }
 
+    private var fontSizeBinding: Binding<Int> {
+        Binding(
+            get: { appUI.fontSize },
+            set: { newValue in
+                settingsManager.updateAppUI { $0.fontSize = newValue }
+            }
+        )
+    }
+
+    private var tabWidthBinding: Binding<Int> {
+        Binding(
+            get: { appUI.tabWidth },
+            set: { newValue in
+                settingsManager.updateAppUI { $0.tabWidth = newValue }
+            }
+        )
+    }
+
     private var appUISection: some View {
         VStack(alignment: .leading, spacing: settingsMetrics.sectionContentSpacing) {
             SettingsFieldRow(String(localized: "Font Size:")) {
@@ -45,6 +67,7 @@ struct AppearanceSettingsTab: View {
                     }
                 }
                 .labelsHidden()
+                .pickerStyle(.menu)
                 .frame(width: settingsMetrics.menuWidth(84))
             }
 
@@ -55,6 +78,7 @@ struct AppearanceSettingsTab: View {
                     }
                 }
                 .labelsHidden()
+                .pickerStyle(.menu)
                 .frame(width: settingsMetrics.menuWidth(128))
             }
 
@@ -124,33 +148,6 @@ struct AppearanceSettingsTab: View {
         .font(settingsMetrics.font())
     }
 
-    private var fontSizeBinding: Binding<Int> {
-        Binding(
-            get: { appUI.fontSize },
-            set: { newValue in
-                settingsManager.updateAppUI { $0.fontSize = newValue }
-            }
-        )
-    }
-
-    private var tabWidthBinding: Binding<Int> {
-        Binding(
-            get: { appUI.tabWidth },
-            set: { newValue in
-                settingsManager.updateAppUI { $0.tabWidth = newValue }
-            }
-        )
-    }
-
-    private func appUIToggle(_ keyPath: WritableKeyPath<AppUISettings, Bool>) -> Binding<Bool> {
-        Binding(
-            get: { appUI[keyPath: keyPath] },
-            set: { newValue in
-                settingsManager.updateAppUI { $0[keyPath: keyPath] = newValue }
-            }
-        )
-    }
-
     private func themeOption(_ theme: AppTheme) -> some View {
         Button {
             settingsManager.updateAppTheme(theme)
@@ -171,17 +168,53 @@ struct AppearanceSettingsTab: View {
                 }
                 .frame(minWidth: 82)
             }
+            .padding(10)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(themeOptionFill(theme))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        appTheme == theme ? Color.accentColor.opacity(0.55) : Color.clear,
+                        lineWidth: 1
+                    )
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { isHovered in
+            hoveredTheme = isHovered ? theme : nil
+        }
         .accessibilityLabel(theme.displayName)
         .accessibilityAddTraits(appTheme == theme ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private func themeOptionFill(_ theme: AppTheme) -> Color {
+        if appTheme == theme {
+            return Color.accentColor.opacity(0.10)
+        }
+        if hoveredTheme == theme {
+            return Color.primary.opacity(0.05)
+        }
+        return .clear
+    }
+
+    private func appUIToggle(_ keyPath: WritableKeyPath<AppUISettings, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { appUI[keyPath: keyPath] },
+            set: { newValue in
+                settingsManager.updateAppUI { $0[keyPath: keyPath] = newValue }
+            }
+        )
     }
 }
 
 // MARK: - ThemePreviewCard
 
 private struct ThemePreviewCard: View {
+    // MARK: Internal
+
     let theme: AppTheme
 
     var body: some View {
@@ -230,9 +263,12 @@ private struct ThemePreviewCard: View {
         }
     }
 
+    // MARK: Private
+
     private var background: Color {
         switch theme {
-        case .system, .light:
+        case .system,
+             .light:
             Color(nsColor: .textBackgroundColor)
         case .dark:
             Color(nsColor: .windowBackgroundColor)

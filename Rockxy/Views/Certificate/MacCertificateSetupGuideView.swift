@@ -94,7 +94,7 @@ struct MacCertificateSetupGuideView: View {
         }
     }
 
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @State private var selectedTab = Tab.automatic
     @State private var snapshot: RootCAStatusSnapshot?
@@ -225,6 +225,7 @@ struct MacCertificateSetupGuideView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var modePicker: some View {
@@ -375,8 +376,8 @@ struct MacCertificateSetupGuideView: View {
         } label: {
             Label(primaryActionTitle, systemImage: primaryActionIcon)
         }
-        .buttonStyle(.borderedProminent)
         .keyboardShortcut(.defaultAction)
+        .rockxyGlassButtonStyle(prominent: true)
         .disabled(activeOperation != nil || currentState.isReady || !hasLoadedSnapshot)
 
         Button {
@@ -603,7 +604,7 @@ struct MacCertificateSetupGuideView: View {
             } label: {
                 Label(String(localized: "Generate Certificate"), systemImage: "plus.circle")
             }
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(activeOperation != nil || !hasLoadedSnapshot)
         }
 
@@ -815,7 +816,7 @@ struct MacCertificateSetupGuideView: View {
 
     private func openGeneralSettings() {
         RockxySettingsTab.select(.general)
-        openSettings()
+        openWindow(id: "settings")
     }
 
     private func openKeychainAccess() {

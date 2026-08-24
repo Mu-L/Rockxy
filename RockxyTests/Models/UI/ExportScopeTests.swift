@@ -130,8 +130,8 @@ struct ExportScopeTests {
         let source = try readProjectFile("Rockxy/Views/Export/ExportScopeSheet.swift")
 
         #expect(source.contains(".pickerStyle(.radioGroup)"))
-        #expect(source.contains(".buttonStyle(.bordered)"))
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains(".rockxyGlassButtonStyle()"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(source.contains(".keyboardShortcut(.cancelAction)"))
         #expect(source.contains(".keyboardShortcut(.defaultAction)"))
         #expect(source.contains("ToolWindowDisplayMetrics"))

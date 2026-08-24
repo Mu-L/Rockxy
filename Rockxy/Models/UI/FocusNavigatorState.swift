@@ -16,6 +16,17 @@ enum FocusNavigatorMode: String, CaseIterable, Identifiable {
         case .library: String(localized: "Library")
         }
     }
+
+    /// Monochrome symbols keep the compact navigator switcher aligned with Xcode's native
+    /// navigator and inspector controls. The localized title remains the help and accessibility
+    /// label, so the icon-only presentation never removes meaning.
+    var systemImage: String {
+        switch self {
+        case .browse: "list.bullet.rectangle"
+        case .focus: "scope"
+        case .library: "books.vertical"
+        }
+    }
 }
 
 // MARK: - TrafficSignal

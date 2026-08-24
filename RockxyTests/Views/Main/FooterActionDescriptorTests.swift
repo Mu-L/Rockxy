@@ -110,6 +110,37 @@ struct FooterActionDescriptorTests {
         #expect(FooterActionKind.networkConditions.toolWindowID == "networkConditions")
         #expect(FooterActionKind.proxyOverride.toolWindowID == nil)
     }
+
+    @Test("Quick Tools stay labeled while Customize remains compact and accessible")
+    func quickToolsUseLabeledNativeGlassControls() throws {
+        let source = try readProjectFile("Rockxy/Views/RequestList/StatusBarView.swift")
+
+        #expect(source.contains("Label(descriptor.title, systemImage: descriptor.systemImage)"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: descriptor.isActive)"))
+        #expect(source.contains("Label(String(localized: \"Quick Tools\"), systemImage: \"hammer\")"))
+        #expect(source.contains("Image(systemName: \"ellipsis\")"))
+        #expect(!source.contains("Label(String(localized: \"Customize\"), systemImage: \"ellipsis\")"))
+        #expect(!source.contains("showsCustomizeTitle"))
+        #expect(source.contains("quickTools\n                    .layoutPriority(0)"))
+        #expect(source.contains("centerStatus\n                    .layoutPriority(3)"))
+        #expect(source.contains("rightStats\n                    .layoutPriority(3)"))
+        #expect(source.contains("ViewThatFits(in: .horizontal)"))
+        #expect(source.contains(".accessibilityLabel(String(localized: \"Customize Quick Tools\"))"))
+        #expect(!source.contains("struct FooterToolIconLabel"))
+        #expect(!source.contains("struct FooterToolingChrome"))
+        #expect(!source.contains("FooterToolingChrome("))
+    }
+
+    // MARK: Private
+
+    private func readProjectFile(_ relativePath: String) throws -> String {
+        var url = URL(fileURLWithPath: #filePath)
+        while url.lastPathComponent != "RockxyTests", url.path != "/" {
+            url.deleteLastPathComponent()
+        }
+        url.deleteLastPathComponent()
+        return try String(contentsOf: url.appendingPathComponent(relativePath), encoding: .utf8)
+    }
 }
 
 // MARK: - QuickToolsLayoutTests
