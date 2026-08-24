@@ -338,6 +338,24 @@ struct ProjectCatalogRepositoryTests {
         #expect(FileManager.default.fileExists(atPath: repo.fileURL.path))
     }
 
+    @Test("reset preserves an existing recovery backup when the live catalog is oversized")
+    func resetKeepsRecoveryBackupWhenLiveCatalogIsOversized() async throws {
+        let repo = makeRepo()
+        try FileManager.default.createDirectory(at: repo.directoryURL, withIntermediateDirectories: true)
+        let backupURL = repo.directoryURL.appendingPathComponent(ProjectCatalogRepository.recoveryBackupFileName)
+        let recoveryData = Data("previous recovery".utf8)
+        try recoveryData.write(to: backupURL)
+        let oversized = Data(repeating: 0x20, count: ProjectCatalogRepository.maxCatalogByteSize + 1)
+        try oversized.write(to: repo.fileURL)
+
+        await #expect(throws: ProjectCatalogRepositoryError.fileTooLarge(bytes: oversized.count)) {
+            try await repo.reset()
+        }
+
+        #expect(try Data(contentsOf: backupURL) == recoveryData)
+        #expect(try Data(contentsOf: repo.fileURL) == oversized)
+    }
+
     @Test("reset refuses to recursively remove a non-regular recovery node")
     func resetPreservesNonRegularRecoveryNode() async throws {
         let repo = makeRepo()
