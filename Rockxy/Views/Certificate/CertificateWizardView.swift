@@ -233,7 +233,7 @@ struct CertificateWizardView: View {
                     Label(String(localized: "Install & Trust"), systemImage: "checkmark.shield.fill")
                 }
                 .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .padding(.top, 8)
             }
         }
@@ -352,14 +352,14 @@ struct CertificateWizardView: View {
                 Button(String(localized: "Get Started")) {
                     goForward()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
 
             case .generate:
                 Button(String(localized: "Next")) {
                     goForward()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
                 .disabled(!generateSuccess)
 
@@ -367,7 +367,7 @@ struct CertificateWizardView: View {
                 Button(String(localized: "Next")) {
                     goForward()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
                 .disabled(!installSuccess)
 
@@ -375,7 +375,7 @@ struct CertificateWizardView: View {
                 Button(String(localized: "Next")) {
                     goForward()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
                 .disabled(!isTrusted)
 
@@ -384,7 +384,7 @@ struct CertificateWizardView: View {
                     Self.logger.info("Certificate wizard completed")
                     onDismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
             }
         }

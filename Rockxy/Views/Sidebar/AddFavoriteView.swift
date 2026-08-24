@@ -189,6 +189,7 @@ struct AddFavoriteView: View {
                 isPresented = false
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(selectedItem == nil || isAddDisabledByQuota)
         }
     }

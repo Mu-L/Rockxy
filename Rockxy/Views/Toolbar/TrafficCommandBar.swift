@@ -155,14 +155,24 @@ struct TrafficCommandBar: View {
 
     let coordinator: MainContentCoordinator
     var onOpenToolWindow: (String) -> Void = { _ in }
+    var isEmbeddedInControlShelf = false
+    var showsQuickTools = true
 
     var body: some View {
         commandRow
             .padding(.horizontal, Theme.Layout.contentPadding)
             .padding(.vertical, max(4, (metrics.fontSize - 10) / 3))
-            .background(Color(nsColor: .windowBackgroundColor))
-            .overlay(alignment: .bottom) { Divider() }
-            .fixedSize(horizontal: false, vertical: true)
+            .background {
+                if !isEmbeddedInControlShelf {
+                    Color(nsColor: .windowBackgroundColor)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !isEmbeddedInControlShelf {
+                    Divider()
+                }
+            }
+            .fixedSize(horizontal: isEmbeddedInControlShelf, vertical: true)
             .task { persistResolvedQuickToolsLayoutIfNeeded() }
     }
 
@@ -224,22 +234,17 @@ struct TrafficCommandBar: View {
         )
     }
 
-    private var followLiveBinding: Binding<Bool> {
-        Binding(
-            get: { coordinator.isFollowingLiveTraffic },
-            set: { coordinator.setFollowingLiveTraffic($0) }
-        )
-    }
-
     private var commandRow: some View {
         HStack(spacing: 8) {
             recordingButton
             clearSessionButton
             commandDivider
             followLiveButton
-            responsiveQuickToolsGroup
+            if showsQuickTools {
+                responsiveQuickToolsGroup
+            }
 
-            Spacer(minLength: 12)
+            Spacer(minLength: showsQuickTools ? 12 : 4)
             moreActionsMenu
         }
     }
@@ -252,12 +257,9 @@ struct TrafficCommandBar: View {
         return Button {
             actions.toggleRecording()
         } label: {
-            Label(presentation.title, systemImage: presentation.systemImage)
-                .font(.system(size: metrics.secondaryFontSize))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+            commandLabel(title: presentation.title, systemImage: presentation.systemImage)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .disabled(!presentation.isEnabled)
         .help(presentation.help)
@@ -287,12 +289,9 @@ struct TrafficCommandBar: View {
         return Button {
             actions.clearSession()
         } label: {
-            Label(descriptor.title, systemImage: descriptor.systemImage)
-                .font(.system(size: metrics.secondaryFontSize))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+            commandLabel(title: descriptor.title, systemImage: descriptor.systemImage)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .disabled(!descriptor.isEnabled)
         .help(descriptor.help)
@@ -301,15 +300,21 @@ struct TrafficCommandBar: View {
 
     private var followLiveButton: some View {
         let descriptor = TrafficCommandDescriptor.followLive(isActive: coordinator.isFollowingLiveTraffic)
-        return Toggle(isOn: followLiveBinding) {
-            Label(descriptor.title, systemImage: descriptor.systemImage)
-                .font(.system(size: metrics.secondaryFontSize))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+        return Button {
+            coordinator.setFollowingLiveTraffic(!coordinator.isFollowingLiveTraffic)
+        } label: {
+            commandLabel(title: descriptor.title, systemImage: descriptor.systemImage)
+                .foregroundStyle(.primary)
         }
-        .toggleStyle(.button)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
+        .overlay {
+            if descriptor.isActive {
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.accentColor.opacity(Theme.Glass.activeStrokeOpacity), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
         .help(descriptor.help)
         .accessibilityLabel(descriptor.title)
         .accessibilityValue(descriptor.isActive ? String(localized: "On") : String(localized: "Off"))
@@ -494,6 +499,20 @@ struct TrafficCommandBar: View {
         Divider()
             .frame(height: 16)
             .padding(.horizontal, 4)
+    }
+
+    @ViewBuilder
+    private func commandLabel(title: String, systemImage: String) -> some View {
+        if isEmbeddedInControlShelf {
+            Image(systemName: systemImage)
+                .font(.system(size: metrics.controlFontSize, weight: .medium))
+                .frame(width: metrics.filterBarHeight, height: metrics.filterBarHeight)
+        } else {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: metrics.secondaryFontSize))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
     }
 
     private func quickToolsRow(_ descriptors: [FooterActionDescriptor]) -> some View {

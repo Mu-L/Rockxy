@@ -403,6 +403,7 @@ struct AllowListWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -460,14 +461,13 @@ struct AllowListWindowView: View {
                     : String(localized: "ALLOW LIST OFF")
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
-            .foregroundStyle(viewModel.isAllowListActive ? Color.white : Color.secondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(viewModel.isAllowListActive ? Color.green : Color.secondary.opacity(0.14))
-            .clipShape(Capsule())
+            .rockxyChipStyle(tint: .green, isActive: viewModel.isAllowListActive)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var footerHint: String {
@@ -582,7 +582,7 @@ struct AllowListWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 

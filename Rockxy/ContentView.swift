@@ -94,7 +94,7 @@ struct ContentView: View {
         } inspector: {
             ContextDockView(
                 coordinator: coordinator,
-                onOpenSettings: openSettings.callAsFunction
+                onOpenSettings: { openWindow(id: "settings") }
             )
         }
         .frame(
@@ -262,8 +262,13 @@ struct ContentView: View {
 
     // MARK: Private
 
+    private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
+        // Establish compact utility panes once, then preserve every user-adjusted divider
+        // position normally again.
+        "nativeWorkspaceSplit.compactUtilityPanes.v1"
+    )
+
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
     @Bindable private var coordinator: MainContentCoordinator
     @State private var nearbyTransferReceiver = RockxyNearbyTransferReceiver.shared
     @State private var isSidebarPresented = true
@@ -271,26 +276,6 @@ struct ContentView: View {
     private let settingsManager = AppSettingsManager.shared
     private let managesLifecycle: Bool
     private let representedWorkspaceID: UUID?
-
-    @ViewBuilder
-    private var toastOverlay: some View {
-        if let toast = coordinator.activeToast {
-            ToastView(message: toast) {
-                coordinator.dismissToast(id: toast.id)
-            }
-            .id(toast.id)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
-            .allowsHitTesting(false)
-            .zIndex(100)
-        }
-    }
-
-    private static let workspaceSplitAutosaveName = RockxyIdentity.current.defaultsKey(
-        // Establish compact utility panes once, then preserve every user-adjusted divider
-        // position normally again.
-        "nativeWorkspaceSplit.compactUtilityPanes.v1"
-    )
 
     private var displayMetrics: AppUIDisplayMetrics {
         AppUIDisplayMetrics(settings: settingsManager.appUI)
@@ -310,12 +295,26 @@ struct ContentView: View {
         return String(localized: "Receive from \(invitation.deviceName)?")
     }
 
+    @ViewBuilder private var toastOverlay: some View {
+        if let toast = coordinator.activeToast {
+            ToastView(message: toast) {
+                coordinator.dismissToast(id: toast.id)
+            }
+            .id(toast.id)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
+            .allowsHitTesting(false)
+            .zIndex(100)
+        }
+    }
+
     private func handleSystemProxyWarningAction(_ action: SystemProxyWarning.Action?) {
         switch action {
         case .retry:
             coordinator.retrySystemProxy()
         case .openGeneralSettings:
-            openSettings()
+            RockxySettingsTab.select(.general)
+            openWindow(id: "settings")
         case .openAdvancedProxySettings:
             openWindow(id: "advancedProxySettings")
         case .reinstallAndTrust:

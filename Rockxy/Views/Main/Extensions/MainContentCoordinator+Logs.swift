@@ -68,12 +68,6 @@ extension MainContentCoordinator {
         } else {
             transactionsByProjectID[projectID] ?? []
         }
-        var projectLogs = if projectID == projectStore.activeProjectID {
-            logEntries
-        } else {
-            logEntriesByProjectID[projectID] ?? []
-        }
-
         if let correlatedId = LogCorrelator.correlate(
             logEntry: entry,
             with: projectTransactions
@@ -81,16 +75,22 @@ extension MainContentCoordinator {
             mutableEntry.correlatedTransactionId = correlatedId
         }
 
-        projectLogs.append(mutableEntry)
-
-        if projectLogs.count > settings.maxLogBufferSize {
-            let excess = projectLogs.count - settings.maxLogBufferSize
-            projectLogs.removeFirst(excess)
-            Self.logger.debug("Evicted \(excess) oldest log entries")
-        }
-        logEntriesByProjectID[projectID] = projectLogs
         if projectID == projectStore.activeProjectID {
-            logEntries = projectLogs
+            logEntries.append(mutableEntry)
+            if logEntries.count > settings.maxLogBufferSize {
+                let excess = logEntries.count - settings.maxLogBufferSize
+                logEntries.removeFirst(excess)
+                Self.logger.debug("Evicted \(excess) oldest log entries")
+            }
+        } else {
+            var projectLogs = logEntriesByProjectID[projectID] ?? []
+            projectLogs.append(mutableEntry)
+            if projectLogs.count > settings.maxLogBufferSize {
+                let excess = projectLogs.count - settings.maxLogBufferSize
+                projectLogs.removeFirst(excess)
+                Self.logger.debug("Evicted \(excess) oldest log entries")
+            }
+            logEntriesByProjectID[projectID] = projectLogs
         }
     }
 }

@@ -530,8 +530,10 @@ final class ProjectStore {
             return
         }
         let snapshot = catalog
+        let previousTask = persistenceTask
         persistenceStatus = .saving
         persistenceTask = Task { @MainActor in
+            await previousTask?.value
             do {
                 try await repository.save(snapshot)
                 if catalog.revision == snapshot.revision {

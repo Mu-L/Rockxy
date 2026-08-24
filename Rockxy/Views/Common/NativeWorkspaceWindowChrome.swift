@@ -19,6 +19,7 @@ enum NativeWorkspaceWindowChrome {
     ) {
         window.titlebarAppearsTransparent = true
         window.styleMask.insert(.fullSizeContentView)
+        window.toolbarStyle = .unified
 
         if let workspaceSplitController,
            let toolbarConfiguration

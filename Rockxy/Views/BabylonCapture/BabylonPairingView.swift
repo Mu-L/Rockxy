@@ -288,6 +288,7 @@ struct BabylonPairingView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     // MARK: - Connection
@@ -488,6 +489,7 @@ struct BabylonPairingView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.vertical, toolMetrics.footerTopPadding)
+            .rockxyFunctionalBar()
     }
 
     private func detailLabel(_ label: String) -> some View {

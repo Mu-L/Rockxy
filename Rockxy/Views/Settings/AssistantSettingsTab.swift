@@ -10,19 +10,19 @@ struct AssistantSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "1. Local Model Setup")) {
+            SettingsSection(String(localized: "1. Local Model Setup")) {
                 globalModelSection
             }
 
-            SettingsSectionCard(String(localized: "2. Provider & Model")) {
+            SettingsSection(String(localized: "2. Provider & Model")) {
                 providerSection
             }
 
-            SettingsSectionCard(String(localized: "3. Connection")) {
+            SettingsSection(String(localized: "3. Connection")) {
                 connectionSection
             }
 
-            SettingsSectionCard(String(localized: "Data Handling")) {
+            SettingsSection(String(localized: "Data Handling")) {
                 privacySection
             }
         }
@@ -35,7 +35,11 @@ struct AssistantSettingsTab: View {
             String(localized: "Remove Local Model?"),
             isPresented: Binding(
                 get: { pendingModelRemoval != nil },
-                set: { if !$0 { pendingModelRemoval = nil } }
+                set: {
+                    if !$0 {
+                        pendingModelRemoval = nil
+                    }
+                }
             )
         ) {
             Button(String(localized: "Cancel"), role: .cancel) {
@@ -101,100 +105,100 @@ struct AssistantSettingsTab: View {
         }
     }
 
-    private var globalModelSection: some View {
-        Group {
-            if let activeID = viewModel.savedConfiguration?.id,
-               !viewModel.savedConfigurations.isEmpty
-            {
-                SettingsFieldRow(String(localized: "Global Default")) {
-                    Picker(String(localized: "Global Default"), selection: Binding(
-                        get: { activeID },
-                        set: viewModel.selectSavedConfiguration
-                    )) {
-                        ForEach(viewModel.savedConfigurations) { configuration in
-                            Text(viewModel.profileLabel(configuration)).tag(configuration.id)
-                        }
+    @ViewBuilder private var globalModelSection: some View {
+        if let activeID = viewModel.savedConfiguration?.id,
+           !viewModel.savedConfigurations.isEmpty
+        {
+            SettingsFieldRow(String(localized: "Global Default")) {
+                Picker(String(localized: "Global Default"), selection: Binding(
+                    get: { activeID },
+                    set: viewModel.selectSavedConfiguration
+                )) {
+                    ForEach(viewModel.savedConfigurations) { configuration in
+                        Text(viewModel.profileLabel(configuration)).tag(configuration.id)
                     }
-                    .labelsHidden()
-                    .frame(width: settingsMetrics.fieldWidth(420))
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: settingsMetrics.fieldWidth(420))
             }
+        }
 
-            SettingsIndentedContent {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(
-                        String(
-                            localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions."
-                        )
+        SettingsIndentedContent {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(
+                    String(
+                        localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions."
                     )
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                )
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)
 
-                    ollamaRuntimeStatus
+                ollamaRuntimeStatus
 
-                    if viewModel.isOllamaReady {
-                        Text(String(localized: "Installed Models"))
-                            .font(settingsMetrics.secondaryFont(weight: .medium))
+                if viewModel.isOllamaReady {
+                    Text(String(localized: "Installed Models"))
+                        .font(settingsMetrics.secondaryFont(weight: .medium))
 
-                        if viewModel.installedOllamaModels.isEmpty {
-                            Label(
-                                String(localized: "No local models installed yet."),
-                                systemImage: "shippingbox"
-                            )
-                            .font(settingsMetrics.secondaryFont())
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(
-                                Color(nsColor: .textBackgroundColor).opacity(0.4),
-                                in: RoundedRectangle(cornerRadius: 7)
-                            )
-                        } else {
-                            ForEach(viewModel.installedOllamaModels) { model in
-                                installedModelRow(model)
-                            }
+                    if viewModel.installedOllamaModels.isEmpty {
+                        Label(
+                            String(localized: "No local models installed yet."),
+                            systemImage: "shippingbox"
+                        )
+                        .font(settingsMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            Color(nsColor: .textBackgroundColor).opacity(0.4),
+                            in: RoundedRectangle(cornerRadius: 7)
+                        )
+                    } else {
+                        ForEach(viewModel.installedOllamaModels) { model in
+                            installedModelRow(model)
                         }
-
-                        Text(String(localized: "Curated Local Models"))
-                            .font(settingsMetrics.secondaryFont(weight: .medium))
-
-                        ForEach(AssistantDownloadableModel.recommended) { model in
-                            downloadableModelRow(model)
-                        }
-
-                        customModelDownload
                     }
 
-                    HStack(spacing: 8) {
-                        if viewModel.isRefreshingModelLibrary {
-                            ProgressView().controlSize(.small)
-                        }
-                        Button(String(localized: "Check Again")) {
-                            viewModel.refreshModelLibrary()
+                    Text(String(localized: "Curated Local Models"))
+                        .font(settingsMetrics.secondaryFont(weight: .medium))
+
+                    ForEach(AssistantDownloadableModel.recommended) { model in
+                        downloadableModelRow(model)
+                    }
+
+                    customModelDownload
+                }
+
+                HStack(spacing: 8) {
+                    if viewModel.isRefreshingModelLibrary {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button(String(localized: "Check Again")) {
+                        viewModel.refreshModelLibrary()
+                    }
+                    .controlSize(.small)
+                    .disabled(viewModel.isRefreshingModelLibrary || viewModel.modelInstallID != nil)
+                    if viewModel.isOllamaReady {
+                        Button(String(localized: "Show Models Folder")) {
+                            viewModel.revealOllamaModelsFolder()
                         }
                         .controlSize(.small)
-                        .disabled(viewModel.isRefreshingModelLibrary || viewModel.modelInstallID != nil)
-                        if viewModel.isOllamaReady {
-                            Button(String(localized: "Show Models Folder")) {
-                                viewModel.revealOllamaModelsFolder()
-                            }
-                            .controlSize(.small)
-                        }
                     }
-
-                    Label(
-                        String(
-                            localized: "Model files remain managed by Ollama. Downloads can require several GB of disk and memory; model license terms vary."
-                        ),
-                        systemImage: "externaldrive"
-                    )
-                    .font(settingsMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: settingsMetrics.fieldWidth(520), alignment: .leading)
+
+                Label(
+                    String(
+                        localized: "Model files remain managed by Ollama. Downloads can require several GB of disk and memory; model license terms vary."
+                    ),
+                    systemImage: "externaldrive"
+                )
+                .font(settingsMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -210,6 +214,7 @@ struct AssistantSettingsTab: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .layoutPriority(1)
 
             Spacer(minLength: 12)
 
@@ -224,17 +229,13 @@ struct AssistantSettingsTab: View {
                         viewModel.prepareRuntimeSetup()
                         isRuntimeSetupPresented = true
                     }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                    .rockxyGlassButtonStyle(prominent: true)
+                    .controlSize(.small)
                 }
             }
         }
-        .padding(12)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.42), lineWidth: 0.5)
-        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     @ViewBuilder private var runtimeStatusIcon: some View {
@@ -261,7 +262,7 @@ struct AssistantSettingsTab: View {
                 Button(String(localized: "Download & Use")) {
                     viewModel.installCustomModel()
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle()
                 .disabled(!viewModel.canInstallCustomModel)
             }
             Text(String(localized: "Enter an exact model tag from the Ollama model library."))
@@ -290,183 +291,183 @@ struct AssistantSettingsTab: View {
         .padding(.top, 2)
     }
 
-    private var providerSection: some View {
-        Group {
-            SettingsFieldRow(String(localized: "Provider")) {
-                Picker(String(localized: "Provider"), selection: Binding(
-                    get: { viewModel.configuration.kind },
-                    set: viewModel.selectProvider
-                )) {
-                    ForEach(AssistantProviderGroup.allCases, id: \.self) { group in
-                        Section(group.title) {
-                            ForEach(AssistantProviderKind.allCases.filter { $0.group == group }) { provider in
-                                Text(providerDisplayTitle(provider))
-                                    .tag(provider)
-                            }
+    @ViewBuilder private var providerSection: some View {
+        SettingsFieldRow(String(localized: "Provider")) {
+            Picker(String(localized: "Provider"), selection: Binding(
+                get: { viewModel.configuration.kind },
+                set: viewModel.selectProvider
+            )) {
+                ForEach(AssistantProviderGroup.allCases, id: \.self) { group in
+                    Section(group.title) {
+                        ForEach(AssistantProviderKind.allCases.filter { $0.group == group }) { provider in
+                            Text(providerDisplayTitle(provider))
+                                .tag(provider)
                         }
                     }
                 }
-                .labelsHidden()
-                .frame(width: settingsMetrics.fieldWidth(420))
             }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: settingsMetrics.fieldWidth(420))
+        }
 
-            if !viewModel.configuration.kind.isImplemented {
-                SettingsIndentedContent {
-                    Label(
-                        String(
-                            localized: "This provider needs its native adapter. Select OpenAI, Anthropic, Gemini, an OpenAI-compatible endpoint, or Ollama."
-                        ),
-                        systemImage: "hammer"
-                    )
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.orange)
-                }
-            }
-
-            SettingsFieldRow(String(localized: "API Surface")) {
-                Text(viewModel.configuration.kind.apiSurface)
-                    .foregroundStyle(.secondary)
-                    .frame(minHeight: settingsMetrics.controlHeight, alignment: .leading)
-            }
-
-            SettingsFieldRow(String(localized: "Base URL")) {
-                TextField(String(localized: "Provider API base URL"), text: $viewModel.configuration.baseURL)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: settingsMetrics.fieldWidth(420))
-                    .frame(minHeight: settingsMetrics.controlHeight)
-                    .disabled(viewModel.configuration.kind.usesFixedEndpoint)
-            }
-
+        if !viewModel.configuration.kind.isImplemented {
             SettingsIndentedContent {
-                endpointSecurityLabel
+                Label(
+                    String(
+                        localized: "This provider needs its native adapter. Select OpenAI, Anthropic, Gemini, an OpenAI-compatible endpoint, or Ollama."
+                    ),
+                    systemImage: "hammer"
+                )
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.orange)
             }
+        }
 
-            SettingsFieldRow(String(localized: "Model")) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        if viewModel.models.isEmpty {
-                            TextField(String(localized: "Exact model ID"), text: $viewModel.configuration.model)
-                                .textFieldStyle(.roundedBorder)
+        SettingsFieldRow(String(localized: "API Surface")) {
+            Text(viewModel.configuration.kind.apiSurface)
+                .foregroundStyle(.secondary)
+                .frame(minHeight: settingsMetrics.controlHeight, alignment: .leading)
+        }
+
+        SettingsFieldRow(String(localized: "Base URL")) {
+            TextField(String(localized: "Provider API base URL"), text: $viewModel.configuration.baseURL)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: settingsMetrics.fieldWidth(420))
+                .frame(minHeight: settingsMetrics.controlHeight)
+                .disabled(viewModel.configuration.kind.usesFixedEndpoint)
+        }
+
+        SettingsIndentedContent {
+            endpointSecurityLabel
+        }
+
+        SettingsFieldRow(String(localized: "Model")) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    if viewModel.models.isEmpty {
+                        TextField(String(localized: "Exact model ID"), text: $viewModel.configuration.model)
+                            .textFieldStyle(.roundedBorder)
+                    } else {
+                        Picker(String(localized: "Available Models"), selection: $viewModel.configuration.model) {
+                            ForEach(viewModel.models) { model in
+                                Text(modelPickerTitle(model)).tag(model.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+
+                    Button {
+                        viewModel.fetchModels()
+                    } label: {
+                        if viewModel.isRefreshingProviderModels {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(width: 14, height: 14)
                         } else {
-                            Picker(String(localized: "Available Models"), selection: $viewModel.configuration.model) {
-                                ForEach(viewModel.models) { model in
-                                    Text(modelPickerTitle(model)).tag(model.id)
-                                }
-                            }
-                            .labelsHidden()
+                            Image(systemName: "arrow.clockwise")
                         }
-
-                        Button {
-                            viewModel.fetchModels()
-                        } label: {
-                            if viewModel.isRefreshingProviderModels {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(width: 14, height: 14)
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(
-                            viewModel.isBusy
-                                || !viewModel.configuration.kind.isImplemented
-                                || !(viewModel.configuration.kind.capabilities?.modelDiscovery ?? false)
-                        )
-                        .help(String(localized: "Refresh available models"))
-                        .accessibilityLabel(String(localized: "Refresh Available Models"))
                     }
-                    .frame(width: settingsMetrics.fieldWidth(420))
-                    .frame(minHeight: settingsMetrics.controlHeight)
+                    .buttonStyle(.borderless)
+                    .disabled(
+                        viewModel.isBusy
+                            || !viewModel.configuration.kind.isImplemented
+                            || !(viewModel.configuration.kind.capabilities?.modelDiscovery ?? false)
+                    )
+                    .help(String(localized: "Refresh available models"))
+                    .accessibilityLabel(String(localized: "Refresh Available Models"))
+                }
+                .frame(width: settingsMetrics.fieldWidth(420))
+                .frame(minHeight: settingsMetrics.controlHeight)
 
-                    if viewModel.models.isEmpty,
-                       viewModel.configuration.kind.capabilities?.modelDiscovery == true
-                    {
-                        Text(String(localized: "Refresh to discover models available from this provider."))
-                            .font(settingsMetrics.metadataFont())
-                            .foregroundStyle(.secondary)
-                    } else if !viewModel.models.isEmpty {
-                        Text(viewModel.availableModelsDetail)
+                if viewModel.models.isEmpty,
+                   viewModel.configuration.kind.capabilities?.modelDiscovery == true
+                {
+                    Text(String(localized: "Refresh to discover models available from this provider."))
                         .font(settingsMetrics.metadataFont())
                         .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            if viewModel.configuration.kind == .ollama {
-                AssistantContextWindowSettingsField(configuration: $viewModel.configuration)
-            }
-
-            SettingsFieldRow(String(localized: "Output Limit")) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        TextField(
-                            String(localized: "Maximum output tokens"),
-                            value: $viewModel.configuration.maxOutputTokens,
-                            format: .number
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: settingsMetrics.fieldWidth(120))
-                        Text(String(localized: "tokens per response"))
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(String(localized: "Rockxy safety range: 1–32,768. The selected model may allow less."))
+                } else if !viewModel.models.isEmpty {
+                    Text(viewModel.availableModelsDetail)
                         .font(settingsMetrics.metadataFont())
                         .foregroundStyle(.secondary)
                 }
+            }
+        }
+
+        if viewModel.configuration.kind == .ollama {
+            AssistantContextWindowSettingsField(configuration: $viewModel.configuration)
+        }
+
+        SettingsFieldRow(String(localized: "Output Limit")) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    TextField(
+                        String(localized: "Maximum output tokens"),
+                        value: $viewModel.configuration.maxOutputTokens,
+                        format: .number
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: settingsMetrics.fieldWidth(120))
+                    Text(String(localized: "tokens per response"))
+                        .foregroundStyle(.secondary)
+                }
+                Text(String(localized: "Rockxy safety range: 1–32,768. The selected model may allow less."))
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minHeight: settingsMetrics.controlHeight)
+        }
+
+        if viewModel.configuration.kind == .openAICompatible
+            || viewModel.configuration.kind.group == .china
+        {
+            SettingsFieldRow(String(localized: "Platform / Region")) {
+                TextField(
+                    String(localized: "Optional deployment or region label"),
+                    text: Binding(
+                        get: { viewModel.configuration.region ?? "" },
+                        set: { viewModel.configuration.region = $0.isEmpty ? nil : $0 }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(width: settingsMetrics.fieldWidth(420))
                 .frame(minHeight: settingsMetrics.controlHeight)
             }
+        }
 
-            if viewModel.configuration.kind == .openAICompatible
-                || viewModel.configuration.kind.group == .china
-            {
-                SettingsFieldRow(String(localized: "Platform / Region")) {
-                    TextField(
-                        String(localized: "Optional deployment or region label"),
-                        text: Binding(
-                            get: { viewModel.configuration.region ?? "" },
-                            set: { viewModel.configuration.region = $0.isEmpty ? nil : $0 }
-                        )
+        if viewModel.configuration.kind != .ollama {
+            SettingsFieldRow(String(localized: "Credential")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    SecureField(
+                        viewModel.hasStoredCredential
+                            ? String(localized: "Saved in Keychain. Enter a new key to replace it.")
+                            : String(localized: "API key"),
+                        text: $viewModel.credentialInput
                     )
                     .textFieldStyle(.roundedBorder)
                     .frame(width: settingsMetrics.fieldWidth(420))
                     .frame(minHeight: settingsMetrics.controlHeight)
-                }
-            }
-
-            if viewModel.configuration.kind != .ollama {
-                SettingsFieldRow(String(localized: "Credential")) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SecureField(
-                            viewModel.hasStoredCredential
-                                ? String(localized: "Saved in Keychain. Enter a new key to replace it.")
-                                : String(localized: "API key"),
-                            text: $viewModel.credentialInput
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: settingsMetrics.fieldWidth(420))
-                        .frame(minHeight: settingsMetrics.controlHeight)
-                        Label(
-                            viewModel.hasStoredCredential
-                                ? String(localized: "Saved locally in macOS Keychain for this profile")
-                                : String(localized: "No credential saved in settings or Keychain"),
-                            systemImage: viewModel.hasStoredCredential ? "key.fill" : "key"
-                        )
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        if viewModel.hasStoredCredential {
-                            Button(String(localized: "Remove Credential"), role: .destructive) {
-                                viewModel.removeCredential()
-                            }
-                            .controlSize(.small)
+                    Label(
+                        viewModel.hasStoredCredential
+                            ? String(localized: "Saved locally in macOS Keychain for this profile")
+                            : String(localized: "No credential saved in settings or Keychain"),
+                        systemImage: viewModel.hasStoredCredential ? "key.fill" : "key"
+                    )
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    if viewModel.hasStoredCredential {
+                        Button(String(localized: "Remove Credential"), role: .destructive) {
+                            viewModel.removeCredential()
                         }
+                        .controlSize(.small)
                     }
                 }
             }
+        }
 
-            SettingsIndentedContent {
-                capabilitySummary
-            }
+        SettingsIndentedContent {
+            capabilitySummary
         }
     }
 
@@ -495,91 +496,107 @@ struct AssistantSettingsTab: View {
         }
     }
 
-    private var connectionSection: some View {
-        Group {
-            SettingsIndentedContent {
-                HStack(spacing: 10) {
-                    Button(String(localized: "Save Configuration")) {
-                        viewModel.save()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.isBusy || !viewModel.configuration.kind.isImplemented)
+    @ViewBuilder private var connectionSection: some View {
+        SettingsIndentedContent {
+            HStack(spacing: 10) {
+                Button(String(localized: "Save Configuration")) {
+                    viewModel.save()
+                }
+                .rockxyGlassButtonStyle(prominent: true)
+                .disabled(viewModel.isBusy || !viewModel.configuration.kind.isImplemented)
 
-                    Button(String(localized: "Test Connection")) {
-                        viewModel.testConnection()
-                    }
-                    .disabled(viewModel.isBusy || !viewModel.configuration.isComplete)
+                Button(String(localized: "Test Connection")) {
+                    viewModel.testConnection()
+                }
+                .disabled(viewModel.isBusy || !viewModel.configuration.isComplete)
 
-                    if viewModel.isBusy {
-                        ProgressView().controlSize(.small)
-                        Button(String(localized: "Cancel")) {
-                            viewModel.cancelConnection()
-                        }
-                        .controlSize(.small)
+                if viewModel.isBusy {
+                    ProgressView().controlSize(.small)
+                    Button(String(localized: "Cancel")) {
+                        viewModel.cancelConnection()
                     }
+                    .controlSize(.small)
                 }
             }
+        }
 
-            if let status = viewModel.statusMessage {
-                SettingsIndentedContent {
-                    Label(
-                        status,
-                        systemImage: viewModel.hasError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+        if let status = viewModel.statusMessage {
+            SettingsIndentedContent {
+                Label(
+                    status,
+                    systemImage: viewModel.hasError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+                )
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(viewModel.hasError ? .red : .green)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+
+        accessSection
+
+        SettingsIndentedContent {
+            Button(String(localized: "Remove Provider"), role: .destructive) {
+                viewModel.removeProvider()
+            }
+            .disabled(viewModel.savedConfiguration == nil || viewModel.isBusy)
+        }
+    }
+
+    @ViewBuilder private var privacySection: some View {
+        SettingsIndentedContent {
+            Label(
+                String(
+                    localized: "Sensitive headers, query values, and body fields are redacted before Review Data."
+                ),
+                systemImage: "checkmark.shield.fill"
+            )
+            .foregroundStyle(.green)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if viewModel.configuration.kind == .openAI {
+            SettingsIndentedContent {
+                VStack(alignment: .leading, spacing: 5) {
+                    Toggle(
+                        String(localized: "Allow provider response storage"),
+                        isOn: $viewModel.configuration.storeResponses
                     )
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(viewModel.hasError ? .red : .green)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .toggleStyle(.checkbox)
+                    Text(String(localized: "When off, Rockxy sends store=false with every Responses API request."))
+                        .font(settingsMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            accessSection
-
+        }
+        SettingsFieldRow(String(localized: "Destination")) {
+            Text(viewModel.configuration.endpointHost)
+                .textSelection(.enabled)
+                .foregroundStyle(.secondary)
+                .frame(minHeight: settingsMetrics.controlHeight, alignment: .leading)
+        }
+        if let documentationURL = viewModel.configuration.kind.documentationURL {
             SettingsIndentedContent {
-                Button(String(localized: "Remove Provider"), role: .destructive) {
-                    viewModel.removeProvider()
-                }
-                .disabled(viewModel.savedConfiguration == nil || viewModel.isBusy)
+                Link(String(localized: "Provider data and API documentation"), destination: documentationURL)
             }
         }
     }
 
-    private var privacySection: some View {
-        Group {
-            SettingsIndentedContent {
-                Label(
-                    String(
-                        localized: "Sensitive headers, query values, and body fields are redacted before Review Data."
-                    ),
-                    systemImage: "checkmark.shield.fill"
-                )
+    @ViewBuilder private var endpointSecurityLabel: some View {
+        switch viewModel.configuration.endpointSecurity {
+        case .encrypted:
+            Label(String(localized: "Encrypted HTTPS connection"), systemImage: "lock.fill")
                 .foregroundStyle(.green)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if viewModel.configuration.kind == .openAI {
-                SettingsIndentedContent {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Toggle(
-                            String(localized: "Allow provider response storage"),
-                            isOn: $viewModel.configuration.storeResponses
-                        )
-                        .toggleStyle(.checkbox)
-                        Text(String(localized: "When off, Rockxy sends store=false with every Responses API request."))
-                            .font(settingsMetrics.secondaryFont())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            SettingsFieldRow(String(localized: "Destination")) {
-                Text(viewModel.configuration.endpointHost)
-                    .textSelection(.enabled)
-                    .foregroundStyle(.secondary)
-                    .frame(minHeight: settingsMetrics.controlHeight, alignment: .leading)
-            }
-            if let documentationURL = viewModel.configuration.kind.documentationURL {
-                SettingsIndentedContent {
-                    Link(String(localized: "Provider data and API documentation"), destination: documentationURL)
-                }
-            }
+        case .localLoopback:
+            Label(String(localized: "Local-only connection on this Mac"), systemImage: "desktopcomputer")
+                .foregroundStyle(.green)
+        case .insecureRemote:
+            Label(
+                String(localized: "Blocked: remote endpoints must use HTTPS"),
+                systemImage: "exclamationmark.shield.fill"
+            )
+            .foregroundStyle(.red)
+        case .invalid:
+            Label(String(localized: "Enter a valid HTTP or HTTPS base URL"), systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -600,8 +617,10 @@ struct AssistantSettingsTab: View {
                         .font(settingsMetrics.metadataFont(monospaced: true))
                         .foregroundStyle(.tertiary)
                 }
+                .layoutPriority(1)
                 Spacer(minLength: 12)
                 modelAction(model)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
             if viewModel.modelInstallID == model.id {
@@ -624,12 +643,7 @@ struct AssistantSettingsTab: View {
             }
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.42), lineWidth: 0.5)
-        }
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private func installedModelRow(_ model: AssistantModel) -> some View {
@@ -644,32 +658,31 @@ struct AssistantSettingsTab: View {
                     .font(settingsMetrics.metadataFont(monospaced: true))
                     .foregroundStyle(.tertiary)
             }
+            .layoutPriority(1)
             Spacer(minLength: 12)
-            if viewModel.isGlobalModel(model.id) {
-                Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
-                    .font(settingsMetrics.metadataFont(weight: .medium))
-                    .foregroundStyle(.green)
-            } else {
-                Button(String(localized: "Use Globally")) {
-                    viewModel.useGlobally(model)
+            HStack(spacing: 8) {
+                if viewModel.isGlobalModel(model.id) {
+                    Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
+                        .font(settingsMetrics.metadataFont(weight: .medium))
+                        .foregroundStyle(.green)
+                } else {
+                    Button(String(localized: "Use Globally")) {
+                        viewModel.useGlobally(model)
+                    }
+                    .controlSize(.small)
                 }
-                .controlSize(.small)
+                Button(role: .destructive) {
+                    pendingModelRemoval = model
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .help(String(localized: "Remove model from Ollama"))
+                .disabled(viewModel.modelRemovalID != nil || viewModel.modelInstallID != nil)
             }
-            Button(role: .destructive) {
-                pendingModelRemoval = model
-            } label: {
-                Image(systemName: "trash")
-            }
-            .help(String(localized: "Remove model from Ollama"))
-            .disabled(viewModel.modelRemovalID != nil || viewModel.modelInstallID != nil)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.55), in: RoundedRectangle(cornerRadius: 7))
-        .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.42), lineWidth: 0.5)
-        }
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     @ViewBuilder
@@ -689,7 +702,7 @@ struct AssistantSettingsTab: View {
                 viewModel.installAndUse(model)
             }
             .controlSize(.small)
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle()
             .disabled(viewModel.modelInstallID != nil)
         }
     }
@@ -707,26 +720,6 @@ struct AssistantSettingsTab: View {
             return provider.title
         }
         return String(localized: "Adapter pending for \(provider.title)")
-    }
-
-    @ViewBuilder private var endpointSecurityLabel: some View {
-        switch viewModel.configuration.endpointSecurity {
-        case .encrypted:
-            Label(String(localized: "Encrypted HTTPS connection"), systemImage: "lock.fill")
-                .foregroundStyle(.green)
-        case .localLoopback:
-            Label(String(localized: "Local-only connection on this Mac"), systemImage: "desktopcomputer")
-                .foregroundStyle(.green)
-        case .insecureRemote:
-            Label(
-                String(localized: "Blocked: remote endpoints must use HTTPS"),
-                systemImage: "exclamationmark.shield.fill"
-            )
-            .foregroundStyle(.red)
-        case .invalid:
-            Label(String(localized: "Enter a valid HTTP or HTTPS base URL"), systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
-        }
     }
 
     private func modelPickerTitle(_ model: AssistantModel) -> String {
@@ -762,6 +755,8 @@ protocol AssistantSettingsManaging: AnyObject {
     func selectAssistantConfiguration(_ configurationID: UUID)
     func removeAssistantConfiguration(_ configurationID: UUID)
 }
+
+// MARK: - AppSettingsManager + AssistantSettingsManaging
 
 extension AppSettingsManager: AssistantSettingsManaging {}
 
@@ -1157,7 +1152,8 @@ final class AssistantSettingsViewModel {
 
     func retryInstalledOllamaRuntime() {
         guard !runtimeSetupState.isBusy,
-              let applicationURL = ollamaApplicationURL else {
+              let applicationURL = ollamaApplicationURL else
+        {
             return
         }
         runtimeSetupState = .starting
@@ -1388,19 +1384,6 @@ final class AssistantSettingsViewModel {
 
     // MARK: Private
 
-    private let manager: any AssistantSettingsManaging
-    private let credentialStorage: any AssistantCredentialStorage
-    private let runtime: any AssistantProviderRuntimeProtocol
-    private let modelInstaller: any AssistantModelInstallerProtocol
-    private let ollamaRuntime: any OllamaRuntimeChecking
-    private let runtimeInstaller: any AssistantLocalRuntimeInstalling
-    private let applicationOpener: any AssistantRuntimeApplicationOpening
-    @ObservationIgnored private var connectionTask: Task<Void, Never>?
-    @ObservationIgnored private var modelInstallTask: Task<Void, Never>?
-    @ObservationIgnored private var runtimeInstallTask: Task<Void, Never>?
-    private var lastInstalledRuntimeURL: URL?
-    private var connectionGeneration = UUID()
-
     private static var defaultRuntimeInstallDestination: URL {
         let fileManager = FileManager.default
         if let applications = fileManager.urls(for: .applicationDirectory, in: .localDomainMask).first,
@@ -1415,6 +1398,19 @@ final class AssistantSettingsViewModel {
         }
         return fileManager.homeDirectoryForCurrentUser
     }
+
+    private let manager: any AssistantSettingsManaging
+    private let credentialStorage: any AssistantCredentialStorage
+    private let runtime: any AssistantProviderRuntimeProtocol
+    private let modelInstaller: any AssistantModelInstallerProtocol
+    private let ollamaRuntime: any OllamaRuntimeChecking
+    private let runtimeInstaller: any AssistantLocalRuntimeInstalling
+    private let applicationOpener: any AssistantRuntimeApplicationOpening
+    @ObservationIgnored private var connectionTask: Task<Void, Never>?
+    @ObservationIgnored private var modelInstallTask: Task<Void, Never>?
+    @ObservationIgnored private var runtimeInstallTask: Task<Void, Never>?
+    private var lastInstalledRuntimeURL: URL?
+    private var connectionGeneration = UUID()
 
     private var ollamaBaseURL: URL {
         if configuration.kind == .ollama, let endpointURL = configuration.endpointURL {
@@ -1575,7 +1571,8 @@ final class AssistantSettingsViewModel {
         _ operation: @escaping (
             AssistantProviderConfiguration,
             AssistantProviderConnectionToken
-        ) async throws -> Void
+        )
+        async throws -> Void
     ) {
         guard !isBusy else {
             return
@@ -1650,12 +1647,16 @@ final class AssistantSettingsViewModel {
 // MARK: - AssistantProviderConnectionToken
 
 private struct AssistantProviderConnectionToken {
+    // MARK: Lifecycle
+
     init(generation: UUID, configuration: AssistantProviderConfiguration) {
         self.generation = generation
         configurationID = configuration.id
         providerKind = configuration.kind
         baseURL = configuration.baseURL
     }
+
+    // MARK: Internal
 
     let generation: UUID
     let configurationID: UUID

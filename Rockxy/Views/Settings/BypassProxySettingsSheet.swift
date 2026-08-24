@@ -81,6 +81,7 @@ struct BypassProxySettingsSheet: View {
                 }
                 .frame(minWidth: toolMetrics.footerButtonWidth)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

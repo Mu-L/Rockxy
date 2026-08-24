@@ -58,11 +58,11 @@ The primary application window — a 3-column developer debugging interface foll
 
 | Control | Icon (SF Symbol) | States | Shortcut | Priority |
 |---------|-----------------|--------|----------|----------|
+| Project Selector | `folder.fill` | Active Project menu | — | High |
 | Start/Stop | `play.fill` / `stop.fill` | Toggle | ⌘⇧R / ⌘. | High |
-| Record | `record.circle` / `record.circle.fill` | Toggle, red when active | ⌘⇧E | High |
-| Clear | `trash` | Enabled when sessions > 0 | ⌘K | Medium |
-| Inspector | `rectangle.split.1x2` | Toggle visibility | — | Medium |
-| Orientation | `rectangle.split.2x1` | Toggle H/V split | — | Low |
+| Developer Hub | `command` | Opens tool launcher | — | Medium |
+| Bottom Inspector | `rectangle.split.1x2` | Toggle visibility | — | Medium |
+| Context Dock | `sidebar.trailing` | Toggle visibility | — | Medium |
 
 ### Project Selector (Leading)
 - Appears immediately after the sidebar tracking separator.

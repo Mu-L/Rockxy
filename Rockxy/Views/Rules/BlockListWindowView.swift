@@ -424,6 +424,7 @@ struct BlockListWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -470,14 +471,13 @@ struct BlockListWindowView: View {
                     : String(localized: "BLOCK LIST OFF")
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
-            .foregroundStyle(viewModel.isBlockListActive ? Color.white : Color.secondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
-            .background(viewModel.isBlockListActive ? Color.red : Color.secondary.opacity(0.14))
-            .clipShape(Capsule())
+            .rockxyChipStyle(tint: .red, isActive: viewModel.isBlockListActive)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var footerHint: String {
@@ -598,7 +598,7 @@ struct BlockListWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -994,6 +994,7 @@ private struct AddBlockRuleSheet: View {
                     footerButtonLabel(primaryButtonTitle)
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(trimmedPattern.isEmpty)
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding)

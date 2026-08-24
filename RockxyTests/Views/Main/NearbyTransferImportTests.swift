@@ -57,4 +57,52 @@ struct NearbyTransferImportTests {
         #expect(coordinator.activeWorkspace.filteredTransactions.count == 1)
         #expect(coordinator.activeWorkspace.filteredTransactions.first?.request.host == "ios.example.com")
     }
+
+    @Test("Import never reintroduces transactions evicted by the live-history cap")
+    func importFiltersOnlyRetainedTransactions() async throws {
+        let coordinator = MainContentCoordinator(policy: SingleEntryHistoryPolicy())
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let transferred = (0 ..< 3).map { index in
+            RockxyNearbyTransferSession.Transaction(
+                id: UUID().uuidString,
+                timestamp: timestamp,
+                request: .init(
+                    method: "GET",
+                    url: "https://ios.example.com/\(index)",
+                    headers: [:],
+                    body: nil,
+                    statusCode: nil,
+                    contentType: nil
+                ),
+                response: nil,
+                timing: nil,
+                clientApp: "Example iOS App"
+            )
+        }
+        let session = RockxyNearbyTransferSession(
+            version: "1",
+            metadata: .init(
+                title: "Bounded Import",
+                createdAt: timestamp,
+                appVersion: "1.0",
+                deviceName: "iPhone"
+            ),
+            transactions: transferred
+        )
+
+        try await coordinator.importNearbyTransfer(session, deviceName: "iPhone")
+
+        let retainedIDs = Set(coordinator.transactions.map(\.id))
+        #expect(coordinator.transactions.count == 1)
+        #expect(coordinator.activeWorkspace.filteredTransactions.count == 1)
+        #expect(coordinator.activeWorkspace.filteredTransactions.allSatisfy { retainedIDs.contains($0.id) })
+    }
+}
+
+private struct SingleEntryHistoryPolicy: AppPolicy {
+    let maxWorkspaceTabs = 8
+    let maxDomainFavorites = 5
+    let maxActiveRulesPerTool = 10
+    let maxEnabledScripts = 10
+    let maxLiveHistoryEntries = 1
 }

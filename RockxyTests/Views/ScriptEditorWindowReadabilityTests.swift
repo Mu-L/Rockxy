@@ -50,7 +50,7 @@ struct ScriptEditorWindowReadabilityTests {
 
         // Save & Activate is the clear primary action with a truthful (label-free) shortcut.
         #expect(source.contains("footerActionLabel(String(localized: \"Save & Activate\"), weight: .semibold)"))
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(!source.contains("Save & Activate ⌘S"))
         #expect(source.contains(#".keyboardShortcut("s", modifiers: .command)"#))
         #expect(source.contains(#".keyboardShortcut("r", modifiers: .command)"#))

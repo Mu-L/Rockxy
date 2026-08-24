@@ -40,7 +40,10 @@ extension MainContentCoordinator {
         transactionsByProjectID[projectStore.activeProjectID] = transactions
         nextSequenceNumberByProjectID[projectStore.activeProjectID] = nextSequenceNumber
         refreshDomainTree(for: destinationWorkspace)
-        destinationWorkspace.filteredTransactions = importedTransactions.filter { !$0.isTLSFailure }
+        let retainedTransactionIDs = Set(transactions.map(\.id))
+        destinationWorkspace.filteredTransactions = importedTransactions.filter {
+            retainedTransactionIDs.contains($0.id) && !$0.isTLSFailure
+        }
         destinationWorkspace.lastDeriveWasAppendOnly = false
         deriveFilteredRows(for: destinationWorkspace)
         rebuildObservedDomainsByApp()

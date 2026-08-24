@@ -10,9 +10,6 @@ import SwiftUI
 struct ProxyStatusIndicator: View {
     // MARK: Internal
 
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.appUIDisplayMetrics) private var metrics
-
     let displayState: ProxyDisplayState
     let listenAddress: String
     let port: Int
@@ -66,7 +63,7 @@ struct ProxyStatusIndicator: View {
             }
         }
         .frame(height: metrics.chromeControlHeight)
-        .contentShape(Rectangle())
+        .contentShape(Capsule(style: .continuous))
         .popover(isPresented: $showPopover) {
             ProxyStatusPopover(
                 displayState: displayState,
@@ -84,20 +81,9 @@ struct ProxyStatusIndicator: View {
 
     private enum ProxyStatusChromeMetrics {
         static let horizontalPadding: CGFloat = 14
-        static let strokeWidth: CGFloat = 0.75
     }
 
-    private var statusDot: some View {
-        Circle()
-            .fill(statusColor)
-            .frame(width: metrics.chromeStatusDotSize, height: metrics.chromeStatusDotSize)
-            .shadow(
-                color: statusShadowColor,
-                radius: 4,
-                x: 0,
-                y: 0
-            )
-    }
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var statusColor: Color {
         switch displayState {
@@ -148,7 +134,18 @@ struct ProxyStatusIndicator: View {
         return captureContext.joined(separator: "\n")
     }
 
-    @ViewBuilder
+    private var statusDot: some View {
+        Circle()
+            .fill(statusColor)
+            .frame(width: metrics.chromeStatusDotSize, height: metrics.chromeStatusDotSize)
+            .shadow(
+                color: statusShadowColor,
+                radius: 4,
+                x: 0,
+                y: 0
+            )
+    }
+
     private func updateStatus(_ summary: AppUpdater.UpdateStatusSummary) -> some View {
         Button(action: openUpdates) {
             ViewThatFits(in: .horizontal) {
@@ -169,24 +166,9 @@ struct ProxyStatusIndicator: View {
     private func updateBadge(_ title: String) -> some View {
         Text(title)
             .font(.system(size: metrics.chromeBadgeFontSize, weight: .semibold))
-            .foregroundStyle(.white)
             .lineLimit(1)
             .padding(.horizontal, 9)
             .frame(height: metrics.chromeBadgeHeight)
-            .background {
-                Capsule(style: .continuous).fill(updateBadgeBackground)
-            }
-            .overlay {
-                Capsule(style: .continuous).strokeBorder(updateBadgeStroke, lineWidth: ProxyStatusChromeMetrics.strokeWidth)
-            }
-            .contentShape(Capsule(style: .continuous))
-    }
-
-    private var updateBadgeBackground: Color {
-        Color(nsColor: .systemGray).opacity(colorScheme == .dark ? 0.62 : 0.82)
-    }
-
-    private var updateBadgeStroke: Color {
-        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06)
+            .rockxyChipStyle(isActive: true)
     }
 }

@@ -27,7 +27,7 @@ struct SystemProxyWarningBanner: View {
             if let primaryActionTitle, let onPrimaryAction {
                 Button(primaryActionTitle, action: onPrimaryAction)
                     .font(.system(size: metrics.chromeBadgeFontSize))
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                     .controlSize(.small)
             }
 

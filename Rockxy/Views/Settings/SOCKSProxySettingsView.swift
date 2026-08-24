@@ -19,6 +19,7 @@ struct SOCKSProxySettingsView: View {
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.vertical, toolMetrics.headerBottomPadding)
+            .rockxyFunctionalBar()
 
             Divider()
 
@@ -59,9 +60,11 @@ struct SOCKSProxySettingsView: View {
                 }
                 .fixedSize(horizontal: true, vertical: false)
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.vertical, toolMetrics.footerTopPadding)
+            .rockxyFunctionalBar()
         }
         .font(toolMetrics.font())
         .frame(width: toolMetrics.fieldWidth(640), height: 280)

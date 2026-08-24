@@ -2,8 +2,8 @@ import SwiftUI
 
 // Shared Quick Tools system: one seven-tool catalog and one persisted layout own both the
 // top `TrafficCommandBar` (3 slots) and the footer `StatusBarView` (4 slots). Both regions render
-// the same `FooterToolingButton` capsule so there is no top-only styling. `proxyOverride` stays a
-// separate dynamic footer control and is never part of this layout.
+// the same labeled native `FooterToolingButton`, preserving discoverability without a separate
+// top-only style. `proxyOverride` stays a dynamic footer control outside this layout.
 
 // MARK: - FooterActionKind + Quick Tools
 
@@ -242,6 +242,7 @@ struct QuickToolsEditor: View {
                     onDone()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle()
             }
         }
         .padding(16)

@@ -6,15 +6,81 @@ import SwiftUI
 // MARK: - AppThemeApplier
 
 /// Applies the user's theme preference (system / light / dark) to all app windows.
+@MainActor
 enum AppThemeApplier {
     static func apply(_ theme: String) {
-        switch theme {
+        let appearance: NSAppearance? = switch theme {
         case "light":
-            NSApp.appearance = NSAppearance(named: .aqua)
+            NSAppearance(named: .aqua)
         case "dark":
-            NSApp.appearance = NSAppearance(named: .darkAqua)
+            NSAppearance(named: .darkAqua)
         default:
-            NSApp.appearance = nil
+            nil
+        }
+
+        NSApp.appearance = appearance
+        refreshExistingWindowChrome(with: appearance)
+
+        // SwiftUI owns the views hosted by NSToolbarItems and can finish its update after this
+        // settings action returns. Refresh once more on the next main-loop turn so an existing
+        // Light toolbar cannot survive inside a window whose content has already changed to Dark
+        // (or vice versa).
+        DispatchQueue.main.async {
+            refreshExistingWindowChrome(with: appearance)
+        }
+    }
+
+    /// Rebinds AppKit chrome that is hosted outside the SwiftUI content hierarchy. SwiftUI toolbar
+    /// hosts can retain their previous explicit appearance even after the window changes theme, so
+    /// app-selected themes must be applied directly to every hosted toolbar view. `nil` keeps the
+    /// System setting live and inherited.
+    static func refreshWindowChrome(_ window: NSWindow, appearance: NSAppearance?) {
+        window.appearance = appearance
+        window.contentView?.appearance = nil
+        window.contentView?.needsLayout = true
+        window.contentView?.needsDisplay = true
+
+        guard let toolbar = window.toolbar else {
+            return
+        }
+
+        let itemViews = (toolbar.items + (toolbar.visibleItems ?? [])).compactMap(\.view)
+        for view in itemViews {
+            refreshToolbarView(view, appearance: appearance)
+        }
+        toolbar.validateVisibleItems()
+    }
+
+    private static func refreshExistingWindowChrome(with appearance: NSAppearance?) {
+        for window in NSApp.windows {
+            refreshWindowChrome(window, appearance: appearance)
+        }
+    }
+
+    static func refreshToolbarView(_ view: NSView, appearance: NSAppearance?) {
+        view.appearance = appearance
+        view.needsLayout = true
+        view.needsDisplay = true
+        for subview in view.subviews {
+            refreshToolbarView(subview, appearance: appearance)
+        }
+    }
+}
+
+// MARK: - AppTheme SwiftUI Presentation
+
+extension AppTheme {
+    /// Resolves the app override without consulting the process-wide system setting from a
+    /// toolbar host. SwiftUI may create that host outside the scene's presentation boundary, so
+    /// the resolved scheme is injected as a normal environment value by every scene provider.
+    func resolvedColorScheme(inheriting colorScheme: ColorScheme) -> ColorScheme {
+        switch self {
+        case .system:
+            colorScheme
+        case .light:
+            .light
+        case .dark:
+            .dark
         }
     }
 }
@@ -110,9 +176,44 @@ enum Theme {
 
     enum FilterPill {
         static let activeBackground = Color.accentColor.opacity(0.15)
-        static let activeForeground = Color.accentColor
+        static let activeForeground = Color.primary
         static let inactiveBackground = Color.clear
         static let inactiveForeground = Color.secondary
+    }
+
+    // MARK: - Liquid Glass
+
+    /// Shared geometry and fallback treatments for the top-level functional layer.
+    /// Keep these values centralized so custom glass surfaces remain visually related
+    /// and their macOS 14/accessibility fallbacks don't drift apart.
+    enum Glass {
+        static let shelfCornerRadius: CGFloat = 16
+        static let shelfInset: CGFloat = 6
+        static let shelfOuterPadding: CGFloat = 10
+        static let shelfSectionSpacing: CGFloat = 7
+        static let footerCornerRadius: CGFloat = 13
+        static let footerOuterHorizontalPadding: CGFloat = 8
+        static let footerOuterVerticalPadding: CGFloat = 6
+        static let functionalBarCornerRadius: CGFloat = 12
+        static let functionalBarHorizontalInset: CGFloat = 7
+        static let functionalBarVerticalInset: CGFloat = 5
+        static let fallbackTintOpacity = 0.15
+        static let fallbackStrokeOpacity = 0.28
+        static let neutralStrokeOpacity = 0.10
+        static let activeStrokeOpacity = 0.55
+        static let activeFillOpacity = 0.13
+        static let neutralFillOpacity = 0.06
+        static let hoverFillOpacity = 0.10
+        static let semanticFillOpacity = 0.14
+        static let semanticHoverFillOpacity = 0.20
+        static let semanticStrokeOpacity = 0.34
+        static let semanticHoverStrokeOpacity = 0.52
+        static let ambientAccentOpacity = 0.20
+        static let ambientSecondaryOpacity = 0.08
+        static let separatorOpacity = 0.55
+        static let toastCornerRadius: CGFloat = 14
+        static let toastHorizontalPadding: CGFloat = 16
+        static let toastVerticalPadding: CGFloat = 10
     }
 
     // MARK: - Status Bar

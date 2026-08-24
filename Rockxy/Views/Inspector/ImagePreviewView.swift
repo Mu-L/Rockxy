@@ -11,7 +11,7 @@ struct ImagePreviewView: View {
                 Spacer()
                 Image(nsImage: nsImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 let rep = nsImage.representations.first

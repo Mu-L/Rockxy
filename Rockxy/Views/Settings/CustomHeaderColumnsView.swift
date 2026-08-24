@@ -417,6 +417,7 @@ struct CustomHeaderColumnsView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
         .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -541,6 +542,7 @@ struct CustomHeaderColumnsView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.footerTopPadding)
         .padding(.bottom, toolMetrics.footerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {
@@ -769,6 +771,7 @@ private struct AddHeaderColumnSheet: View {
                     footerButtonLabel(String(localized: "Add"))
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!isSubmittable)
             }
             .padding(.horizontal, 24)

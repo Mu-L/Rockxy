@@ -290,77 +290,91 @@ struct CertificateStatusPanel: View {
     }
 
     private var actionRow: some View {
-        HStack(spacing: 8) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                actionButtons
             }
 
-            switch state {
-            case .notAvailable:
-                Button(String(localized: "Generate New\u{2026}")) {
-                    onAction(.generate)
-                }
-                .disabled(isLoading)
-
-            case .generatedOnly:
-                Button(String(localized: "Install & Trust")) {
-                    onAction(.installAndTrust)
-                }
-                .disabled(isLoading)
-                shareCertificateButton
-                Button(String(localized: "Generate New\u{2026}")) {
-                    onAction(.generate)
-                }
-                .disabled(isLoading)
-
-            case .trustIncomplete:
-                Button(String(localized: "Install & Trust")) {
-                    onAction(.installAndTrust)
-                }
-                .disabled(isLoading)
-                shareCertificateButton
-                Button(String(localized: "Reset Certificate"), role: .destructive) {
-                    onAction(.reset)
-                }
-                .disabled(isLoading)
-                Button(String(localized: "Recheck Status")) {
-                    onAction(.recheck)
-                }
-                .disabled(isLoading)
-
-            case .installedNotTrusted:
-                Button(String(localized: "Install & Trust")) {
-                    onAction(.installAndTrust)
-                }
-                .disabled(isLoading)
-                shareCertificateButton
-                Button(String(localized: "Reset Certificate"), role: .destructive) {
-                    onAction(.reset)
-                }
-                .disabled(isLoading)
-                Button(String(localized: "Recheck Status")) {
-                    onAction(.recheck)
-                }
-                .disabled(isLoading)
-
-            case .trusted:
-                Button(String(localized: "Export Certificate\u{2026}")) {
-                    onAction(.export)
-                }
-                .disabled(isLoading)
-                shareCertificateButton
-                Button(String(localized: "Generate New\u{2026}")) {
-                    onAction(.generate)
-                }
-                .disabled(isLoading)
-                Button(String(localized: "Reset Certificate"), role: .destructive) {
-                    onAction(.reset)
-                }
-                .disabled(isLoading)
+            VStack(alignment: .leading, spacing: 8) {
+                actionButtons
             }
         }
         .font(actionFont)
+    }
+
+    @ViewBuilder private var actionButtons: some View {
+        if isLoading {
+            ProgressView()
+                .controlSize(.small)
+        }
+
+        switch state {
+        case .notAvailable:
+            Button(String(localized: "Generate New\u{2026}")) {
+                onAction(.generate)
+            }
+            .rockxyGlassButtonStyle(prominent: true)
+            .disabled(isLoading)
+
+        case .generatedOnly:
+            Button(String(localized: "Install & Trust")) {
+                onAction(.installAndTrust)
+            }
+            .rockxyGlassButtonStyle(prominent: true)
+            .disabled(isLoading)
+            shareCertificateButton
+            Button(String(localized: "Generate New\u{2026}")) {
+                onAction(.generate)
+            }
+            .disabled(isLoading)
+
+        case .trustIncomplete:
+            Button(String(localized: "Install & Trust")) {
+                onAction(.installAndTrust)
+            }
+            .rockxyGlassButtonStyle(prominent: true)
+            .disabled(isLoading)
+            shareCertificateButton
+            Button(String(localized: "Reset Certificate"), role: .destructive) {
+                onAction(.reset)
+            }
+            .disabled(isLoading)
+            Button(String(localized: "Recheck Status")) {
+                onAction(.recheck)
+            }
+            .disabled(isLoading)
+
+        case .installedNotTrusted:
+            Button(String(localized: "Install & Trust")) {
+                onAction(.installAndTrust)
+            }
+            .rockxyGlassButtonStyle(prominent: true)
+            .disabled(isLoading)
+            shareCertificateButton
+            Button(String(localized: "Reset Certificate"), role: .destructive) {
+                onAction(.reset)
+            }
+            .disabled(isLoading)
+            Button(String(localized: "Recheck Status")) {
+                onAction(.recheck)
+            }
+            .disabled(isLoading)
+
+        case .trusted:
+            Button(String(localized: "Export Certificate\u{2026}")) {
+                onAction(.export)
+            }
+            .disabled(isLoading)
+            shareCertificateButton
+            Button(String(localized: "Generate New\u{2026}")) {
+                onAction(.generate)
+            }
+            .disabled(isLoading)
+            Button(String(localized: "Reset Certificate"), role: .destructive) {
+                onAction(.reset)
+            }
+            .disabled(isLoading)
+        }
     }
 
     private var shareCertificateButton: some View {

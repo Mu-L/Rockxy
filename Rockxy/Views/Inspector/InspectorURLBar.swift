@@ -31,7 +31,7 @@ struct InspectorURLBar: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Theme.Inspector.urlBarBackground)
+        .rockxyFunctionalBar()
     }
 
     // MARK: Private

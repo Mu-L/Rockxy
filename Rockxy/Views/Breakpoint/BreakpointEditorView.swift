@@ -686,6 +686,7 @@ struct BreakpointEditorView: View {
                     savePendingTemplate()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!validation.isValid)
             }
         }

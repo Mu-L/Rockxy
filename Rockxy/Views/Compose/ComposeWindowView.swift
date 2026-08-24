@@ -167,6 +167,7 @@ struct ComposeWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.controlSpacing)
+        .rockxyFunctionalBar()
     }
 
     @ViewBuilder private var sendButton: some View {
@@ -177,7 +178,7 @@ struct ComposeWindowView: View {
                 Text(String(localized: "Cancel"))
                     .frame(width: sendControlWidth)
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.regular)
             .frame(height: toolMetrics.formControlHeight)
             .keyboardShortcut(".", modifiers: .command)
@@ -189,7 +190,7 @@ struct ComposeWindowView: View {
                 Text(String(localized: "Send"))
                     .frame(width: sendControlWidth)
             }
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle(prominent: true)
             .controlSize(.regular)
             .frame(height: toolMetrics.formControlHeight)
             .keyboardShortcut(.return, modifiers: .command)
@@ -228,7 +229,7 @@ struct ComposeWindowView: View {
                     Button(String(localized: "Use Empty Body")) {
                         viewModel.replaceUnavailableBody(with: "")
                     }
-                    .buttonStyle(.bordered)
+                    .rockxyGlassButtonStyle()
                 }
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -249,6 +250,7 @@ struct ComposeWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var templateMenu: some View {

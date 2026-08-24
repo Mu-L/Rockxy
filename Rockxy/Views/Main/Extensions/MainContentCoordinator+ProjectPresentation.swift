@@ -48,7 +48,9 @@ extension MainContentCoordinator {
             case .containsControlCharacters:
                 String(localized: "Project names cannot contain control characters.")
             case let .tooLong(count):
-                String(localized: "Project names are limited to 80 characters (received \(count)).")
+                String(
+                    localized: "Project names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count))."
+                )
             case .notCanonical:
                 String(localized: "The Project name is not in canonical Unicode form.")
             }

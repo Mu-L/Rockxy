@@ -95,6 +95,7 @@ struct BreakpointTemplateWindowView: View {
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.top, toolMetrics.headerTopPadding)
             .padding(.bottom, toolMetrics.headerBottomPadding)
+            .rockxyFunctionalBar()
 
             Divider()
 
@@ -176,6 +177,7 @@ struct BreakpointTemplateWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var compactAddRemoveControl: some View {
@@ -255,7 +257,7 @@ struct BreakpointTemplateWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -310,6 +312,7 @@ struct BreakpointTemplateWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -420,6 +423,7 @@ struct BreakpointTemplateWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var filteredTemplates: [BreakpointTemplate] {

@@ -136,6 +136,15 @@ extension MainContentCoordinator {
         importPreview = nil
 
         Task { @MainActor in
+            guard await ensureProjectCatalogReadyForDataIntake() else {
+                showImportError(
+                    title: String(localized: "Import Unavailable"),
+                    message: String(
+                        localized: "Projects could not be loaded. Repair Projects before importing captured traffic."
+                    )
+                )
+                return
+            }
             switch preview.fileType {
             case .har:
                 await executeHARImport(from: preview.sourceURL, fileName: preview.fileName)

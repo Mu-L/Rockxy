@@ -103,7 +103,7 @@ enum ProjectNormalization {
     /// preserving the joining controls in ``allowedFormatScalars``.
     private static func isDisallowedScalar(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.properties.generalCategory {
-        case .control:
+        case .control, .lineSeparator, .paragraphSeparator:
             true
         case .format:
             !allowedFormatScalars.contains(scalar)

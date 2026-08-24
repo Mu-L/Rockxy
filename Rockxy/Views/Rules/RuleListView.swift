@@ -79,7 +79,7 @@ struct RuleListView: View {
             } label: {
                 Label(String(localized: "Add Rule"), systemImage: "plus")
             }
-            .buttonStyle(.borderedProminent)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button {
@@ -91,7 +91,7 @@ struct RuleListView: View {
             } label: {
                 Label(String(localized: "Remove"), systemImage: "minus")
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .disabled(selectedRuleID == nil)
 
@@ -119,6 +119,7 @@ struct RuleListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .rockxyFunctionalBar()
     }
 
     // MARK: - Rule Table
@@ -192,13 +193,13 @@ struct RuleListView: View {
             Button(String(localized: "Import")) {
                 importRules()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button(String(localized: "Export")) {
                 exportRules()
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
             .disabled(rules.isEmpty)
 
@@ -257,6 +258,7 @@ struct RuleListView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .rockxyFunctionalBar()
     }
 
     private func actionType(for action: RuleAction) -> RuleActionType {
@@ -489,6 +491,7 @@ private struct RuleEditSheet: View {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
                 .disabled(!isValid)
             }
             .padding()

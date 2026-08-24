@@ -85,6 +85,7 @@ struct ExternalProxySettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var behaviorNotice: some View {
@@ -457,6 +458,7 @@ struct ExternalProxySettingsView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var footerActions: some View {
@@ -486,6 +488,7 @@ struct ExternalProxySettingsView: View {
                 footerButtonLabel(String(localized: "Apply"))
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(!viewModel.canApply)
         }
     }

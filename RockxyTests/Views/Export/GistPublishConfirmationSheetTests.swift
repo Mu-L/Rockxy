@@ -134,7 +134,7 @@ struct GistPublishConfirmationSheetTests {
         #expect(source.contains("Publishing"))
         #expect(source.contains("guard !isPublishing else {"))
         #expect(source.contains(".disabled(isPublishing)"))
-        #expect(source.contains(".buttonStyle(.borderedProminent)"))
+        #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
 
         // Failure re-enables controls and shows an inline error.
         #expect(source.contains("errorMessage = error.localizedDescription"))

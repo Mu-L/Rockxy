@@ -280,6 +280,11 @@ actor ProjectCatalogRepository: ProjectCatalogPersisting {
         guard let type = fileType(at: fileURL) else {
             return
         }
+        // Validate the live node before touching the prior recovery copy. A
+        // malformed live directory must not destroy the last usable backup.
+        guard type == .typeRegular || type == .typeSymbolicLink else {
+            throw ProjectCatalogRepositoryError.notRegularFile
+        }
         if let recoveryType = fileType(at: recoveryBackupURL) {
             guard recoveryType == .typeRegular || recoveryType == .typeSymbolicLink else {
                 throw ProjectCatalogRepositoryError.notRegularFile
@@ -290,9 +295,6 @@ actor ProjectCatalogRepository: ProjectCatalogPersisting {
             // Explicit reset may remove the link itself, but never follows it.
             try fileManager.removeItem(at: fileURL)
             return
-        }
-        guard type == .typeRegular else {
-            throw ProjectCatalogRepositoryError.notRegularFile
         }
         let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
         if let size = attributes[.size] as? Int, size > Self.maxCatalogByteSize {

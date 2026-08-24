@@ -11,19 +11,19 @@ struct MCPSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSectionCard(String(localized: "MCP Server")) {
+            SettingsSection(String(localized: "MCP Server")) {
                 mcpServerSection
             }
 
-            SettingsSectionCard(String(localized: "Client Configuration")) {
+            SettingsSection(String(localized: "Client Configuration")) {
                 mcpConfigurationSection
             }
 
-            SettingsSectionCard(String(localized: "Privacy")) {
+            SettingsSection(String(localized: "Privacy")) {
                 privacySection
             }
 
-            SettingsSectionCard(String(localized: "About MCP")) {
+            SettingsSection(String(localized: "About MCP")) {
                 aboutSection
             }
         }

@@ -9,11 +9,13 @@ struct PluginsSettingsTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
+            HSplitView {
                 pluginListPanel
-                    .frame(width: settingsMetrics.fieldWidth(240))
-
-                Divider()
+                    .frame(
+                        minWidth: settingsMetrics.fieldWidth(220),
+                        idealWidth: settingsMetrics.fieldWidth(250),
+                        maxWidth: settingsMetrics.fieldWidth(300)
+                    )
 
                 if let plugin = viewModel.selectedPlugin {
                     PluginDetailView(plugin: plugin, viewModel: viewModel)
@@ -58,15 +60,11 @@ struct PluginsSettingsTab: View {
 
     private var pluginListPanel: some View {
         VStack(spacing: 0) {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField(String(localized: "Search Plugins"), text: $viewModel.searchText)
-                    .textFieldStyle(.plain)
-                    .font(settingsMetrics.font())
-                    .frame(minHeight: settingsMetrics.controlHeight)
-            }
-            .padding(8)
+            TextField(String(localized: "Search Plugins"), text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(settingsMetrics.font())
+                .frame(minHeight: settingsMetrics.controlHeight)
+                .padding(8)
 
             Divider()
 
@@ -86,16 +84,28 @@ struct PluginsSettingsTab: View {
                 .tag(plugin.id)
                 .listRowInsets(EdgeInsets())
             }
-            .listStyle(.sidebar)
+            .listStyle(.inset)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var categoryFilterBar: some View {
-        HStack(spacing: 4) {
-            categoryPill(String(localized: "All"), category: nil)
-            categoryPill(String(localized: "Inspector"), category: .inspector)
-            categoryPill(String(localized: "Exporter"), category: .exporter)
-            categoryPill(String(localized: "Script"), category: .script)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                categoryPill(String(localized: "All"), category: nil)
+                categoryPill(String(localized: "Inspector"), category: .inspector)
+                categoryPill(String(localized: "Exporter"), category: .exporter)
+                categoryPill(String(localized: "Script"), category: .script)
+            }
+
+            Picker(String(localized: "Plugin Category"), selection: $viewModel.selectedCategory) {
+                Text(String(localized: "All")).tag(PluginType?.none)
+                Text(String(localized: "Inspector")).tag(PluginType?.some(.inspector))
+                Text(String(localized: "Exporter")).tag(PluginType?.some(.exporter))
+                Text(String(localized: "Script")).tag(PluginType?.some(.script))
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
         }
     }
 
@@ -129,6 +139,7 @@ struct PluginsSettingsTab: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: settingsMetrics.footerHeight)
+        .rockxyFunctionalBar()
     }
 
     private func categoryPill(_ title: String, category: PluginType?) -> some View {
@@ -140,9 +151,11 @@ struct PluginsSettingsTab: View {
                 .font(settingsMetrics.secondaryFont(weight: isActive ? .semibold : .regular))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-                .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                .clipShape(Capsule())
+                .rockxyChipStyle(
+                    tint: .accentColor,
+                    isActive: isActive,
+                    isEnabled: true
+                )
         }
         .buttonStyle(.plain)
     }

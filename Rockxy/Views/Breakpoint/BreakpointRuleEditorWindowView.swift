@@ -94,6 +94,7 @@ struct BreakpointRuleEditorWindowView: View {
                         )
                     }
                     .keyboardShortcut(.defaultAction)
+                    .rockxyGlassButtonStyle(prominent: true)
                     .disabled(!isValid || isSaving)
                 }
             }

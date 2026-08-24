@@ -33,7 +33,7 @@ struct DiffControlBar: View {
         .frame(minHeight: toolMetrics.footerControlHeight)
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
-        .background(.bar)
+        .rockxyFunctionalBar()
     }
 
     // MARK: Private

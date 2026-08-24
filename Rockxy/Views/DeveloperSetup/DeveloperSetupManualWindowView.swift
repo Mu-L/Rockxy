@@ -13,21 +13,7 @@ struct DeveloperSetupManualWindowView: View {
     // MARK: Internal
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                Divider()
-                if viewModel.isRuntimeTerminalTarget {
-                    terminalCard
-                } else {
-                    targetManualCard
-                }
-                footer
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
+        setupLayout
         .frame(minWidth: 640, minHeight: 460)
         .background(Color(nsColor: .windowBackgroundColor))
         .font(setupMetrics.font())
@@ -55,6 +41,55 @@ struct DeveloperSetupManualWindowView: View {
 
     private var setupMetrics: DeveloperSetupDisplayMetrics {
         DeveloperSetupDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    @ViewBuilder private var setupLayout: some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            ScrollView {
+                setupContent
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .safeAreaBar(edge: .top, spacing: 0) {
+                header
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+            }
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                footer
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+            }
+        } else {
+            legacySetupLayout
+        }
+        #else
+        legacySetupLayout
+        #endif
+    }
+
+    private var legacySetupLayout: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                Divider()
+                setupContent
+                footer
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    @ViewBuilder private var setupContent: some View {
+        if viewModel.isRuntimeTerminalTarget {
+            terminalCard
+        } else {
+            targetManualCard
+        }
     }
 
     private var header: some View {

@@ -11,10 +11,22 @@ struct ContextDockView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker(String(localized: "Inspector"), selection: selectedTab) {
-                Text(String(localized: "Details")).tag(ContextDockTab.details)
-                Text(String(localized: "AI Assistant")).tag(ContextDockTab.aiAssistant)
-            }
+            WorkspaceModeSegmentedControl(
+                selection: selectedTab,
+                segments: [
+                    WorkspaceModeSegment(
+                        value: ContextDockTab.details,
+                        title: String(localized: "Details"),
+                        systemImage: "doc.text.magnifyingglass"
+                    ),
+                    WorkspaceModeSegment(
+                        value: ContextDockTab.aiAssistant,
+                        title: String(localized: "AI Assistant"),
+                        systemImage: "sparkles"
+                    ),
+                ],
+                accessibilityLabel: String(localized: "Inspector")
+            )
             .workspaceModeSwitcherStyle()
 
             Divider()
@@ -40,7 +52,7 @@ struct ContextDockView: View {
                 guard coordinator.activeWorkspace.contextDockTab != tab else {
                     return
                 }
-                // Picker callbacks can arrive during the native inspector's constraint pass.
+                // Segmented-control callbacks can arrive during the native inspector's constraint pass.
                 // Publish the content swap on the next run-loop turn so both tab roots keep
                 // a stable inspector size while AppKit finishes the current layout.
                 DispatchQueue.main.async { [weak coordinator] in
@@ -361,7 +373,7 @@ private struct AIAssistantDockView: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: max(36, appMetrics.primaryFontSize + 20))
-        .background(Color.clear)
+        .rockxyFunctionalBar()
     }
 
     private var conversationSwitcher: some View {
@@ -734,7 +746,7 @@ private struct AIAssistantDockView: View {
                         .font(assistantFont(appMetrics.controlFontSize, weight: .semibold))
                         .frame(width: 16, height: 16)
                 }
-                .buttonStyle(.borderedProminent)
+                .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.small)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!canSendDraft)
@@ -821,7 +833,7 @@ private struct AIAssistantDockView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.clear)
+        .rockxyFunctionalBar()
     }
 
     private func suggestionCard(_ recipe: DebugAssistantRecipe) -> some View {
@@ -837,7 +849,7 @@ private struct AIAssistantDockView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .controlSize(.small)
         .disabled(isBusy)
         .help(recipe.detail)

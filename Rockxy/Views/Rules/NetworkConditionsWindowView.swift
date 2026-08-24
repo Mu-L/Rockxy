@@ -758,6 +758,7 @@ struct NetworkConditionsWindowView: View {
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var infoBanner: some View {
@@ -889,14 +890,13 @@ struct NetworkConditionsWindowView: View {
 
             Text(statusCapsuleText)
                 .font(toolMetrics.metadataFont(weight: .semibold))
-                .foregroundStyle(statusCapsuleForeground)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                .background(statusCapsuleBackground)
-                .clipShape(Capsule())
+                .rockxyChipStyle(tint: statusCapsuleTint, isActive: statusCapsuleIsActive)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private var addRemoveControl: some View {
@@ -994,7 +994,7 @@ struct NetworkConditionsWindowView: View {
             }
         }
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
+        .rockxyGlassButtonStyle()
         .fixedSize()
     }
 
@@ -1049,24 +1049,18 @@ struct NetworkConditionsWindowView: View {
         return String(localized: "1 ENABLED")
     }
 
-    private var statusCapsuleForeground: Color {
-        if viewModel.hasMultipleActive, viewModel.isToolEnabled {
-            return .white
-        }
-        if viewModel.activeCount == 1, viewModel.isToolEnabled {
-            return .white
-        }
-        return .secondary
+    private var statusCapsuleIsActive: Bool {
+        viewModel.isToolEnabled && (viewModel.hasMultipleActive || viewModel.activeCount == 1)
     }
 
-    private var statusCapsuleBackground: Color {
+    private var statusCapsuleTint: Color {
         if viewModel.hasMultipleActive, viewModel.isToolEnabled {
             return .orange
         }
         if viewModel.activeCount == 1, viewModel.isToolEnabled {
             return .green
         }
-        return Color.secondary.opacity(0.14)
+        return .secondary
     }
 
     @ViewBuilder
@@ -1218,6 +1212,7 @@ private struct NetworkConditionsEditSheet: View {
                         )
                     }
                     .keyboardShortcut(.defaultAction)
+                    .rockxyGlassButtonStyle(prominent: true)
                     .disabled(!isValid || isSaving)
                 }
             }

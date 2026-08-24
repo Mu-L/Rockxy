@@ -55,7 +55,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         configure(window)
         installObserversIfNeeded(for: window)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func openWorkspaceTab(coordinator: MainContentCoordinator, workspaceID: UUID) {
@@ -65,7 +65,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         self.coordinator = coordinator
         coordinator.workspaceStore.selectWorkspace(id: workspaceID)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func openNewWorkspaceTabFromNativeControl() {
@@ -90,21 +90,21 @@ final class RockxyWorkspaceWindowManager: NSObject {
         self.coordinator = coordinator
         coordinator.workspaceStore.selectWorkspace(at: index)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func selectPreviousWorkspaceTab(coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
         coordinator.workspaceStore.selectPreviousWorkspace()
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func selectNextWorkspaceTab(coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
         coordinator.workspaceStore.selectNextWorkspace()
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func handleWindowDidBecomeKey(_ window: NSWindow) {
@@ -112,9 +112,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
             return
         }
         updateTabAccessory()
-        if let coordinator {
-            updateWindowTitles(coordinator: coordinator)
-        }
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func handleWindowWillClose(_ window: NSWindow) {
@@ -127,14 +125,10 @@ final class RockxyWorkspaceWindowManager: NSObject {
         coordinator = nil
     }
 
-    func updateWindowTitles(coordinator: MainContentCoordinator) {
-        primaryWindow?.title = coordinator.projectStore.activeProject.name
-    }
-
     func projectDidChange(coordinator: MainContentCoordinator) {
         self.coordinator = coordinator
         updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     func flushProjectStateForTermination() async {
@@ -175,6 +169,23 @@ final class RockxyWorkspaceWindowManager: NSObject {
     private(set) weak var primaryWindow: NSWindow?
     private var accessoryControllers: [ObjectIdentifier: WorkspaceTabBarAccessoryController] = [:]
     private var observersByWindow: [ObjectIdentifier: [NSObjectProtocol]] = [:]
+    private var titleObservationsByWindow: [ObjectIdentifier: [NSKeyValueObservation]] = [:]
+
+    /// The toolbar's Project selector and workspace tabs already communicate the
+    /// active context. Keep a stable app title for Window-menu and accessibility
+    /// semantics, but never let a Project name become a second visible title.
+    private func enforceToolbarOnlyProjectPresentation(on window: NSWindow? = nil) {
+        guard let window = window ?? primaryWindow,
+              window === primaryWindow else {
+            return
+        }
+        if window.title != RockxyIdentity.current.displayName {
+            window.title = RockxyIdentity.current.displayName
+        }
+        if window.titleVisibility != .hidden {
+            window.titleVisibility = .hidden
+        }
+    }
 
     private func configure(_ window: NSWindow) {
         window.identifier = Self.mainWindowIdentifier
@@ -218,6 +229,18 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
 
         observersByWindow[key] = [didBecomeKey, willClose]
+        titleObservationsByWindow[key] = [
+            window.observe(\.title, options: [.new]) { [weak self, weak window] _, _ in
+                MainActor.assumeIsolated {
+                    self?.enforceToolbarOnlyProjectPresentation(on: window)
+                }
+            },
+            window.observe(\.titleVisibility, options: [.new]) { [weak self, weak window] _, _ in
+                MainActor.assumeIsolated {
+                    self?.enforceToolbarOnlyProjectPresentation(on: window)
+                }
+            },
+        ]
     }
 
     private func removeObservers(for window: NSWindow) {
@@ -228,6 +251,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
+        titleObservationsByWindow.removeValue(forKey: key)
     }
 
     private func updateTabAccessory(forceVisible: Bool = false) {
@@ -289,7 +313,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
         coordinator.workspaceStore.selectWorkspace(id: workspaceID)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     fileprivate func closeWorkspace(_ workspaceID: UUID) {
@@ -300,7 +324,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
         coordinator.closeWorkspace(id: workspaceID)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     fileprivate func createWorkspace() {
@@ -315,7 +339,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
         coordinator.workspaceStore.renameWorkspace(id: workspaceID, to: normalizedTitle)
         updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
     }
 
     @discardableResult
@@ -335,7 +359,7 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
         coordinator.workspaceStore.moveWorkspace(from: sourceIndex, to: destinationIndex)
         updateTabAccessory()
-        updateWindowTitles(coordinator: coordinator)
+        enforceToolbarOnlyProjectPresentation()
         return true
     }
 }
@@ -403,7 +427,9 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.appearanceDidChange()
+            MainActor.assumeIsolated {
+                self?.appearanceDidChange()
+            }
         }
     }
 
@@ -430,6 +456,11 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: WorkspaceTabBarMetrics.barHeight)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 
     override func updateTrackingAreas() {
@@ -627,7 +658,9 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
             return
         }
 
-        endEditing(commit: true)
+        guard endEditing(commit: true) else {
+            return
+        }
         editingWorkspaceID = workspaceID
         originalTitle = workspace.title
 
@@ -648,28 +681,42 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
-    func endEditing(commit: Bool) {
+    @discardableResult
+    func endEditing(commit: Bool) -> Bool {
         guard let editingWorkspaceID,
               let field = editField else {
-            return
+            return true
         }
-        removeEditingMonitor()
 
-        let fallbackTitle = originalTitle
-        let committedTitle: String
+        var committedTitle = originalTitle
         if commit {
-            let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            committedTitle = trimmed.isEmpty ? fallbackTitle : trimmed
-        } else {
-            committedTitle = fallbackTitle
+            do {
+                committedTitle = try ProjectNormalization.normalizedDisplayName(field.stringValue)
+            } catch let error as ProjectNameNormalizationError {
+                field.textColor = .systemRed
+                field.toolTip = inlineRenameErrorMessage(for: error)
+                NSSound.beep()
+                window?.makeFirstResponder(field)
+                return false
+            } catch {
+                field.textColor = .systemRed
+                field.toolTip = String(localized: "Enter a valid Traffic Tab name.")
+                NSSound.beep()
+                window?.makeFirstResponder(field)
+                return false
+            }
         }
 
+        removeEditingMonitor()
         self.editingWorkspaceID = nil
         originalTitle = ""
         editField = nil
         field.removeFromSuperview()
-        manager.renameWorkspace(editingWorkspaceID, to: committedTitle)
+        if commit {
+            manager.renameWorkspace(editingWorkspaceID, to: committedTitle)
+        }
         needsDisplay = true
+        return true
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
@@ -1388,8 +1435,22 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
                 return event
             }
         }
-        endEditing(commit: true)
-        return event
+        return endEditing(commit: true) ? event : nil
+    }
+
+    private func inlineRenameErrorMessage(for error: ProjectNameNormalizationError) -> String {
+        switch error {
+        case .empty:
+            String(localized: "Enter a Traffic Tab name.")
+        case .containsControlCharacters:
+            String(localized: "Traffic Tab names cannot contain control characters.")
+        case let .tooLong(count):
+            String(
+                localized: "Traffic Tab names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count))."
+            )
+        case .notCanonical:
+            String(localized: "The Traffic Tab name is not in canonical Unicode form.")
+        }
     }
 
     @objc private func renameTabFromMenu(_ sender: NSMenuItem) {

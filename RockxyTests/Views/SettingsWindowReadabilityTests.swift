@@ -58,52 +58,34 @@ struct SettingsWindowReadabilityTests {
         #expect(defaults.string(forKey: RockxySettingsTab.defaultsKey) == "general")
     }
 
-    @Test("Settings shell is a resizable native sidebar/content window")
+    @Test("Settings shell clones the native Developer Setup window contract")
     func settingsShellIsResizableNativeSidebarContentWindow() throws {
         let source = try readProjectFile("Rockxy/Views/Settings/SettingsView.swift")
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
+        let sceneSource = try readProjectFile("Rockxy/Views/Settings/SettingsWindowScene.swift")
 
-        // NavigationSplitView owns the columns. Rockxy removes the system
-        // toggle because Settings can otherwise host it in a second toolbar row.
-        #expect(source.contains("NavigationSplitView(columnVisibility: $columnVisibility)"))
-        #expect(source.contains("List(RockxySettingsTab.allCases, selection: selectionBinding)"))
+        // Settings uses the same fully native split-view structure as Developer
+        // Setup. The system owns its sidebar toggle and unified title bar.
+        #expect(source.contains("NavigationSplitView {"))
+        #expect(source.contains("List(selection: selectionBinding)"))
         #expect(source.contains("Binding<RockxySettingsTab?>"))
+        #expect(source.contains("RockxySettingsSidebarSection.allCases"))
+        #expect(source.contains("Section(section.title)"))
         #expect(source.contains("min: settingsMetrics.sidebarMinWidth"))
         #expect(source.contains("ideal: settingsMetrics.sidebarIdealWidth"))
         #expect(source.contains("max: settingsMetrics.sidebarMaxWidth"))
-        #expect(source.contains(".navigationSplitViewStyle(.balanced)"))
-        #expect(source.contains(".toolbar(removing: .sidebarToggle)"))
-        #expect(!source.contains("titlebarContentInset"))
-
-        // Settings uses a real AppKit toolbar item followed by a
-        // sidebar-tracking separator. It stays unbordered so the native glyph
-        // does not gain a capsule that overlaps the rounded sidebar edge.
-        #expect(source.contains(
-            "@State private var columnVisibility: NavigationSplitViewVisibility = .all"
-        ))
-        #expect(source.contains("SettingsChromeMetrics.sidebarContentTopInset"))
-        #expect(source.contains(".safeAreaInset(edge: .top, spacing: 0)"))
-        #expect(source.contains("static let sidebarContentTopInset: CGFloat = 14"))
-        #expect(source.contains("SettingsWindowToolbarInstaller("))
-        #expect(source.contains("SettingsWindowToolbar: NSObject, NSToolbarDelegate"))
-        #expect(source.contains("managedToolbar = NSToolbar(identifier: Self.toolbarIdentifier)"))
-        #expect(source.contains("window.styleMask.insert(.fullSizeContentView)"))
-        #expect(source.contains("window.toolbarStyle = .unifiedCompact"))
-        #expect(source.contains("withAnimation(.easeInOut(duration: 0.26))"))
-        #expect(source.contains(".sidebarTrackingSeparator"))
-        #expect(source.contains("let item = NSToolbarItem(itemIdentifier: itemIdentifier)"))
-        #expect(source.contains("systemSymbolName: \"sidebar.leading\""))
-        #expect(source.contains("item.target = self"))
-        #expect(source.contains("item.action = #selector(toggleSidebar(_:))"))
-        #expect(source.contains("item.isBordered = false"))
-        #expect(!source.contains("item.isBordered = true"))
-        #expect(!source.contains("toolbarControlDownwardOffset"))
-        #expect(!source.contains("button.layer?.setAffineTransform("))
-        #expect(source.contains("columnVisibility == .detailOnly"))
+        #expect(source.contains(".navigationTitle(selectedTab.title)"))
+        #expect(source.contains(".scrollEdgeEffectStyle(.soft, for: .vertical)"))
+        #expect(!source.contains("settingsToolbarContent"))
+        #expect(!source.contains("Settings Category"))
+        #expect(!source.contains("ToolbarItem(placement: .principal)"))
+        #expect(!source.contains(".safeAreaBar(edge: .top"))
+        #expect(!source.contains("SettingsWindowToolbarInstaller"))
+        #expect(!source.contains("NSToolbarDelegate"))
 
         // Font scaling belongs to pane content. Applying it at the split root
         // also scales native toolbar controls and can create a second toolbar row.
-        #expect(source.contains(".font(settingsMetrics.font())\n                .tag(tab)"))
+        #expect(source.contains(".font(settingsMetrics.font(weight: selectedTab == tab ? .semibold : .regular))"))
         #expect(!source.contains(".listStyle(.sidebar)\n            .font(settingsMetrics.font())"))
         #expect(source.contains("detailContent(for: selectedTab)\n                .font(settingsMetrics.font())"))
 
@@ -118,9 +100,9 @@ struct SettingsWindowReadabilityTests {
         #expect(source.contains("switch tab {"))
         #expect(!source.contains("AnyView"))
 
-        // One compact native pane header precedes the selected pane.
-        #expect(source.contains("private func paneHeader(for tab: RockxySettingsTab)"))
-        #expect(source.contains("tab.paneDescription"))
+        // Category title belongs to native navigation chrome, not to a second
+        // picker or hand-built bar floating above every pane.
+        #expect(!source.contains("private func paneHeader(for tab: RockxySettingsTab)"))
 
         // The fixed 820x600 shell is gone; geometry is adaptive and resizable.
         #expect(!source.contains(".frame(width: settingsMetrics.windowWidth, height: settingsMetrics.windowHeight)"))
@@ -129,10 +111,18 @@ struct SettingsWindowReadabilityTests {
         #expect(source.contains("minHeight: settingsMetrics.windowMinHeight"))
         #expect(source.contains("maxWidth: .infinity"))
 
-        // The Settings scene inherits Appearance metrics and resizes to content min size.
-        #expect(appSource.contains("Settings {\n            AppUIDisplayMetricsProvider"))
-        #expect(appSource.contains(".windowResizability(.contentMinSize)"))
-        #expect(appSource.contains(".windowToolbarStyle(.unifiedCompact)"))
+        // Settings is a normal Window scene just like Developer Setup. This is
+        // what keeps the automatic sidebar toggle inside the unified title bar.
+        #expect(appSource.contains("SettingsWindowScene()"))
+        #expect(appSource.contains("CommandGroup(replacing: .appSettings)"))
+        #expect(appSource.contains("openWindow(id: \"settings\")"))
+        #expect(!appSource.contains("Settings {"))
+        #expect(sceneSource.contains("struct SettingsWindowScene: Scene"))
+        #expect(sceneSource.contains("Window(String(localized: \"Settings\"), id: \"settings\")"))
+        #expect(sceneSource.contains(".defaultSize(width: 1_000, height: 640)"))
+        #expect(sceneSource.contains(".defaultPosition(.center)"))
+        #expect(sceneSource.contains(".windowResizability(.contentMinSize)"))
+        #expect(sceneSource.contains(".windowToolbarStyle(.unified(showsTitle: true))"))
     }
 
     @Test("Settings panes share one outer layout contract")
@@ -141,6 +131,12 @@ struct SettingsWindowReadabilityTests {
         #expect(componentSource.contains("struct SettingsPane<Content: View>: View"))
         #expect(componentSource.contains(".padding(.horizontal, settingsMetrics.contentPadding)"))
         #expect(componentSource.contains(".padding(.vertical, settingsMetrics.paneContentPadding)"))
+        #expect(componentSource.contains("settingsMetrics.contentMaxWidth"))
+        #expect(componentSource.contains("Color(nsColor: .windowBackgroundColor)"))
+        #expect(componentSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(componentSource.contains("settingsMetrics.fieldSpacing"))
+        #expect(!componentSource.contains("GroupBox"))
+        #expect(!componentSource.contains("Color.clear.frame(width: settingsMetrics.rowLeading)"))
 
         let standardPanePaths = [
             "Rockxy/Views/Settings/GeneralSettingsTab.swift",
@@ -167,19 +163,39 @@ struct SettingsWindowReadabilityTests {
         let appearanceSource = try readProjectFile("Rockxy/Views/Settings/AppearanceSettingsTab.swift")
         #expect(!appearanceSource.contains(".padding(.horizontal, 18)"))
 
-        // Plugins intentionally keeps a full-bleed master/detail surface; it
-        // still lives under the same shell header and does not add outer insets.
+        let advancedSource = try readProjectFile("Rockxy/Views/Settings/AdvancedSettingsTab.swift")
+        #expect(!advancedSource.contains("settingsRow(label: String(localized: \"Software Update:\"))"))
+        #expect(advancedSource.contains("SettingsFieldRow(String(localized: \"Check Frequency\"))"))
+        #expect(advancedSource.contains(".labelsHidden()"))
+
+        // Plugins intentionally keeps a full-bleed master/detail surface with
+        // a native resizable content split and a compact menu fallback.
         let pluginsSource = try readProjectFile("Rockxy/Views/Settings/PluginsSettingsTab.swift")
         #expect(pluginsSource.contains("VStack(spacing: 0)"))
         #expect(pluginsSource.contains("pluginListPanel"))
+        #expect(pluginsSource.contains("HSplitView"))
+        #expect(pluginsSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(pluginsSource.contains(".pickerStyle(.menu)"))
+        #expect(pluginsSource.contains(".listStyle(.inset)"))
         #expect(!pluginsSource.contains(".padding(.horizontal, settingsMetrics.contentPadding)"))
+    }
+
+    @Test("Assistant local model library uses the available Settings width")
+    func assistantModelLibraryUsesAvailableWidth() throws {
+        let source = try readProjectFile("Rockxy/Views/Settings/AssistantSettingsTab.swift")
+
+        #expect(source.contains(".frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)"))
+        #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+        #expect(source.components(separatedBy: "settingsMetrics.fieldWidth(520)").count - 1 == 1)
+        #expect(source.components(separatedBy: ".layoutPriority(1)").count - 1 >= 3)
+        #expect(source.contains("modelAction(model)\n                    .fixedSize(horizontal: true, vertical: false)"))
     }
 
     @Test("MCP configuration remains readable without wrapping long paths")
     func mcpConfigurationUsesScrollableCodeSurface() throws {
         let source = try readProjectFile("Rockxy/Views/Settings/MCPSettingsTab.swift")
 
-        #expect(source.contains("SettingsSectionCard(String(localized: \"Client Configuration\"))"))
+        #expect(source.contains("SettingsSection(String(localized: \"Client Configuration\"))"))
         #expect(source.contains("ScrollView(.horizontal)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: true)"))
         #expect(source.contains(".textSelection(.enabled)"))

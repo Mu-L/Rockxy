@@ -14,6 +14,7 @@ struct AdvancedFilterBar: View {
 
     var presetStore: FilterPresetStore
     var onSave: () -> Void = {}
+    var isEmbeddedInControlShelf = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,11 +23,30 @@ struct AdvancedFilterBar: View {
             }
             shortcutsHint
         }
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .bottom) { Divider() }
+        .background {
+            if !isEmbeddedInControlShelf {
+                Color(nsColor: .windowBackgroundColor)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !isEmbeddedInControlShelf {
+                Divider()
+            }
+        }
     }
 
     // MARK: Private
+
+    private static let advancedFields: [FilterField] = [
+        .url, .method, .statusCode, .requestHeader, .responseHeader, .requestBody,
+        .responseBody, .clientApp, .domain, .contentType, .queryString, .cookies,
+        .comment, .color,
+    ]
+
+    private static let enableToggleWidth: CGFloat = 22
+    private static let connectorWidth: CGFloat = 76
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var shortcutsHint: some View {
         HStack(spacing: 12) {
@@ -42,6 +62,45 @@ struct AdvancedFilterBar: View {
         .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+    }
+
+    private var presetMenu: some View {
+        Menu {
+            Button {
+                _ = presetStore.saveGeneratedPreset(rules: rules)
+                onSave()
+            } label: {
+                Label(String(localized: "Save Current Filter"), systemImage: "square.and.arrow.down")
+            }
+            .disabled(FilterRuleEvaluator.activeRules(in: rules, isFilterBarVisible: true).isEmpty)
+
+            if !presetStore.presets.isEmpty {
+                Divider()
+                ForEach(presetStore.presets) { preset in
+                    Button {
+                        rules = preset.rules.isEmpty ? [FilterRule()] : preset.rules
+                    } label: {
+                        Label(preset.name, systemImage: "line.3.horizontal.decrease.circle")
+                    }
+                }
+
+                Divider()
+                Menu(String(localized: "Delete Preset")) {
+                    ForEach(presetStore.presets) { preset in
+                        Button(role: .destructive) {
+                            presetStore.deletePreset(id: preset.id)
+                        } label: {
+                            Text(preset.name)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label(String(localized: "Presets"), systemImage: "chevron.down")
+                .labelStyle(.titleAndIcon)
+        }
+        .menuStyle(.borderlessButton)
+        .controlSize(.small)
     }
 
     private func filterRow(at index: Int, isFirst: Bool) -> some View {
@@ -91,7 +150,7 @@ struct AdvancedFilterBar: View {
                 Image(systemName: "minus")
                     .font(.system(size: metrics.controlFontSize, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             Button {
@@ -100,7 +159,7 @@ struct AdvancedFilterBar: View {
                 Image(systemName: "plus")
                     .font(.system(size: metrics.controlFontSize, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .rockxyGlassButtonStyle()
             .controlSize(.small)
 
             if isFirst {
@@ -124,55 +183,5 @@ struct AdvancedFilterBar: View {
             return
         }
         rules.remove(at: index)
-    }
-
-    private static let advancedFields: [FilterField] = [
-        .url, .method, .statusCode, .requestHeader, .responseHeader, .requestBody,
-        .responseBody, .clientApp, .domain, .contentType, .queryString, .cookies,
-        .comment, .color,
-    ]
-
-    private static let enableToggleWidth: CGFloat = 22
-    private static let connectorWidth: CGFloat = 76
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var presetMenu: some View {
-        Menu {
-            Button {
-                _ = presetStore.saveGeneratedPreset(rules: rules)
-                onSave()
-            } label: {
-                Label(String(localized: "Save Current Filter"), systemImage: "square.and.arrow.down")
-            }
-            .disabled(FilterRuleEvaluator.activeRules(in: rules, isFilterBarVisible: true).isEmpty)
-
-            if !presetStore.presets.isEmpty {
-                Divider()
-                ForEach(presetStore.presets) { preset in
-                    Button {
-                        rules = preset.rules.isEmpty ? [FilterRule()] : preset.rules
-                    } label: {
-                        Label(preset.name, systemImage: "line.3.horizontal.decrease.circle")
-                    }
-                }
-
-                Divider()
-                Menu(String(localized: "Delete Preset")) {
-                    ForEach(presetStore.presets) { preset in
-                        Button(role: .destructive) {
-                            presetStore.deletePreset(id: preset.id)
-                        } label: {
-                            Text(preset.name)
-                        }
-                    }
-                }
-            }
-        } label: {
-            Label(String(localized: "Presets"), systemImage: "chevron.down")
-                .labelStyle(.titleAndIcon)
-        }
-        .menuStyle(.borderlessButton)
-        .controlSize(.small)
     }
 }
