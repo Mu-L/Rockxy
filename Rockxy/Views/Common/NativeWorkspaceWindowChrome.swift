@@ -3,9 +3,31 @@ import SwiftUI
 
 // MARK: - NativeWorkspaceToolbarConfiguration
 
+@MainActor
 struct NativeWorkspaceToolbarConfiguration {
+    // MARK: Lifecycle
+
+    init(
+        coordinator: MainContentCoordinator,
+        onOpenDeveloperHub: @escaping () -> Void,
+        onToggleProxy: (() -> Void)? = nil
+    ) {
+        self.coordinator = coordinator
+        self.onOpenDeveloperHub = onOpenDeveloperHub
+        self.onToggleProxy = onToggleProxy ?? {
+            if coordinator.isProxyRunning {
+                coordinator.stopProxy()
+            } else {
+                coordinator.startProxy()
+            }
+        }
+    }
+
+    // MARK: Internal
+
     let coordinator: MainContentCoordinator
     let onOpenDeveloperHub: () -> Void
+    let onToggleProxy: () -> Void
 }
 
 // MARK: - NativeWorkspaceWindowChrome
@@ -47,6 +69,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         self.splitViewController = splitViewController
         coordinator = configuration.coordinator
         onOpenDeveloperHub = configuration.onOpenDeveloperHub
+        onToggleProxy = configuration.onToggleProxy
         managedToolbar = NSToolbar(identifier: Self.toolbarIdentifier)
         super.init()
 
@@ -100,6 +123,16 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                         continuation.resume()
                     }
                 }
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                // Observation can resume while SwiftUI is still reconciling one of the
+                // toolbar's hosted views. Mutating NSToolbarItem geometry in that turn can
+                // make AppKit re-enter NSHostingView layout and leave a newly opened tool
+                // window with a skipped (blank) content pass. Give the current render turn
+                // back to SwiftUI before updating AppKit-owned toolbar items.
+                await Task.yield()
                 guard !Task.isCancelled else {
                     return
                 }
@@ -171,6 +204,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private let splitViewController: NativeWorkspaceSplitViewController
     private let coordinator: MainContentCoordinator
     private let onOpenDeveloperHub: () -> Void
+    private let onToggleProxy: () -> Void
     private var hostingControllers: [
         NSToolbarItem.Identifier: NSHostingController<AnyView>
     ] = [:]
@@ -307,16 +341,25 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
 
     @objc
     private func toggleProxy(_ sender: Any?) {
-        if coordinator.isProxyRunning {
-            coordinator.stopProxy()
-        } else {
-            coordinator.startProxy()
+        // Starting capture synchronously mutates observable SwiftUI state from this
+        // AppKit toolbar action. On macOS 26 that re-enters the toolbar's hosting
+        // views and can poison the next tool-window layout pass. Leave the AppKit
+        // action turn before beginning the proxy state transition.
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.onToggleProxy()
         }
     }
 
     @objc
     private func openDeveloperHub(_ sender: Any?) {
-        onOpenDeveloperHub()
+        // `openWindow` builds another SwiftUI host. Running it inline from an AppKit
+        // toolbar target can re-enter SwiftUI layout when capture-state toolbar updates
+        // are settling, which macOS records as an invalid configuration and skips.
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.onOpenDeveloperHub()
+        }
     }
 
     @objc
