@@ -154,5 +154,14 @@ struct SettingsIndentedContent<Content: View>: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, settingsMetrics.rowLeading)
+    }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var settingsMetrics: SettingsDisplayMetrics {
+        SettingsDisplayMetrics(appMetrics: appMetrics)
     }
 }

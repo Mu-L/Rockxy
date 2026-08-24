@@ -285,16 +285,25 @@ actor ProjectCatalogRepository: ProjectCatalogPersisting {
         guard type == .typeRegular || type == .typeSymbolicLink else {
             throw ProjectCatalogRepositoryError.notRegularFile
         }
-        if let recoveryType = fileType(at: recoveryBackupURL) {
+        let recoveryType = fileType(at: recoveryBackupURL)
+        if let recoveryType {
             guard recoveryType == .typeRegular || recoveryType == .typeSymbolicLink else {
                 throw ProjectCatalogRepositoryError.notRegularFile
             }
-            try fileManager.removeItem(at: recoveryBackupURL)
         }
         if type == .typeSymbolicLink {
-            // Explicit reset may remove the link itself, but never follows it.
+            // Explicit reset may remove the live link itself, but never follows it.
+            // Keep a prior regular recovery file because this path cannot create
+            // a replacement from the unsafe live node. A recovery symlink is not
+            // usable evidence and can be removed without following its target.
+            if recoveryType == .typeSymbolicLink {
+                try fileManager.removeItem(at: recoveryBackupURL)
+            }
             try fileManager.removeItem(at: fileURL)
             return
+        }
+        if recoveryType != nil {
+            try fileManager.removeItem(at: recoveryBackupURL)
         }
         let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
         if let size = attributes[.size] as? Int, size > Self.maxCatalogByteSize {

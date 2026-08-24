@@ -204,7 +204,11 @@ struct GitHubSettingsTab: View {
     }
 
     @ViewBuilder private var accountActions: some View {
-        Button(String(localized: viewModel.isConnected ? "Reconnect..." : "Authorize...")) {
+        Button(
+            viewModel.isConnected
+                ? String(localized: "Reconnect...")
+                : String(localized: "Authorize...")
+        ) {
             if viewModel.canUseOAuth {
                 showDeviceCodeSheet = true
             } else {

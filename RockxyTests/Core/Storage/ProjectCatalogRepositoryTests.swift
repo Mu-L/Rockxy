@@ -286,6 +286,27 @@ struct ProjectCatalogRepositoryTests {
         try reloaded.validate()
     }
 
+    @Test("reset preserves an existing recovery backup when discarding a live symlink")
+    func resetKeepsRecoveryBackupWhenLiveCatalogIsSymlink() async throws {
+        let repo = makeRepo()
+        try FileManager.default.createDirectory(at: repo.directoryURL, withIntermediateDirectories: true)
+        let backupURL = repo.directoryURL.appendingPathComponent(ProjectCatalogRepository.recoveryBackupFileName)
+        let recoveryData = Data("previous recovery".utf8)
+        try recoveryData.write(to: backupURL)
+
+        let secret = repo.directoryURL.appendingPathComponent("secret.json")
+        let secretData = Data("secret".utf8)
+        try secretData.write(to: secret)
+        try FileManager.default.createSymbolicLink(at: repo.fileURL, withDestinationURL: secret)
+
+        let fresh = try await repo.reset()
+        let reloaded = try await repo.load()
+
+        #expect(try Data(contentsOf: backupURL) == recoveryData)
+        #expect(try Data(contentsOf: secret) == secretData)
+        #expect(reloaded == fresh)
+    }
+
     @Test("reset refuses to recursively remove a non-regular catalog node")
     func resetPreservesNonRegularCatalogNode() async throws {
         let repo = makeRepo()
