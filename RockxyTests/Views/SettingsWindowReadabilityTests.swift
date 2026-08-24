@@ -137,6 +137,12 @@ struct SettingsWindowReadabilityTests {
         #expect(componentSource.contains("settingsMetrics.fieldSpacing"))
         #expect(!componentSource.contains("GroupBox"))
         #expect(!componentSource.contains("Color.clear.frame(width: settingsMetrics.rowLeading)"))
+        #expect(componentSource.contains(".padding(.leading, settingsMetrics.rowLeading)"))
+
+        let githubSource = try readProjectFile("Rockxy/Views/Settings/GitHubSettingsTab.swift")
+        #expect(githubSource.contains("? String(localized: \"Reconnect...\")"))
+        #expect(githubSource.contains(": String(localized: \"Authorize...\")"))
+        #expect(!githubSource.contains("String(localized: viewModel.isConnected ?"))
 
         let standardPanePaths = [
             "Rockxy/Views/Settings/GeneralSettingsTab.swift",

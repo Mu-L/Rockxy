@@ -51,7 +51,7 @@ The primary application window — a 3-column developer debugging interface foll
 
 ### Layout
 ```
-[Sidebar] │ [📁 Active Project ▾]     {● Listening on 127.0.0.1:9090}     [▶ Start/Stop] [Inspector] [Context Dock]
+[Sidebar] │ [📁 Active Project ▾]     {● Listening on 127.0.0.1:9090}     [▶ Start/Stop] [Developer Hub] [Bottom Inspector] [Context Dock]
 ```
 
 ### Controls
@@ -75,7 +75,7 @@ The primary application window — a 3-column developer debugging interface foll
 - Font: `.systemFont(ofSize: 12)`, `NSColor.secondaryLabelColor`
 
 ### Styling
-- Button style: `.borderless`
+- Button style: native bordered `NSToolbarItem` controls in the unified toolbar, with the shared glass-control treatment used by SwiftUI toolbar fallbacks
 - Icon size: 16pt SF Symbols
 - Button spacing: 4pt
 - Separator: SwiftUI `Divider()` between action groups
