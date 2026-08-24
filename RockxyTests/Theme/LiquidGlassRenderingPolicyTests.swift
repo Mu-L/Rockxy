@@ -176,6 +176,23 @@ struct AppThemeApplierTests {
 // MARK: - LiquidGlassPresentationContractTests
 
 struct LiquidGlassPresentationContractTests {
+    @Test("macOS 26-only presentation APIs stay compatible with the CI compiler")
+    func nativePresentationAPIsAreCompilerGated() throws {
+        let requiredFiles = [
+            "Rockxy/Theme/LiquidGlass.swift",
+            "Rockxy/Views/DeveloperSetup/DeveloperSetupAutomaticWindowView.swift",
+            "Rockxy/Views/DeveloperSetup/DeveloperSetupManualWindowView.swift",
+            "Rockxy/Views/Settings/SettingsSectionComponents.swift",
+            "Rockxy/Views/Settings/SettingsView.swift",
+            "Rockxy/Views/Sidebar/SidebarView.swift",
+        ]
+
+        for file in requiredFiles {
+            let source = try readProjectFile(file)
+            #expect(source.contains("#if compiler(>=6.2)"), "Missing compiler gate in \(file)")
+        }
+    }
+
     @Test("Every scene provider propagates theme into SwiftUI-hosted toolbar chrome")
     func sceneProviderPropagatesTheme() throws {
         let source = try readProjectFile("Rockxy/Models/UI/AppUIDisplayMetrics.swift")

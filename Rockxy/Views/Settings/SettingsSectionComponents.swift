@@ -23,11 +23,15 @@ struct SettingsPane<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
 
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             scrollView.scrollEdgeEffectStyle(.soft, for: .vertical)
         } else {
             scrollView
         }
+        #else
+        scrollView
+        #endif
     }
 
     // MARK: Private

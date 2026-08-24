@@ -182,6 +182,7 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var navigatorChrome: some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             navigatorList
                 .scrollEdgeEffectStyle(.soft, for: .vertical)
@@ -192,13 +193,20 @@ struct SidebarView: View {
                     sidebarBottomBar
                 }
         } else {
-            VStack(spacing: 0) {
-                navigatorPicker
-                Divider()
-                navigatorList
-                Divider()
-                sidebarBottomBar
-            }
+            legacyNavigatorChrome
+        }
+        #else
+        legacyNavigatorChrome
+        #endif
+    }
+
+    private var legacyNavigatorChrome: some View {
+        VStack(spacing: 0) {
+            navigatorPicker
+            Divider()
+            navigatorList
+            Divider()
+            sidebarBottomBar
         }
     }
 

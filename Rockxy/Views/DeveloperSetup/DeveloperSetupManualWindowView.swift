@@ -44,6 +44,7 @@ struct DeveloperSetupManualWindowView: View {
     }
 
     @ViewBuilder private var setupLayout: some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             ScrollView {
                 setupContent
@@ -62,17 +63,24 @@ struct DeveloperSetupManualWindowView: View {
                     .padding(.vertical, 12)
             }
         } else {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    header
-                    Divider()
-                    setupContent
-                    footer
-                }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 20)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+            legacySetupLayout
+        }
+        #else
+        legacySetupLayout
+        #endif
+    }
+
+    private var legacySetupLayout: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                Divider()
+                setupContent
+                footer
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 

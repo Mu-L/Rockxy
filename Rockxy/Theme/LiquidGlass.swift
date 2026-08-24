@@ -69,6 +69,7 @@ struct RockxyGlassEffectGroup<Content: View>: View {
     // MARK: Internal
 
     var body: some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             GlassEffectContainer(spacing: spacing) {
                 content
@@ -77,6 +78,9 @@ struct RockxyGlassEffectGroup<Content: View>: View {
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 
     // MARK: Private
@@ -192,9 +196,11 @@ private struct RockxyFunctionalBarModifier: ViewModifier {
     }
 
     private static var isLiquidGlassAvailable: Bool {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             return true
         }
+        #endif
         return false
     }
 }
@@ -209,6 +215,7 @@ private struct RockxyGlassButtonStyleModifier: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             if prominent {
                 content
@@ -224,6 +231,13 @@ private struct RockxyGlassButtonStyleModifier: ViewModifier {
         } else {
             content.buttonStyle(.bordered)
         }
+        #else
+        if prominent {
+            content.buttonStyle(.borderedProminent)
+        } else {
+            content.buttonStyle(.bordered)
+        }
+        #endif
     }
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -317,9 +331,11 @@ private struct RockxyGlassEffectModifier<S: InsettableShape>: ViewModifier {
     // MARK: Private
 
     private static var isLiquidGlassAvailable: Bool {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             return true
         }
+        #endif
         return false
     }
 
@@ -350,6 +366,7 @@ private extension View {
     {
         switch decision {
         case .liquidGlass:
+            #if compiler(>=6.2)
             if #available(macOS 26.0, *) {
                 glassEffect(
                     Glass.regular
@@ -360,6 +377,9 @@ private extension View {
             } else {
                 rockxyMaterialSurface(tint: tint, in: shape)
             }
+            #else
+            rockxyMaterialSurface(tint: tint, in: shape)
+            #endif
         case .systemMaterial:
             rockxyMaterialSurface(tint: tint, in: shape)
         case .opaqueColor:

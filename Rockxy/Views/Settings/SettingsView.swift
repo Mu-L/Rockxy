@@ -210,11 +210,15 @@ struct SettingsView: View {
         )
         .accessibilityLabel(String(localized: "Settings categories"))
 
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
             list.scrollEdgeEffectStyle(.soft, for: .vertical)
         } else {
             list
         }
+        #else
+        list
+        #endif
     }
 
     /// Keeps panes alive after their first visit so sidebar navigation does not
