@@ -242,6 +242,86 @@ struct NativeWorkspaceSplitViewTests {
         #expect(controller.isSidebarPresented)
     }
 
+    @Test("Developer Hub opening leaves the AppKit toolbar action turn before building its SwiftUI window")
+    func developerHubOpenIsDeferredDuringCaptureStateUpdates() async throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let coordinator = MainContentCoordinator()
+        var actionDispatchReturned = false
+        var openCount = 0
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: coordinator,
+                onOpenDeveloperHub: {
+                    #expect(actionDispatchReturned)
+                    openCount += 1
+                }
+            )
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+        toolbar.startObservingState()
+        await Task.yield()
+
+        // Match the reported trigger: capture state changes immediately before the
+        // Developer Hub action is dispatched from the native toolbar.
+        coordinator.isProxyRunning = true
+
+        let actionGroup = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.actionGroupIdentifier
+        } as? NSToolbarItemGroup)
+        let developerHubItem = try #require(actionGroup.subitems.first {
+            $0.itemIdentifier.rawValue.hasSuffix(".developerHub")
+        })
+        let action = try #require(developerHubItem.action)
+
+        NSApp.sendAction(action, to: developerHubItem.target, from: developerHubItem)
+        #expect(openCount == 0)
+        actionDispatchReturned = true
+
+        for _ in 0..<4 where openCount == 0 {
+            await Task.yield()
+        }
+        #expect(openCount == 1)
+    }
+
+    @Test("Capture start leaves the AppKit toolbar action turn before mutating SwiftUI state")
+    func proxyToggleIsDeferredFromNativeToolbarAction() async throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        var actionDispatchReturned = false
+        var toggleCount = 0
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {},
+                onToggleProxy: {
+                    #expect(actionDispatchReturned)
+                    toggleCount += 1
+                }
+            )
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+
+        let actionGroup = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.actionGroupIdentifier
+        } as? NSToolbarItemGroup)
+        let proxyItem = try #require(actionGroup.subitems.first {
+            $0.itemIdentifier.rawValue.hasSuffix(".proxy")
+        })
+        let action = try #require(proxyItem.action)
+
+        NSApp.sendAction(action, to: proxyItem.target, from: proxyItem)
+        #expect(toggleCount == 0)
+        actionDispatchReturned = true
+
+        for _ in 0..<4 where toggleCount == 0 {
+            await Task.yield()
+        }
+        #expect(toggleCount == 1)
+    }
+
     // MARK: - Project selector sizing metrics
 
     @Test("Project selector preferred width stays within its metric bounds")
