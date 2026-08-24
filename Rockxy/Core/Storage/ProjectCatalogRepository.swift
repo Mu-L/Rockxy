@@ -302,12 +302,12 @@ actor ProjectCatalogRepository: ProjectCatalogPersisting {
             try fileManager.removeItem(at: fileURL)
             return
         }
-        if recoveryType != nil {
-            try fileManager.removeItem(at: recoveryBackupURL)
-        }
         let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
         if let size = attributes[.size] as? Int, size > Self.maxCatalogByteSize {
             throw ProjectCatalogRepositoryError.fileTooLarge(bytes: size)
+        }
+        if recoveryType != nil {
+            try fileManager.removeItem(at: recoveryBackupURL)
         }
         try fileManager.moveItem(at: fileURL, to: recoveryBackupURL)
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recoveryBackupURL.path)
