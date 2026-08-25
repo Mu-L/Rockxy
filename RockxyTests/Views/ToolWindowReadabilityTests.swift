@@ -358,6 +358,10 @@ struct ToolWindowReadabilityTests {
 
         #expect(viewerSource.contains("GeometryReader"))
         #expect(viewerSource.contains("ScrollView([.horizontal, .vertical])"))
+        #expect(viewerSource.contains("ScrollView(.vertical)"))
+        #expect(viewerSource.contains(".fixedSize(horizontal: false, vertical: true)"))
+        #expect(viewerSource.contains(".frame(width: paneWidth, alignment: .leading)"))
+        #expect(viewerSource.contains(".fixedSize(horizontal: allowsHorizontalOverflow, vertical: false)"))
         #expect(viewerSource.contains("case .textReady"))
         #expect(viewerSource.contains("comparisonContent(showsIdentity: false)"))
         #expect(viewerSource.contains("Left text"))

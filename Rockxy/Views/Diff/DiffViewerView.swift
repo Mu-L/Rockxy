@@ -85,6 +85,7 @@ struct DiffViewerView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(.quaternary.opacity(0.3))
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Text Paste Mode
@@ -178,7 +179,9 @@ struct DiffViewerView: View {
 
     private func sideBySideView(_ result: DiffResult) -> some View {
         GeometryReader { geometry in
-            ScrollView([.horizontal, .vertical]) {
+            let paneWidth = max(320, (geometry.size.width - 1) / 2)
+
+            ScrollView(.vertical) {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(result.sections) { section in
                         sectionHeader(section.title)
@@ -186,15 +189,17 @@ struct DiffViewerView: View {
                         ForEach(rows) { row in
                             HStack(spacing: 0) {
                                 sideBySideCell(row.left)
-                                    .frame(minWidth: max(320, (geometry.size.width - 1) / 2))
+                                    .frame(width: paneWidth, alignment: .leading)
+                                    .clipped()
                                 Divider()
                                 sideBySideCell(row.right)
-                                    .frame(minWidth: max(320, (geometry.size.width - 1) / 2))
+                                    .frame(width: paneWidth, alignment: .leading)
+                                    .clipped()
                             }
                         }
                     }
                 }
-                .frame(minWidth: geometry.size.width, alignment: .leading)
+                .frame(width: max(641, geometry.size.width), alignment: .leading)
             }
         }
     }
@@ -202,7 +207,7 @@ struct DiffViewerView: View {
     @ViewBuilder
     private func sideBySideCell(_ line: DiffLine?) -> some View {
         if let line {
-            diffLineRow(line)
+            diffLineRow(line, allowsHorizontalOverflow: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Color.clear
@@ -220,7 +225,7 @@ struct DiffViewerView: View {
                     ForEach(result.sections) { section in
                         sectionHeader(section.title)
                         ForEach(section.lines) { line in
-                            diffLineRow(line)
+                            diffLineRow(line, allowsHorizontalOverflow: true)
                         }
                     }
                 }
@@ -241,7 +246,7 @@ struct DiffViewerView: View {
             .background(.quaternary.opacity(0.2))
     }
 
-    private func diffLineRow(_ line: DiffLine) -> some View {
+    private func diffLineRow(_ line: DiffLine, allowsHorizontalOverflow: Bool) -> some View {
         HStack(spacing: 0) {
             Text("\(line.lineNumber)")
                 .font(toolMetrics.metadataFont(monospaced: true))
@@ -258,7 +263,8 @@ struct DiffViewerView: View {
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(contentColor(for: line.type))
                 .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: allowsHorizontalOverflow, vertical: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 1)
