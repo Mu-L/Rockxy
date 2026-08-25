@@ -35,6 +35,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.36.0] - 2026-08-24
+
+### Added
+
+- Added local Projects with project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only Project file import and export.
+- Added optional iCloud synchronization for Pro Projects, with conflict-safe merging and local recovery.
+- Added detachable transaction inspectors, letting you continue capturing traffic while reviewing a request in its own window.
+- Added a dedicated traffic command bar for recording controls, Follow Live, Clear Session, and faster traffic navigation.
+
+### Fixed
+
+- Prevented Developer Hub from appearing blank after traffic capture starts.
+- Hardened Project lifecycle, reopening, retention, and recovery behavior.
+- Preserved recovery options for oversized Project catalogs before size validation blocks normal loading.
+- Improved Settings and recovery presentation during invalid or damaged state handling.
+
+### Changed
+
+- Refreshed the workspace, Settings, and tool windows with native Liquid Glass styling that respects themes and accessibility preferences.
+- Improved transaction selection and per-workspace navigation so reveal and follow actions remain attached to the correct workspace.
+- Strengthened bounded traffic capture and Project retention to keep long-running sessions predictable.
+
 ## [0.35.0] - 2026-08-19
 
 ### Added
