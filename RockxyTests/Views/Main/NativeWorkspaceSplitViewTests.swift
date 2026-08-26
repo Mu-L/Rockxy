@@ -160,7 +160,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(window.titleVisibility == .hidden)
     }
 
-    @Test("Main toolbar places the sidebar toggle before its tracking separator")
+    @Test("Main toolbar keeps the sidebar toggle inside the leading pane before its tracking separator")
     func nativeSidebarToolbarChrome() {
         let controller = makeController(sidebarPresented: true, inspectorPresented: true)
         let coordinator = MainContentCoordinator()
@@ -200,6 +200,9 @@ struct NativeWorkspaceSplitViewTests {
                 toolbar.managedToolbar.items[trackingSeparatorIndex]
                     is NSTrackingSeparatorToolbarItem
             )
+        }
+        if let toggleIndex {
+            #expect(!toolbar.managedToolbar.items[toggleIndex].isNavigational)
         }
         if let projectSelectorIndex,
            let selectorView = toolbar.managedToolbar.items[projectSelectorIndex].view

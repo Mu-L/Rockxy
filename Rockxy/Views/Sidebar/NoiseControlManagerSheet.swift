@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - NoiseControlManagerSheet
 
-/// Workspace-scoped manager for traffic that should stay captured but remain out of the working set.
+/// Traffic Tab-scoped manager for traffic that should stay captured but remain out of the working set.
 struct NoiseControlManagerSheet: View {
     // MARK: Lifecycle
 
@@ -18,22 +18,28 @@ struct NoiseControlManagerSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             sheetHeader
-            Divider()
             managerContent
-            Divider()
             actionBar
         }
-        .frame(width: 600, height: 570)
+        .font(toolMetrics.font())
+        .frame(width: max(680, toolMetrics.fieldWidth(680)), height: 590)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("noiseControl.sheet")
     }
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.dismiss) private var dismiss
     @State private var sourceKind: CapturedValueKind = .domain
     @State private var sourceDraft = ""
     @State private var searchText = ""
 
     private let suggestions: FocusSetEditorSuggestions
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
 
     private var allSources: [MutedTrafficSource] {
         coordinator.activeWorkspace.mutedTrafficSources.sorted {
@@ -119,202 +125,217 @@ struct NoiseControlManagerSheet: View {
     }
 
     private var sheetHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "eye.slash")
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(String(localized: "Noise Control"))
-                    .font(.headline)
-                Text(String(localized: "Hide matching traffic in this workspace without stopping capture."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(toolMetrics.font(weight: .medium))
+                Text(
+                    String(
+                        localized: "Hide recurring traffic from the current Traffic Tab. Capture continues and no requests are deleted."
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+
+            Spacer(minLength: 20)
+
+            TextField(String(localized: "Filter muted sources"), text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: toolMetrics.fieldWidth(210), height: toolMetrics.formControlHeight)
+                .accessibilityLabel(String(localized: "Filter muted sources"))
+                .accessibilityIdentifier("noiseControl.filter")
         }
-        .padding(.horizontal, 18)
-        .frame(height: 58)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var managerContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                addSourceGroup
-                mutedSourcesGroup
+        VStack(alignment: .leading, spacing: 0) {
+            addSourceGroup
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(String(localized: "Muted Sources"))
+                        .font(toolMetrics.font(weight: .semibold))
+                    Text(String(localized: "Muted sources apply regardless of the active Focus Set."))
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                mutedSourcesTable
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .controlSize(.regular)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var addSourceGroup: some View {
-        conditionGroup(
-            title: String(localized: "Mute Source"),
-            description: String(localized: "Hide matching traffic throughout this workspace. Capture continues.")
-        ) {
-            conditionRow(title: String(localized: "Source Type"), icon: "slider.horizontal.3") {
-                Picker(String(localized: "Source Type"), selection: $sourceKind) {
-                    Text(String(localized: "Domain")).tag(CapturedValueKind.domain)
-                    Text(String(localized: "Path Prefix")).tag(CapturedValueKind.path)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(String(localized: "Mute a Source"))
+                    .font(toolMetrics.font(weight: .semibold))
+                Text(String(localized: "Choose a captured domain or path, or enter a pattern."))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            conditionDivider
-
-            conditionRow(title: String(localized: "Pattern"), icon: sourceKind.systemImage) {
-                HStack(alignment: .top, spacing: 8) {
-                    CapturedTextSuggestionField(
-                        text: $sourceDraft,
-                        placeholder: sourcePlaceholder,
-                        pickerTitle: sourcePickerTitle,
-                        searchPrompt: sourceSearchPrompt,
-                        emptySelectionTitle: String(localized: "No Selection"),
-                        suggestions: currentSuggestions,
-                        kind: sourceKind,
-                        requestsInitialFocus: true
-                    )
-                    Button(String(localized: "Mute"), action: addSource)
-                        .keyboardShortcut(.return, modifiers: [.command])
-                        .disabled(validationMessage != nil)
+            VStack(spacing: 10) {
+                conditionRow(title: String(localized: "Type")) {
+                    Picker(String(localized: "Source Type"), selection: $sourceKind) {
+                        Text(String(localized: "Domain")).tag(CapturedValueKind.domain)
+                        Text(String(localized: "Path Prefix")).tag(CapturedValueKind.path)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: toolMetrics.fieldWidth(250))
                 }
 
-                Text(sourceMessage)
-                    .font(.caption)
-                    .foregroundStyle(isSourceMessageError ? Color.orange : Color.secondary)
+                conditionRow(title: String(localized: "Pattern")) {
+                    HStack(alignment: .top, spacing: 8) {
+                        CapturedTextSuggestionField(
+                            text: $sourceDraft,
+                            placeholder: sourcePlaceholder,
+                            pickerTitle: sourcePickerTitle,
+                            searchPrompt: sourceSearchPrompt,
+                            emptySelectionTitle: String(localized: "No Selection"),
+                            suggestions: currentSuggestions,
+                            kind: sourceKind,
+                            requestsInitialFocus: true
+                        )
+                        Button(String(localized: "Mute"), action: addSource)
+                            .keyboardShortcut(.return, modifiers: [.command])
+                            .rockxyGlassButtonStyle()
+                            .disabled(validationMessage != nil)
+                    }
+
+                    Text(sourceMessage)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(
+                            isSourceMessageError ? Color.red : Color(nsColor: .tertiaryLabelColor)
+                        )
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
         .onChange(of: sourceKind) { _, _ in
             sourceDraft = ""
         }
     }
 
-    private var mutedSourcesGroup: some View {
-        conditionGroup(
-            title: String(localized: "Muted Sources"),
-            description: String(
-                localized: "Focus Set exclusions apply only inside that Focus Set; these rules apply regardless of the active Focus Set."
-            )
-        ) {
-            conditionRow(title: String(localized: "Filter"), icon: "magnifyingglass") {
-                TextField(String(localized: "Filter muted sources"), text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            conditionDivider
-
-            if filteredSources.isEmpty {
-                Text(searchText.isEmpty
-                    ? String(localized: "No muted sources. Add a domain or path prefix above.")
-                    : String(localized: "No muted sources match this filter."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 64, alignment: .center)
-            } else {
-                LazyVStack(spacing: 0) {
-                    ForEach(filteredSources) { source in
-                        sourceRow(source)
-                        if source.id != filteredSources.last?.id {
-                            Divider().padding(.leading, 30)
-                        }
-                    }
+    private var mutedSourcesTable: some View {
+        Table(filteredSources) {
+            TableColumn(String(localized: "Source")) { source in
+                HStack(spacing: 7) {
+                    Image(systemName: source.systemImage)
+                        .font(toolMetrics.metadataFont())
+                        .foregroundStyle(.secondary)
+                    Text(source.title)
+                        .font(toolMetrics.font(monospaced: true))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(source.title)
                 }
             }
+            .width(min: 190, ideal: 250)
+
+            TableColumn(String(localized: "Type")) { source in
+                Text(sourceKindLabel(source))
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 130, ideal: 150)
+
+            TableColumn(String(localized: "Matches")) { source in
+                Text("\(coordinator.mutedTransactionCount(for: source))")
+                    .font(toolMetrics.font(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .width(60)
+
+            TableColumn("") { source in
+                Button {
+                    coordinator.unmuteTrafficSource(source)
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Unmute \(source.title)"))
+                .accessibilityLabel(String(localized: "Unmute \(source.title)"))
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .width(32)
+        }
+        .overlay {
+            if filteredSources.isEmpty {
+                ContentUnavailableView(
+                    searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? String(localized: "No Muted Sources")
+                        : String(localized: "No Matching Sources"),
+                    systemImage: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? "eye.slash"
+                        : "magnifyingglass",
+                    description: Text(
+                        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? String(localized: "Mute a domain or path prefix to keep recurring traffic out of this Traffic Tab.")
+                            : String(localized: "Try a different domain or path prefix.")
+                    )
+                )
+            }
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
     }
 
     private var actionBar: some View {
-        HStack(spacing: 10) {
-            Label(String(localized: "\(allSources.count) muted sources"), systemImage: "eye.slash")
-                .font(.caption)
+        HStack(spacing: toolMetrics.controlSpacing) {
+            Label(mutedSourceCountLabel, systemImage: "eye.slash")
+                .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
             Spacer()
             Button(String(localized: "Unmute All"), role: .destructive) {
                 coordinator.unmuteAllTrafficSources()
             }
+            .rockxyGlassButtonStyle()
             .disabled(allSources.isEmpty)
             Button(String(localized: "Done")) { dismiss() }
                 .keyboardShortcut(.defaultAction)
-                .rockxyGlassButtonStyle()
+                .rockxyGlassButtonStyle(prominent: true)
         }
-        .padding(.horizontal, 18)
-        .frame(height: 52)
-    }
-
-    private var conditionDivider: some View {
-        Divider()
-            .padding(.leading, 104)
-    }
-
-    private func sourceRow(_ source: MutedTrafficSource) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: source.systemImage)
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(source.title)
-                    .font(.body.monospaced())
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(source.title)
-                Text(sourceKindLabel(source))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            Text(String(localized: "\(coordinator.mutedTransactionCount(for: source)) matches"))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-            Button(String(localized: "Unmute")) {
-                coordinator.unmuteTrafficSource(source)
-            }
-        }
-        .padding(.vertical, 8)
-    }
-
-    private func conditionGroup(
-        title: String,
-        description: String,
-        @ViewBuilder content: () -> some View
-    )
-        -> some View
-    {
-        VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            VStack(spacing: 10) {
-                content()
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
-            }
-        }
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private func conditionRow(
         title: String,
-        icon: String,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
         HStack(alignment: .top, spacing: 12) {
-            Label(title, systemImage: icon)
+            Text(title)
+                .font(toolMetrics.font(weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 92, alignment: .trailing)
+                .frame(width: toolMetrics.formLabelWidth, alignment: .trailing)
             VStack(alignment: .leading, spacing: 3) {
                 content()
             }
@@ -329,6 +350,12 @@ struct NoiseControlManagerSheet: View {
         case .pathPrefix:
             String(localized: "Path prefix")
         }
+    }
+
+    private var mutedSourceCountLabel: String {
+        allSources.count == 1
+            ? String(localized: "1 muted source")
+            : String(localized: "\(allSources.count) muted sources")
     }
 
     private func addSource() {

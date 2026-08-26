@@ -31,12 +31,13 @@ struct FocusSetEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             sheetHeader
-            Divider()
             editorContent
-            Divider()
             actionBar
         }
-        .frame(width: 600, height: 570)
+        .font(toolMetrics.font())
+        .frame(width: max(640, toolMetrics.fieldWidth(640)), height: 600)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("focusSetEditor.sheet")
         .onChange(of: draft.suggestedName) { _, suggestedName in
             guard isCreating, usesSuggestedName else {
                 return
@@ -53,6 +54,7 @@ struct FocusSetEditorSheet: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.dismiss) private var dismiss
     @State private var draft: FocusSet
     @State private var usesSuggestedName: Bool
@@ -63,54 +65,62 @@ struct FocusSetEditorSheet: View {
         draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var matchCount: Int {
         transactions.count { !$0.isTLSFailure && draft.matches($0) }
     }
 
     private var matchSummary: String {
         if draft.ruleCount == 0 {
-            return String(localized: "Add at least one include or exclude condition")
+            return String(localized: "Add an include or exclude condition to preview matches")
         }
-        return String(localized: "\(matchCount) matching requests")
+        return matchCount == 1
+            ? String(localized: "1 matching request")
+            : String(localized: "\(matchCount) matching requests")
     }
 
     private var sheetHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "scope")
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(isCreating
                     ? String(localized: "Create Focus Set")
                     : String(localized: "Edit Focus Set"))
-                    .font(.headline)
-                Text(String(localized: "Show only the traffic that matters for this task."))
-                    .font(.caption)
+                    .font(toolMetrics.font(weight: .medium))
+                Text(String(localized: "Save a reusable view of the traffic relevant to one task."))
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
-        .padding(.horizontal, 18)
-        .frame(height: 58)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.top, toolMetrics.headerTopPadding)
+        .padding(.bottom, toolMetrics.headerBottomPadding)
+        .rockxyFunctionalBar()
     }
 
     private var editorContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
                 nameField
+
+                Divider()
 
                 conditionGroup(
                     title: String(localized: "Include"),
-                    description: String(localized: "Traffic must match every condition you fill in.")
+                    description: String(
+                        localized: "A request must match every condition you set. Empty fields match any value."
+                    )
                 ) {
                     applicationCondition
                     conditionDivider
                     suggestionCondition(
                         title: String(localized: "Domain"),
-                        icon: "globe",
                         placeholder: String(localized: "Any domain"),
-                        hint: String(localized: "Matches this domain and its subdomains, for example api.example.com."),
+                        hint: String(localized: "Matches this domain and its subdomains, such as api.example.com."),
                         pickerTitle: String(localized: "Choose Captured Domain"),
                         searchPrompt: String(localized: "Search captured domains"),
                         emptySelectionTitle: String(localized: "Any Domain"),
@@ -121,10 +131,9 @@ struct FocusSetEditorSheet: View {
                     conditionDivider
                     suggestionCondition(
                         title: String(localized: "Path Prefix"),
-                        icon: "point.topleft.down.to.point.bottomright.curvepath",
                         placeholder: String(localized: "Any path"),
                         hint: String(
-                            localized: "Matches URL paths that begin with this value, for example /v1/orders."
+                            localized: "Matches URL paths that begin with this value, such as /v1/orders."
                         ),
                         pickerTitle: String(localized: "Choose Captured Path"),
                         searchPrompt: String(localized: "Search captured paths"),
@@ -135,17 +144,18 @@ struct FocusSetEditorSheet: View {
                     )
                 }
 
+                Divider()
+
                 conditionGroup(
                     title: String(localized: "Exclude"),
                     description: String(
-                        localized: "Matching traffic is removed after the include conditions are applied."
+                        localized: "Matching requests are hidden after the include conditions are applied."
                     )
                 ) {
                     suggestionCondition(
                         title: String(localized: "Domain"),
-                        icon: "globe.badge.xmark",
                         placeholder: String(localized: "No excluded domain"),
-                        hint: String(localized: "Removes this domain and its subdomains from the Focus Set."),
+                        hint: String(localized: "Hides this domain and its subdomains from the Focus Set."),
                         pickerTitle: String(localized: "Choose Excluded Domain"),
                         searchPrompt: String(localized: "Search captured domains"),
                         emptySelectionTitle: String(localized: "No Excluded Domain"),
@@ -156,9 +166,8 @@ struct FocusSetEditorSheet: View {
                     conditionDivider
                     suggestionCondition(
                         title: String(localized: "Path Prefix"),
-                        icon: "point.topleft.down.to.point.bottomright.curvepath",
                         placeholder: String(localized: "No excluded path"),
-                        hint: String(localized: "Removes URL paths that begin with this value from the Focus Set."),
+                        hint: String(localized: "Hides URL paths that begin with this value from the Focus Set."),
                         pickerTitle: String(localized: "Choose Excluded Path"),
                         searchPrompt: String(localized: "Search captured paths"),
                         emptySelectionTitle: String(localized: "No Excluded Path"),
@@ -168,26 +177,38 @@ struct FocusSetEditorSheet: View {
                     )
                 }
             }
-            .padding(18)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .controlSize(.regular)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var nameField: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(String(localized: "Name"))
-                .foregroundStyle(.secondary)
-                .frame(width: 92, alignment: .trailing)
-            TextField(String(localized: "For example: Checkout API"), text: $draft.name)
-                .textFieldStyle(.roundedBorder)
+        VStack(alignment: .leading, spacing: 7) {
+            conditionRow(title: String(localized: "Name")) {
+                TextField(String(localized: "For example: Checkout API"), text: $draft.name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(height: toolMetrics.formControlHeight)
+                    .accessibilityIdentifier("focusSetEditor.name")
+            }
+
+            Text(
+                String(
+                    localized: "Focus Sets are available in every Project. Saving applies this set to the current Traffic Tab."
+                )
+            )
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.leading, toolMetrics.formLabelWidth + toolMetrics.controlSpacing)
         }
     }
 
     private var applicationCondition: some View {
         conditionRow(
             title: String(localized: "Application"),
-            icon: "app",
             hint: String(localized: "Only includes traffic captured from the selected application.")
         ) {
             CapturedApplicationSelectionField(
@@ -199,17 +220,18 @@ struct FocusSetEditorSheet: View {
 
     private var conditionDivider: some View {
         Divider()
-            .padding(.leading, 104)
+            .padding(.leading, toolMetrics.formLabelWidth + toolMetrics.controlSpacing)
     }
 
     private var actionBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: toolMetrics.controlSpacing) {
             Label(matchSummary, systemImage: "line.3.horizontal.decrease.circle")
-                .font(.caption)
+                .font(toolMetrics.secondaryFont())
                 .foregroundStyle(matchCount == 0 ? Color.orange : Color.secondary)
             Spacer()
             Button(String(localized: "Cancel"), role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
+                .rockxyGlassButtonStyle()
             Button(isCreating ? String(localized: "Create") : String(localized: "Save")) {
                 draft.name = trimmedName
                 onSave(draft)
@@ -219,8 +241,9 @@ struct FocusSetEditorSheet: View {
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(trimmedName.isEmpty || draft.ruleCount == 0)
         }
-        .padding(.horizontal, 18)
-        .frame(height: 52)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private func conditionGroup(
@@ -230,31 +253,24 @@ struct FocusSetEditorSheet: View {
     )
         -> some View
     {
-        VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(toolMetrics.font(weight: .semibold))
                 Text(description)
-                    .font(.caption)
+                    .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 content()
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
             }
         }
     }
 
     private func suggestionCondition(
         title: String,
-        icon: String,
         placeholder: String,
         hint: String,
         pickerTitle: String,
@@ -266,7 +282,7 @@ struct FocusSetEditorSheet: View {
     )
         -> some View
     {
-        conditionRow(title: title, icon: icon, hint: hint) {
+        conditionRow(title: title, hint: hint) {
             CapturedTextSuggestionField(
                 text: text,
                 placeholder: placeholder,
@@ -281,22 +297,24 @@ struct FocusSetEditorSheet: View {
 
     private func conditionRow(
         title: String,
-        icon: String,
-        hint: String,
+        hint: String? = nil,
         @ViewBuilder content: () -> some View
     )
         -> some View
     {
         HStack(alignment: .top, spacing: 12) {
-            Label(title, systemImage: icon)
+            Text(title)
+                .font(toolMetrics.font(weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 92, alignment: .trailing)
+                .frame(width: toolMetrics.formLabelWidth, alignment: .trailing)
             VStack(alignment: .leading, spacing: 3) {
                 content()
-                Text(hint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let hint {
+                    Text(hint)
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
