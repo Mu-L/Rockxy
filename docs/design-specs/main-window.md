@@ -59,7 +59,7 @@ The primary application window — a 3-column developer debugging interface foll
 | Control | Icon (SF Symbol) | States | Shortcut | Priority |
 |---------|-----------------|--------|----------|----------|
 | Project Selector | `folder.fill` | Active Project menu | — | High |
-| Start/Stop | `play.fill` / `stop.fill` | Toggle | ⌘⇧R / ⌘. | High |
+| Start/Stop | `play.fill` / `stop.fill` | Toggle | — / ⌘. | High |
 | Developer Hub | `command` | Opens tool launcher | — | Medium |
 | Bottom Inspector | `rectangle.split.1x2` | Toggle visibility | — | Medium |
 | Context Dock | `sidebar.trailing` | Toggle visibility | — | Medium |
@@ -80,6 +80,33 @@ The primary application window — a 3-column developer debugging interface foll
 - Button spacing: 4pt
 - Separator: SwiftUI `Divider()` between action groups
 - Tooltips on all buttons via `.help()` modifier
+
+### Customization Flow
+- Entry point: `Customize Toolbar…` at the bottom of the protocol-filter ellipsis menu.
+- Uses the standard AppKit toolbar customization palette, including Icon and Text display modes,
+  fixed/flexible spaces, Done, and the draggable default set.
+- User-customizable items: Source List, Project, Proxy Status, Start or Stop Proxy, Developer Hub,
+  Bottom Inspector, and Context Dock.
+- The source-list tracking separator is structural and immovable so the unified titlebar continues
+  to align with the three-pane split even when the Source List button is removed. AppKit documents
+  immovable items as un-draggable and non-removable, so the separator cannot be dragged out or
+  reordered from the customization palette.
+- Removing a toolbar item never removes the underlying command: proxy, Project, panel, Source List,
+  and Developer Hub actions remain available from the app menus or the traffic control shelf; Proxy
+  Status is informational only.
+- Proxy Status is registered as the toolbar's centered item, so when present it stays visually
+  centered regardless of the surrounding item order — removing and re-adding it, or reordering its
+  neighbors, does not move it out of the centered set.
+- The Icon and Text display modes only change how AppKit's own image/label items render. The custom
+  hosted items (Project selector, Proxy Status) supply their own SwiftUI content via `NSHostingController`,
+  so they keep their native rendered view across every display mode rather than collapsing to a
+  system label or icon.
+- The customized order, visibility, and display mode autosave under a versioned toolbar identity and
+  are reused whenever AppKit recreates the main workspace toolbar. Toolbar instances sharing that
+  identity synchronize changes immediately.
+- Dynamic toolbar items keep live behavior after removal and re-addition: Start/Stop follows proxy
+  state, Bottom Inspector follows selection and panel visibility, and Context Dock tooltips follow
+  its visible state.
 
 ---
 

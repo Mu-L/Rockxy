@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // Renders the protocol filter bar interface for toolbar controls and filtering.
@@ -42,11 +43,16 @@ struct ProtocolFilterBar: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+        .background {
+            ToolbarCustomizationWindowReader(reference: customizationWindowReference)
+                .frame(width: 0, height: 0)
+        }
     }
 
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var customizationWindowReference = ToolbarCustomizationWindowReference()
 
     private var hasActiveFilters: Bool {
         !activeFilters.isEmpty
@@ -104,6 +110,12 @@ struct ProtocolFilterBar: View {
             overflowSection(String(localized: "Protocol"), ProtocolFilterSelection.protocolFilters, visiblePills)
             overflowSection(String(localized: "Content"), ProtocolFilterSelection.contentTypeFilters, visiblePills)
             overflowStatusSection(visiblePills)
+            Divider()
+            Button(String(localized: "Customize Toolbar…")) {
+                NativeWorkspaceToolbar.presentCustomizationPalette(
+                    preferredWindow: customizationWindowReference.window
+                )
+            }
         } label: {
             Image(systemName: hasHidden ? "ellipsis.circle.fill" : "ellipsis.circle")
                 .font(.system(size: metrics.secondaryFontSize))
@@ -178,5 +190,41 @@ struct ProtocolFilterBar: View {
             get: { ProtocolFilterSelection.isSelected(filter, in: activeFilters) },
             set: { _ in activeFilters = ProtocolFilterSelection.toggling(filter, in: activeFilters) }
         )
+    }
+}
+
+// MARK: - ToolbarCustomizationWindowReader
+
+@MainActor
+private final class ToolbarCustomizationWindowReference {
+    weak var window: NSWindow?
+}
+
+private struct ToolbarCustomizationWindowReader: NSViewRepresentable {
+    let reference: ToolbarCustomizationWindowReference
+
+    func makeNSView(context: Context) -> ToolbarCustomizationWindowAnchor {
+        let view = ToolbarCustomizationWindowAnchor()
+        view.reference = reference
+        return view
+    }
+
+    func updateNSView(_ nsView: ToolbarCustomizationWindowAnchor, context: Context) {
+        nsView.reference = reference
+        nsView.captureWindow()
+    }
+}
+
+@MainActor
+private final class ToolbarCustomizationWindowAnchor: NSView {
+    weak var reference: ToolbarCustomizationWindowReference?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        captureWindow()
+    }
+
+    func captureWindow() {
+        reference?.window = window
     }
 }
