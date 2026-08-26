@@ -336,7 +336,6 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             action: #selector(toggleSidebar(_:))
         )
         item.isBordered = true
-        item.isNavigational = true
         item.toolTip = String(localized: "Show or hide the Source List")
         return item
     }
