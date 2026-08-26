@@ -169,7 +169,9 @@ struct NativeWorkspaceSplitViewTests {
             configuration: NativeWorkspaceToolbarConfiguration(
                 coordinator: coordinator,
                 onOpenDeveloperHub: {}
-            )
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
         )
         let window = NSWindow(contentViewController: controller)
 
@@ -214,6 +216,256 @@ struct NativeWorkspaceSplitViewTests {
         }
     }
 
+    @Test("Main toolbar supports and persists native user customization")
+    func nativeToolbarCustomizationConfiguration() {
+        // The autosave contract is verified under a unique identifier so the shared production
+        // toolbar preferences are never written. The default initializer opts into autosaving.
+        let autosaveIdentifier = uniqueToolbarIdentifier()
+        let autosavingToolbar = NativeWorkspaceToolbar(
+            splitViewController: makeController(sidebarPresented: true, inspectorPresented: true),
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: autosaveIdentifier
+        )
+        #expect(autosavingToolbar.managedToolbar.autosavesConfiguration)
+        autosavingToolbar.managedToolbar.autosavesConfiguration = false
+        removeToolbarConfigurationDefaults(autosaveIdentifier)
+
+        // `customizationToolbar` matches by the production identifier, so the customization contract
+        // is exercised with a non-autosaving toolbar that carries that identifier. Autosave is off,
+        // so nothing is written to the production preferences.
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: NativeWorkspaceToolbar.toolbarIdentifier,
+            autosavesConfiguration: false
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+
+        #expect(toolbar.managedToolbar.allowsUserCustomization)
+        #expect(!toolbar.managedToolbar.autosavesConfiguration)
+
+        let defaults = toolbar.toolbarDefaultItemIdentifiers(toolbar.managedToolbar)
+        let allowed = toolbar.toolbarAllowedItemIdentifiers(toolbar.managedToolbar)
+        let immovable = toolbar.toolbarImmovableItemIdentifiers(toolbar.managedToolbar)
+
+        #expect(defaults == NativeWorkspaceToolbar.defaultItemIdentifiers)
+        #expect(allowed == NativeWorkspaceToolbar.allowedItemIdentifiers)
+        #expect(Set(allowed).count == allowed.count)
+        #expect(Set(defaults).isSubset(of: Set(allowed)))
+        #expect(allowed.contains(.space))
+        #expect(allowed.contains(.flexibleSpace))
+        #expect(Set(NativeWorkspaceToolbar.userCustomizableItemIdentifiers).isSubset(of: Set(allowed)))
+        #expect(immovable == [NativeWorkspaceToolbar.sidebarTrackingSeparatorIdentifier])
+
+        let preferredWindow = window
+        let fallbackWindow = NSWindow()
+        let fallbackToolbar = NSToolbar(identifier: NativeWorkspaceToolbar.toolbarIdentifier)
+        fallbackToolbar.allowsUserCustomization = true
+        fallbackWindow.toolbar = fallbackToolbar
+
+        #expect(NativeWorkspaceToolbar.customizationToolbar(
+            preferredWindow: preferredWindow,
+            fallbackWindows: [fallbackWindow]
+        ) === toolbar.managedToolbar)
+
+        let unrelatedWindow = NSWindow()
+        unrelatedWindow.toolbar = NSToolbar(identifier: "unrelated.toolbar")
+        #expect(NativeWorkspaceToolbar.customizationToolbar(
+            preferredWindow: unrelatedWindow,
+            fallbackWindows: [fallbackWindow]
+        ) === fallbackToolbar)
+    }
+
+    @Test("Every customizable toolbar option has a complete native palette representation")
+    func customizableToolbarItemCatalogIsComplete() throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
+        )
+
+        for identifier in NativeWorkspaceToolbar.userCustomizableItemIdentifiers {
+            let item = try #require(toolbar.toolbar(
+                toolbar.managedToolbar,
+                itemForItemIdentifier: identifier,
+                willBeInsertedIntoToolbar: false
+            ))
+            #expect(!item.label.isEmpty)
+            #expect(!item.paletteLabel.isEmpty)
+            #expect(item.image != nil || item.view != nil)
+        }
+    }
+
+    @Test("Tracking separator uses a compact default-set palette label")
+    func trackingSeparatorPaletteLabelIsCompact() throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
+        )
+
+        let separator = try #require(toolbar.toolbar(
+            toolbar.managedToolbar,
+            itemForItemIdentifier: NativeWorkspaceToolbar.sidebarTrackingSeparatorIdentifier,
+            willBeInsertedIntoToolbar: false
+        ))
+
+        #expect(separator.label == String(localized: "Source List Divider"))
+        #expect(separator.paletteLabel == String(localized: "Divider"))
+    }
+
+    @Test("Optional toolbar items can be removed and restored independently")
+    func customizableToolbarItemsRoundTrip() throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+
+        for identifier in NativeWorkspaceToolbar.userCustomizableItemIdentifiers {
+            let index = try #require(toolbar.managedToolbar.items.firstIndex {
+                $0.itemIdentifier == identifier
+            })
+            toolbar.managedToolbar.removeItem(at: index)
+            #expect(!toolbar.managedToolbar.items.contains { $0.itemIdentifier == identifier })
+
+            toolbar.managedToolbar.insertItem(withItemIdentifier: identifier, at: index)
+            let restored = try #require(toolbar.managedToolbar.items.first {
+                $0.itemIdentifier == identifier
+            })
+            #expect(!restored.paletteLabel.isEmpty)
+        }
+
+        #expect(toolbar.managedToolbar.items.contains {
+            $0.itemIdentifier == NativeWorkspaceToolbar.sidebarTrackingSeparatorIdentifier
+        })
+
+        // Proxy Status is the toolbar's centered item; removing and re-adding items must not
+        // drop it from the centered set.
+        #expect(toolbar.managedToolbar.centeredItemIdentifiers.contains(
+            NativeWorkspaceToolbar.proxyStatusIdentifier
+        ))
+    }
+
+    @Test("Releasing a workspace controller deallocates the controller and its toolbar")
+    func toolbarReleaseDeallocatesControllerAndToolbar() async {
+        weak var weakController: NativeWorkspaceSplitViewController?
+        weak var weakToolbar: NativeWorkspaceToolbar?
+
+        do {
+            let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+            let toolbar = NativeWorkspaceToolbar(
+                splitViewController: controller,
+                configuration: NativeWorkspaceToolbarConfiguration(
+                    coordinator: MainContentCoordinator(),
+                    onOpenDeveloperHub: {}
+                ),
+                toolbarIdentifier: uniqueToolbarIdentifier(),
+                autosavesConfiguration: false
+            )
+            // A bare window (no contentViewController) is used deliberately: if AppKit retains the
+            // window past this scope it only keeps the NSToolbar alive, never the controller, so the
+            // deallocation assertions below stay reliable.
+            let window = NSWindow()
+            // The controller strongly owns the toolbar (associated object) while the toolbar keeps
+            // only a weak reference back, so this mirrors the production ownership graph.
+            controller.attachNativeToolbar(toolbar, to: window)
+
+            weakController = controller
+            weakToolbar = toolbar
+            #expect(weakController != nil)
+            #expect(weakToolbar != nil)
+        }
+
+        // Drain any observation follow-up task scheduled during startObservingState().
+        await Task.yield()
+
+        #expect(weakController == nil)
+        #expect(weakToolbar == nil)
+    }
+
+    @Test("Workspace windows with the same toolbar identity share customization")
+    func customizableToolbarConfigurationSynchronizesAcrossWindows() async throws {
+        let identifier = uniqueToolbarIdentifier()
+        let firstController = makeController(sidebarPresented: true, inspectorPresented: true)
+        let secondController = makeController(sidebarPresented: true, inspectorPresented: true)
+        let firstToolbar = NativeWorkspaceToolbar(
+            splitViewController: firstController,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: identifier,
+            autosavesConfiguration: false
+        )
+        let secondToolbar = NativeWorkspaceToolbar(
+            splitViewController: secondController,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: identifier,
+            autosavesConfiguration: false
+        )
+        let firstWindow = NSWindow(contentViewController: firstController)
+        let secondWindow = NSWindow(contentViewController: secondController)
+        firstWindow.toolbar = firstToolbar.managedToolbar
+        secondWindow.toolbar = secondToolbar.managedToolbar
+
+        let removedIdentifier = NativeWorkspaceToolbar.developerHubIdentifier
+        let removedIndex = try #require(firstToolbar.managedToolbar.items.firstIndex {
+            $0.itemIdentifier == removedIdentifier
+        })
+        firstToolbar.managedToolbar.removeItem(at: removedIndex)
+
+        for _ in 0 ..< 6 where secondToolbar.managedToolbar.items.contains(where: {
+            $0.itemIdentifier == removedIdentifier
+        }) {
+            await Task.yield()
+        }
+        #expect(!secondToolbar.managedToolbar.items.contains {
+            $0.itemIdentifier == removedIdentifier
+        })
+
+        firstToolbar.managedToolbar.insertItem(
+            withItemIdentifier: removedIdentifier,
+            at: removedIndex
+        )
+        for _ in 0 ..< 6 where !secondToolbar.managedToolbar.items.contains(where: {
+            $0.itemIdentifier == removedIdentifier
+        }) {
+            await Task.yield()
+        }
+        #expect(secondToolbar.managedToolbar.items.contains {
+            $0.itemIdentifier == removedIdentifier
+        })
+    }
+
     @Test("Native toolbar toggle collapses and restores the sidebar split item")
     func nativeToolbarTogglesSidebar() {
         let controller = makeController(sidebarPresented: true, inspectorPresented: true)
@@ -222,7 +474,9 @@ struct NativeWorkspaceSplitViewTests {
             configuration: NativeWorkspaceToolbarConfiguration(
                 coordinator: MainContentCoordinator(),
                 onOpenDeveloperHub: {}
-            )
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
         )
         let window = NSWindow(contentViewController: controller)
         window.toolbar = toolbar.managedToolbar
@@ -256,7 +510,9 @@ struct NativeWorkspaceSplitViewTests {
                     #expect(actionDispatchReturned)
                     openCount += 1
                 }
-            )
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
         )
         let window = NSWindow(contentViewController: controller)
         window.toolbar = toolbar.managedToolbar
@@ -267,11 +523,8 @@ struct NativeWorkspaceSplitViewTests {
         // Developer Hub action is dispatched from the native toolbar.
         coordinator.isProxyRunning = true
 
-        let actionGroup = try #require(toolbar.managedToolbar.items.first {
-            $0.itemIdentifier == NativeWorkspaceToolbar.actionGroupIdentifier
-        } as? NSToolbarItemGroup)
-        let developerHubItem = try #require(actionGroup.subitems.first {
-            $0.itemIdentifier.rawValue.hasSuffix(".developerHub")
+        let developerHubItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.developerHubIdentifier
         })
         let action = try #require(developerHubItem.action)
 
@@ -279,7 +532,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(openCount == 0)
         actionDispatchReturned = true
 
-        for _ in 0..<4 where openCount == 0 {
+        for _ in 0 ..< 4 where openCount == 0 {
             await Task.yield()
         }
         #expect(openCount == 1)
@@ -299,16 +552,15 @@ struct NativeWorkspaceSplitViewTests {
                     #expect(actionDispatchReturned)
                     toggleCount += 1
                 }
-            )
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
         )
         let window = NSWindow(contentViewController: controller)
         window.toolbar = toolbar.managedToolbar
 
-        let actionGroup = try #require(toolbar.managedToolbar.items.first {
-            $0.itemIdentifier == NativeWorkspaceToolbar.actionGroupIdentifier
-        } as? NSToolbarItemGroup)
-        let proxyItem = try #require(actionGroup.subitems.first {
-            $0.itemIdentifier.rawValue.hasSuffix(".proxy")
+        let proxyItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
         })
         let action = try #require(proxyItem.action)
 
@@ -316,10 +568,96 @@ struct NativeWorkspaceSplitViewTests {
         #expect(toggleCount == 0)
         actionDispatchReturned = true
 
-        for _ in 0..<4 where toggleCount == 0 {
+        for _ in 0 ..< 4 where toggleCount == 0 {
             await Task.yield()
         }
         #expect(toggleCount == 1)
+    }
+
+    @Test("Dynamic toolbar state survives palette creation and item re-addition")
+    func customizableToolbarDynamicStateRemainsLive() async throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        let coordinator = MainContentCoordinator()
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: coordinator,
+                onOpenDeveloperHub: {}
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+        toolbar.startObservingState()
+        await Task.yield()
+
+        let activeProxyItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
+        })
+        #expect(activeProxyItem.label == String(localized: "Start"))
+        #expect(activeProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+
+        // AppKit asks for separate item instances while constructing the palette.
+        // That must not replace the live toolbar instance tracked by state updates.
+        _ = toolbar.toolbar(
+            toolbar.managedToolbar,
+            itemForItemIdentifier: NativeWorkspaceToolbar.proxyToggleIdentifier,
+            willBeInsertedIntoToolbar: false
+        )
+        coordinator.isProxyRunning = true
+        for _ in 0 ..< 6 where activeProxyItem.label != String(localized: "Stop") {
+            await Task.yield()
+        }
+        #expect(activeProxyItem.label == String(localized: "Stop"))
+        #expect(activeProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+
+        let proxyIndex = try #require(toolbar.managedToolbar.items.firstIndex {
+            $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
+        })
+        toolbar.managedToolbar.removeItem(at: proxyIndex)
+        toolbar.managedToolbar.insertItem(
+            withItemIdentifier: NativeWorkspaceToolbar.proxyToggleIdentifier,
+            at: proxyIndex
+        )
+        let restoredProxyItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
+        })
+        #expect(restoredProxyItem.label == String(localized: "Stop"))
+        #expect(restoredProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+
+        coordinator.isProxyRunning = false
+        for _ in 0 ..< 6 where restoredProxyItem.label != String(localized: "Start") {
+            await Task.yield()
+        }
+        #expect(restoredProxyItem.label == String(localized: "Start"))
+
+        let transaction = TestFixtures.makeTransaction()
+        coordinator.selectedTransaction = transaction
+        coordinator.selectedTransactionIDs = [transaction.id]
+        let bottomItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.bottomInspectorIdentifier
+        })
+        for _ in 0 ..< 6 where !bottomItem.isEnabled {
+            await Task.yield()
+        }
+        #expect(bottomItem.isEnabled)
+        #expect(bottomItem.toolTip == String(localized: "Hide Bottom Inspector"))
+
+        let contextItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.contextDockIdentifier
+        })
+        let initialContextVisibility = coordinator.isContextDockVisible
+        let action = try #require(contextItem.action)
+        NSApp.sendAction(action, to: contextItem.target, from: contextItem)
+        let expectedContextToolTip = initialContextVisibility
+            ? String(localized: "Show Context Dock")
+            : String(localized: "Hide Context Dock")
+        for _ in 0 ..< 6 where contextItem.toolTip != expectedContextToolTip {
+            await Task.yield()
+        }
+        #expect(coordinator.isContextDockVisible != initialContextVisibility)
+        #expect(contextItem.toolTip == expectedContextToolTip)
     }
 
     // MARK: - Project selector sizing metrics
@@ -646,6 +984,10 @@ struct NativeWorkspaceSplitViewTests {
         "NativeWorkspaceSplitViewTests-\(UUID().uuidString)"
     }
 
+    private func uniqueToolbarIdentifier() -> NSToolbar.Identifier {
+        NSToolbar.Identifier("NativeWorkspaceSplitViewTests.Toolbar.\(UUID().uuidString)")
+    }
+
     private func expectNonNegativeArrangedGeometry(_ controller: NativeWorkspaceSplitViewController) {
         for item in controller.splitViewItems {
             let frame = item.viewController.view.frame
@@ -658,5 +1000,9 @@ struct NativeWorkspaceSplitViewTests {
 
     private func removeSplitViewAutosaveDefaults(_ autosaveName: String) {
         UserDefaults.standard.removeObject(forKey: "NSSplitView Subview Frames \(autosaveName)")
+    }
+
+    private func removeToolbarConfigurationDefaults(_ identifier: NSToolbar.Identifier) {
+        UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(identifier)")
     }
 }
