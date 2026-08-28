@@ -8,15 +8,15 @@ struct GitHubSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "Account")) {
+            SettingsSection(String(localized: "Account", bundle: RockxyLocalization.bundle)) {
                 permissionSection
             }
 
-            SettingsSection(String(localized: "Publishing Defaults")) {
+            SettingsSection(String(localized: "Publishing Defaults", bundle: RockxyLocalization.bundle)) {
                 defaultsSection
             }
 
-            SettingsSection(String(localized: "Access & Help")) {
+            SettingsSection(String(localized: "Access & Help", bundle: RockxyLocalization.bundle)) {
                 advancedSection
             }
         }
@@ -67,7 +67,7 @@ struct GitHubSettingsTab: View {
 
     private var permissionSection: some View {
         VStack(alignment: .leading, spacing: 22) {
-            alignedRow(label: String(localized: "Gist Permission:")) {
+            alignedRow(label: String(localized: "Gist Permission:", bundle: RockxyLocalization.bundle)) {
                 HStack(spacing: 8) {
                     Image(systemName: viewModel.isConnected ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(viewModel.isConnected ? .green : .orange)
@@ -93,7 +93,7 @@ struct GitHubSettingsTab: View {
                             To read or write Gists on a user's behalf, Rockxy requires Gist Permission from your \
                             GitHub account. After the authorization, your GitHub Access Token will securely store \
                             in System Keychain.
-                            """
+                            """, bundle: RockxyLocalization.bundle
                         )
                     )
                     .font(settingsMetrics.secondaryFont())
@@ -104,7 +104,8 @@ struct GitHubSettingsTab: View {
                     if !viewModel.canUseOAuth {
                         Text(
                             String(
-                                localized: "OAuth is not configured for this build. Personal access token fallback is available."
+                                localized: "OAuth is not configured for this build. Personal access token fallback is available.",
+                                bundle: RockxyLocalization.bundle
                             )
                         )
                         .font(settingsMetrics.secondaryFont())
@@ -118,9 +119,12 @@ struct GitHubSettingsTab: View {
 
     private var defaultsSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            alignedRow(label: String(localized: "Publish as:")) {
+            alignedRow(label: String(localized: "Publish as:", bundle: RockxyLocalization.bundle)) {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker(String(localized: "Publish as"), selection: gistVisibilityBinding) {
+                    Picker(
+                        String(localized: "Publish as", bundle: RockxyLocalization.bundle),
+                        selection: gistVisibilityBinding
+                    ) {
                         ForEach(GitHubGistVisibility.allCases, id: \.self) { visibility in
                             Text(visibility.title).tag(visibility)
                         }
@@ -136,7 +140,8 @@ struct GitHubSettingsTab: View {
                     if GitHubGistVisibility(rawValue: gistVisibility) == .public {
                         Text(
                             String(
-                                localized: "Public Gists are discoverable. Review captured traffic before publishing."
+                                localized: "Public Gists are discoverable. Review captured traffic before publishing.",
+                                bundle: RockxyLocalization.bundle
                             )
                         )
                         .font(settingsMetrics.secondaryFont(weight: .medium))
@@ -145,9 +150,13 @@ struct GitHubSettingsTab: View {
                     }
 
                     checkboxWithHelp(
-                        title: String(localized: "Automatic redact sensitive headers"),
+                        title: String(
+                            localized: "Automatic redact sensitive headers",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         subtitle: String(
-                            localized: "Authorization, Cookies, Set-Cookies, ... are censored before publishing to Gist."
+                            localized: "Authorization, Cookies, Set-Cookies, ... are censored before publishing to Gist.",
+                            bundle: RockxyLocalization.bundle
                         ),
                         isOn: $redactSensitiveData,
                         onChange: AppSettingsManager.shared.updateGitHubGistRedactSensitiveData
@@ -155,16 +164,19 @@ struct GitHubSettingsTab: View {
                 }
             }
 
-            alignedRow(label: String(localized: "After Publish:")) {
+            alignedRow(label: String(localized: "After Publish:", bundle: RockxyLocalization.bundle)) {
                 VStack(alignment: .leading, spacing: 12) {
                     checkboxWithHelp(
-                        title: String(localized: "Open Gist with default Web Browser"),
+                        title: String(
+                            localized: "Open Gist with default Web Browser",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         subtitle: nil,
                         isOn: $openInBrowser,
                         onChange: AppSettingsManager.shared.updateGitHubGistOpenInBrowser
                     )
                     checkboxWithHelp(
-                        title: String(localized: "Copy Gist URL to clipboard"),
+                        title: String(localized: "Copy Gist URL to clipboard", bundle: RockxyLocalization.bundle),
                         subtitle: nil,
                         isOn: $copyURLToClipboard,
                         onChange: AppSettingsManager.shared.updateGitHubGistCopyURLToClipboard
@@ -176,17 +188,20 @@ struct GitHubSettingsTab: View {
 
     private var advancedSection: some View {
         VStack(alignment: .leading, spacing: 18) {
-            alignedRow(label: String(localized: "Advanced:")) {
+            alignedRow(label: String(localized: "Advanced:", bundle: RockxyLocalization.bundle)) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Button(String(localized: "Manage Access")) {
+                    Button(String(localized: "Manage Access", bundle: RockxyLocalization.bundle)) {
                         viewModel.openManageAccess()
                     }
                     .controlSize(.large)
 
-                    Text(String(localized: "Review or Revoke Application Authorization."))
-                        .font(settingsMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Review or Revoke Application Authorization.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                     Button {
                         viewModel.openHelp()
@@ -197,7 +212,7 @@ struct GitHubSettingsTab: View {
                     .rockxyGlassButtonStyle()
                     .buttonBorderShape(.circle)
                     .controlSize(.small)
-                    .help(String(localized: "Open Publish to Gist documentation"))
+                    .help(String(localized: "Open Publish to Gist documentation", bundle: RockxyLocalization.bundle))
                 }
             }
         }
@@ -206,8 +221,8 @@ struct GitHubSettingsTab: View {
     @ViewBuilder private var accountActions: some View {
         Button(
             viewModel.isConnected
-                ? String(localized: "Reconnect...")
-                : String(localized: "Authorize...")
+                ? String(localized: "Reconnect...", bundle: RockxyLocalization.bundle)
+                : String(localized: "Authorize...", bundle: RockxyLocalization.bundle)
         ) {
             if viewModel.canUseOAuth {
                 showDeviceCodeSheet = true
@@ -218,13 +233,13 @@ struct GitHubSettingsTab: View {
         .rockxyGlassButtonStyle(prominent: true)
         .controlSize(.regular)
 
-        Button(String(localized: "Use Token...")) {
+        Button(String(localized: "Use Token...", bundle: RockxyLocalization.bundle)) {
             showPersonalAccessTokenSheet = true
         }
         .controlSize(.regular)
 
         if viewModel.isConnected {
-            Button(String(localized: "Disconnect")) {
+            Button(String(localized: "Disconnect", bundle: RockxyLocalization.bundle)) {
                 viewModel.disconnect()
             }
             .controlSize(.regular)
@@ -305,12 +320,12 @@ final class GitHubSettingsViewModel {
 
     var connectionTitle: String {
         guard let metadata else {
-            return String(localized: "Not Authorized Yet!")
+            return String(localized: "Not Authorized Yet!", bundle: RockxyLocalization.bundle)
         }
         if let login = metadata.login, !login.isEmpty {
-            return String(localized: "Authorized as \(login)")
+            return String(localized: "Authorized as \(login)", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Authorized ••••\(metadata.tokenSuffix)")
+        return String(localized: "Authorized ••••\(metadata.tokenSuffix)", bundle: RockxyLocalization.bundle)
     }
 
     var oauthClientID: String? {
@@ -402,18 +417,24 @@ private struct PersonalAccessTokenFallbackSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: "Personal Access Token"))
+            Text(String(localized: "Personal Access Token", bundle: RockxyLocalization.bundle))
                 .font(.system(size: max(16, settingsMetrics.bodyFontSize + 3), weight: .semibold))
 
-            Text(String(localized: "Paste a GitHub token with Gist access. Rockxy stores the token in Keychain."))
-                .font(settingsMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(
+                localized: "Paste a GitHub token with Gist access. Rockxy stores the token in Keychain.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(settingsMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
-            SecureField(String(localized: "GitHub token"), text: $viewModel.personalAccessToken)
-                .textFieldStyle(.roundedBorder)
-                .font(settingsMetrics.font(monospaced: true))
-                .frame(minHeight: settingsMetrics.controlHeight)
+            SecureField(
+                String(localized: "GitHub token", bundle: RockxyLocalization.bundle),
+                text: $viewModel.personalAccessToken
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(settingsMetrics.font(monospaced: true))
+            .frame(minHeight: settingsMetrics.controlHeight)
 
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
@@ -423,16 +444,16 @@ private struct PersonalAccessTokenFallbackSheet: View {
             }
 
             HStack {
-                Button(String(localized: "Create Token")) {
+                Button(String(localized: "Create Token", bundle: RockxyLocalization.bundle)) {
                     if let url = URL(string: "https://github.com/settings/tokens/new?scopes=gist&description=Rockxy") {
                         NSWorkspace.shared.open(url)
                     }
                 }
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
-                Button(String(localized: "Save")) {
+                Button(String(localized: "Save", bundle: RockxyLocalization.bundle)) {
                     viewModel.savePersonalAccessToken()
                     if viewModel.errorMessage == nil {
                         dismiss()
@@ -467,11 +488,11 @@ private struct GitHubDeviceCodeAuthorizationSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: "Authorize GitHub"))
+            Text(String(localized: "Authorize GitHub", bundle: RockxyLocalization.bundle))
                 .font(.system(size: max(16, settingsMetrics.bodyFontSize + 3), weight: .semibold))
 
             if let deviceCode {
-                Text(String(localized: "Enter this code on GitHub:"))
+                Text(String(localized: "Enter this code on GitHub:", bundle: RockxyLocalization.bundle))
                     .font(settingsMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                 Text(deviceCode.userCode)
@@ -479,22 +500,25 @@ private struct GitHubDeviceCodeAuthorizationSheet: View {
                     .textSelection(.enabled)
 
                 HStack {
-                    Button(String(localized: "Open GitHub")) {
+                    Button(String(localized: "Open GitHub", bundle: RockxyLocalization.bundle)) {
                         if let url = URL(string: deviceCode.verificationURI) {
                             NSWorkspace.shared.open(url)
                         }
                     }
-                    Button(String(localized: "I Authorized")) {
+                    Button(String(localized: "I Authorized", bundle: RockxyLocalization.bundle)) {
                         Task { await poll() }
                     }
                     .disabled(isLoading)
                 }
             } else {
-                Text(String(localized: "Rockxy will request GitHub Gist permission using OAuth device authorization."))
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(String(localized: "Start Authorization")) {
+                Text(String(
+                    localized: "Rockxy will request GitHub Gist permission using OAuth device authorization.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                Button(String(localized: "Start Authorization", bundle: RockxyLocalization.bundle)) {
                     Task { await start() }
                 }
                 .disabled(isLoading)
@@ -514,7 +538,7 @@ private struct GitHubDeviceCodeAuthorizationSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Done")) {
+                Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
             }

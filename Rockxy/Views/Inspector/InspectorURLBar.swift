@@ -58,10 +58,10 @@ struct InspectorURLBar: View {
         let backgroundColor: Color
         switch transaction.state {
         case .active:
-            label = String(localized: "ACTIVE")
+            label = String(localized: "ACTIVE", bundle: RockxyLocalization.bundle)
             backgroundColor = .yellow
         case .pending:
-            label = String(localized: "PENDING")
+            label = String(localized: "PENDING", bundle: RockxyLocalization.bundle)
             backgroundColor = .gray
         case .completed,
              .failed,
@@ -120,7 +120,7 @@ struct InspectorURLBar: View {
                 .font(.system(size: metrics.controlFontSize))
         }
         .buttonStyle(.borderless)
-        .help(String(localized: "Open Inspector in New Window"))
-        .accessibilityLabel(String(localized: "Open Inspector in New Window"))
+        .help(String(localized: "Open Inspector in New Window", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "Open Inspector in New Window", bundle: RockxyLocalization.bundle))
     }
 }

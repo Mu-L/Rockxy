@@ -9,15 +9,7 @@ import Foundation
 /// This is a value type snapshot — mutating headers or body creates a modified copy
 /// used by the rule engine (breakpoint editing) and request replay.
 struct HTTPRequestData: Sendable {
-    let method: String
-    let url: URL
-    let httpVersion: String
-    var headers: [HTTPHeader]
-    var body: Data?
-    var contentType: ContentType?
-    /// Logical Project/session ownership captured at request start. It is runtime
-    /// routing metadata and is deliberately excluded from HAR/session serializers.
-    let captureContext: TrafficCaptureContext?
+    // MARK: Lifecycle
 
     init(
         method: String,
@@ -36,6 +28,18 @@ struct HTTPRequestData: Sendable {
         self.contentType = contentType
         self.captureContext = captureContext
     }
+
+    // MARK: Internal
+
+    let method: String
+    let url: URL
+    let httpVersion: String
+    var headers: [HTTPHeader]
+    var body: Data?
+    var contentType: ContentType?
+    /// Logical Project/session ownership captured at request start. It is runtime
+    /// routing metadata and is deliberately excluded from HAR/session serializers.
+    let captureContext: TrafficCaptureContext?
 
     var host: String {
         url.host() ?? ""
@@ -59,7 +63,7 @@ struct HTTPRequestData: Sendable {
 // MARK: - HTTPHeader
 
 /// A single HTTP header name-value pair, used in both requests and responses.
-struct HTTPHeader: Equatable, Sendable {
+struct HTTPHeader: Equatable, Sendable, Codable {
     let name: String
     let value: String
 }

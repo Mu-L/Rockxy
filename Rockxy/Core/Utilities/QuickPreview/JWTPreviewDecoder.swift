@@ -3,16 +3,22 @@ import Foundation
 // MARK: - JWTPreviewDecoder
 
 enum JWTPreviewDecoder {
-    private static let bearerPrefix = "bearer "
+    // MARK: Internal
 
     static func decode(_ input: String, now: Date = Date()) -> QuickPreviewResult {
         do {
             let preview = try decodePreview(input, now: now)
             return .jwt(preview)
         } catch let error as JWTPreviewError {
-            return .error(title: String(localized: "Invalid JWT"), message: error.localizedDescription)
+            return .error(
+                title: String(localized: "Invalid JWT", bundle: RockxyLocalization.bundle),
+                message: error.localizedDescription
+            )
         } catch {
-            return .error(title: String(localized: "Invalid JWT"), message: error.localizedDescription)
+            return .error(
+                title: String(localized: "Invalid JWT", bundle: RockxyLocalization.bundle),
+                message: error.localizedDescription
+            )
         }
     }
 
@@ -38,7 +44,10 @@ enum JWTPreviewDecoder {
         return JWTPreview(
             headerText: headerText,
             payloadText: payloadText,
-            signaturePreview: signature.isEmpty ? String(localized: "Empty signature") : signature,
+            signaturePreview: signature.isEmpty ? String(
+                localized: "Empty signature",
+                bundle: RockxyLocalization.bundle
+            ) : signature,
             claims: claims,
             warnings: warnings
         )
@@ -76,6 +85,10 @@ enum JWTPreviewDecoder {
         return data
     }
 
+    // MARK: Private
+
+    private static let bearerPrefix = "bearer "
+
     private static func jsonObject(from data: Data, segmentName: String) throws -> Any {
         do {
             return try JSONSerialization.jsonObject(with: data)
@@ -86,8 +99,7 @@ enum JWTPreviewDecoder {
 
     private static func prettyJSON(_ object: Any) -> String? {
         guard JSONSerialization.isValidJSONObject(object),
-              let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-        else {
+              let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]) else {
             return nil
         }
         return String(data: data, encoding: .utf8)
@@ -104,7 +116,7 @@ enum JWTPreviewDecoder {
         var warnings: [JWTPreviewWarning] = [
             JWTPreviewWarning(
                 severity: .info,
-                message: String(localized: "Decoded only. Signature not verified.")
+                message: String(localized: "Decoded only. Signature not verified.", bundle: RockxyLocalization.bundle)
             ),
         ]
 
@@ -114,28 +126,28 @@ enum JWTPreviewDecoder {
         {
             warnings.append(JWTPreviewWarning(
                 severity: .warning,
-                message: String(localized: "Header uses alg: none.")
+                message: String(localized: "Header uses alg: none.", bundle: RockxyLocalization.bundle)
             ))
         }
 
         if signature.isEmpty {
             warnings.append(JWTPreviewWarning(
                 severity: .warning,
-                message: String(localized: "Signature segment is empty.")
+                message: String(localized: "Signature segment is empty.", bundle: RockxyLocalization.bundle)
             ))
         }
 
         if let expiration = claims.exp, expiration <= now {
             warnings.append(JWTPreviewWarning(
                 severity: .warning,
-                message: String(localized: "Token is expired.")
+                message: String(localized: "Token is expired.", bundle: RockxyLocalization.bundle)
             ))
         }
 
         if let notBefore = claims.nbf, notBefore > now {
             warnings.append(JWTPreviewWarning(
                 severity: .warning,
-                message: String(localized: "Token is not valid yet.")
+                message: String(localized: "Token is not valid yet.", bundle: RockxyLocalization.bundle)
             ))
         }
 
@@ -173,15 +185,7 @@ struct JWTPreview: Equatable, Sendable {
 // MARK: - JWTClaims
 
 struct JWTClaims: Equatable, Sendable {
-    let issuer: String?
-    let subject: String?
-    let audience: String?
-    let expiration: String?
-    let notBefore: String?
-    let issuedAt: String?
-    let exp: Date?
-    let nbf: Date?
-    let iat: Date?
+    // MARK: Lifecycle
 
     init(object: Any) {
         let dict = object as? [String: Any] ?? [:]
@@ -196,6 +200,18 @@ struct JWTClaims: Equatable, Sendable {
         issuedAt = iat.map(Self.dateString)
     }
 
+    // MARK: Internal
+
+    let issuer: String?
+    let subject: String?
+    let audience: String?
+    let expiration: String?
+    let notBefore: String?
+    let issuedAt: String?
+    let exp: Date?
+    let nbf: Date?
+    let iat: Date?
+
     var summaryRows: [QuickPreviewKeyValueRow] {
         [
             ("iss", issuer),
@@ -209,6 +225,8 @@ struct JWTClaims: Equatable, Sendable {
             value.map { QuickPreviewKeyValueRow(key: key, value: $0) }
         }
     }
+
+    // MARK: Private
 
     private static func dateValue(_ value: Any?) -> Date? {
         switch value {
@@ -260,14 +278,19 @@ enum JWTPreviewError: LocalizedError, Equatable {
     case invalidBase64(String)
     case invalidJSON(String)
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .invalidSegmentCount:
-            String(localized: "Expected header.payload.signature.")
+            String(localized: "Expected header.payload.signature.", bundle: RockxyLocalization.bundle)
         case let .invalidBase64(segment):
-            String(localized: "Could not decode the \(segment) segment as Base64URL.")
+            String(
+                localized: "Could not decode the \(segment) segment as Base64URL.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .invalidJSON(segment):
-            String(localized: "The \(segment) segment is not valid JSON.")
+            String(localized: "The \(segment) segment is not valid JSON.", bundle: RockxyLocalization.bundle)
         }
     }
 }

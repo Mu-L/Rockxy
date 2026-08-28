@@ -56,7 +56,10 @@ extension MainContentCoordinator {
             guard DomainGrouping.host(domain, matchesDomain: sidebarDomain) else {
                 return
             }
-            if !DomainGrouping.path(transaction.request.path, matchesPrefix: workspace.filterCriteria.sidebarPathPrefix) {
+            if !DomainGrouping.path(
+                transaction.request.path,
+                matchesPrefix: workspace.filterCriteria.sidebarPathPrefix
+            ) {
                 return
             }
         }
@@ -144,7 +147,7 @@ extension MainContentCoordinator {
     }
 
     func addToAppGroupingIndex(_ transaction: HTTPTransaction, in workspace: WorkspaceState) {
-        let appName = transaction.clientApp ?? String(localized: "Unknown")
+        let appName = transaction.clientApp ?? String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         if let sidebarApp = workspace.filterCriteria.sidebarApp, appName != sidebarApp {
             return
         }

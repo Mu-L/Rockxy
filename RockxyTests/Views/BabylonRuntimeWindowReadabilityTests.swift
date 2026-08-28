@@ -18,11 +18,17 @@ struct BabylonRuntimeWindowReadabilityTests {
         let app = try readProjectFile("Rockxy/RockxyApp.swift")
 
         let sceneStart = try #require(
-            app.range(of: "Window(String(localized: \"Babylon Runtime\"), id: \"babylonRuntime\")")
+            app
+                .range(
+                    of: "String(localized: \"Babylon Runtime\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let scenesAfter = app[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Developer Setup\"), id: \"developerSetupHub\")")
+            scenesAfter
+                .range(
+                    of: "String(localized: \"Developer Setup\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
 
@@ -53,12 +59,12 @@ struct BabylonRuntimeWindowReadabilityTests {
         require(source, [
             "Table(filteredEvents, selection: $selection)",
             "filter.apply(to: Array(store.events.reversed()))",
-            "String(localized: \"Kind\")",
-            "String(localized: \"Name\")",
-            "String(localized: \"Source\")",
-            "String(localized: \"Received\")",
-            "String(localized: \"Duration\")",
-            "String(localized: \"Outcome\")",
+            "String(localized: \"Kind\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Name\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Source\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Received\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Duration\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Outcome\", bundle: RockxyLocalization.bundle)",
             ".truncationMode(.middle)",
         ])
         forbid(source, [
@@ -71,34 +77,34 @@ struct BabylonRuntimeWindowReadabilityTests {
             "HSplitView",
             "private var detailInspector",
             "ScrollView(.vertical)",
-            "String(localized: \"Overview\")",
-            "String(localized: \"Identifiers\")",
-            "String(localized: \"Timing\")",
-            "String(localized: \"Metadata\")",
+            "String(localized: \"Overview\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Identifiers\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Timing\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Metadata\", bundle: RockxyLocalization.bundle)",
             "event.packageID",
             "event.receivedAt",
             "event.isContentTruncated",
             "event.truncatedFields",
             "event.sortedMetadata",
             ".textSelection(.enabled)",
-            "String(localized: \"No Event Selected\")",
+            "String(localized: \"No Event Selected\", bundle: RockxyLocalization.bundle)",
         ])
 
         // Exact-kind + source filters and Cmd-F search.
         require(source, [
             "BabylonRuntimeEventFilter(",
             "BabylonRuntimePackageDTO.Kind.displayOrder",
-            "String(localized: \"All Kinds\")",
-            "String(localized: \"All Sources\")",
+            "String(localized: \"All Kinds\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"All Sources\", bundle: RockxyLocalization.bundle)",
             "@FocusState private var searchIsFocused",
             ".keyboardShortcut(\"f\", modifiers: .command)",
-            "TextField(String(localized: \"Search names, IDs, errors\")",
+            "TextField(String(localized: \"Search names, IDs, errors\", bundle: RockxyLocalization.bundle)",
         ])
 
         // Truthful raw vs filtered empty states + stable selection reconciliation.
         require(source, [
-            "String(localized: \"No Runtime Events\")",
-            "String(localized: \"No Matching Events\")",
+            "String(localized: \"No Runtime Events\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"No Matching Events\", bundle: RockxyLocalization.bundle)",
             "filter.isActive",
             "reconcileSelection(with:",
             ".onChange(of: filteredEventIDs)",
@@ -111,15 +117,15 @@ struct BabylonRuntimeWindowReadabilityTests {
             "BabylonPairingAvailability(",
             "listenerStatus: receiver.listenerStatus",
             "hasToken: !pairingStore.token.isEmpty",
-            "String(localized: \"Open Pairing\")",
+            "String(localized: \"Open Pairing\", bundle: RockxyLocalization.bundle)",
             "openWindow(id: \"babylonPairing\")",
         ])
 
         // Explicit global in-memory clear that routes through the receiver barrier
         // and never touches traffic or pairing.
         require(source, [
-            "String(localized: \"Clear Runtime Events?\")",
-            "String(localized: \"Clear Events\")",
+            "String(localized: \"Clear Runtime Events?\", bundle: RockxyLocalization.bundle)",
+            "String(localized: \"Clear Events\", bundle: RockxyLocalization.bundle)",
             "receiver.clearRuntimeEvents()",
             "HTTP traffic and Babylon pairing are not affected.",
             "store.evictedEventCount",
@@ -130,12 +136,12 @@ struct BabylonRuntimeWindowReadabilityTests {
             ".font(.headline)",
             ".font(.caption",
             "event.kind.rawValue",
-            "String(localized: \"Running\")",
+            "String(localized: \"Running\", bundle: RockxyLocalization.bundle)",
         ])
 
         let commands = try readProjectFile("Rockxy/Views/BabylonCapture/BabylonCaptureCommands.swift")
-        #expect(commands.contains("String(localized: \"Runtime Events…\")"))
-        #expect(!commands.contains("String(localized: \"Runtime Timeline…\")"))
+        #expect(commands.contains("String(localized: \"Runtime Events…\", bundle: RockxyLocalization.bundle)"))
+        #expect(!commands.contains("String(localized: \"Runtime Timeline…\", bundle: RockxyLocalization.bundle)"))
     }
 
     @Test("Receiver batches runtime events on its queue instead of one task per event")

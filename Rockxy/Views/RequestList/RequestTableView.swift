@@ -2,20 +2,24 @@ import AppKit
 import os
 import SwiftUI
 
+// MARK: - RequestTableBoundaryNavigation
+
 // swiftlint:disable file_length
 
 // Renders the request table interface for traffic list presentation.
-
-// MARK: - RequestTableView
 
 enum RequestTableBoundaryNavigation: Equatable {
     case first
     case last
 
+    // MARK: Internal
+
     static func resolve(
         keyCode: UInt16,
         modifierFlags: NSEvent.ModifierFlags
-    ) -> Self? {
+    )
+        -> Self?
+    {
         let relevantModifiers = modifierFlags.intersection([.command, .option, .control, .shift])
         guard relevantModifiers == .command else {
             return nil
@@ -31,6 +35,8 @@ enum RequestTableBoundaryNavigation: Equatable {
         }
     }
 }
+
+// MARK: - NavigableRequestTableView
 
 /// Owns request-table-only key equivalents. Keeping these commands on the AppKit table means
 /// Command-Up/Down retain their standard behavior everywhere else, including editable fields.
@@ -50,6 +56,8 @@ final class NavigableRequestTableView: NSTableView {
     }
 }
 
+// MARK: - RequestTableView
+
 /// AppKit `NSTableView` wrapped in `NSViewRepresentable` for the main request list.
 /// Uses NSTableView instead of SwiftUI List because SwiftUI List cannot handle 100k+ rows
 /// with acceptable scroll performance — NSTableView provides native virtual scrolling,
@@ -66,13 +74,148 @@ struct RequestTableView: NSViewRepresentable {
     var revealRequest: TrafficRevealRequest?
     var displayMetricsOverride: AppUIDisplayMetrics?
     @Binding var selectedIDs: Set<UUID>
-    @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
     var onSelectionChanged: ((Set<UUID>, UUID?) -> Void)?
     var onUserScroll: (() -> Void)?
     var onDoubleClick: ((HTTPTransaction) -> Void)?
     var mainCoordinator: MainContentCoordinator?
     var headerColumns: [HeaderColumn] = []
+
+    static func makeColumns() -> [NSTableColumn] {
+        let specs: [ColumnSpec] = [
+            ColumnSpec(id: "status", title: "", width: 22, minWidth: 22),
+            ColumnSpec(
+                id: "row",
+                title: String(localized: "ID", bundle: RockxyLocalization.bundle),
+                width: 46,
+                minWidth: 36
+            ),
+            ColumnSpec(
+                id: "ai",
+                title: String(localized: "Protocol", bundle: RockxyLocalization.bundle),
+                width: 92,
+                minWidth: 64
+            ),
+            ColumnSpec(
+                id: "url",
+                title: String(localized: "URL", bundle: RockxyLocalization.bundle),
+                width: 300,
+                minWidth: 200
+            ),
+            ColumnSpec(
+                id: "client",
+                title: String(localized: "Client", bundle: RockxyLocalization.bundle),
+                width: 120,
+                minWidth: 60
+            ),
+            ColumnSpec(
+                id: "method",
+                title: String(localized: "Method", bundle: RockxyLocalization.bundle),
+                width: 82,
+                minWidth: 72
+            ),
+            ColumnSpec(
+                id: "state",
+                title: String(localized: "Status", bundle: RockxyLocalization.bundle),
+                width: 150,
+                minWidth: 112
+            ),
+            ColumnSpec(
+                id: "code",
+                title: String(localized: "Code", bundle: RockxyLocalization.bundle),
+                width: 52,
+                minWidth: 44
+            ),
+            ColumnSpec(
+                id: "time",
+                title: String(localized: "Time", bundle: RockxyLocalization.bundle),
+                width: 80,
+                minWidth: 60
+            ),
+            ColumnSpec(
+                id: "duration",
+                title: String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                width: 70,
+                minWidth: 50
+            ),
+            ColumnSpec(
+                id: "requestSize",
+                title: String(localized: "Request", bundle: RockxyLocalization.bundle),
+                width: 78,
+                minWidth: 60
+            ),
+            ColumnSpec(
+                id: "responseSize",
+                title: String(localized: "Response", bundle: RockxyLocalization.bundle),
+                width: 78,
+                minWidth: 60
+            ),
+            ColumnSpec(
+                id: "ssl",
+                title: String(localized: "SSL", bundle: RockxyLocalization.bundle),
+                width: 38,
+                minWidth: 32
+            ),
+            ColumnSpec(
+                id: "queryName",
+                title: String(localized: "Operation", bundle: RockxyLocalization.bundle),
+                width: 110,
+                minWidth: 70
+            ),
+        ]
+
+        return specs.map { spec in
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.id))
+            column.title = spec.title
+            column.width = spec.width
+            column.minWidth = spec.minWidth
+            column.resizingMask = .userResizingMask
+
+            if spec.id == "url" || spec.id == "client" {
+                column.resizingMask = [.userResizingMask, .autoresizingMask]
+            }
+
+            if spec.id == "status" {
+                column.resizingMask = []
+                column.maxWidth = 22
+            } else if spec.id == "ai" {
+                column.maxWidth = 112
+                column.sortDescriptorPrototype = NSSortDescriptor(
+                    key: spec.id,
+                    ascending: true
+                )
+            } else if spec.id == "ssl" {
+                column.maxWidth = 42
+            } else {
+                column.sortDescriptorPrototype = NSSortDescriptor(
+                    key: spec.id,
+                    ascending: true
+                )
+            }
+
+            return column
+        }
+    }
+
+    static func migrateLegacyDefaultColumnOrder(in tableView: NSTableView) {
+        let legacyBuiltInOrder = [
+            "status", "ai", "row", "url", "client", "method", "state", "code", "time",
+            "duration", "requestSize", "responseSize", "ssl", "queryName",
+        ]
+        let columnIDs = tableView.tableColumns.map(\.identifier.rawValue)
+        guard columnIDs.count >= legacyBuiltInOrder.count,
+              Array(columnIDs.prefix(legacyBuiltInOrder.count)) == legacyBuiltInOrder,
+              columnIDs.dropFirst(legacyBuiltInOrder.count).allSatisfy({ columnID in
+                  columnID.hasPrefix("reqHeader.") || columnID.hasPrefix("resHeader.")
+              }),
+              let protocolIndex = columnIDs.firstIndex(of: "ai"),
+              let rowIndex = columnIDs.firstIndex(of: "row") else
+        {
+            return
+        }
+
+        tableView.moveColumn(protocolIndex, toColumn: rowIndex)
+    }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -265,85 +408,16 @@ struct RequestTableView: NSViewRepresentable {
 
     // MARK: Private
 
-    private var effectiveDisplayMetrics: AppUIDisplayMetrics {
-        displayMetricsOverride ?? displayMetrics
-    }
-
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         return formatter
     }()
 
-    static func makeColumns() -> [NSTableColumn] {
-        let specs: [ColumnSpec] = [
-            ColumnSpec(id: "status", title: "", width: 22, minWidth: 22),
-            ColumnSpec(id: "row", title: String(localized: "ID"), width: 46, minWidth: 36),
-            ColumnSpec(id: "ai", title: String(localized: "Protocol"), width: 92, minWidth: 64),
-            ColumnSpec(id: "url", title: String(localized: "URL"), width: 300, minWidth: 200),
-            ColumnSpec(id: "client", title: String(localized: "Client"), width: 120, minWidth: 60),
-            ColumnSpec(id: "method", title: String(localized: "Method"), width: 82, minWidth: 72),
-            ColumnSpec(id: "state", title: String(localized: "Status"), width: 150, minWidth: 112),
-            ColumnSpec(id: "code", title: String(localized: "Code"), width: 52, minWidth: 44),
-            ColumnSpec(id: "time", title: String(localized: "Time"), width: 80, minWidth: 60),
-            ColumnSpec(id: "duration", title: String(localized: "Duration"), width: 70, minWidth: 50),
-            ColumnSpec(id: "requestSize", title: String(localized: "Request"), width: 78, minWidth: 60),
-            ColumnSpec(id: "responseSize", title: String(localized: "Response"), width: 78, minWidth: 60),
-            ColumnSpec(id: "ssl", title: String(localized: "SSL"), width: 38, minWidth: 32),
-            ColumnSpec(id: "queryName", title: String(localized: "Operation"), width: 110, minWidth: 70),
-        ]
+    @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
-        return specs.map { spec in
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.id))
-            column.title = spec.title
-            column.width = spec.width
-            column.minWidth = spec.minWidth
-            column.resizingMask = .userResizingMask
-
-            if spec.id == "url" || spec.id == "client" {
-                column.resizingMask = [.userResizingMask, .autoresizingMask]
-            }
-
-            if spec.id == "status" {
-                column.resizingMask = []
-                column.maxWidth = 22
-            } else if spec.id == "ai" {
-                column.maxWidth = 112
-                column.sortDescriptorPrototype = NSSortDescriptor(
-                    key: spec.id,
-                    ascending: true
-                )
-            } else if spec.id == "ssl" {
-                column.maxWidth = 42
-            } else {
-                column.sortDescriptorPrototype = NSSortDescriptor(
-                    key: spec.id,
-                    ascending: true
-                )
-            }
-
-            return column
-        }
-    }
-
-    static func migrateLegacyDefaultColumnOrder(in tableView: NSTableView) {
-        let legacyBuiltInOrder = [
-            "status", "ai", "row", "url", "client", "method", "state", "code", "time",
-            "duration", "requestSize", "responseSize", "ssl", "queryName",
-        ]
-        let columnIDs = tableView.tableColumns.map { $0.identifier.rawValue }
-        guard columnIDs.count >= legacyBuiltInOrder.count,
-              Array(columnIDs.prefix(legacyBuiltInOrder.count)) == legacyBuiltInOrder,
-              columnIDs.dropFirst(legacyBuiltInOrder.count).allSatisfy({ columnID in
-                  columnID.hasPrefix("reqHeader.") || columnID.hasPrefix("resHeader.")
-              }),
-              let protocolIndex = columnIDs.firstIndex(of: "ai"),
-              let rowIndex = columnIDs.firstIndex(of: "row")
-        else {
-            return
-        }
-
-        tableView.moveColumn(protocolIndex, toColumn: rowIndex)
+    private var effectiveDisplayMetrics: AppUIDisplayMetrics {
+        displayMetricsOverride ?? displayMetrics
     }
 }
 
@@ -359,10 +433,7 @@ private struct ColumnSpec {
 // MARK: - FixedIconCellView
 
 private final class FixedIconCellView: NSView {
-    let imageView = NSImageView()
-
-    private var widthConstraint: NSLayoutConstraint?
-    private var heightConstraint: NSLayoutConstraint?
+    // MARK: Lifecycle
 
     init(identifier: NSUserInterfaceItemIdentifier) {
         super.init(frame: .zero)
@@ -388,6 +459,10 @@ private final class FixedIconCellView: NSView {
         nil
     }
 
+    // MARK: Internal
+
+    let imageView = NSImageView()
+
     func updateIconSize(_ size: CGFloat) {
         if widthConstraint?.constant != size {
             widthConstraint?.constant = size
@@ -396,15 +471,17 @@ private final class FixedIconCellView: NSView {
             heightConstraint?.constant = size
         }
     }
+
+    // MARK: Private
+
+    private var widthConstraint: NSLayoutConstraint?
+    private var heightConstraint: NSLayoutConstraint?
 }
 
 // MARK: - RequestTableAppliedMetrics
 
 private struct RequestTableAppliedMetrics: Equatable {
-    let rowHeight: CGFloat
-    let usesAlternatingRowBackgroundColors: Bool
-    let headerFontSize: CGFloat
-    let contentMetrics: RequestTableContentMetrics
+    // MARK: Lifecycle
 
     init(metrics: AppUIDisplayMetrics) {
         rowHeight = metrics.tableRowHeight
@@ -412,15 +489,19 @@ private struct RequestTableAppliedMetrics: Equatable {
         headerFontSize = metrics.secondaryFontSize
         contentMetrics = RequestTableContentMetrics(metrics: metrics)
     }
+
+    // MARK: Internal
+
+    let rowHeight: CGFloat
+    let usesAlternatingRowBackgroundColors: Bool
+    let headerFontSize: CGFloat
+    let contentMetrics: RequestTableContentMetrics
 }
 
+// MARK: - RequestTableContentMetrics
+
 private struct RequestTableContentMetrics: Equatable {
-    let fontSize: CGFloat
-    let secondaryFontSize: CGFloat
-    let statusDotSize: CGFloat
-    let sslIconSize: CGFloat
-    let clientIconSize: CGFloat
-    let useMonospacedFont: Bool
+    // MARK: Lifecycle
 
     init(metrics: AppUIDisplayMetrics) {
         fontSize = metrics.fontSize
@@ -430,6 +511,15 @@ private struct RequestTableContentMetrics: Equatable {
         clientIconSize = metrics.tableClientIconSize
         useMonospacedFont = metrics.settings.useMonospacedFont
     }
+
+    // MARK: Internal
+
+    let fontSize: CGFloat
+    let secondaryFontSize: CGFloat
+    let statusDotSize: CGFloat
+    let sslIconSize: CGFloat
+    let clientIconSize: CGFloat
+    let useMonospacedFont: Bool
 }
 
 // MARK: - RequestTableView.Coordinator
@@ -445,7 +535,26 @@ extension RequestTableView {
             self.mainCoordinator = parent.mainCoordinator
         }
 
+        deinit {
+            if let userScrollObserver {
+                NotificationCenter.default.removeObserver(userScrollObserver)
+            }
+        }
+
         // MARK: Internal
+
+        struct DisplayMetricsChange: Equatable {
+            let reloadVisibleRows: Bool
+            let autosizeContentColumns: Bool
+            let rowHeightChanged: Bool
+            let contentMetricsChanged: Bool
+        }
+
+        struct ScrollAnchor: Equatable {
+            let row: Int
+            let intraRowOffset: CGFloat
+            let xOffset: CGFloat
+        }
 
         var parent: RequestTableView
         var rows: [RequestListRow]
@@ -457,13 +566,6 @@ extension RequestTableView {
         var lastRefreshToken: Int = 0
         var previousRowCount: Int = 0
         var lastAppliedDisplayMetrics: AppUIDisplayMetrics?
-        private var autosizeGeneration = 0
-        private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
-        private var pendingContextSelectionIDs: Set<UUID>?
-        private var pendingContextPrimaryID: UUID?
-        private var userScrollObserver: NSObjectProtocol?
-        private var lastAppliedRevealGenerationByWorkspace: [UUID: Int] = [:]
-
         /// Guard flag to prevent feedback loops: when we programmatically update NSTableView
         /// selection from SwiftUI state, we suppress the delegate callback that would
         /// re-propagate the change back to SwiftUI.
@@ -472,15 +574,6 @@ extension RequestTableView {
         /// Guard flag to prevent feedback loops when syncing sort descriptors from
         /// coordinator state back into NSTableView.
         private(set) var isUpdatingSortDescriptors = false
-
-        private var lastSyncedSelectionIDs: Set<UUID> = []
-        private var visibleMetricsRefreshGeneration = 0
-
-        deinit {
-            if let userScrollObserver {
-                NotificationCenter.default.removeObserver(userScrollObserver)
-            }
-        }
 
         // MARK: - NSTableViewDataSource
 
@@ -516,7 +609,9 @@ extension RequestTableView {
             lastAppliedToken: Int,
             workspaceChanged: Bool,
             tableRowCount: Int
-        ) -> Bool {
+        )
+            -> Bool
+        {
             guard let appendChainOrigin else {
                 return false
             }
@@ -536,19 +631,6 @@ extension RequestTableView {
             isUpdatingSelection = true
             defer { isUpdatingSelection = wasUpdatingSelection }
             update()
-        }
-
-        struct DisplayMetricsChange: Equatable {
-            let reloadVisibleRows: Bool
-            let autosizeContentColumns: Bool
-            let rowHeightChanged: Bool
-            let contentMetricsChanged: Bool
-        }
-
-        struct ScrollAnchor: Equatable {
-            let row: Int
-            let intraRowOffset: CGFloat
-            let xOffset: CGFloat
         }
 
         @discardableResult
@@ -849,10 +931,15 @@ extension RequestTableView {
                     text = rowData.responseSize.map { SizeFormatter.format(bytes: $0) } ?? "—"
                     font = .monospacedDigitSystemFont(ofSize: metrics.secondaryFontSize, weight: .regular)
                 case "queryName":
-                    // Unified display: WS rows show frame count, Web3 rows show RPC method, GraphQL rows show operation name.
+                    // Unified display: WS rows show frame count, Web3 rows show RPC method, GraphQL rows show operation
+                    // name.
                     if rowData.isWebSocket {
                         let count = rowData.webSocketFrameCount
-                        text = "\(count) \(count == 1 ? "frame" : "frames")"
+                        text = String(AttributedString(
+                            localized: "^[\(count) frame](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters)
                     } else if rowData.isWeb3RPC {
                         text = rowData.web3RPCMethod ?? ""
                     } else {
@@ -1425,6 +1512,11 @@ extension RequestTableView {
 
         // MARK: Private
 
+        private struct AppIconCacheKey: Hashable {
+            let appName: String
+            let iconSize: Int
+        }
+
         private static let logger = Logger(
             subsystem: RockxyIdentity.current.logSubsystem,
             category: "RequestTableView"
@@ -1458,11 +1550,6 @@ extension RequestTableView {
         private static var resizedAppIconCache: [AppIconCacheKey: NSImage] = [:]
         private static var missingAppIconNames: Set<String> = []
 
-        private struct AppIconCacheKey: Hashable {
-            let appName: String
-            let iconSize: Int
-        }
-
         private static let bundleIDByAppName: [String: String] = [
             "Chrome": "com.google.Chrome",
             "Safari": "com.apple.Safari",
@@ -1482,6 +1569,16 @@ extension RequestTableView {
             "Microsoft Edge": "com.microsoft.edgemac",
             "Opera": "com.operasoftware.Opera",
         ]
+
+        private var autosizeGeneration = 0
+        private var lastAppliedRequestTableMetrics: RequestTableAppliedMetrics?
+        private var pendingContextSelectionIDs: Set<UUID>?
+        private var pendingContextPrimaryID: UUID?
+        private var userScrollObserver: NSObjectProtocol?
+        private var lastAppliedRevealGenerationByWorkspace: [UUID: Int] = [:]
+
+        private var lastSyncedSelectionIDs: Set<UUID> = []
+        private var visibleMetricsRefreshGeneration = 0
 
         private static func colorFromHex(_ hex: UInt32) -> NSColor {
             let red = CGFloat((hex >> 16) & 0xFF) / 255.0
@@ -1513,42 +1610,50 @@ extension RequestTableView {
 
         private func buildCopyGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Copy URL"), action: #selector(handleCopyURL(_:)),
+                String(localized: "Copy URL", bundle: RockxyLocalization.bundle), action: #selector(handleCopyURL(_:)),
                 symbol: "doc.on.doc", transaction: transaction
             ))
             menu.addItem(menuItem(
-                String(localized: "Copy cURL"), action: #selector(handleCopyCURL(_:)),
+                String(localized: "Copy cURL", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyCURL(_:)),
                 transaction: transaction
             ))
             menu.addItem(menuItem(
-                String(localized: "Copy Cell Value"), action: #selector(handleCopyCellValue(_:)),
+                String(localized: "Copy Cell Value", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyCellValue(_:)),
                 transaction: transaction
             ))
 
             let copyAsSubmenu = NSMenu()
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Request Headers"), action: #selector(handleCopyRequestHeaders(_:)),
+                String(localized: "Request Headers", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyRequestHeaders(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Response Headers"), action: #selector(handleCopyResponseHeaders(_:)),
+                String(localized: "Response Headers", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyResponseHeaders(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Request Body"), action: #selector(handleCopyRequestBody(_:)),
+                String(localized: "Request Body", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyRequestBody(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Response Body"), action: #selector(handleCopyResponseBody(_:)),
+                String(localized: "Response Body", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyResponseBody(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(.separator())
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Request Cookies"), action: #selector(handleCopyRequestCookies(_:)),
+                String(localized: "Request Cookies", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyRequestCookies(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Response Cookies"), action: #selector(handleCopyResponseCookies(_:)),
+                String(localized: "Response Cookies", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyResponseCookies(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(.separator())
@@ -1559,15 +1664,17 @@ extension RequestTableView {
                 "HAR Entry", action: #selector(handleCopyAsHAR(_:)), transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Raw Request"), action: #selector(handleCopyRawRequest(_:)),
+                String(localized: "Raw Request", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyRawRequest(_:)),
                 transaction: transaction
             ))
             copyAsSubmenu.addItem(menuItem(
-                String(localized: "Raw Response"), action: #selector(handleCopyRawResponse(_:)),
+                String(localized: "Raw Response", bundle: RockxyLocalization.bundle),
+                action: #selector(handleCopyRawResponse(_:)),
                 transaction: transaction
             ))
             let copyAsItem = NSMenuItem(
-                title: String(localized: "Copy as"), action: nil, keyEquivalent: ""
+                title: String(localized: "Copy as", bundle: RockxyLocalization.bundle), action: nil, keyEquivalent: ""
             )
             copyAsItem.submenu = copyAsSubmenu
             menu.addItem(copyAsItem)
@@ -1575,13 +1682,13 @@ extension RequestTableView {
 
         private func buildFilterGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Filter by Value"),
+                String(localized: "Filter by Value", bundle: RockxyLocalization.bundle),
                 action: #selector(handleFilterCellValue(_:)),
                 symbol: "line.3.horizontal.decrease.circle",
                 transaction: transaction
             ))
             menu.addItem(menuItem(
-                String(localized: "Exclude Value"),
+                String(localized: "Exclude Value", bundle: RockxyLocalization.bundle),
                 action: #selector(handleExcludeCellValue(_:)),
                 symbol: "line.3.horizontal.decrease.circle.fill",
                 transaction: transaction
@@ -1594,8 +1701,8 @@ extension RequestTableView {
                 selectedRowIndexes: tableView?.selectedRowIndexes ?? []
             ).count
             let title = selectionCount > 1
-                ? String(localized: "Ask Rockxy Assistant About Selection…")
-                : String(localized: "Ask Rockxy Assistant…")
+                ? String(localized: "Ask Rockxy Assistant About Selection…", bundle: RockxyLocalization.bundle)
+                : String(localized: "Ask Rockxy Assistant…", bundle: RockxyLocalization.bundle)
             menu.addItem(menuItem(
                 title,
                 action: #selector(handleAskDebugAssistant(_:)),
@@ -1606,27 +1713,28 @@ extension RequestTableView {
 
         private func buildRepeatGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Repeat"), action: #selector(handleRepeat(_:)),
+                String(localized: "Repeat", bundle: RockxyLocalization.bundle), action: #selector(handleRepeat(_:)),
                 symbol: "arrow.clockwise", transaction: transaction
             ))
             menu.addItem(menuItem(
-                String(localized: "Edit and Repeat…"), action: #selector(handleEditAndRepeat(_:)),
+                String(localized: "Edit and Repeat…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleEditAndRepeat(_:)),
                 transaction: transaction
             ))
         }
 
         private func buildPinGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             let pinTitle = transaction.isPinned
-                ? String(localized: "Unpin")
-                : String(localized: "Pin")
+                ? String(localized: "Unpin", bundle: RockxyLocalization.bundle)
+                : String(localized: "Pin", bundle: RockxyLocalization.bundle)
             let pinSymbol = transaction.isPinned ? "pin.slash" : "pin"
             menu.addItem(menuItem(
                 pinTitle, action: #selector(handleTogglePin(_:)),
                 symbol: pinSymbol, transaction: transaction
             ))
             let saveTitle = transaction.isSaved
-                ? String(localized: "Unsave")
-                : String(localized: "Save this Request")
+                ? String(localized: "Unsave", bundle: RockxyLocalization.bundle)
+                : String(localized: "Save this Request", bundle: RockxyLocalization.bundle)
             let saveSymbol = transaction.isSaved ? "tray.full.fill" : "tray.and.arrow.down.fill"
             menu.addItem(menuItem(
                 saveTitle, action: #selector(handleSaveRequest(_:)),
@@ -1639,7 +1747,8 @@ extension RequestTableView {
 
             // Group 1: Debugging
             let breakpointItem = menuItem(
-                String(localized: "Breakpoint…"), action: #selector(handleBreakpoint(_:)),
+                String(localized: "Breakpoint…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleBreakpoint(_:)),
                 transaction: transaction
             )
             breakpointItem.image = NSImage(systemSymbolName: "pause.circle", accessibilityDescription: nil)
@@ -1649,14 +1758,16 @@ extension RequestTableView {
 
             // Group 2: Request modification
             let mapLocalItem = menuItem(
-                String(localized: "Map Local…"), action: #selector(handleMapLocal(_:)),
+                String(localized: "Map Local…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleMapLocal(_:)),
                 transaction: transaction
             )
             mapLocalItem.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
             toolsSubmenu.addItem(mapLocalItem)
 
             let mapRemoteItem = menuItem(
-                String(localized: "Map Remote…"), action: #selector(handleMapRemote(_:)),
+                String(localized: "Map Remote…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleMapRemote(_:)),
                 transaction: transaction
             )
             mapRemoteItem.image = NSImage(systemSymbolName: "arrow.triangle.swap", accessibilityDescription: nil)
@@ -1666,14 +1777,14 @@ extension RequestTableView {
 
             // Group 3: Request filtering
             let blockItem = menuItem(
-                String(localized: "Block List…"), action: #selector(handleBlock(_:)),
+                String(localized: "Block List…", bundle: RockxyLocalization.bundle), action: #selector(handleBlock(_:)),
                 transaction: transaction
             )
             blockItem.image = NSImage(systemSymbolName: "nosign", accessibilityDescription: nil)
             toolsSubmenu.addItem(blockItem)
 
             let allowItem = menuItem(
-                String(localized: "Allow List…"), action: #selector(handleAllow(_:)),
+                String(localized: "Allow List…", bundle: RockxyLocalization.bundle), action: #selector(handleAllow(_:)),
                 transaction: transaction
             )
             allowItem.image = NSImage(
@@ -1686,7 +1797,8 @@ extension RequestTableView {
 
             // Group 4: Protocol conditions
             let networkConditionsItem = menuItem(
-                String(localized: "Network Conditions…"), action: #selector(handleNetworkConditions(_:)),
+                String(localized: "Network Conditions…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleNetworkConditions(_:)),
                 transaction: transaction
             )
             networkConditionsItem.image = NSImage(
@@ -1699,13 +1811,18 @@ extension RequestTableView {
 
             // Group 5: SSL
             let sslItem = menuItem(
-                String(localized: "SSL Proxying"), action: #selector(handleSSLProxying(_:)),
+                String(localized: "SSL Proxying", bundle: RockxyLocalization.bundle),
+                action: #selector(handleSSLProxying(_:)),
                 transaction: transaction
             )
             sslItem.image = NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil)
             toolsSubmenu.addItem(sslItem)
 
-            let toolsItem = NSMenuItem(title: String(localized: "Tools"), action: nil, keyEquivalent: "")
+            let toolsItem = NSMenuItem(
+                title: String(localized: "Tools", bundle: RockxyLocalization.bundle),
+                action: nil,
+                keyEquivalent: ""
+            )
             toolsItem.image = NSImage(systemSymbolName: "wrench.and.screwdriver", accessibilityDescription: nil)
             toolsItem.submenu = toolsSubmenu
             menu.addItem(toolsItem)
@@ -1713,18 +1830,19 @@ extension RequestTableView {
 
         private func buildAnnotationGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             menu.addItem(menuItem(
-                String(localized: "Add Note…"), action: #selector(handleAddComment(_:)),
+                String(localized: "Add Note…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleAddComment(_:)),
                 symbol: "pencil.line", transaction: transaction
             ))
 
             let highlightSubmenu = NSMenu()
             let colors: [(String, HighlightColor)] = [
-                (String(localized: "Red"), .red),
-                (String(localized: "Orange"), .orange),
-                (String(localized: "Yellow"), .yellow),
-                (String(localized: "Green"), .green),
-                (String(localized: "Blue"), .blue),
-                (String(localized: "Purple"), .purple),
+                (String(localized: "Red", bundle: RockxyLocalization.bundle), .red),
+                (String(localized: "Orange", bundle: RockxyLocalization.bundle), .orange),
+                (String(localized: "Yellow", bundle: RockxyLocalization.bundle), .yellow),
+                (String(localized: "Green", bundle: RockxyLocalization.bundle), .green),
+                (String(localized: "Blue", bundle: RockxyLocalization.bundle), .blue),
+                (String(localized: "Purple", bundle: RockxyLocalization.bundle), .purple),
             ]
             for (name, color) in colors {
                 let item = menuItem(
@@ -1739,14 +1857,15 @@ extension RequestTableView {
             }
             highlightSubmenu.addItem(.separator())
             let removeItem = menuItem(
-                String(localized: "Remove Highlight"), action: #selector(handleRemoveHighlight(_:)),
+                String(localized: "Remove Highlight", bundle: RockxyLocalization.bundle),
+                action: #selector(handleRemoveHighlight(_:)),
                 transaction: transaction
             )
             removeItem.isEnabled = transaction.highlightColor != nil
             highlightSubmenu.addItem(removeItem)
 
             let highlightItem = NSMenuItem(
-                title: String(localized: "Highlight"), action: nil, keyEquivalent: ""
+                title: String(localized: "Highlight", bundle: RockxyLocalization.bundle), action: nil, keyEquivalent: ""
             )
             highlightItem.submenu = highlightSubmenu
             menu.addItem(highlightItem)
@@ -1755,18 +1874,19 @@ extension RequestTableView {
         private func buildExportGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             let exportSubmenu = NSMenu()
             exportSubmenu.addItem(menuItem(
-                String(localized: "Export as HAR…"), action: #selector(handleExportHAR(_:)),
+                String(localized: "Export as HAR…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleExportHAR(_:)),
                 transaction: transaction
             ))
 
             let openAPITitle = openAPIExportTitle(for: transaction)
             let openAPIYAMLItem = menuItem(
-                String(localized: "\(openAPITitle) YAML…"),
+                String(localized: "\(openAPITitle) YAML…", bundle: RockxyLocalization.bundle),
                 action: #selector(handleExportOpenAPIYAML(_:)),
                 transaction: transaction
             )
             let openAPIHTMLItem = menuItem(
-                String(localized: "\(openAPITitle) HTML…"),
+                String(localized: "\(openAPITitle) HTML…", bundle: RockxyLocalization.bundle),
                 action: #selector(handleExportOpenAPIHTML(_:)),
                 transaction: transaction
             )
@@ -1785,26 +1905,33 @@ extension RequestTableView {
             ))
 
             let reqBodyItem = menuItem(
-                String(localized: "Export Request Body…"), action: #selector(handleExportRequestBody(_:)),
+                String(localized: "Export Request Body…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleExportRequestBody(_:)),
                 transaction: transaction
             )
             reqBodyItem.isEnabled = transaction.request.body != nil
             exportSubmenu.addItem(reqBodyItem)
 
             let respBodyItem = menuItem(
-                String(localized: "Export Response Body…"), action: #selector(handleExportResponseBody(_:)),
+                String(localized: "Export Response Body…", bundle: RockxyLocalization.bundle),
+                action: #selector(handleExportResponseBody(_:)),
                 transaction: transaction
             )
             respBodyItem.isEnabled = transaction.response?.body != nil
             exportSubmenu.addItem(respBodyItem)
 
-            let exportItem = NSMenuItem(title: String(localized: "Export"), action: nil, keyEquivalent: "")
+            let exportItem = NSMenuItem(
+                title: String(localized: "Export", bundle: RockxyLocalization.bundle),
+                action: nil,
+                keyEquivalent: ""
+            )
             exportItem.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: nil)
             exportItem.submenu = exportSubmenu
             menu.addItem(exportItem)
 
             menu.addItem(menuItem(
-                String(localized: "Enable SSL Proxying"), action: #selector(handleSSLProxying(_:)),
+                String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+                action: #selector(handleSSLProxying(_:)),
                 transaction: transaction
             ))
         }
@@ -1813,10 +1940,11 @@ extension RequestTableView {
             MainActor.assumeIsolated {
                 guard let coordinator = mainCoordinator,
                       coordinator.selectedTransactionIDs.contains(transaction.id),
-                      coordinator.selectedTransactionIDs.count > 1 else {
-                    return String(localized: "Export as OpenAPI")
+                      coordinator.selectedTransactionIDs.count > 1 else
+                {
+                    return String(localized: "Export as OpenAPI", bundle: RockxyLocalization.bundle)
                 }
-                return String(localized: "Export Selected as OpenAPI")
+                return String(localized: "Export Selected as OpenAPI", bundle: RockxyLocalization.bundle)
             }
         }
 
@@ -1824,7 +1952,8 @@ extension RequestTableView {
             MainActor.assumeIsolated {
                 guard let coordinator = mainCoordinator,
                       coordinator.selectedTransactionIDs.contains(transaction.id),
-                      coordinator.selectedTransactionIDs.count > 1 else {
+                      coordinator.selectedTransactionIDs.count > 1 else
+                {
                     return [transaction]
                 }
                 return coordinator.resolveSelectedTransactions()
@@ -1835,17 +1964,18 @@ extension RequestTableView {
             MainActor.assumeIsolated {
                 guard let coordinator = mainCoordinator,
                       coordinator.selectedTransactionIDs.contains(transaction.id),
-                      coordinator.selectedTransactionIDs.count > 1 else {
-                    return String(localized: "Publish to Gist…")
+                      coordinator.selectedTransactionIDs.count > 1 else
+                {
+                    return String(localized: "Publish to Gist…", bundle: RockxyLocalization.bundle)
                 }
-                return String(localized: "Publish Selected to Gist…")
+                return String(localized: "Publish Selected to Gist…", bundle: RockxyLocalization.bundle)
             }
         }
 
         private func buildCompareGroup(_ menu: NSMenu) {
             let selectedCount = tableView?.selectedRowIndexes.count ?? 0
             let item = NSMenuItem(
-                title: String(localized: "Compare Selected"),
+                title: String(localized: "Compare Selected", bundle: RockxyLocalization.bundle),
                 action: selectedCount == 2 ? #selector(handleCompareSelected(_:)) : nil,
                 keyEquivalent: ""
             )
@@ -1862,7 +1992,7 @@ extension RequestTableView {
 
         private func buildDeleteGroup(_ menu: NSMenu, transaction: HTTPTransaction) {
             let item = menuItem(
-                String(localized: "Delete"), action: #selector(handleDelete(_:)),
+                String(localized: "Delete", bundle: RockxyLocalization.bundle), action: #selector(handleDelete(_:)),
                 symbol: "trash", transaction: transaction
             )
             menu.addItem(item)
@@ -1901,20 +2031,20 @@ extension RequestTableView {
 
             // Built-in column visibility
             let builtInColumns: [(id: String, title: String)] = [
-                ("status", String(localized: "Status Icon")),
-                ("ai", String(localized: "Protocol")),
+                ("status", String(localized: "Status Icon", bundle: RockxyLocalization.bundle)),
+                ("ai", String(localized: "Protocol", bundle: RockxyLocalization.bundle)),
                 ("row", "#"),
-                ("url", String(localized: "URL")),
-                ("client", String(localized: "Client")),
-                ("method", String(localized: "Method")),
-                ("state", String(localized: "Status")),
-                ("code", String(localized: "Code")),
-                ("time", String(localized: "Time")),
-                ("duration", String(localized: "Duration")),
-                ("requestSize", String(localized: "Request")),
-                ("responseSize", String(localized: "Response")),
-                ("ssl", String(localized: "SSL")),
-                ("queryName", String(localized: "Operation")),
+                ("url", String(localized: "URL", bundle: RockxyLocalization.bundle)),
+                ("client", String(localized: "Client", bundle: RockxyLocalization.bundle)),
+                ("method", String(localized: "Method", bundle: RockxyLocalization.bundle)),
+                ("state", String(localized: "Status", bundle: RockxyLocalization.bundle)),
+                ("code", String(localized: "Code", bundle: RockxyLocalization.bundle)),
+                ("time", String(localized: "Time", bundle: RockxyLocalization.bundle)),
+                ("duration", String(localized: "Duration", bundle: RockxyLocalization.bundle)),
+                ("requestSize", String(localized: "Request", bundle: RockxyLocalization.bundle)),
+                ("responseSize", String(localized: "Response", bundle: RockxyLocalization.bundle)),
+                ("ssl", String(localized: "SSL", bundle: RockxyLocalization.bundle)),
+                ("queryName", String(localized: "Operation", bundle: RockxyLocalization.bundle)),
             ]
 
             for col in builtInColumns {
@@ -1963,7 +2093,7 @@ extension RequestTableView {
 
             reqSubmenu.addItem(.separator())
             let manageReqItem = NSMenuItem(
-                title: String(localized: "Manage Header Columns…"),
+                title: String(localized: "Manage Header Columns…", bundle: RockxyLocalization.bundle),
                 action: #selector(handleOpenColumnManager(_:)),
                 keyEquivalent: ""
             )
@@ -1971,7 +2101,8 @@ extension RequestTableView {
             reqSubmenu.addItem(manageReqItem)
 
             let reqItem = NSMenuItem(
-                title: String(localized: "Request Headers"), action: nil, keyEquivalent: ""
+                title: String(localized: "Request Headers", bundle: RockxyLocalization.bundle), action: nil,
+                keyEquivalent: ""
             )
             reqItem.submenu = reqSubmenu
             menu.addItem(reqItem)
@@ -2008,7 +2139,7 @@ extension RequestTableView {
 
             resSubmenu.addItem(.separator())
             let manageResItem = NSMenuItem(
-                title: String(localized: "Manage Header Columns…"),
+                title: String(localized: "Manage Header Columns…", bundle: RockxyLocalization.bundle),
                 action: #selector(handleOpenColumnManager(_:)),
                 keyEquivalent: ""
             )
@@ -2016,7 +2147,8 @@ extension RequestTableView {
             resSubmenu.addItem(manageResItem)
 
             let resItem = NSMenuItem(
-                title: String(localized: "Response Headers"), action: nil, keyEquivalent: ""
+                title: String(localized: "Response Headers", bundle: RockxyLocalization.bundle), action: nil,
+                keyEquivalent: ""
             )
             resItem.submenu = resSubmenu
             menu.addItem(resItem)
@@ -2085,8 +2217,7 @@ extension RequestTableView {
             let cellID = NSUserInterfaceItemIdentifier("Cell_status")
             let dotSize = parent.effectiveDisplayMetrics.tableStatusDotSize
 
-            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? FixedIconCellView
-            {
+            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? FixedIconCellView {
                 configureStatusDotCell(existing, row: row, dotSize: dotSize)
                 return existing
             }
@@ -2105,8 +2236,7 @@ extension RequestTableView {
             let cellID = NSUserInterfaceItemIdentifier("Cell_ssl")
             let iconSize = parent.effectiveDisplayMetrics.tableSSLIconSize
 
-            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? FixedIconCellView
-            {
+            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? FixedIconCellView {
                 configureSSLImageView(existing.imageView, row: row)
                 existing.updateIconSize(iconSize)
                 return existing
@@ -2174,7 +2304,7 @@ extension RequestTableView {
             guard row.state == .failed else {
                 return nil
             }
-            return String(localized: "Failed")
+            return String(localized: "Failed", bundle: RockxyLocalization.bundle)
         }
 
         private func makeErrorStatusBadgeView(
@@ -2250,7 +2380,8 @@ extension RequestTableView {
                 return cached
             }
             guard let source = appIconSource(for: appName),
-                  let icon = source.copy() as? NSImage else {
+                  let icon = source.copy() as? NSImage else
+            {
                 return nil
             }
             icon.size = NSSize(width: iconSize, height: iconSize)
@@ -2319,7 +2450,12 @@ extension RequestTableView {
                 let fallbackView = existing.subviews[1]
                 let nameLabel = existing.subviews[2] as? NSTextField
 
-                updateClientIconFrames(imageView: imageView, fallbackView: fallbackView, iconSize: iconSize, iconY: iconY)
+                updateClientIconFrames(
+                    imageView: imageView,
+                    fallbackView: fallbackView,
+                    iconSize: iconSize,
+                    iconY: iconY
+                )
                 if let nameLabel {
                     updateClientNameConstraints(nameLabel, in: existing, iconSize: iconSize, gap: gap)
                 }
@@ -2579,7 +2715,13 @@ extension RequestTableView {
             case "queryName":
                 if rowData.isWebSocket {
                     let count = rowData.webSocketFrameCount
-                    cell.stringValue = "\(count) \(count == 1 ? "frame" : "frames")"
+                    cell.stringValue = String(
+                        AttributedString(
+                            localized: "^[\(count) frame](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters
+                    )
                     cell.textColor = .tertiaryLabelColor
                     cell.toolTip = nil
                 } else if rowData.isWeb3RPC {
@@ -2611,9 +2753,13 @@ extension RequestTableView {
                 .systemRed
             case "Web3":
                 .systemGreen
-            case "AI API", "AI Session", "Likely AI":
+            case "AI API",
+                 "AI Session",
+                 "Likely AI":
                 .controlAccentColor
-            case "gRPC", "GraphQL", "WS":
+            case "gRPC",
+                 "GraphQL",
+                 "WS":
                 .systemBlue
             default:
                 .secondaryLabelColor
@@ -2643,7 +2789,8 @@ extension RequestTableView {
 
         private func statusTextColor(for state: TransactionState) -> NSColor {
             switch state {
-            case .pending, .active:
+            case .pending,
+                 .active:
                 .systemOrange
             case .completed:
                 .secondaryLabelColor

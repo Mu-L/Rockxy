@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Parses and displays URL query parameters from the request URL in a name/value grid.
 struct QueryInspectorView: View {
+    // MARK: Internal
+
     let transaction: HTTPTransaction
     var highlightContext: InspectorHighlightContext = .empty
 
@@ -12,7 +14,7 @@ struct QueryInspectorView: View {
         Group {
             if queryItems.isEmpty {
                 InspectorEmptyStateView(
-                    String(localized: "No Query Parameters"),
+                    String(localized: "No Query Parameters", bundle: RockxyLocalization.bundle),
                     systemImage: "questionmark.circle"
                 )
             } else {
@@ -21,11 +23,11 @@ struct QueryInspectorView: View {
                         GridItem(.flexible(minimum: 100, maximum: 200), alignment: .topLeading),
                         GridItem(.flexible(), alignment: .topLeading),
                     ], spacing: 4) {
-                        Text(String(localized: "Name"))
+                        Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                             .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundStyle(.secondary)
-                        Text(String(localized: "Value"))
+                        Text(String(localized: "Value", bundle: RockxyLocalization.bundle))
                             .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundStyle(.secondary)
@@ -45,6 +47,8 @@ struct QueryInspectorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }

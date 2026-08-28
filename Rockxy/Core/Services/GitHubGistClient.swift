@@ -3,13 +3,13 @@ import Foundation
 // MARK: - GistPublishResult
 
 struct GistPublishResult: Codable, Equatable, Sendable {
-    let id: String
-    let htmlURL: URL
-
     enum CodingKeys: String, CodingKey {
         case id
         case htmlURL = "html_url"
     }
+
+    let id: String
+    let htmlURL: URL
 }
 
 // MARK: - GitHubGistClient
@@ -30,18 +30,26 @@ struct GitHubGistClient: Sendable {
         case unexpectedStatus(Int)
         case invalidResponse
 
+        // MARK: Internal
+
         var errorDescription: String? {
             switch self {
             case .unauthorized:
-                String(localized: "GitHub rejected the saved token. Reconnect GitHub in Settings.")
+                String(
+                    localized: "GitHub rejected the saved token. Reconnect GitHub in Settings.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .forbidden:
-                String(localized: "The saved GitHub token does not have permission to create Gists.")
+                String(
+                    localized: "The saved GitHub token does not have permission to create Gists.",
+                    bundle: RockxyLocalization.bundle
+                )
             case let .validationFailed(message):
                 message
             case let .unexpectedStatus(status):
-                String(localized: "GitHub returned HTTP \(status).")
+                String(localized: "GitHub returned HTTP \(status).", bundle: RockxyLocalization.bundle)
             case .invalidResponse:
-                String(localized: "GitHub returned an unexpected response.")
+                String(localized: "GitHub returned an unexpected response.", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -88,9 +96,10 @@ struct GitHubGistClient: Sendable {
     private static func validationMessage(from data: Data) -> String {
         if let response = try? JSONDecoder().decode(ErrorResponse.self, from: data),
            let message = response.message,
-           !message.isEmpty {
+           !message.isEmpty
+        {
             return message
         }
-        return String(localized: "GitHub could not validate the Gist payload.")
+        return String(localized: "GitHub could not validate the Gist payload.", bundle: RockxyLocalization.bundle)
     }
 }

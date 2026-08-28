@@ -165,9 +165,13 @@ extension MainContentCoordinator {
             style: .success,
             text: alreadyEnabled ?
                 String(
-                    localized: "SSL Proxying is already enabled for \(domain). Make the request again to inspect it."
+                    localized: "SSL Proxying is already enabled for \(domain). Make the request again to inspect it.",
+                    bundle: RockxyLocalization.bundle
                 ) :
-                String(localized: "Enabled SSL Proxying for \(domain). Make the request again to inspect it.")
+                String(
+                    localized: "Enabled SSL Proxying for \(domain). Make the request again to inspect it.",
+                    bundle: RockxyLocalization.bundle
+                )
         )
     }
 
@@ -183,7 +187,8 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Decryption retry is ready for \(domain). Repeat the request or reconnect the app."
+                localized: "Decryption retry is ready for \(domain). Repeat the request or reconnect the app.",
+                bundle: RockxyLocalization.bundle
             )
         )
     }
@@ -198,7 +203,8 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Disabled SSL Proxying for \(domain). Requests to it will stay tunneled."
+                localized: "Disabled SSL Proxying for \(domain). Requests to it will stay tunneled.",
+                bundle: RockxyLocalization.bundle
             )
         )
     }
@@ -228,7 +234,8 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Enabled SSL Proxying for domains from \(appName). Make the request again to inspect them."
+                localized: "Enabled SSL Proxying for domains from \(appName). Make the request again to inspect them.",
+                bundle: RockxyLocalization.bundle
             )
         )
     }
@@ -254,7 +261,8 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Disabled SSL Proxying for domains from \(appName). Requests from it will stay tunneled."
+                localized: "Disabled SSL Proxying for domains from \(appName). Requests from it will stay tunneled.",
+                bundle: RockxyLocalization.bundle
             )
         )
     }
@@ -335,13 +343,17 @@ extension MainContentCoordinator {
                 activeToast = ToastMessage(
                     style: .success,
                     text: String(
-                        localized: "Certificate installed and trusted. Make the request again to inspect HTTPS content."
+                        localized: "Certificate installed and trusted. Make the request again to inspect HTTPS content.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             } catch {
                 activeToast = ToastMessage(
                     style: .error,
-                    text: String(localized: "Failed to install certificate — \(error.localizedDescription)")
+                    text: String(
+                        localized: "Failed to install certificate — \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }
@@ -361,7 +373,7 @@ extension MainContentCoordinator {
 
     private func normalizedObservedAppName(_ value: String?) -> String {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return normalized.isEmpty ? String(localized: "Unknown") : normalized
+        return normalized.isEmpty ? String(localized: "Unknown", bundle: RockxyLocalization.bundle) : normalized
     }
 
     private func normalizedObservedHost(_ value: String) -> String {
@@ -508,10 +520,13 @@ extension MainContentCoordinator {
 
     private func showSidebarExportError(_ error: Error) {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Export Failed")
-        alert.informativeText = String(localized: "Could not export HAR file.\n\n\(error.localizedDescription)")
+        alert.messageText = String(localized: "Export Failed", bundle: RockxyLocalization.bundle)
+        alert.informativeText = String(
+            localized: "Could not export HAR file.\n\n\(error.localizedDescription)",
+            bundle: RockxyLocalization.bundle
+        )
         alert.alertStyle = .warning
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 

@@ -215,16 +215,16 @@ struct QuickToolsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(String(localized: "Customize Quick Tools"))
+            Text(String(localized: "Customize Quick Tools", bundle: RockxyLocalization.bundle))
                 .font(.headline)
 
             section(
-                title: String(localized: "Command Bar"),
+                title: String(localized: "Command Bar", bundle: RockxyLocalization.bundle),
                 region: .commandBar,
                 identifierPrefix: "commandBarQuickTools"
             )
             section(
-                title: String(localized: "Footer"),
+                title: String(localized: "Footer", bundle: RockxyLocalization.bundle),
                 region: .footer,
                 identifierPrefix: "footerQuickTools"
             )
@@ -232,12 +232,12 @@ struct QuickToolsEditor: View {
             Divider()
 
             HStack {
-                Button(String(localized: "Reset Defaults")) {
+                Button(String(localized: "Reset Defaults", bundle: RockxyLocalization.bundle)) {
                     layout = .default
                     onReset()
                 }
                 Spacer()
-                Button(String(localized: "Done")) {
+                Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                     onSave(layout)
                     onDone()
                 }
@@ -274,7 +274,7 @@ struct QuickToolsEditor: View {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                 ForEach(tools.indices, id: \.self) { index in
                     GridRow {
-                        Text(String(localized: "Slot \(index + 1)"))
+                        Text(String(localized: "Slot \(index + 1)", bundle: RockxyLocalization.bundle))
                             .frame(width: 44, alignment: .leading)
                         slotMenu(
                             region: region,

@@ -21,13 +21,15 @@ struct ProtobufTreeView: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var metrics
+
     private var header: some View {
         HStack(spacing: 12) {
-            Text(String(localized: "Field"))
+            Text(String(localized: "Field", bundle: RockxyLocalization.bundle))
                 .frame(width: 120, alignment: .leading)
-            Text(String(localized: "Wire Type"))
+            Text(String(localized: "Wire Type", bundle: RockxyLocalization.bundle))
                 .frame(width: 130, alignment: .leading)
-            Text(String(localized: "Best Guess Value"))
+            Text(String(localized: "Best Guess Value", bundle: RockxyLocalization.bundle))
             Spacer()
         }
         .font(.system(size: metrics.metadataFontSize, weight: .semibold))
@@ -36,8 +38,6 @@ struct ProtobufTreeView: View {
         .padding(.vertical, 6)
         .background(Color(nsColor: .controlBackgroundColor))
     }
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }
 
 // MARK: - ProtobufFieldRow
@@ -121,9 +121,9 @@ private struct ProtobufFieldRow: View {
         case let .string(value):
             "\"\(value)\""
         case let .bytes(data):
-            String(localized: "raw bytes · \(data.count) bytes")
+            String(localized: "raw bytes · \(data.count) bytes", bundle: RockxyLocalization.bundle)
         case let .message(tree):
-            String(localized: "nested message · \(tree.fields.count) fields")
+            String(localized: "nested message · \(tree.fields.count) fields", bundle: RockxyLocalization.bundle)
         }
     }
 }

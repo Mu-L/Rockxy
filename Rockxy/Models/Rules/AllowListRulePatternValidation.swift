@@ -7,7 +7,9 @@ enum AllowListRulePatternValidation {
         rawPattern: String,
         matchType: RuleMatchType,
         includeSubpaths: Bool
-    ) -> Bool {
+    )
+        -> Bool
+    {
         if matchType == .regex, rawPattern.count > maxRegexLength {
             return false
         }
@@ -23,19 +25,24 @@ enum AllowListRulePatternValidation {
         rawPattern: String,
         matchType: RuleMatchType,
         includeSubpaths: Bool
-    ) -> String? {
+    )
+        -> String?
+    {
         guard matchType == .regex, !rawPattern.isEmpty else {
             return nil
         }
         guard rawPattern.count <= maxRegexLength else {
-            return String(localized: "Regular expressions are limited to 2,048 characters.")
+            return String(
+                localized: "Regular expressions are limited to 2,048 characters.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         guard isValid(
             rawPattern: rawPattern,
             matchType: matchType,
             includeSubpaths: includeSubpaths
         ) else {
-            return String(localized: "Enter a valid regular expression.")
+            return String(localized: "Enter a valid regular expression.", bundle: RockxyLocalization.bundle)
         }
         return nil
     }

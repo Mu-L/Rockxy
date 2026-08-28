@@ -18,13 +18,19 @@ struct ActiveFilterSummaryBar: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     if let signal = coordinator.activeWorkspace.activeTrafficSignal {
-                        FilterChip(label: String(localized: "Signal: \(signal.title)")) {
+                        FilterChip(label: String(
+                            localized: "Signal: \(signal.title)",
+                            bundle: RockxyLocalization.bundle
+                        )) {
                             coordinator.toggleTrafficSignal(signal)
                         }
                     }
 
                     if let focusSet = coordinator.activeWorkspace.activeFocusSet {
-                        FilterChip(label: String(localized: "Focus: \(focusSet.displayName)")) {
+                        FilterChip(label: String(
+                            localized: "Focus: \(focusSet.displayName)",
+                            bundle: RockxyLocalization.bundle
+                        )) {
                             coordinator.applyFocusSet(nil)
                         }
                     }
@@ -32,7 +38,8 @@ struct ActiveFilterSummaryBar: View {
                     if !coordinator.activeWorkspace.mutedTrafficSources.isEmpty {
                         FilterChip(
                             label: String(
-                                localized: "\(coordinator.activeWorkspace.mutedTrafficSources.count) muted sources"
+                                localized: "\(coordinator.activeWorkspace.mutedTrafficSources.count) muted sources",
+                                bundle: RockxyLocalization.bundle
                             ),
                             onRemove: coordinator.unmuteAllTrafficSources
                         )
@@ -41,7 +48,10 @@ struct ActiveFilterSummaryBar: View {
                     if let domain = coordinator.filterCriteria.sidebarDomain {
                         let pathPrefix = coordinator.filterCriteria.sidebarPathPrefix ?? ""
                         FilterChip(
-                            label: String(localized: "Domain: \(domain)\(pathPrefix)"),
+                            label: String(
+                                localized: "Domain: \(domain)\(pathPrefix)",
+                                bundle: RockxyLocalization.bundle
+                            ),
                             onRemove: {
                                 coordinator.filterCriteria.sidebarDomain = nil
                                 coordinator.filterCriteria.sidebarPathPrefix = nil
@@ -53,7 +63,7 @@ struct ActiveFilterSummaryBar: View {
 
                     if let app = coordinator.filterCriteria.sidebarApp {
                         FilterChip(
-                            label: String(localized: "App: \(app)"),
+                            label: String(localized: "App: \(app)", bundle: RockxyLocalization.bundle),
                             onRemove: {
                                 coordinator.filterCriteria.sidebarApp = nil
                                 coordinator.sidebarSelection = nil
@@ -63,7 +73,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     if coordinator.filterCriteria.sidebarScope == .saved {
-                        FilterChip(label: String(localized: "Saved")) {
+                        FilterChip(label: String(localized: "Saved", bundle: RockxyLocalization.bundle)) {
                             coordinator.filterCriteria.sidebarScope = .allTraffic
                             coordinator.filterCriteria.exactTransactionID = nil
                             coordinator.sidebarSelection = nil
@@ -72,7 +82,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     if coordinator.filterCriteria.sidebarScope == .pinned {
-                        FilterChip(label: String(localized: "Pinned")) {
+                        FilterChip(label: String(localized: "Pinned", bundle: RockxyLocalization.bundle)) {
                             coordinator.filterCriteria.sidebarScope = .allTraffic
                             coordinator.filterCriteria.exactTransactionID = nil
                             coordinator.sidebarSelection = nil
@@ -81,7 +91,7 @@ struct ActiveFilterSummaryBar: View {
                     }
 
                     if coordinator.filterCriteria.sidebarScope == .notes {
-                        FilterChip(label: String(localized: "Notes")) {
+                        FilterChip(label: String(localized: "Notes", bundle: RockxyLocalization.bundle)) {
                             coordinator.filterCriteria.sidebarScope = .allTraffic
                             coordinator.filterCriteria.exactTransactionID = nil
                             coordinator.sidebarSelection = nil
@@ -89,7 +99,7 @@ struct ActiveFilterSummaryBar: View {
                         }
                     }
 
-                    Button(String(localized: "Clear All")) {
+                    Button(String(localized: "Clear All", bundle: RockxyLocalization.bundle)) {
                         coordinator.clearAllWorkspaceFilters()
                     }
                     .font(.system(size: metrics.secondaryFontSize, weight: .medium))

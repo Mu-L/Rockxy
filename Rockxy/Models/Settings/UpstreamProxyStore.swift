@@ -162,7 +162,10 @@ final class UpstreamProxyStore {
 
     func testConnection() async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
         guard configuration.isEnabled else {
-            return .failure(.invalidConfiguration(String(localized: "Upstream Proxy is disabled.")))
+            return .failure(.invalidConfiguration(String(
+                localized: "Upstream Proxy is disabled.",
+                bundle: RockxyLocalization.bundle
+            )))
         }
         return await testConnection(configuration: configuration)
     }
@@ -170,7 +173,9 @@ final class UpstreamProxyStore {
     func testConnection(
         configuration draftConfiguration: UpstreamProxyConfiguration,
         credentials suppliedCredentials: UpstreamProxyCredentials? = nil
-    ) async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
+    )
+        async -> Result<UpstreamProxyTestResult, UpstreamProxyError>
+    {
         do {
             var testConfiguration = draftConfiguration
             testConfiguration.isEnabled = true
@@ -201,9 +206,30 @@ final class UpstreamProxyStore {
 
     // MARK: Private
 
+    private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "UpstreamProxy")
+    private static let userDefaultsKey = "upstreamProxy.config.v1"
+
+    private let policy: any AppPolicy
+    private let userDefaults: UserDefaults
+    private let credentialStorage: any UpstreamProxyCredentialStorage
+    private let testTarget: UpstreamProxyTestTarget
+    private let lock = NSLock()
+    nonisolated(unsafe) private var cachedResolvedConfiguration: UpstreamProxyResolvedConfiguration?
+
+    private static func loadConfiguration(from userDefaults: UserDefaults) -> UpstreamProxyConfiguration {
+        guard let data = userDefaults.data(forKey: userDefaultsKey),
+              let configuration = try? JSONDecoder().decode(UpstreamProxyConfiguration.self, from: data) else
+        {
+            return .disabled
+        }
+        return configuration
+    }
+
     private func testConnection(
         using snapshot: UpstreamProxyResolvedConfiguration?
-    ) async -> Result<UpstreamProxyTestResult, UpstreamProxyError> {
+    )
+        async -> Result<UpstreamProxyTestResult, UpstreamProxyError>
+    {
         let start = ContinuousClock.now
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer {
@@ -252,25 +278,6 @@ final class UpstreamProxyStore {
         }
     }
 
-    private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "UpstreamProxy")
-    private static let userDefaultsKey = "upstreamProxy.config.v1"
-
-    private let policy: any AppPolicy
-    private let userDefaults: UserDefaults
-    private let credentialStorage: any UpstreamProxyCredentialStorage
-    private let testTarget: UpstreamProxyTestTarget
-    private let lock = NSLock()
-    nonisolated(unsafe) private var cachedResolvedConfiguration: UpstreamProxyResolvedConfiguration?
-
-    private static func loadConfiguration(from userDefaults: UserDefaults) -> UpstreamProxyConfiguration {
-        guard let data = userDefaults.data(forKey: userDefaultsKey),
-              let configuration = try? JSONDecoder().decode(UpstreamProxyConfiguration.self, from: data) else
-        {
-            return .disabled
-        }
-        return configuration
-    }
-
     private func enforcePolicy(
         for configuration: UpstreamProxyConfiguration,
         credentials: UpstreamProxyCredentials?
@@ -309,7 +316,9 @@ final class UpstreamProxyStore {
 
     private func reachabilitySnapshot(
         from snapshot: UpstreamProxyResolvedConfiguration
-    ) -> UpstreamProxyResolvedConfiguration {
+    )
+        -> UpstreamProxyResolvedConfiguration
+    {
         var configuration = snapshot.configuration
         configuration.bypassHostPatterns = []
         configuration.bypassLocalhost = false
@@ -346,10 +355,13 @@ final class UpstreamProxyStore {
 enum UpstreamProxyStoreError: LocalizedError {
     case credentialsUnavailable
 
+    // MARK: Internal
+
     var errorDescription: String? {
         String(
             localized:
-            "Saved upstream proxy credentials are unavailable. Enter the username and password again."
+            "Saved upstream proxy credentials are unavailable. Enter the username and password again.",
+            bundle: RockxyLocalization.bundle
         )
     }
 }
@@ -357,6 +369,8 @@ enum UpstreamProxyStoreError: LocalizedError {
 // MARK: - PACRouteCapture
 
 private final class PACRouteCapture: @unchecked Sendable {
+    // MARK: Internal
+
     func store(_ route: UpstreamPACRoute) {
         lock.lock()
         capturedRoute = route
@@ -369,6 +383,8 @@ private final class PACRouteCapture: @unchecked Sendable {
         lock.unlock()
         return snapshot
     }
+
+    // MARK: Private
 
     private let lock = NSLock()
     private var capturedRoute: UpstreamPACRoute?

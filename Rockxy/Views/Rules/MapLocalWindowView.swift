@@ -53,6 +53,11 @@ final class MapLocalViewModel {
         mapLocalRules.filter(\.isEnabled).count
     }
 
+    var isReorderable: Bool {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && selectedRuleIDs.count == 1
+    }
+
     var selectedRule: ProxyRule? {
         guard let id = selectedRuleIDs.first else {
             return nil
@@ -77,6 +82,28 @@ final class MapLocalViewModel {
                 await RulePolicyGate.shared.replaceAllRules(updated)
                 allRules = await RuleEngine.shared.allRules
             }
+        }
+    }
+
+    static func applyingMapLocalOrder(_ orderedSubset: [ProxyRule], to allRules: [ProxyRule]) -> [ProxyRule] {
+        let currentIDs = allRules.compactMap { rule -> UUID? in
+            if case .mapLocal = rule.action {
+                return rule.id
+            }
+            return nil
+        }
+        guard orderedSubset.count == currentIDs.count,
+              Set(orderedSubset.map(\.id)) == Set(currentIDs) else
+        {
+            return allRules
+        }
+
+        var iterator = orderedSubset.makeIterator()
+        return allRules.map { rule in
+            if case .mapLocal = rule.action {
+                return iterator.next() ?? rule
+            }
+            return rule
         }
     }
 
@@ -161,8 +188,30 @@ final class MapLocalViewModel {
         addRule(rule)
     }
 
+    func moveSelectedRule(by offset: Int) {
+        guard isReorderable, let selectedID = selectedRuleIDs.first,
+              let sourceIndex = mapLocalRules.firstIndex(where: { $0.id == selectedID }) else
+        {
+            return
+        }
+        let destinationIndex = sourceIndex + offset
+        guard mapLocalRules.indices.contains(destinationIndex) else {
+            return
+        }
+
+        var reordered = mapLocalRules
+        let moved = reordered.remove(at: sourceIndex)
+        reordered.insert(moved, at: destinationIndex)
+        let orderedIDs = reordered.map(\.id)
+        allRules = Self.applyingMapLocalOrder(reordered, to: allRules)
+        Task {
+            await RulePolicyGate.shared.reorderMapLocalRules(orderedIDs: orderedIDs)
+            allRules = await RuleEngine.shared.allRules
+        }
+    }
+
     func filePath(for rule: ProxyRule) -> String {
-        if case let .mapLocal(path, _, _, _) = rule.action {
+        if case let .mapLocal(path, _, _, _, _) = rule.action {
             return path
         }
         return ""
@@ -195,14 +244,14 @@ final class MapLocalViewModel {
     }
 
     func isDirectory(for rule: ProxyRule) -> Bool {
-        if case let .mapLocal(_, _, isDirectory, _) = rule.action {
+        if case let .mapLocal(_, _, isDirectory, _, _) = rule.action {
             return isDirectory
         }
         return false
     }
 
     func delayLabel(for rule: ProxyRule) -> String {
-        if case let .mapLocal(_, _, _, delayMs) = rule.action, delayMs != 0 {
+        if case let .mapLocal(_, _, _, delayMs, _) = rule.action, delayMs != 0 {
             return MapLocalDelayPreset.from(delayMs: delayMs).displayName
         }
         return ""
@@ -261,7 +310,7 @@ struct MapLocalWindowView: View {
             viewModel.handleRulesDidChange(notification)
         }
         .alert(
-            String(localized: "Map Local"),
+            String(localized: "Map Local", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: {
@@ -271,7 +320,7 @@ struct MapLocalWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { viewModel.errorMessage = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { viewModel.errorMessage = nil }
         } message: {
             if let error = viewModel.errorMessage {
                 Text(error)
@@ -290,9 +339,9 @@ struct MapLocalWindowView: View {
 
     private var footerHint: String {
         let countText = isSearching
-            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
-            : String(localized: "\(viewModel.ruleCount) rules")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
+            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
@@ -303,7 +352,7 @@ struct MapLocalWindowView: View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Toggle(
-                    String(localized: "Enable Map Local"),
+                    String(localized: "Enable Map Local", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { viewModel.isToolEnabled },
                         set: { viewModel.setToolEnabled($0) }
@@ -312,19 +361,19 @@ struct MapLocalWindowView: View {
                 .toggleStyle(.checkbox)
                 .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "Serve a local file or directory for matching requests."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(localized: "Serve a local file or directory for matching requests.", bundle: RockxyLocalization.bundle))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Map Local rules"))
+                .accessibilityLabel(String(localized: "Search Map Local rules", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -338,7 +387,8 @@ struct MapLocalWindowView: View {
             Text(
                 String(
                     localized:
-                    "Map Local participates in Rockxy's global first-match rule order. A match returns the selected local response without contacting the remote server."
+                    "Map Local participates in Rockxy's global first-match rule order. Reorder rules from the More menu; unavailable local targets safely fall back to the origin.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -352,7 +402,7 @@ struct MapLocalWindowView: View {
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleIDs) {
-            TableColumn(String(localized: "Enabled")) { rule in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
                 Toggle("", isOn: Binding(
                     get: { rule.isEnabled },
                     set: { _ in viewModel.toggleRule(id: rule.id) }
@@ -362,21 +412,21 @@ struct MapLocalWindowView: View {
             }
             .width(62)
 
-            TableColumn(String(localized: "Name")) { rule in
-                Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
+            TableColumn(String(localized: "Name", bundle: RockxyLocalization.bundle)) { rule in
+                Text(rule.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : rule.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .help(rule.name)
             }
             .width(min: 150, ideal: 190)
 
-            TableColumn(String(localized: "Method")) { rule in
+            TableColumn(String(localized: "Method", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.methodLabel(for: rule))
                     .lineLimit(1)
             }
             .width(76)
 
-            TableColumn(String(localized: "Matching Rule")) { rule in
+            TableColumn(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.matchingRuleLabel(for: rule))
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -385,7 +435,7 @@ struct MapLocalWindowView: View {
             }
             .width(min: 220, ideal: 300)
 
-            TableColumn(String(localized: "Local Response")) { rule in
+            TableColumn(String(localized: "Local Response", bundle: RockxyLocalization.bundle)) { rule in
                 HStack(spacing: 6) {
                     Text(viewModel.mapFromLabel(for: rule))
                         .lineLimit(1)
@@ -414,13 +464,13 @@ struct MapLocalWindowView: View {
             if viewModel.filteredRules.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No matching rules")
-                        : String(localized: "No Map Local rules"),
+                        ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Map Local rules", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "folder.badge.gearshape",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different name, method, URL, or local path.")
-                            : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                            ? String(localized: "Try a different name, method, URL, or local path.", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Click \"+\" or press ⌘N to create a rule.", bundle: RockxyLocalization.bundle)
                     )
                 )
             }
@@ -449,8 +499,8 @@ struct MapLocalWindowView: View {
 
             Text(
                 viewModel.isToolEnabled
-                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
-                    : String(localized: "MAP LOCAL OFF")
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE", bundle: RockxyLocalization.bundle))"
+                    : String(localized: "MAP LOCAL OFF", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
             .padding(.horizontal, 12)
@@ -475,7 +525,7 @@ struct MapLocalWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -493,7 +543,7 @@ struct MapLocalWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleIDs.isEmpty)
-            .help(String(localized: "Remove Selected Rules"))
+            .help(String(localized: "Remove Selected Rules", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -509,19 +559,21 @@ struct MapLocalWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New Rule")) { openNewEditor() }
+            Button(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) { openNewEditor() }
                 .keyboardShortcut("n", modifiers: .command)
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.selectedRule {
                     openEditor(for: rule)
                 }
             }
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRule == nil)
-            Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
-                .keyboardShortcut("d", modifiers: .command)
-                .disabled(viewModel.selectedRule == nil)
-            Button(String(localized: "Toggle Enabled")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
+                viewModel.duplicateSelectedRule()
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Toggle Enabled", bundle: RockxyLocalization.bundle)) {
                 if let id = viewModel.selectedRuleIDs.first {
                     viewModel.toggleRule(id: id)
                 }
@@ -529,14 +581,23 @@ struct MapLocalWindowView: View {
             .keyboardShortcut(.space, modifiers: [])
             .disabled(viewModel.selectedRule == nil)
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Move Up", bundle: RockxyLocalization.bundle)) {
+                viewModel.moveSelectedRule(by: -1)
+            }
+            .disabled(!canMoveSelectedRule(by: -1))
+            Button(String(localized: "Move Down", bundle: RockxyLocalization.bundle)) {
+                viewModel.moveSelectedRule(by: 1)
+            }
+            .disabled(!canMoveSelectedRule(by: 1))
+            Divider()
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelectedRules()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleIDs.isEmpty)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -549,17 +610,28 @@ struct MapLocalWindowView: View {
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first {
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.allRules.first(where: { $0.id == id }) {
                     openEditor(for: rule)
                 }
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRuleIDs = [id]
                 viewModel.duplicateSelectedRule()
             }
             Divider()
-            Button(String(localized: "Delete Rule"), role: .destructive) {
+            Button(String(localized: "Move Up", bundle: RockxyLocalization.bundle)) {
+                viewModel.selectedRuleIDs = [id]
+                viewModel.moveSelectedRule(by: -1)
+            }
+            .disabled(!canMoveRule(id: id, by: -1))
+            Button(String(localized: "Move Down", bundle: RockxyLocalization.bundle)) {
+                viewModel.selectedRuleIDs = [id]
+                viewModel.moveSelectedRule(by: 1)
+            }
+            .disabled(!canMoveRule(id: id, by: 1))
+            Divider()
+            Button(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeRule(id: id)
             }
         }
@@ -580,6 +652,22 @@ struct MapLocalWindowView: View {
             return
         }
         openNewEditor(draft: draft)
+    }
+
+    private func canMoveSelectedRule(by offset: Int) -> Bool {
+        guard let id = viewModel.selectedRuleIDs.first else {
+            return false
+        }
+        return canMoveRule(id: id, by: offset)
+    }
+
+    private func canMoveRule(id: UUID, by offset: Int) -> Bool {
+        guard viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let index = viewModel.mapLocalRules.firstIndex(where: { $0.id == id }) else
+        {
+            return false
+        }
+        return viewModel.mapLocalRules.indices.contains(index + offset)
     }
 }
 
@@ -620,7 +708,7 @@ struct MapLocalEditorWindowView: View {
             viewModel.load(context: editorStore.context)
         }
         .alert(
-            String(localized: "Map Local"),
+            String(localized: "Map Local", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: {
@@ -630,7 +718,7 @@ struct MapLocalEditorWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { viewModel.errorMessage = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { viewModel.errorMessage = nil }
         } message: {
             if let error = viewModel.errorMessage {
                 Text(error)
@@ -647,8 +735,8 @@ struct MapLocalEditorWindowView: View {
 
     private var editorTitle: String {
         viewModel.existingID == nil
-            ? String(localized: "New Map Local Rule")
-            : String(localized: "Edit Map Local Rule")
+            ? String(localized: "New Map Local Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Edit Map Local Rule", bundle: RockxyLocalization.bundle)
     }
 
     private var quickCreateProvenance: String? {
@@ -656,9 +744,9 @@ struct MapLocalEditorWindowView: View {
             return nil
         }
         if let sourceURL = draft.sourceURL {
-            return String(localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)")
+            return String(localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Created from domain \(draft.sourceHost)")
+        return String(localized: "Created from domain \(draft.sourceHost)", bundle: RockxyLocalization.bundle)
     }
 
     private var fileStatusColor: Color {
@@ -673,41 +761,66 @@ struct MapLocalEditorWindowView: View {
 
     private var fileStatusMessage: String {
         if viewModel.isCapturedBinary {
-            return String(localized: "Captured binary response will be written when the rule is saved.")
+            return String(localized: "Captured binary response will be written when the rule is saved.", bundle: RockxyLocalization.bundle)
         }
         if viewModel.isExternalReference {
+            if viewModel.isExternalFullHTTPMessage {
+                return String(localized: "Full HTTP response file detected — previewing file-owned status, headers, and body.", bundle: RockxyLocalization.bundle)
+            }
             return viewModel.isSelectedFileAvailable
-                ? String(localized: "External file available")
-                : String(localized: "External file is currently unavailable")
+                ? String(localized: "External file available", bundle: RockxyLocalization.bundle)
+                : String(localized: "External file is currently unavailable", bundle: RockxyLocalization.bundle)
         }
         return viewModel.isSelectedFileAvailable
-            ? String(localized: "Rockxy-owned response file available")
-            : String(localized: "Rockxy will create this response file when the rule is saved.")
+            ? String(localized: "Rockxy-owned response file available", bundle: RockxyLocalization.bundle)
+            : String(localized: "Rockxy will create this response file when the rule is saved.", bundle: RockxyLocalization.bundle)
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var localFileResponseDescription: String {
+        if viewModel.isInlineResponseEditable {
+            return String(localized: "Edit the status line, response headers, and body. Rockxy always recalculates Content-Length.", bundle: RockxyLocalization.bundle)
+        }
+        if viewModel.isCapturedBinary {
+            // swiftlint:disable:next line_length
+            return String(localized: "Edit status and headers here. Captured binary body bytes stay preserved and text after the blank line is ignored.", bundle: RockxyLocalization.bundle)
+        }
+        if viewModel.isExternalFullHTTPMessage {
+            if viewModel.externalFullMessageHasBinaryBody {
+                // swiftlint:disable:next line_length
+                return String(localized: "Read-only preview. This file controls the status and headers; its binary body is preserved but not shown.", bundle: RockxyLocalization.bundle)
+            }
+            return String(localized: "Read-only preview. This file controls the status, ordered headers, and body at request time.", bundle: RockxyLocalization.bundle)
+        }
+        // swiftlint:disable:next line_length
+        return String(localized: "Edit status and headers here. The body comes from the user-owned file and text after the blank line is ignored.", bundle: RockxyLocalization.bundle)
+    }
+
     private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                    fieldGroup(String(localized: "Name")) {
-                        TextField(String(localized: "Untitled"), text: $viewModel.name)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel(String(localized: "Rule name"))
+                    fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                        TextField(
+                            String(localized: "Untitled", bundle: RockxyLocalization.bundle),
+                            text: $viewModel.name
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
                     }
                     .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-                    fieldGroup(String(localized: "URL pattern")) {
+                    fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                         TextField("https://example.com/api/*", text: $viewModel.urlText)
                             .textFieldStyle(.roundedBorder)
                             .font(toolMetrics.font(monospaced: true))
-                            .accessibilityLabel(String(localized: "URL pattern"))
+                            .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -718,16 +831,22 @@ struct MapLocalEditorWindowView: View {
                         .foregroundStyle(.red)
                 }
 
+                MapLocalHTTPSPrerequisiteNotice(
+                    isHTTPSPattern: viewModel.isHTTPSPattern,
+                    targetHost: viewModel.httpsTargetHost,
+                    toolMetrics: toolMetrics
+                )
+
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                    inlineField(String(localized: "Method")) {
+                    inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                         methodMenu
                     }
-                    inlineField(String(localized: "Match type")) {
+                    inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                         matchTypeMenu
                     }
 
                     if viewModel.matchType == .wildcard {
-                        Text(String(localized: "Supports * and ?."))
+                        Text(String(localized: "Supports * and ?.", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.secondaryFont())
                             .foregroundStyle(.secondary)
                     }
@@ -736,21 +855,29 @@ struct MapLocalEditorWindowView: View {
 
                 if viewModel.matchType == .wildcard {
                     Toggle(
-                        String(localized: "Include all subpaths of this URL"),
+                        String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
                         isOn: $viewModel.includeSubpaths
                     )
                     .toggleStyle(.checkbox)
                 }
 
+                if let validationMessage = viewModel.directoryRegexValidationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.red)
+                }
+
+                MapLocalRuleTesterSection(viewModel: viewModel, toolMetrics: toolMetrics)
+
                 Divider()
 
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
-                    Text(String(localized: "Response delay"))
+                    Text(String(localized: "Response delay", bundle: RockxyLocalization.bundle))
                         .foregroundStyle(.secondary)
                     delayMenu
                     if viewModel.delayPreset == .custom {
                         Stepper(
-                            String(localized: "\(viewModel.customDelaySeconds) seconds"),
+                            String(localized: "\(viewModel.customDelaySeconds) seconds", bundle: RockxyLocalization.bundle),
                             value: $viewModel.customDelaySeconds,
                             in: 0 ... 300
                         )
@@ -772,11 +899,14 @@ struct MapLocalEditorWindowView: View {
 
     private var responseSourceSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Response Source"))
+            Text(String(localized: "Response Source", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                Picker(String(localized: "Source type"), selection: $viewModel.targetMode) {
+                Picker(
+                    String(localized: "Source type", bundle: RockxyLocalization.bundle),
+                    selection: $viewModel.targetMode
+                ) {
                     Text(MapLocalTargetMode.localFile.displayName).tag(MapLocalTargetMode.localFile)
                     Text(MapLocalTargetMode.localDirectory.displayName).tag(MapLocalTargetMode.localDirectory)
                 }
@@ -809,7 +939,7 @@ struct MapLocalEditorWindowView: View {
     private var localFileSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
             HStack(alignment: .bottom, spacing: toolMetrics.controlSpacing) {
-                fieldGroup(String(localized: "Local file")) {
+                fieldGroup(String(localized: "Local file", bundle: RockxyLocalization.bundle)) {
                     Text(viewModel.filePath)
                         .font(toolMetrics.font(monospaced: true))
                         .foregroundStyle(.secondary)
@@ -828,7 +958,7 @@ struct MapLocalEditorWindowView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                Button(String(localized: "Choose…")) { viewModel.choosePath() }
+                Button(String(localized: "Choose…", bundle: RockxyLocalization.bundle)) { viewModel.choosePath() }
                     .frame(height: toolMetrics.formControlHeight)
 
                 fileActionsMenu
@@ -845,64 +975,28 @@ struct MapLocalEditorWindowView: View {
                 Text(viewModel.responseContentType)
                     .font(toolMetrics.metadataFont(monospaced: true))
                     .foregroundStyle(.secondary)
-                    .help(String(localized: "Content-Type is inferred from the file extension."))
+                    .help(String(localized: "Configured Content-Type, or the file-extension fallback.", bundle: RockxyLocalization.bundle))
             }
 
-            if viewModel.isInlineResponseEditable {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Response body"))
-                        .foregroundStyle(.secondary)
-                    MapLocalHTTPMessageEditor(
-                        text: Binding(
-                            get: { viewModel.responseBodyText },
-                            set: { viewModel.responseBodyText = $0 }
-                        ),
-                        editorSettings: toolMetrics.codeEditorSettings
-                    )
-                    .frame(minHeight: 230)
-                    .clipped()
-                    .overlay {
-                        Rectangle()
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                    }
-                    Text(
-                        String(
-                            localized:
-                            "Rockxy saves the status code and body. Content-Type is inferred from the file extension."
-                        )
-                    )
+            if let validationMessage = viewModel.externalFileValidationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                }
-            } else {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: viewModel.isCapturedBinary ? "doc.zipper" : "link")
-                        .foregroundStyle(.secondary)
-                    Text(
-                        viewModel.isCapturedBinary
-                            ? String(
-                                localized:
-                                "Captured binary data is preserved byte-for-byte and cannot be edited inline."
-                            )
-                            : String(
-                                localized:
-                                "This rule references a user-owned file. Rockxy will never rewrite its contents."
-                            )
-                    )
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(10)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .foregroundStyle(.orange)
             }
+
+            MapLocalHTTPResponseSection(
+                text: $viewModel.httpMessageText,
+                bodyIsEditable: viewModel.isInlineResponseEditable,
+                bodyDescription: localFileResponseDescription,
+                toolMetrics: toolMetrics,
+                messageIsEditable: !viewModel.isExternalFullHTTPMessage
+            )
         }
     }
 
     private var responseStatusRow: some View {
         HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Status code"))
+            Text(String(localized: "Status code", bundle: RockxyLocalization.bundle))
                 .foregroundStyle(.secondary)
             TextField(
                 "",
@@ -914,8 +1008,11 @@ struct MapLocalEditorWindowView: View {
             )
             .textFieldStyle(.roundedBorder)
             .frame(width: 84, height: toolMetrics.formControlHeight)
-            .accessibilityLabel(String(localized: "HTTP response status code"))
-            Text(String(localized: "Applied to every response from this rule. Valid range: 100–599."))
+            .accessibilityLabel(String(localized: "HTTP response status code", bundle: RockxyLocalization.bundle))
+            .disabled(viewModel.isExternalFullHTTPMessage)
+            Text(viewModel.isExternalFullHTTPMessage
+                ? String(localized: "The selected full HTTP response file controls this status code.", bundle: RockxyLocalization.bundle)
+                : String(localized: "Applied to every response from this rule. Valid range: 100–599.", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
             Spacer()
@@ -924,14 +1021,19 @@ struct MapLocalEditorWindowView: View {
 
     private var localDirectorySection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-            fieldGroup(String(localized: "Local directory")) {
+            fieldGroup(String(localized: "Local directory", bundle: RockxyLocalization.bundle)) {
                 HStack(spacing: toolMetrics.controlSpacing) {
-                    TextField(String(localized: "Choose a directory"), text: $viewModel.directoryPath)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font(monospaced: true))
-                    Button(String(localized: "Choose…")) { viewModel.choosePath() }
-                    Button(String(localized: "Show in Finder")) { viewModel.showSelectedPathInFinder() }
-                        .disabled(!viewModel.isDirectoryValid)
+                    TextField(
+                        String(localized: "Choose a directory", bundle: RockxyLocalization.bundle),
+                        text: $viewModel.directoryPath
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font(monospaced: true))
+                    Button(String(localized: "Choose…", bundle: RockxyLocalization.bundle)) { viewModel.choosePath() }
+                    Button(String(localized: "Show in Finder", bundle: RockxyLocalization.bundle)) {
+                        viewModel.showSelectedPathInFinder()
+                    }
+                    .disabled(!viewModel.isDirectoryValid)
                 }
             }
             HStack(spacing: 8) {
@@ -939,8 +1041,8 @@ struct MapLocalEditorWindowView: View {
                     .fill(viewModel.isDirectoryValid ? Color.green : Color.orange)
                     .frame(width: 8, height: 8)
                 Text(viewModel.isDirectoryValid
-                    ? String(localized: "Directory available")
-                    : String(localized: "Choose an available directory to continue."))
+                    ? String(localized: "Directory available", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Choose an available directory to continue.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
@@ -950,9 +1052,11 @@ struct MapLocalEditorWindowView: View {
                     .foregroundStyle(.secondary)
                 Text(
                     String(
-                        localized:
-                        "Request subpaths resolve inside this directory. Root requests use index.html when it exists."
+                        localized: "Request subpaths resolve to files inside this directory. Root requests and missing files continue to the origin.",
+                        bundle: RockxyLocalization.bundle
                     )
+                        + " "
+                        + String(localized: "Regex directory rules use the first capture group as the relative file path.", bundle: RockxyLocalization.bundle)
                 )
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
@@ -961,6 +1065,17 @@ struct MapLocalEditorWindowView: View {
             .padding(10)
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 5))
+
+            MapLocalHTTPResponseSection(
+                text: $viewModel.httpMessageText,
+                bodyIsEditable: false,
+                bodyDescription: String(
+                    localized:
+                    "Edit status and headers here. Response bodies come from the matched file in this directory; text after the blank line is ignored.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                toolMetrics: toolMetrics
+            )
         }
     }
 
@@ -1026,11 +1141,13 @@ struct MapLocalEditorWindowView: View {
 
     private var fileActionsMenu: some View {
         Menu {
-            Button(String(localized: "Show in Finder")) { viewModel.showSelectedPathInFinder() }
-                .disabled(!viewModel.isSelectedFileAvailable)
+            Button(String(localized: "Show in Finder", bundle: RockxyLocalization.bundle)) {
+                viewModel.showSelectedPathInFinder()
+            }
+            .disabled(!viewModel.isSelectedFileAvailable)
             Divider()
             ForEach(MapLocalExternalEditor.allCases) { editor in
-                Button(String(localized: "Open with \(editor.displayName)")) {
+                Button(String(localized: "Open with \(editor.displayName)", bundle: RockxyLocalization.bundle)) {
                     viewModel.openSelectedPath(with: editor)
                 }
                 .disabled(!viewModel.isSelectedFileAvailable)
@@ -1041,7 +1158,7 @@ struct MapLocalEditorWindowView: View {
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .help(String(localized: "File Actions"))
+        .help(String(localized: "File Actions", bundle: RockxyLocalization.bundle))
     }
 
     private var footer: some View {
@@ -1050,7 +1167,7 @@ struct MapLocalEditorWindowView: View {
             Button {
                 dismiss()
             } label: {
-                footerButtonLabel(String(localized: "Cancel"))
+                footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
             }
             .keyboardShortcut(.cancelAction)
 
@@ -1059,10 +1176,10 @@ struct MapLocalEditorWindowView: View {
             } label: {
                 footerButtonLabel(
                     isSaving
-                        ? String(localized: "Saving…")
+                        ? String(localized: "Saving…", bundle: RockxyLocalization.bundle)
                         : viewModel.existingID == nil
-                        ? String(localized: "Add")
-                        : String(localized: "Save")
+                        ? String(localized: "Add", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Save", bundle: RockxyLocalization.bundle)
                 )
             }
             .keyboardShortcut(.defaultAction)
@@ -1177,7 +1294,8 @@ struct MapLocalEditorWindowView: View {
                 guard accepted else {
                     viewModel.errorMessage = String(
                         localized:
-                        "The active Map Local rule limit was reached. Disable another rule and try again."
+                        "The active Map Local rule limit was reached. Disable another rule and try again.",
+                        bundle: RockxyLocalization.bundle
                     )
                     isSaving = false
                     return

@@ -18,30 +18,45 @@ enum DebugAssistantRecipe: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .explainRequest:
-            String(localized: "Explain This Request")
+            String(localized: "Explain This Request", bundle: RockxyLocalization.bundle)
         case .explainFailure:
-            String(localized: "Explain This Failure")
+            String(localized: "Explain This Failure", bundle: RockxyLocalization.bundle)
         case .compareWithSuccess:
-            String(localized: "Compare With Successful Request")
+            String(localized: "Compare With Successful Request", bundle: RockxyLocalization.bundle)
         case .checkAuthentication:
-            String(localized: "Check Authentication")
+            String(localized: "Check Authentication", bundle: RockxyLocalization.bundle)
         case .prepareBugReport:
-            String(localized: "Prepare Bug Report")
+            String(localized: "Prepare Bug Report", bundle: RockxyLocalization.bundle)
         }
     }
 
     var detail: String {
         switch self {
         case .explainRequest:
-            String(localized: "Explain what the request does, its captured outcome, and anything worth checking.")
+            String(
+                localized: "Explain what the request does, its captured outcome, and anything worth checking.",
+                bundle: RockxyLocalization.bundle
+            )
         case .explainFailure:
-            String(localized: "Trace the status, response headers, timing, and nearby failures.")
+            String(
+                localized: "Trace the status, response headers, timing, and nearby failures.",
+                bundle: RockxyLocalization.bundle
+            )
         case .compareWithSuccess:
-            String(localized: "Find the closest successful request and compare captured evidence.")
+            String(
+                localized: "Find the closest successful request and compare captured evidence.",
+                bundle: RockxyLocalization.bundle
+            )
         case .checkAuthentication:
-            String(localized: "Review credential presence and authentication response signals.")
+            String(
+                localized: "Review credential presence and authentication response signals.",
+                bundle: RockxyLocalization.bundle
+            )
         case .prepareBugReport:
-            String(localized: "Summarize reproducible evidence without exposing captured secrets.")
+            String(
+                localized: "Summarize reproducible evidence without exposing captured secrets.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -58,15 +73,18 @@ enum DebugAssistantRecipe: String, CaseIterable, Identifiable {
     var prompt: String {
         switch self {
         case .explainRequest:
-            String(localized: "Explain what this request does and whether anything looks unusual.")
+            String(
+                localized: "Explain what this request does and whether anything looks unusual.",
+                bundle: RockxyLocalization.bundle
+            )
         case .explainFailure:
-            String(localized: "Why did this request fail?")
+            String(localized: "Why did this request fail?", bundle: RockxyLocalization.bundle)
         case .compareWithSuccess:
-            String(localized: "Compare this with the last successful request.")
+            String(localized: "Compare this with the last successful request.", bundle: RockxyLocalization.bundle)
         case .checkAuthentication:
-            String(localized: "Do you see an authentication problem here?")
+            String(localized: "Do you see an authentication problem here?", bundle: RockxyLocalization.bundle)
         case .prepareBugReport:
-            String(localized: "Turn this traffic into a concise bug report.")
+            String(localized: "Turn this traffic into a concise bug report.", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -239,10 +257,14 @@ struct DebugAssistantConversationContext: Equatable {
 
     var summary: String {
         if requestedSelectionCount == selectedTransactionIDs.count {
-            return String(localized: "\(selectedTransactionIDs.count) selected request(s)")
+            return String(
+                localized: "\(selectedTransactionIDs.count) selected request(s)",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return String(
-            localized: "\(selectedTransactionIDs.count) of \(requestedSelectionCount) selected request(s)"
+            localized: "\(selectedTransactionIDs.count) of \(requestedSelectionCount) selected request(s)",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -311,7 +333,7 @@ struct DebugAssistantConversation: Identifiable, Equatable {
 
     var preview: String {
         messages.last(where: { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.text
-            ?? String(localized: "No messages yet")
+            ?? String(localized: "No messages yet", bundle: RockxyLocalization.bundle)
     }
 
     var retainedTextBytes: Int {
@@ -340,10 +362,10 @@ enum InvestigationEvidenceKind: String, CaseIterable, Codable {
 
     var title: String {
         switch self {
-        case .observed: String(localized: "Observed")
-        case .derived: String(localized: "Derived")
-        case .inferred: String(localized: "Inferred")
-        case .unknown: String(localized: "Unknown")
+        case .observed: String(localized: "Observed", bundle: RockxyLocalization.bundle)
+        case .derived: String(localized: "Derived", bundle: RockxyLocalization.bundle)
+        case .inferred: String(localized: "Inferred", bundle: RockxyLocalization.bundle)
+        case .unknown: String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         }
     }
 }

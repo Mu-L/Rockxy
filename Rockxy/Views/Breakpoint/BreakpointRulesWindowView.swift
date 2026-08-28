@@ -4,23 +4,27 @@ import SwiftUI
 
 @MainActor @Observable
 final class BreakpointRulesViewModel {
+    // MARK: Lifecycle
+
     init(syncsChanges: Bool = !RockxyIdentity.isRunningTests) {
         self.syncsChanges = syncsChanges
     }
 
-    var selectedRuleID: UUID?
-    var searchText = "" {
-        didSet {
-            reconcileSelection(requireVisible: true)
-        }
-    }
+    // MARK: Internal
 
+    var selectedRuleID: UUID?
     var mutationError: String?
     private(set) var allRules: [ProxyRule] = []
 
     var isBreakpointToolEnabled: Bool = UserDefaults.standard.object(
         forKey: "breakpointToolEnabled"
     ) as? Bool ?? true
+
+    var searchText = "" {
+        didSet {
+            reconcileSelection(requireVisible: true)
+        }
+    }
 
     var breakpointRules: [ProxyRule] {
         allRules.filter {
@@ -154,7 +158,9 @@ final class BreakpointRulesViewModel {
         phaseResponse: Bool,
         includeSubpaths: Bool,
         using gate: RulePolicyGate = .shared
-    ) async -> Bool {
+    )
+        async -> Bool
+    {
         let rule = BreakpointRuleForm.makeRule(
             original: original,
             ruleName: ruleName,
@@ -236,7 +242,7 @@ final class BreakpointRulesViewModel {
             return
         }
         let copy = ProxyRule(
-            name: String(localized: "Copy of \(original.name)"),
+            name: String(localized: "Copy of \(original.name)", bundle: RockxyLocalization.bundle),
             isEnabled: original.isEnabled,
             matchCondition: original.matchCondition,
             action: original.action,
@@ -281,23 +287,23 @@ final class BreakpointRulesViewModel {
     func matchTypeLabel(for rule: ProxyRule) -> String {
         switch BreakpointRuleForm.decode(rule: rule).matchType {
         case .wildcard:
-            String(localized: "Wildcard")
+            String(localized: "Wildcard", bundle: RockxyLocalization.bundle)
         case .regex:
-            String(localized: "Regex")
+            String(localized: "Regex", bundle: RockxyLocalization.bundle)
         }
     }
 
     func phaseLabel(for rule: ProxyRule) -> String {
         guard case let .breakpoint(phase) = rule.action else {
-            return String(localized: "Both")
+            return String(localized: "Both", bundle: RockxyLocalization.bundle)
         }
         switch phase {
         case .request:
-            return String(localized: "Request")
+            return String(localized: "Request", bundle: RockxyLocalization.bundle)
         case .response:
-            return String(localized: "Response")
+            return String(localized: "Response", bundle: RockxyLocalization.bundle)
         case .both:
-            return String(localized: "Request + Response")
+            return String(localized: "Request + Response", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -315,17 +321,24 @@ final class BreakpointRulesViewModel {
         return phase == .response || phase == .both
     }
 
+    // MARK: Private
+
     private let syncsChanges: Bool
     private var pendingRuleSyncTask: Task<Void, Never>?
 
     private var quotaError: String {
-        String(localized: "The active Breakpoint rule limit was reached. Disable another rule and try again.")
+        String(
+            localized: "The active Breakpoint rule limit was reached. Disable another rule and try again.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     @discardableResult
     private func enqueueMutation<Result: Sendable>(
         _ operation: @escaping @MainActor @Sendable () async -> Result
-    ) -> Task<Result, Never> {
+    )
+        -> Task<Result, Never>
+    {
         let previousTask = pendingRuleSyncTask
         let task = Task { @MainActor in
             await previousTask?.value
@@ -357,6 +370,8 @@ final class BreakpointRulesViewModel {
 // MARK: - BreakpointRulesWindowView
 
 struct BreakpointRulesWindowView: View {
+    // MARK: Internal
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -381,13 +396,17 @@ struct BreakpointRulesWindowView: View {
             viewModel.handleRulesDidChange(notification)
         }
         .alert(
-            String(localized: "Breakpoint Rules"),
+            String(localized: "Breakpoint Rules", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { viewModel.mutationError != nil },
-                set: { if !$0 { viewModel.mutationError = nil } }
+                set: {
+                    if !$0 {
+                        viewModel.mutationError = nil
+                    }
+                }
             )
         ) {
-            Button(String(localized: "OK")) { viewModel.mutationError = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { viewModel.mutationError = nil }
         } message: {
             if let mutationError = viewModel.mutationError {
                 Text(mutationError)
@@ -395,9 +414,45 @@ struct BreakpointRulesWindowView: View {
         }
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.openWindow) private var openWindow
     @State private var viewModel = BreakpointRulesViewModel()
+
+    private var enableDisableLabel: String {
+        guard let selectedRule = viewModel.selectedRule else {
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
+        }
+        return selectedRule.isEnabled
+            ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
+    }
+
+    private var footerHint: String {
+        let count = isSearching
+            ? "\(viewModel.filteredBreakpointRules.count) of \(viewModel.ruleCount)"
+            : "\(viewModel.ruleCount)"
+        return String(
+            localized: "\(count) rules  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
+    private var statusText: String {
+        guard viewModel.isBreakpointToolEnabled else {
+            return String(localized: "BREAKPOINTS OFF", bundle: RockxyLocalization.bundle)
+        }
+        return String(localized: "\(viewModel.activeRuleCount) ACTIVE", bundle: RockxyLocalization.bundle)
+    }
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
 
     private var header: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
@@ -406,23 +461,26 @@ struct BreakpointRulesWindowView: View {
                     get: { viewModel.isBreakpointToolEnabled },
                     set: { viewModel.setBreakpointToolEnabled($0) }
                 )) {
-                    Text(String(localized: "Enable Breakpoint Tool"))
+                    Text(String(localized: "Enable Breakpoint Tool", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .medium))
                 }
                 .toggleStyle(.checkbox)
 
-                Text(String(localized: "Pause matching traffic before it continues through the proxy."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Pause matching traffic before it continues through the proxy.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Breakpoint rules"))
+                .accessibilityLabel(String(localized: "Search Breakpoint rules", bundle: RockxyLocalization.bundle))
                 .keyboardShortcut("f", modifiers: .command)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -441,7 +499,7 @@ struct BreakpointRulesWindowView: View {
                     """
                     The first enabled rule that matches pauses the request, response, or both. \
                     Disabling a rule affects future matches; traffic already waiting remains in the Breakpoint Queue.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -456,7 +514,7 @@ struct BreakpointRulesWindowView: View {
 
     private var tableContent: some View {
         Table(viewModel.filteredBreakpointRules, selection: $viewModel.selectedRuleID) {
-            TableColumn(String(localized: "Enabled")) { rule in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
                 HStack {
                     Spacer()
                     Toggle("", isOn: Binding(
@@ -467,16 +525,16 @@ struct BreakpointRulesWindowView: View {
                     .labelsHidden()
                     .accessibilityLabel(
                         rule.isEnabled
-                            ? String(localized: "Disable \(rule.name)")
-                            : String(localized: "Enable \(rule.name)")
+                            ? String(localized: "Disable \(rule.name)", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Enable \(rule.name)", bundle: RockxyLocalization.bundle)
                     )
                     Spacer()
                 }
             }
             .width(72)
 
-            TableColumn(String(localized: "Name")) { rule in
-                Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
+            TableColumn(String(localized: "Name", bundle: RockxyLocalization.bundle)) { rule in
+                Text(rule.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : rule.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .opacity(rule.isEnabled ? 1 : 0.5)
@@ -484,21 +542,21 @@ struct BreakpointRulesWindowView: View {
             }
             .width(min: 170, ideal: 220)
 
-            TableColumn(String(localized: "Method")) { rule in
+            TableColumn(String(localized: "Method", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.methodLabel(for: rule))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1 : 0.5)
             }
             .width(82)
 
-            TableColumn(String(localized: "Match Type")) { rule in
+            TableColumn(String(localized: "Match Type", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.matchTypeLabel(for: rule))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1 : 0.5)
             }
             .width(92)
 
-            TableColumn(String(localized: "Matching Rule")) { rule in
+            TableColumn(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.matchingRuleLabel(for: rule))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -507,7 +565,7 @@ struct BreakpointRulesWindowView: View {
             }
             .width(min: 280, ideal: 420)
 
-            TableColumn(String(localized: "Pause Phase")) { rule in
+            TableColumn(String(localized: "Pause Phase", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.phaseLabel(for: rule))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1 : 0.5)
@@ -518,7 +576,8 @@ struct BreakpointRulesWindowView: View {
             tableContextMenu(ids: ids)
         } primaryAction: { ids in
             guard let id = ids.first,
-                  let rule = viewModel.breakpointRules.first(where: { $0.id == id }) else {
+                  let rule = viewModel.breakpointRules.first(where: { $0.id == id }) else
+            {
                 return
             }
             openEditor(for: rule)
@@ -527,13 +586,19 @@ struct BreakpointRulesWindowView: View {
             if viewModel.filteredBreakpointRules.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No Matching Breakpoint Rules")
-                        : String(localized: "No Breakpoint Rules"),
+                        ? String(localized: "No Matching Breakpoint Rules", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Breakpoint Rules", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "pause.circle",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different name, method, phase, or URL pattern.")
-                            : String(localized: "Click + or create a rule from captured traffic.")
+                            ? String(
+                                localized: "Try a different name, method, phase, or URL pattern.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Click + or create a rule from captured traffic.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -561,11 +626,11 @@ struct BreakpointRulesWindowView: View {
 
             Spacer()
 
-            Button(String(localized: "Open Queue")) {
+            Button(String(localized: "Open Queue", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpoints")
             }
 
-            Button(String(localized: "Templates…")) {
+            Button(String(localized: "Templates…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointTemplates")
             }
             .keyboardShortcut("t", modifiers: .command)
@@ -590,7 +655,7 @@ struct BreakpointRulesWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .accessibilityLabel(String(localized: "New Breakpoint rule"))
+            .accessibilityLabel(String(localized: "New Breakpoint rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor))
@@ -607,7 +672,7 @@ struct BreakpointRulesWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
-            .accessibilityLabel(String(localized: "Delete selected Breakpoint rule"))
+            .accessibilityLabel(String(localized: "Delete selected Breakpoint rule", bundle: RockxyLocalization.bundle))
         }
         .foregroundStyle(.primary)
         .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
@@ -621,12 +686,12 @@ struct BreakpointRulesWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New Rule")) {
+            Button(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) {
                 openNewEditor()
             }
             .keyboardShortcut("n", modifiers: .command)
 
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.selectedRule {
                     openEditor(for: rule)
                 }
@@ -634,7 +699,7 @@ struct BreakpointRulesWindowView: View {
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRule == nil)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 if let id = viewModel.selectedRuleID {
                     viewModel.duplicateRule(id: id)
                 }
@@ -651,14 +716,14 @@ struct BreakpointRulesWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Delete Rule"), role: .destructive) {
+            Button(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -676,58 +741,27 @@ struct BreakpointRulesWindowView: View {
             .rockxyChipStyle(isActive: viewModel.isBreakpointToolEnabled)
     }
 
-    private var enableDisableLabel: String {
-        guard let selectedRule = viewModel.selectedRule else {
-            return String(localized: "Enable Rule")
-        }
-        return selectedRule.isEnabled
-            ? String(localized: "Disable Rule")
-            : String(localized: "Enable Rule")
-    }
-
-    private var footerHint: String {
-        let count = isSearching
-            ? "\(viewModel.filteredBreakpointRules.count) of \(viewModel.ruleCount)"
-            : "\(viewModel.ruleCount)"
-        return String(localized: "\(count) rules  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete")
-    }
-
-    private var statusText: String {
-        guard viewModel.isBreakpointToolEnabled else {
-            return String(localized: "BREAKPOINTS OFF")
-        }
-        return String(localized: "\(viewModel.activeRuleCount) ACTIVE")
-    }
-
-    private var isSearching: Bool {
-        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first {
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.breakpointRules.first(where: { $0.id == id }) {
                     openEditor(for: rule)
                 }
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRuleID = id
                 viewModel.duplicateRule(id: id)
             }
             Button(
                 viewModel.breakpointRules.first(where: { $0.id == id })?.isEnabled == true
-                    ? String(localized: "Disable Rule")
-                    : String(localized: "Enable Rule")
+                    ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
             ) {
                 viewModel.toggleRule(id: id)
             }
             Divider()
-            Button(String(localized: "Delete Rule"), role: .destructive) {
+            Button(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeRule(id: id)
             }
         }

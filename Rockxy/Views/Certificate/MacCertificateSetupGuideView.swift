@@ -39,7 +39,7 @@ struct MacCertificateSetupGuideView: View {
             }
             Task { await refreshStatus(validate: true) }
         }
-        .alert(String(localized: "Certificate Setup Failed"), isPresented: Binding(
+        .alert(String(localized: "Certificate Setup Failed", bundle: RockxyLocalization.bundle), isPresented: Binding(
             get: { errorMessage != nil },
             set: {
                 if !$0 {
@@ -47,7 +47,7 @@ struct MacCertificateSetupGuideView: View {
                 }
             }
         )) {
-            Button(String(localized: "OK"), role: .cancel) {}
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }
@@ -68,9 +68,9 @@ struct MacCertificateSetupGuideView: View {
         var title: String {
             switch self {
             case .automatic:
-                String(localized: "Automatic")
+                String(localized: "Automatic", bundle: RockxyLocalization.bundle)
             case .manual:
-                String(localized: "Manual")
+                String(localized: "Manual", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -85,11 +85,11 @@ struct MacCertificateSetupGuideView: View {
         var statusMessage: String {
             switch self {
             case .generating:
-                String(localized: "Generating the Rockxy certificate…")
+                String(localized: "Generating the Rockxy certificate…", bundle: RockxyLocalization.bundle)
             case .installing:
-                String(localized: "Installing and trusting the certificate…")
+                String(localized: "Installing and trusting the certificate…", bundle: RockxyLocalization.bundle)
             case .checking:
-                String(localized: "Checking certificate trust…")
+                String(localized: "Checking certificate trust…", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -114,13 +114,13 @@ struct MacCertificateSetupGuideView: View {
     private var primaryActionTitle: String {
         switch currentState {
         case .missing:
-            String(localized: "Generate, Install & Trust")
+            String(localized: "Generate, Install & Trust", bundle: RockxyLocalization.bundle)
         case .generatedOnly:
-            String(localized: "Install & Trust")
+            String(localized: "Install & Trust", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "Repair Trust")
+            String(localized: "Repair Trust", bundle: RockxyLocalization.bundle)
         case .installedAndTrusted:
-            String(localized: "Installed & Trusted")
+            String(localized: "Installed & Trusted", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -130,11 +130,11 @@ struct MacCertificateSetupGuideView: View {
 
     private var systemValidationText: String {
         guard let snapshot, snapshot.hasTrustSettings else {
-            return String(localized: "Not Checked")
+            return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
         }
         return snapshot.isSystemTrustValidated
-            ? String(localized: "Passed")
-            : String(localized: "Failed")
+            ? String(localized: "Passed", bundle: RockxyLocalization.bundle)
+            : String(localized: "Failed", bundle: RockxyLocalization.bundle)
     }
 
     private var systemValidationColor: Color {
@@ -160,7 +160,8 @@ struct MacCertificateSetupGuideView: View {
         }
         if expiryDate < Date() {
             return String(
-                localized: "This certificate has expired. Generate and trust a new certificate to restore HTTPS interception."
+                localized: "This certificate has expired. Generate and trust a new certificate to restore HTTPS interception.",
+                bundle: RockxyLocalization.bundle
             )
         }
         let daysRemaining = Int(expiryDate.timeIntervalSinceNow / (24 * 3_600))
@@ -168,7 +169,8 @@ struct MacCertificateSetupGuideView: View {
             return nil
         }
         return String(
-            localized: "This certificate expires in \(daysRemaining) days. Replace it soon to avoid interrupting HTTPS interception."
+            localized: "This certificate expires in \(daysRemaining) days. Replace it soon to avoid interrupting HTTPS interception.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -238,11 +240,11 @@ struct MacCertificateSetupGuideView: View {
                 .fixedSize()
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .accessibilityLabel(String(localized: "Setup Mode"))
+        .accessibilityLabel(String(localized: "Setup Mode", bundle: RockxyLocalization.bundle))
     }
 
     private var modePickerBase: some View {
-        Picker(String(localized: "Setup Mode"), selection: $selectedTab) {
+        Picker(String(localized: "Setup Mode", bundle: RockxyLocalization.bundle), selection: $selectedTab) {
             ForEach(Tab.allCases) { tab in
                 Text(tab.title).tag(tab)
             }
@@ -281,11 +283,14 @@ struct MacCertificateSetupGuideView: View {
                     .frame(width: statusIconSize, height: statusIconSize)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Checking Certificate"))
+                    Text(String(localized: "Checking Certificate", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .semibold))
-                    Text(String(localized: "Reading the certificate, Keychain, and macOS trust state."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "Reading the certificate, Keychain, and macOS trust state.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -331,8 +336,11 @@ struct MacCertificateSetupGuideView: View {
                 }
                 .padding(6)
             } label: {
-                Label(String(localized: "Certificate Readiness"), systemImage: "checkmark.shield")
-                    .font(toolMetrics.font(weight: .semibold))
+                Label(
+                    String(localized: "Certificate Readiness", bundle: RockxyLocalization.bundle),
+                    systemImage: "checkmark.shield"
+                )
+                .font(toolMetrics.font(weight: .semibold))
             }
 
             if snapshot?.hasGeneratedCertificate == true {
@@ -341,8 +349,11 @@ struct MacCertificateSetupGuideView: View {
                         .padding(6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } label: {
-                    Label(String(localized: "Certificate Details"), systemImage: "info.circle")
-                        .font(toolMetrics.font(weight: .semibold))
+                    Label(
+                        String(localized: "Certificate Details", bundle: RockxyLocalization.bundle),
+                        systemImage: "info.circle"
+                    )
+                    .font(toolMetrics.font(weight: .semibold))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -383,7 +394,7 @@ struct MacCertificateSetupGuideView: View {
         Button {
             Task { await recheckStatus() }
         } label: {
-            Label(String(localized: "Recheck"), systemImage: "arrow.clockwise")
+            Label(String(localized: "Recheck", bundle: RockxyLocalization.bundle), systemImage: "arrow.clockwise")
         }
         .disabled(activeOperation != nil)
     }
@@ -398,28 +409,28 @@ struct MacCertificateSetupGuideView: View {
     private var diagnosticsGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
             diagnosticRow(
-                label: String(localized: "Certificate"),
+                label: String(localized: "Certificate", bundle: RockxyLocalization.bundle),
                 value: snapshot?.hasGeneratedCertificate == true
-                    ? String(localized: "Generated")
-                    : String(localized: "Not Generated"),
+                    ? String(localized: "Generated", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Not Generated", bundle: RockxyLocalization.bundle),
                 isComplete: snapshot?.hasGeneratedCertificate == true
             )
             diagnosticRow(
-                label: String(localized: "Keychain"),
+                label: String(localized: "Keychain", bundle: RockxyLocalization.bundle),
                 value: snapshot?.isInstalledInKeychain == true
-                    ? String(localized: "Installed")
-                    : String(localized: "Not Installed"),
+                    ? String(localized: "Installed", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Not Installed", bundle: RockxyLocalization.bundle),
                 isComplete: snapshot?.isInstalledInKeychain == true
             )
             diagnosticRow(
-                label: String(localized: "Trust Settings"),
+                label: String(localized: "Trust Settings", bundle: RockxyLocalization.bundle),
                 value: snapshot?.hasTrustSettings == true
-                    ? String(localized: "Present")
-                    : String(localized: "Missing"),
+                    ? String(localized: "Present", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Missing", bundle: RockxyLocalization.bundle),
                 isComplete: snapshot?.hasTrustSettings == true
             )
             diagnosticRow(
-                label: String(localized: "TLS Validation"),
+                label: String(localized: "TLS Validation", bundle: RockxyLocalization.bundle),
                 value: systemValidationText,
                 isComplete: snapshot?.isSystemTrustValidated == true,
                 color: systemValidationColor
@@ -436,7 +447,8 @@ struct MacCertificateSetupGuideView: View {
         {
             let message = snapshot.lastValidationErrorMessage
                 ?? String(
-                    localized: "Trust settings exist, but macOS TLS validation still fails. Repair trust, then recheck the certificate."
+                    localized: "Trust settings exist, but macOS TLS validation still fails. Repair trust, then recheck the certificate.",
+                    bundle: RockxyLocalization.bundle
                 )
             callout(
                 message: message,
@@ -450,20 +462,20 @@ struct MacCertificateSetupGuideView: View {
         VStack(alignment: .leading, spacing: 10) {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
                 detailRow(
-                    label: String(localized: "Common Name"),
+                    label: String(localized: "Common Name", bundle: RockxyLocalization.bundle),
                     value: snapshot?.commonName ?? "—"
                 )
                 detailRow(
-                    label: String(localized: "Valid From"),
+                    label: String(localized: "Valid From", bundle: RockxyLocalization.bundle),
                     value: snapshot?.notValidBefore?.formatted(date: .abbreviated, time: .omitted) ?? "—"
                 )
                 detailRow(
-                    label: String(localized: "Valid Until"),
+                    label: String(localized: "Valid Until", bundle: RockxyLocalization.bundle),
                     value: snapshot?.notValidAfter?.formatted(date: .abbreviated, time: .omitted) ?? "—",
                     color: expiryColor
                 )
                 detailRow(
-                    label: String(localized: "SHA-256"),
+                    label: String(localized: "SHA-256", bundle: RockxyLocalization.bundle),
                     value: truncatedFingerprint,
                     monospaced: true,
                     accessibilityValue: snapshot?.fingerprintSHA256
@@ -517,8 +529,11 @@ struct MacCertificateSetupGuideView: View {
                 }
                 .padding(6)
             } label: {
-                Label(String(localized: "Current Status"), systemImage: "gauge.with.dots.needle.67percent")
-                    .font(toolMetrics.font(weight: .semibold))
+                Label(
+                    String(localized: "Current Status", bundle: RockxyLocalization.bundle),
+                    systemImage: "gauge.with.dots.needle.67percent"
+                )
+                .font(toolMetrics.font(weight: .semibold))
             }
 
             GroupBox {
@@ -526,11 +541,18 @@ struct MacCertificateSetupGuideView: View {
                     manualStep(
                         number: 1,
                         isComplete: snapshot?.isInstalledInKeychain == true,
-                        title: String(localized: "Add the Rockxy CA to the System keychain"),
+                        title: String(
+                            localized: "Add the Rockxy CA to the System keychain",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         lines: [
-                            String(localized: "Generate the certificate if needed, then export it as a PEM file."),
                             String(
-                                localized: "Open Keychain Access, choose System under System Keychains, and drag the PEM into the certificate list."
+                                localized: "Generate the certificate if needed, then export it as a PEM file.",
+                                bundle: RockxyLocalization.bundle
+                            ),
+                            String(
+                                localized: "Open Keychain Access, choose System under System Keychains, and drag the PEM into the certificate list.",
+                                bundle: RockxyLocalization.bundle
                             )
                         ]
                     )
@@ -550,13 +572,15 @@ struct MacCertificateSetupGuideView: View {
                     manualStep(
                         number: 2,
                         isComplete: snapshot?.isSystemTrustValidated == true,
-                        title: String(localized: "Trust the certificate"),
+                        title: String(localized: "Trust the certificate", bundle: RockxyLocalization.bundle),
                         lines: [
                             String(
-                                localized: "Search for Rockxy CA, open the certificate, and expand Trust."
+                                localized: "Search for Rockxy CA, open the certificate, and expand Trust.",
+                                bundle: RockxyLocalization.bundle
                             ),
                             String(
-                                localized: "Set When using this certificate to Always Trust, then close the window and approve the change."
+                                localized: "Set When using this certificate to Always Trust, then close the window and approve the change.",
+                                bundle: RockxyLocalization.bundle
                             )
                         ]
                     )
@@ -571,7 +595,8 @@ struct MacCertificateSetupGuideView: View {
                         callout(
                             message: snapshot.lastValidationErrorMessage
                                 ?? String(
-                                    localized: "macOS still rejects the certificate. Confirm the trust setting, then recheck."
+                                    localized: "macOS still rejects the certificate. Confirm the trust setting, then recheck.",
+                                    bundle: RockxyLocalization.bundle
                                 ),
                             systemImage: "exclamationmark.triangle.fill",
                             color: .red
@@ -581,7 +606,7 @@ struct MacCertificateSetupGuideView: View {
                 }
                 .padding(6)
             } label: {
-                Label(String(localized: "Keychain Access"), systemImage: "key")
+                Label(String(localized: "Keychain Access", bundle: RockxyLocalization.bundle), systemImage: "key")
                     .font(toolMetrics.font(weight: .semibold))
             }
 
@@ -589,7 +614,7 @@ struct MacCertificateSetupGuideView: View {
                 terminalAlternative
                     .padding(6)
             } label: {
-                Label(String(localized: "Terminal"), systemImage: "terminal")
+                Label(String(localized: "Terminal", bundle: RockxyLocalization.bundle), systemImage: "terminal")
                     .font(toolMetrics.font(weight: .semibold))
             }
         }
@@ -602,7 +627,10 @@ struct MacCertificateSetupGuideView: View {
             Button {
                 Task { await generateCertificate() }
             } label: {
-                Label(String(localized: "Generate Certificate"), systemImage: "plus.circle")
+                Label(
+                    String(localized: "Generate Certificate", bundle: RockxyLocalization.bundle),
+                    systemImage: "plus.circle"
+                )
             }
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(activeOperation != nil || !hasLoadedSnapshot)
@@ -615,7 +643,7 @@ struct MacCertificateSetupGuideView: View {
         Button {
             Task { await recheckStatus() }
         } label: {
-            Label(String(localized: "Recheck"), systemImage: "arrow.clockwise")
+            Label(String(localized: "Recheck", bundle: RockxyLocalization.bundle), systemImage: "arrow.clockwise")
         }
         .disabled(activeOperation != nil || !hasLoadedSnapshot)
     }
@@ -624,17 +652,21 @@ struct MacCertificateSetupGuideView: View {
         Button {
             openKeychainAccess()
         } label: {
-            Label(String(localized: "Open Keychain Access"), systemImage: "arrow.up.forward.app")
+            Label(
+                String(localized: "Open Keychain Access", bundle: RockxyLocalization.bundle),
+                systemImage: "arrow.up.forward.app"
+            )
         }
     }
 
     private var terminalAlternative: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Trust with Terminal"))
+            Text(String(localized: "Trust with Terminal", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
             Text(
                 String(
-                    localized: "Use this command if you prefer Terminal or Keychain Access cannot complete the trust change."
+                    localized: "Use this command if you prefer Terminal or Keychain Access cannot complete the trust change.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -645,7 +677,8 @@ struct MacCertificateSetupGuideView: View {
 
             Text(
                 String(
-                    localized: "Automatically trusts the Rockxy CA in your System keychain. Administrator approval is required."
+                    localized: "Automatically trusts the Rockxy CA in your System keychain. Administrator approval is required.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.metadataFont())
@@ -653,7 +686,7 @@ struct MacCertificateSetupGuideView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: toolMetrics.controlSpacing) {
-                Button(String(localized: "Copy")) {
+                Button(String(localized: "Copy", bundle: RockxyLocalization.bundle)) {
                     copyManualTrustCommand()
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
@@ -676,17 +709,20 @@ struct MacCertificateSetupGuideView: View {
         Button {
             CertificateExportPanelPresenter().export(format: .rootCertificatePEM)
         } label: {
-            Label(String(localized: "Export PEM"), systemImage: "square.and.arrow.up")
+            Label(
+                String(localized: "Export PEM", bundle: RockxyLocalization.bundle),
+                systemImage: "square.and.arrow.up"
+            )
         }
         .disabled(activeOperation != nil || snapshot?.hasGeneratedCertificate != true)
-        .help(String(localized: "Save the public Rockxy root CA as a PEM file"))
+        .help(String(localized: "Save the public Rockxy root CA as a PEM file", bundle: RockxyLocalization.bundle))
     }
 
     private var manageCertificatesButton: some View {
-        Button(String(localized: "Manage Certificates")) {
+        Button(String(localized: "Manage Certificates", bundle: RockxyLocalization.bundle)) {
             openGeneralSettings()
         }
-        .help(String(localized: "Open certificate management in General settings"))
+        .help(String(localized: "Open certificate management in General settings", bundle: RockxyLocalization.bundle))
     }
 
     private func diagnosticRow(
@@ -797,7 +833,7 @@ struct MacCertificateSetupGuideView: View {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
-        .accessibilityLabel(String(localized: "Manual trust command"))
+        .accessibilityLabel(String(localized: "Manual trust command", bundle: RockxyLocalization.bundle))
         .accessibilityValue(command)
     }
 
@@ -811,7 +847,7 @@ struct MacCertificateSetupGuideView: View {
     private func copyManualTrustCommand() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(manualTrustCommand, forType: .string)
-        manualTrustCopyMessage = String(localized: "Copied.")
+        manualTrustCopyMessage = String(localized: "Copied.", bundle: RockxyLocalization.bundle)
     }
 
     private func openGeneralSettings() {
@@ -825,7 +861,7 @@ struct MacCertificateSetupGuideView: View {
         ),
             NSWorkspace.shared.open(url) else
         {
-            errorMessage = String(localized: "Keychain Access is unavailable.")
+            errorMessage = String(localized: "Keychain Access is unavailable.", bundle: RockxyLocalization.bundle)
             return
         }
     }

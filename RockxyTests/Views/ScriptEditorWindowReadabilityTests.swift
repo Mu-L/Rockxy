@@ -25,18 +25,18 @@ struct ScriptEditorWindowReadabilityTests {
         // Compact matching GroupBox + resizable code/console HSplitView (not a fixed 230 panel).
         #expect(source.contains("GroupBox"))
         #expect(source.contains("HSplitView"))
-        #expect(source.contains("String(localized: \"Matching Configuration\")"))
+        #expect(source.contains("String(localized: \"Matching Configuration\", bundle: RockxyLocalization.bundle)"))
         #expect(!source.contains(".frame(width: 230)"))
-        #expect(!source.contains("String(localized: \"Matching Rule\")"))
+        #expect(!source.contains("String(localized: \"Matching Rule\", bundle: RockxyLocalization.bundle)"))
 
         // Explicit native unavailable/loading states for the intent-dependent window.
         #expect(source.contains("ContentUnavailableView"))
         #expect(source.contains("case .awaitingIntent"))
-        #expect(source.contains("String(localized: \"No Script Loaded\")"))
+        #expect(source.contains("String(localized: \"No Script Loaded\", bundle: RockxyLocalization.bundle)"))
         #expect(source.contains("viewModel.requestLoad(intent:"))
 
         // User-directed Test URL / Test Match; invalid regex is surfaced honestly.
-        #expect(source.contains("String(localized: \"Test URL\")"))
+        #expect(source.contains("String(localized: \"Test URL\", bundle: RockxyLocalization.bundle)"))
         #expect(source.contains("Text(\"Test Match\")"))
         #expect(source.contains("viewModel.runRuleTest()"))
         #expect(!source.contains("Test your Rule"))
@@ -49,7 +49,9 @@ struct ScriptEditorWindowReadabilityTests {
         #expect(source.contains("viewModel.setRunOnRequest($0)"))
 
         // Save & Activate is the clear primary action with a truthful (label-free) shortcut.
-        #expect(source.contains("footerActionLabel(String(localized: \"Save & Activate\"), weight: .semibold)"))
+        #expect(source.contains("footerActionLabel("))
+        #expect(source.contains("localized: \"Save & Activate\""))
+        #expect(source.contains("weight: .semibold"))
         #expect(source.contains(".rockxyGlassButtonStyle(prominent: true)"))
         #expect(!source.contains("Save & Activate ⌘S"))
         #expect(source.contains(#".keyboardShortcut("s", modifiers: .command)"#))
@@ -57,15 +59,16 @@ struct ScriptEditorWindowReadabilityTests {
         #expect(source.contains(#".keyboardShortcut("c", modifiers: [.command, .shift])"#))
 
         // Truthful editing helpers, no fictional templates.
-        #expect(source.contains("footerActionLabel(String(localized: \"Beautify\"))"))
+        #expect(source
+            .contains("footerActionLabel(String(localized: \"Beautify\", bundle: RockxyLocalization.bundle))"))
         #expect(source.contains("viewModel.insertHeaderExample()"))
         #expect(!source.contains("Snippet Code"))
 
         // Three-way unsaved-changes decision + destructive reset confirmation.
         #expect(source.contains(".confirmationDialog("))
-        #expect(source.contains("String(localized: \"Save & Switch\")"))
-        #expect(source.contains("String(localized: \"Discard Changes\")"))
-        #expect(source.contains("String(localized: \"Reset Shared State\")"))
+        #expect(source.contains("String(localized: \"Save & Switch\", bundle: RockxyLocalization.bundle)"))
+        #expect(source.contains("String(localized: \"Discard Changes\", bundle: RockxyLocalization.bundle)"))
+        #expect(source.contains("String(localized: \"Reset Shared State\", bundle: RockxyLocalization.bundle)"))
         #expect(source.contains("isShowingResetConfirmation"))
 
         // Every dead-end / no-op affordance is gone.
@@ -87,11 +90,17 @@ struct ScriptEditorWindowReadabilityTests {
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
 
         let sceneStart = try #require(
-            appSource.range(of: "Window(String(localized: \"Script Editor\"), id: \"scriptEditor\")")
+            appSource
+                .range(
+                    of: "String(localized: \"Script Editor\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let scenesAfter = appSource[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Inspector Preview Tabs\"), id: \"bodyPreviewerTabs\")")
+            scenesAfter
+                .range(
+                    of: "String(localized: \"Inspector Preview Tabs\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
 

@@ -16,9 +16,12 @@ enum CharlesSSLImporter {
         var errorDescription: String? {
             switch self {
             case .invalidFormat:
-                String(localized: "The file is not a valid Charles Proxy SSL settings export.")
+                String(
+                    localized: "The file is not a valid Charles Proxy SSL settings export.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .noLocationsFound:
-                String(localized: "No SSL proxy locations found in the file.")
+                String(localized: "No SSL proxy locations found in the file.", bundle: RockxyLocalization.bundle)
             }
         }
     }

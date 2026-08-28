@@ -129,7 +129,9 @@ struct DeveloperSetupGuideCatalogTests {
     @Test("Flutter guide explains local validation does not attribute the emitting runtime")
     func flutterGuideValidationCopyIsSpecificAboutAttributionLimits() throws {
         let guide = try #require(DeveloperSetupGuideCatalog.content(for: .flutter))
-        let validationMessages = guide.validationTips.map(\.message).joined(separator: " ")
+        let validationMessages = guide.validationTips
+            .map { String(localized: $0.message) }
+            .joined(separator: " ")
 
         #expect(validationMessages.contains("validates the proxy path"))
         #expect(validationMessages.contains("device, emulator, simulator"))
@@ -193,7 +195,8 @@ struct DeveloperSetupGuideCatalogTests {
             #expect(target.manualSummary.contains("httpbin.org") == false)
 
             if let guide = DeveloperSetupGuideCatalog.content(for: target.id) {
-                let messages = (guide.setupTips + guide.validationTips + guide.troubleshootingTips).map(\.message)
+                let messages = (guide.setupTips + guide.validationTips + guide.troubleshootingTips)
+                    .map { String(localized: $0.message) }
                 #expect(messages.contains(where: { $0.contains("httpbin.org") }) == false)
             }
         }
@@ -274,11 +277,13 @@ struct DeveloperSetupGuideCatalogTests {
         let guide = try #require(DeveloperSetupGuideCatalog.content(for: .androidEmulator))
 
         #expect(
-            guide.setupTips.contains(where: { $0.message.contains("10.0.2.2") }),
+            guide.setupTips.contains(where: { String(localized: $0.message).contains("10.0.2.2") }),
             "Emulator guide must mention 10.0.2.2"
         )
         #expect(
-            guide.setupTips.contains(where: { $0.message.contains("network-security-config") }),
+            guide.setupTips.contains(where: {
+                String(localized: $0.message).contains("network-security-config")
+            }),
             "Emulator guide must mention network-security-config"
         )
     }
@@ -288,7 +293,7 @@ struct DeveloperSetupGuideCatalogTests {
         let guide = try #require(DeveloperSetupGuideCatalog.content(for: .iosSimulator))
 
         let anyTipMentionsRelaunch = (guide.setupTips + guide.validationTips).contains { tip in
-            let lowercase = tip.message.lowercased()
+            let lowercase = String(localized: tip.message).lowercased()
             return lowercase.contains("reinstall") || lowercase.contains("cold-launch") || lowercase
                 .contains("relaunch")
         }
@@ -301,9 +306,9 @@ struct DeveloperSetupGuideCatalogTests {
         let simulatorGuide = try #require(DeveloperSetupGuideCatalog.content(for: .iosSimulator))
         let combinedTips = deviceGuide.setupTips + simulatorGuide.setupTips
 
-        #expect(combinedTips.contains(where: { $0.message.contains("Developer Setup") }))
-        #expect(combinedTips.contains(where: { $0.message.contains("Share Certificate") }))
-        #expect(!combinedTips.contains(where: { $0.message.contains("certificate panel") }))
+        #expect(combinedTips.contains(where: { String(localized: $0.message).contains("Developer Setup") }))
+        #expect(combinedTips.contains(where: { String(localized: $0.message).contains("Share Certificate") }))
+        #expect(!combinedTips.contains(where: { String(localized: $0.message).contains("certificate panel") }))
     }
 
     @Test("tvOS / watchOS + Vision Pro guides explicitly defer to the iOS paths")
@@ -311,14 +316,15 @@ struct DeveloperSetupGuideCatalogTests {
         let tvOS = try #require(DeveloperSetupGuideCatalog.content(for: .tvOSWatchOS))
         let vision = try #require(DeveloperSetupGuideCatalog.content(for: .visionPro))
 
-        #expect(tvOS.setupTips.contains(where: { $0.message.contains("iOS") }))
-        #expect(vision.setupTips.contains(where: { $0.message.contains("iOS") }))
+        #expect(tvOS.setupTips.contains(where: { String(localized: $0.message).contains("iOS") }))
+        #expect(vision.setupTips.contains(where: { String(localized: $0.message).contains("iOS") }))
     }
 
     @Test("React Native guide pins platform setup and Metro troubleshooting")
     func reactNativeGuidePinsPlatformAndMetroLandmarks() throws {
         let guide = try #require(DeveloperSetupGuideCatalog.content(for: .reactNative))
-        let allMessages = (guide.setupTips + guide.validationTips + guide.troubleshootingTips).map(\.message)
+        let allMessages = (guide.setupTips + guide.validationTips + guide.troubleshootingTips)
+            .map { String(localized: $0.message) }
 
         #expect(allMessages.contains(where: { $0.contains("iOS Device") || $0.contains("iOS") }))
         #expect(allMessages.contains(where: { $0.contains("iOS Simulator") || $0.contains("simulator") }))

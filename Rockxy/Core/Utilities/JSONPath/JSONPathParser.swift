@@ -13,10 +13,14 @@ struct JSONPathExpression: Equatable, Sendable {
     var tailFunction: JSONPathFunctionCall?
 }
 
+// MARK: - JSONPathSegment
+
 enum JSONPathSegment: Equatable, Sendable {
     case child([JSONPathSelector])
     case descendant([JSONPathSelector])
 }
+
+// MARK: - JSONPathSelector
 
 enum JSONPathSelector: Equatable, Sendable {
     case name(String)
@@ -25,6 +29,8 @@ enum JSONPathSelector: Equatable, Sendable {
     case slice(start: Int?, end: Int?, step: Int?)
     case filter(JSONPathFilterExpression)
 }
+
+// MARK: - JSONPathFunctionCall
 
 struct JSONPathFunctionCall: Equatable, Sendable {
     let name: String
@@ -42,6 +48,8 @@ indirect enum JSONPathFilterExpression: Equatable, Sendable {
     case binary(JSONPathFilterExpression, JSONPathBinaryOperator, JSONPathFilterExpression)
 }
 
+// MARK: - JSONPathLiteral
+
 enum JSONPathLiteral: Equatable, Sendable {
     case string(String)
     case number(Double)
@@ -49,6 +57,8 @@ enum JSONPathLiteral: Equatable, Sendable {
     case null
     case regex(pattern: String, options: NSRegularExpression.Options)
 }
+
+// MARK: - JSONPathBinaryOperator
 
 enum JSONPathBinaryOperator: String, Equatable, Sendable {
     case equal
@@ -72,9 +82,7 @@ enum JSONPathBinaryOperator: String, Equatable, Sendable {
 // MARK: - JSONPathParser
 
 struct JSONPathParser {
-    private var tokens: [JSONPathToken]
-    private var index: Int = 0
-    private let limits: JSONPathEvaluationLimits
+    // MARK: Lifecycle
 
     init(tokens: [JSONPathToken], limits: JSONPathEvaluationLimits = .default) {
         self.tokens = tokens
@@ -86,17 +94,35 @@ struct JSONPathParser {
         tokens = try JSONPathLexer(source: source, limits: limits).tokenize()
     }
 
+    // MARK: Internal
+
     mutating func parse() throws -> JSONPathExpression {
         let expression = try parsePathExpression(required: true, depth: 0)
         guard current == .eof else {
-            throw JSONPathError.invalidQuery(String(localized: "Unexpected token at end of query."))
+            throw JSONPathError.invalidQuery(String(
+                localized: "Unexpected token at end of query.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         return expression
     }
 
+    // MARK: Private
+
+    private var tokens: [JSONPathToken]
+    private var index: Int = 0
+    private let limits: JSONPathEvaluationLimits
+
+    private var current: JSONPathToken {
+        tokens[index]
+    }
+
     private mutating func parsePathExpression(required: Bool, depth: Int) throws -> JSONPathExpression {
         guard depth <= limits.maxASTDepth else {
-            throw JSONPathError.limitExceeded(String(localized: "Query is too complex."))
+            throw JSONPathError.limitExceeded(String(
+                localized: "Query is too complex.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         let origin: JSONPathExpression.Origin
@@ -105,9 +131,15 @@ struct JSONPathParser {
         } else if match(.current) {
             origin = .current
         } else if required {
-            throw JSONPathError.invalidQuery(String(localized: "Query must start with $ or @."))
+            throw JSONPathError.invalidQuery(String(
+                localized: "Query must start with $ or @.",
+                bundle: RockxyLocalization.bundle
+            ))
         } else {
-            throw JSONPathError.invalidQuery(String(localized: "Expected path expression."))
+            throw JSONPathError.invalidQuery(String(
+                localized: "Expected path expression.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         var expression = JSONPathExpression(origin: origin, segments: [], tailFunction: nil)
@@ -128,14 +160,17 @@ struct JSONPathParser {
                     expression.segments.append(.descendant([.wildcard]))
                 } else if match(.leftBracket) {
                     let selectors = try parseSelectors(depth: depth + 1)
-                    try consume(.rightBracket, message: String(localized: "Expected ]."))
+                    try consume(
+                        .rightBracket,
+                        message: String(localized: "Expected ].", bundle: RockxyLocalization.bundle)
+                    )
                     expression.segments.append(.descendant(selectors))
                 } else {
-                    expression.segments.append(.descendant([.name(try consumeIdentifier())]))
+                    try expression.segments.append(.descendant([.name(consumeIdentifier())]))
                 }
             } else if match(.leftBracket) {
                 let selectors = try parseSelectors(depth: depth + 1)
-                try consume(.rightBracket, message: String(localized: "Expected ]."))
+                try consume(.rightBracket, message: String(localized: "Expected ].", bundle: RockxyLocalization.bundle))
                 expression.segments.append(.child(selectors))
             } else {
                 break
@@ -147,9 +182,15 @@ struct JSONPathParser {
 
     private mutating func parseSelectors(depth: Int) throws -> [JSONPathSelector] {
         if match(.question) {
-            try consume(.leftParen, message: String(localized: "Expected ( after ?."))
+            try consume(
+                .leftParen,
+                message: String(localized: "Expected ( after ?.", bundle: RockxyLocalization.bundle)
+            )
             let filter = try parseFilterExpression(depth: depth + 1)
-            try consume(.rightParen, message: String(localized: "Expected ) after filter."))
+            try consume(
+                .rightParen,
+                message: String(localized: "Expected ) after filter.", bundle: RockxyLocalization.bundle)
+            )
             return [.filter(filter)]
         }
 
@@ -163,14 +204,17 @@ struct JSONPathParser {
             } else if case let .number(value) = current {
                 advance()
                 if current == .colon {
-                    selectors.append(try parseSlice(start: Int(value), depth: depth))
+                    try selectors.append(parseSlice(start: Int(value), depth: depth))
                 } else {
                     selectors.append(.index(Int(value) ?? 0))
                 }
             } else if match(.colon) {
-                selectors.append(try parseSlice(start: nil, consumedFirstColon: true, depth: depth))
+                try selectors.append(parseSlice(start: nil, consumedFirstColon: true, depth: depth))
             } else {
-                throw JSONPathError.invalidQuery(String(localized: "Invalid bracket selector."))
+                throw JSONPathError.invalidQuery(String(
+                    localized: "Invalid bracket selector.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
         } while match(.comma)
 
@@ -181,16 +225,17 @@ struct JSONPathParser {
         start: Int?,
         consumedFirstColon: Bool = false,
         depth _: Int
-    ) throws -> JSONPathSelector {
+    )
+        throws -> JSONPathSelector
+    {
         if !consumedFirstColon {
-            try consume(.colon, message: String(localized: "Expected : in slice."))
+            try consume(.colon, message: String(localized: "Expected : in slice.", bundle: RockxyLocalization.bundle))
         }
         let end = consumeOptionalInt()
-        let step: Int?
-        if match(.colon) {
-            step = consumeOptionalInt()
+        let step: Int? = if match(.colon) {
+            consumeOptionalInt()
         } else {
-            step = nil
+            nil
         }
         return .slice(start: start, end: end, step: step)
     }
@@ -202,7 +247,7 @@ struct JSONPathParser {
     private mutating func parseOr(depth: Int) throws -> JSONPathFilterExpression {
         var expr = try parseAnd(depth: depth + 1)
         while match(.or) {
-            expr = .binary(expr, .or, try parseAnd(depth: depth + 1))
+            expr = try .binary(expr, .or, parseAnd(depth: depth + 1))
         }
         return expr
     }
@@ -210,7 +255,7 @@ struct JSONPathParser {
     private mutating func parseAnd(depth: Int) throws -> JSONPathFilterExpression {
         var expr = try parseComparison(depth: depth + 1)
         while match(.and) {
-            expr = .binary(expr, .and, try parseComparison(depth: depth + 1))
+            expr = try .binary(expr, .and, parseComparison(depth: depth + 1))
         }
         return expr
     }
@@ -218,14 +263,14 @@ struct JSONPathParser {
     private mutating func parseComparison(depth: Int) throws -> JSONPathFilterExpression {
         var expr = try parseUnary(depth: depth + 1)
         while let op = consumeComparisonOperator() {
-            expr = .binary(expr, op, try parseUnary(depth: depth + 1))
+            expr = try .binary(expr, op, parseUnary(depth: depth + 1))
         }
         return expr
     }
 
     private mutating func parseUnary(depth: Int) throws -> JSONPathFilterExpression {
         if match(.bang) {
-            return .unaryNot(try parseUnary(depth: depth + 1))
+            return try .unaryNot(parseUnary(depth: depth + 1))
         }
         return try parsePrimary(depth: depth + 1)
     }
@@ -234,7 +279,7 @@ struct JSONPathParser {
         switch current {
         case .root,
              .current:
-            return .path(try parsePathExpression(required: true, depth: depth + 1))
+            return try .path(parsePathExpression(required: true, depth: depth + 1))
         case let .string(value):
             advance()
             return .literal(.string(value))
@@ -255,36 +300,39 @@ struct JSONPathParser {
             var values: [JSONPathFilterExpression] = []
             if current != .rightBracket {
                 repeat {
-                    values.append(try parseFilterExpression(depth: depth + 1))
+                    try values.append(parseFilterExpression(depth: depth + 1))
                 } while match(.comma)
             }
-            try consume(.rightBracket, message: String(localized: "Expected ]."))
+            try consume(.rightBracket, message: String(localized: "Expected ].", bundle: RockxyLocalization.bundle))
             return .array(values)
         case let .identifier(name):
             advance()
             if current == .leftParen {
-                return .function(try parseFunctionCall(name: name, depth: depth + 1))
+                return try .function(parseFunctionCall(name: name, depth: depth + 1))
             }
             return .literal(.string(name))
         case .leftParen:
             advance()
             let expr = try parseFilterExpression(depth: depth + 1)
-            try consume(.rightParen, message: String(localized: "Expected )."))
+            try consume(.rightParen, message: String(localized: "Expected ).", bundle: RockxyLocalization.bundle))
             return expr
         default:
-            throw JSONPathError.invalidQuery(String(localized: "Expected expression."))
+            throw JSONPathError.invalidQuery(String(
+                localized: "Expected expression.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
     }
 
     private mutating func parseFunctionCall(name: String, depth: Int) throws -> JSONPathFunctionCall {
-        try consume(.leftParen, message: String(localized: "Expected (."))
+        try consume(.leftParen, message: String(localized: "Expected (.", bundle: RockxyLocalization.bundle))
         var args: [JSONPathFilterExpression] = []
         if current != .rightParen {
             repeat {
-                args.append(try parseFilterExpression(depth: depth + 1))
+                try args.append(parseFilterExpression(depth: depth + 1))
             } while match(.comma)
         }
-        try consume(.rightParen, message: String(localized: "Expected )."))
+        try consume(.rightParen, message: String(localized: "Expected ).", bundle: RockxyLocalization.bundle))
         return JSONPathFunctionCall(name: name, arguments: args)
     }
 
@@ -313,22 +361,25 @@ struct JSONPathParser {
             return .regexMatch
         case let .identifier(name):
             switch name {
-            case "in": advance(); return .in
-            case "nin": advance(); return .nin
-            case "subsetof": advance(); return .subsetof
-            case "anyof": advance(); return .anyof
-            case "noneof": advance(); return .noneof
-            case "size": advance(); return .size
-            case "empty": advance(); return .empty
+            case "in": advance()
+                return .in
+            case "nin": advance()
+                return .nin
+            case "subsetof": advance()
+                return .subsetof
+            case "anyof": advance()
+                return .anyof
+            case "noneof": advance()
+                return .noneof
+            case "size": advance()
+                return .size
+            case "empty": advance()
+                return .empty
             default: return nil
             }
         default:
             return nil
         }
-    }
-
-    private var current: JSONPathToken {
-        tokens[index]
     }
 
     private mutating func advance() {
@@ -351,7 +402,10 @@ struct JSONPathParser {
 
     private mutating func consumeIdentifier() throws -> String {
         guard case let .identifier(value) = current else {
-            throw JSONPathError.invalidQuery(String(localized: "Expected identifier."))
+            throw JSONPathError.invalidQuery(String(
+                localized: "Expected identifier.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         advance()
         return value

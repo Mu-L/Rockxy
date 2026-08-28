@@ -19,12 +19,13 @@ struct BypassProxySettingsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-                Text(String(localized: "TLS Passthrough Exceptions"))
+                Text(String(localized: "TLS Passthrough Exceptions", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
                 Text(
                     String(
-                        localized: "These hosts always stay encrypted when they pass through Rockxy. They do not bypass the proxy."
+                        localized: "These hosts always stay encrypted when they pass through Rockxy. They do not bypass the proxy.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -43,10 +44,13 @@ struct BypassProxySettingsSheet: View {
                         validationError = nil
                     }
 
-                Text(String(localized: "Enter one host pattern per line. Use * for all hosts or *.domain.com for subdomains."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Enter one host pattern per line. Use * for all hosts or *.domain.com for subdomains.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
                 if let validationError {
                     Text(validationError)
@@ -65,18 +69,18 @@ struct BypassProxySettingsSheet: View {
                 Button {
                     domainsText = Self.editableText(from: SSLProxyingManager.defaultBypassDomains)
                 } label: {
-                    Text(String(localized: "Reset to Default"))
+                    Text(String(localized: "Reset to Default", bundle: RockxyLocalization.bundle))
                 }
 
                 Spacer()
 
-                Button(String(localized: "Cancel")) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
                 .frame(minWidth: toolMetrics.footerButtonWidth)
                 .keyboardShortcut(.cancelAction)
 
-                Button(String(localized: "Save")) {
+                Button(String(localized: "Save", bundle: RockxyLocalization.bundle)) {
                     save()
                 }
                 .frame(minWidth: toolMetrics.footerButtonWidth)
@@ -105,19 +109,6 @@ struct BypassProxySettingsSheet: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
-    private func save() {
-        let patterns = Self.patterns(from: domainsText)
-        if let invalid = patterns.first(where: { Self.validationError(for: $0) != nil }),
-           let error = Self.validationError(for: invalid)
-        {
-            validationError = String(localized: "\(invalid): \(error)")
-            return
-        }
-
-        manager.setBypassDomains(patterns.joined(separator: ","))
-        dismiss()
-    }
-
     private static func editableText(from storedValue: String) -> String {
         patterns(from: storedValue).joined(separator: "\n")
     }
@@ -136,5 +127,18 @@ struct BypassProxySettingsSheet: View {
 
     private static func validationError(for value: String) -> String? {
         SSLHostPatternValidation.message(for: value)
+    }
+
+    private func save() {
+        let patterns = Self.patterns(from: domainsText)
+        if let invalid = patterns.first(where: { Self.validationError(for: $0) != nil }),
+           let error = Self.validationError(for: invalid)
+        {
+            validationError = String(localized: "\(invalid): \(error)", bundle: RockxyLocalization.bundle)
+            return
+        }
+
+        manager.setBypassDomains(patterns.joined(separator: ","))
+        dismiss()
     }
 }

@@ -98,12 +98,15 @@ struct RequestListEmptyStateCopy: Equatable {
     init(_ state: RequestListEmptyState) {
         switch state {
         case let .filtered(availableCount):
-            title = String(localized: "No Matching Requests")
+            title = String(localized: "No Matching Requests", bundle: RockxyLocalization.bundle)
             systemImage = "line.3.horizontal.decrease.circle"
             description = Self.filteredDescription(availableCount: availableCount)
             action = .clearFilters
-            actionTitle = String(localized: "Clear Filters")
-            actionHelp = String(localized: "Clear the active filters to show all captured traffic.")
+            actionTitle = String(localized: "Clear Filters", bundle: RockxyLocalization.bundle)
+            actionHelp = String(
+                localized: "Clear the active filters to show all captured traffic.",
+                bundle: RockxyLocalization.bundle
+            )
 
         case let .emptyCollection(scope):
             let collection = Self.collectionCopy(for: scope)
@@ -111,40 +114,57 @@ struct RequestListEmptyStateCopy: Equatable {
             systemImage = collection.systemImage
             description = collection.description
             action = .showAllTraffic
-            actionTitle = String(localized: "Show All Traffic")
-            actionHelp = String(localized: "Leave this collection and show all captured traffic.")
+            actionTitle = String(localized: "Show All Traffic", bundle: RockxyLocalization.bundle)
+            actionHelp = String(
+                localized: "Leave this collection and show all captured traffic.",
+                bundle: RockxyLocalization.bundle
+            )
 
         case .proxyStarting:
-            title = String(localized: "Starting Proxy")
+            title = String(localized: "Starting Proxy", bundle: RockxyLocalization.bundle)
             systemImage = "hourglass"
-            description = String(localized: "Rockxy is starting the proxy. Captured requests will appear here.")
+            description = String(
+                localized: "Rockxy is starting the proxy. Captured requests will appear here.",
+                bundle: RockxyLocalization.bundle
+            )
             action = nil
             actionTitle = nil
             actionHelp = nil
 
         case .proxyStopped:
-            title = String(localized: "No Traffic Captured")
+            title = String(localized: "No Traffic Captured", bundle: RockxyLocalization.bundle)
             systemImage = "network.slash"
-            description = String(localized: "The proxy is stopped. Start it to begin capturing requests.")
+            description = String(
+                localized: "The proxy is stopped. Start it to begin capturing requests.",
+                bundle: RockxyLocalization.bundle
+            )
             action = .startProxy
-            actionTitle = String(localized: "Start Proxy")
-            actionHelp = String(localized: "Start the proxy to begin capturing network traffic.")
+            actionTitle = String(localized: "Start Proxy", bundle: RockxyLocalization.bundle)
+            actionHelp = String(
+                localized: "Start the proxy to begin capturing network traffic.",
+                bundle: RockxyLocalization.bundle
+            )
 
         case .recordingPaused:
-            title = String(localized: "Recording Paused")
+            title = String(localized: "Recording Paused", bundle: RockxyLocalization.bundle)
             systemImage = "pause.circle"
             description = String(
-                localized: "New requests are not being recorded. Resume recording to capture traffic."
+                localized: "New requests are not being recorded. Resume recording to capture traffic.",
+                bundle: RockxyLocalization.bundle
             )
             action = .resumeRecording
-            actionTitle = String(localized: "Resume Recording")
-            actionHelp = String(localized: "Resume recording so new requests are captured.")
+            actionTitle = String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
+            actionHelp = String(
+                localized: "Resume recording so new requests are captured.",
+                bundle: RockxyLocalization.bundle
+            )
 
         case .waitingForTraffic:
-            title = String(localized: "Waiting for Requests")
+            title = String(localized: "Waiting for Requests", bundle: RockxyLocalization.bundle)
             systemImage = "dot.radiowaves.left.and.right"
             description = String(
-                localized: "Rockxy is capturing. Send a request through the proxy and it will appear here."
+                localized: "Rockxy is capturing. Send a request through the proxy and it will appear here.",
+                bundle: RockxyLocalization.bundle
             )
             action = nil
             actionTitle = nil
@@ -171,10 +191,14 @@ struct RequestListEmptyStateCopy: Equatable {
 
     private static func filteredDescription(availableCount: Int) -> String {
         if availableCount == 1 {
-            return String(localized: "No requests match the active filters. 1 request is available before filtering.")
+            return String(
+                localized: "No requests match the active filters. 1 request is available before filtering.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return String(
-            localized: "No requests match the active filters. \(availableCount) requests are available before filtering."
+            localized: "No requests match the active filters. \(availableCount) requests are available before filtering.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -182,30 +206,37 @@ struct RequestListEmptyStateCopy: Equatable {
         switch scope {
         case .saved:
             CollectionCopy(
-                title: String(localized: "No Saved Requests"),
+                title: String(localized: "No Saved Requests", bundle: RockxyLocalization.bundle),
                 systemImage: "bookmark",
                 description: String(
-                    localized: "Requests you save appear here. Save a request from its menu to keep it across sessions."
+                    localized: "Requests you save appear here. Save a request from its menu to keep it across sessions.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         case .pinned:
             CollectionCopy(
-                title: String(localized: "No Pinned Requests"),
+                title: String(localized: "No Pinned Requests", bundle: RockxyLocalization.bundle),
                 systemImage: "pin",
-                description: String(localized: "Pin a request to keep it at hand. Pinned requests appear here.")
+                description: String(
+                    localized: "Pin a request to keep it at hand. Pinned requests appear here.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         case .notes:
             CollectionCopy(
-                title: String(localized: "No Requests with Notes"),
+                title: String(localized: "No Requests with Notes", bundle: RockxyLocalization.bundle),
                 systemImage: "note.text",
-                description: String(localized: "Requests with notes appear here. Add a note to a request to track it.")
+                description: String(
+                    localized: "Requests with notes appear here. Add a note to a request to track it.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         case .allTraffic:
             // Not reachable — `.emptyCollection` is only resolved for Library scopes.
             CollectionCopy(
-                title: String(localized: "No Requests"),
+                title: String(localized: "No Requests", bundle: RockxyLocalization.bundle),
                 systemImage: "tray",
-                description: String(localized: "No requests to show.")
+                description: String(localized: "No requests to show.", bundle: RockxyLocalization.bundle)
             )
         }
     }

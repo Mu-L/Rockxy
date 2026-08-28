@@ -21,7 +21,7 @@ struct ResponseInspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(String(localized: "Response"))
+            Text(String(localized: "Response", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.fontSize, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
@@ -164,6 +164,17 @@ struct ResponseInspectorView: View {
         return descriptors
     }
 
+    private var canPrettifyResponseBody: Bool {
+        guard let body = transaction.response?.body else {
+            return false
+        }
+        return !body.isEmpty
+    }
+
+    private var hasAIInspection: Bool {
+        AITrafficDetector.isLikelyAI(transaction: transaction)
+    }
+
     private var inspectorTabBar: some View {
         InspectorTabStrip(tabs: tabDescriptors) {
             inspectorTrailingControls
@@ -180,7 +191,7 @@ struct ResponseInspectorView: View {
                 .frame(width: metrics.inspectorTabHeight, height: metrics.inspectorTabHeight)
         }
         .buttonStyle(.plain)
-        .help(String(localized: "Preview Tabs"))
+        .help(String(localized: "Preview Tabs", bundle: RockxyLocalization.bundle))
         .popover(isPresented: $showPreviewPopover, arrowEdge: .bottom) {
             PreviewTabPopover(panel: .response, store: previewTabStore)
         }
@@ -204,7 +215,10 @@ struct ResponseInspectorView: View {
             Button {
                 bodyDisplayMode = .tree
             } label: {
-                checkedMenuLabel(String(localized: "Tree View"), isSelected: bodyDisplayMode == .tree)
+                checkedMenuLabel(
+                    String(localized: "Tree View", bundle: RockxyLocalization.bundle),
+                    isSelected: bodyDisplayMode == .tree
+                )
             }
 
             Button {
@@ -216,7 +230,10 @@ struct ResponseInspectorView: View {
             Button {
                 bodyDisplayMode = .raw
             } label: {
-                checkedMenuLabel(String(localized: "Raw"), isSelected: bodyDisplayMode == .raw)
+                checkedMenuLabel(
+                    String(localized: "Raw", bundle: RockxyLocalization.bundle),
+                    isSelected: bodyDisplayMode == .raw
+                )
             }
 
             Button {
@@ -227,19 +244,19 @@ struct ResponseInspectorView: View {
 
             Divider()
 
-            Menu(String(localized: "Settings")) {
-                Toggle(String(localized: "Sort JSON Keys"), isOn: $sortJSONKeys)
+            Menu(String(localized: "Settings", bundle: RockxyLocalization.bundle)) {
+                Toggle(String(localized: "Sort JSON Keys", bundle: RockxyLocalization.bundle), isOn: $sortJSONKeys)
             }
 
-            Menu(String(localized: "Format with")) {
-                Button(String(localized: "Prettify JSON")) {
+            Menu(String(localized: "Format with", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Prettify JSON", bundle: RockxyLocalization.bundle)) {
                     sortJSONKeys = true
                     bodyDisplayMode = .json
                 }
                 .disabled(!canPrettifyResponseBody)
             }
 
-            Menu(String(localized: "Open with")) {
+            Menu(String(localized: "Open with", bundle: RockxyLocalization.bundle)) {
                 Button {
                     openResponseBody(bundleIdentifier: "com.microsoft.VSCode")
                 } label: {
@@ -268,20 +285,28 @@ struct ResponseInspectorView: View {
                 Button {
                     openResponseBody(bundleIdentifier: nil)
                 } label: {
-                    Label(String(localized: "Open by System…"), systemImage: "arrow.up.right.square")
+                    Label(
+                        String(localized: "Open by System…", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.up.right.square"
+                    )
                 }
 
                 Divider()
                 Button {
                     showResponseBodyInFinder()
                 } label: {
-                    Label(String(localized: "Show in Finder…"), systemImage: "folder")
+                    Label(
+                        String(localized: "Show in Finder…", bundle: RockxyLocalization.bundle),
+                        systemImage: "folder"
+                    )
                 }
             }
 
-            Menu(String(localized: "Export")) {
-                Button(String(localized: "Copy Body")) { copyResponseBodyToClipboard() }
-                Button(String(localized: "Save Body As…")) { exportResponseBody() }
+            Menu(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Copy Body", bundle: RockxyLocalization.bundle)) {
+                    copyResponseBodyToClipboard()
+                }
+                Button(String(localized: "Save Body As…", bundle: RockxyLocalization.bundle)) { exportResponseBody() }
             }
         } label: {
             HStack(spacing: 4) {
@@ -298,19 +323,10 @@ struct ResponseInspectorView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(String(localized: "Response body display options"))
+        .help(String(localized: "Response body display options", bundle: RockxyLocalization.bundle))
     }
 
-    private func checkedMenuLabel(_ title: String, isSelected: Bool) -> some View {
-        HStack {
-            if isSelected {
-                Image(systemName: "checkmark")
-            }
-            Text(title)
-        }
-    }
-
-    @ViewBuilder private var tabContent: some View {
+    private var tabContent: some View {
         Group {
             if let proto = protocolTab {
                 switch proto {
@@ -353,9 +369,12 @@ struct ResponseInspectorView: View {
                     AIInspectorView(transaction: transaction)
                 } else {
                     InspectorEmptyStateView(
-                        String(localized: "No AI Metadata"),
+                        String(localized: "No AI Metadata", bundle: RockxyLocalization.bundle),
                         systemImage: "sparkles",
-                        description: String(localized: "This response does not look like captured AI model traffic.")
+                        description: String(
+                            localized: "This response does not look like captured AI model traffic.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 }
             case .headers:
@@ -371,10 +390,19 @@ struct ResponseInspectorView: View {
             }
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Response"),
+                String(localized: "No Response", bundle: RockxyLocalization.bundle),
                 systemImage: "arrow.down.circle",
-                description: String(localized: "Waiting for response...")
+                description: String(localized: "Waiting for response...", bundle: RockxyLocalization.bundle)
             )
+        }
+    }
+
+    private func checkedMenuLabel(_ title: String, isSelected: Bool) -> some View {
+        HStack {
+            if isSelected {
+                Image(systemName: "checkmark")
+            }
+            Text(title)
         }
     }
 
@@ -382,7 +410,7 @@ struct ResponseInspectorView: View {
     private func responseHeadersView(response: HTTPResponseData) -> some View {
         if response.headers.isEmpty {
             InspectorEmptyStateView(
-                String(localized: "No Headers"),
+                String(localized: "No Headers", bundle: RockxyLocalization.bundle),
                 systemImage: "list.bullet"
             )
         } else {
@@ -393,7 +421,7 @@ struct ResponseInspectorView: View {
                     source: .response,
                     coordinator: coordinator
                 )
-                    .padding()
+                .padding()
             }
         }
     }
@@ -421,27 +449,16 @@ struct ResponseInspectorView: View {
             }
         } else if response.body != nil {
             InspectorEmptyStateView(
-                String(localized: "Empty Body"),
+                String(localized: "Empty Body", bundle: RockxyLocalization.bundle),
                 systemImage: "doc",
-                description: String(localized: "The response body is empty.")
+                description: String(localized: "The response body is empty.", bundle: RockxyLocalization.bundle)
             )
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Body"),
+                String(localized: "No Body", bundle: RockxyLocalization.bundle),
                 systemImage: "doc",
-                description: String(localized: "This response has no body")
+                description: String(localized: "This response has no body", bundle: RockxyLocalization.bundle)
             )
-        }
-    }
-
-    private func responseBody(for mode: ResponseBodyDisplayMode, snapshot: InspectorResponseSnapshot) -> Data? {
-        switch mode {
-        case .hex:
-            snapshot.body
-        case .tree,
-             .json,
-             .raw:
-            snapshot.displayBody
         }
     }
 
@@ -456,9 +473,9 @@ struct ResponseInspectorView: View {
                 return .text(text)
             }
             return .unavailable(
-                title: String(localized: "No Response"),
+                title: String(localized: "No Response", bundle: RockxyLocalization.bundle),
                 systemImage: "arrow.down.circle",
-                description: String(localized: "Waiting for response...")
+                description: String(localized: "Waiting for response...", bundle: RockxyLocalization.bundle)
             )
         }
     }
@@ -474,7 +491,7 @@ struct ResponseInspectorView: View {
                 return .text(text)
             }
             return .unavailable(
-                title: String(localized: "Binary Body"),
+                title: String(localized: "Binary Body", bundle: RockxyLocalization.bundle),
                 systemImage: "doc",
                 description: SizeFormatter.format(bytes: body.count)
             )
@@ -484,6 +501,17 @@ struct ResponseInspectorView: View {
     private func encryptedHTTPSPrompt(_ prompt: HTTPSInspectionPromptModel) -> some View {
         HTTPSInspectionPromptView(prompt: prompt, onAction: handleHTTPSPromptAction)
             .id(transaction.id)
+    }
+
+    private func responseBody(for mode: ResponseBodyDisplayMode, snapshot: InspectorResponseSnapshot) -> Data? {
+        switch mode {
+        case .hex:
+            snapshot.body
+        case .tree,
+             .json,
+             .raw:
+            snapshot.displayBody
+        }
     }
 
     private func handleHTTPSPromptAction(_ action: HTTPSInspectionPromptAction) {
@@ -532,22 +560,10 @@ struct ResponseInspectorView: View {
         guard let body = InspectorResponseSnapshot(response: response).displayBody else {
             return nil
         }
-        if let pretty = prettyJSONString(from: body, sortedKeys: sortJSONKeys)
-        {
+        if let pretty = prettyJSONString(from: body, sortedKeys: sortJSONKeys) {
             return pretty
         }
         return String(data: body, encoding: .utf8)
-    }
-
-    private var canPrettifyResponseBody: Bool {
-        guard let body = transaction.response?.body else {
-            return false
-        }
-        return !body.isEmpty
-    }
-
-    private var hasAIInspection: Bool {
-        AITrafficDetector.isLikelyAI(transaction: transaction)
     }
 
     private func prettyJSONString(from data: Data, sortedKeys: Bool) -> String? {
@@ -630,21 +646,27 @@ struct ResponseInspectorView: View {
     }
 }
 
+// MARK: - ResponseBodyDisplayMode
+
 private enum ResponseBodyDisplayMode {
     case tree
     case json
     case raw
     case hex
 
+    // MARK: Internal
+
     var displayName: String {
         switch self {
-        case .tree: String(localized: "Tree View")
+        case .tree: String(localized: "Tree View", bundle: RockxyLocalization.bundle)
         case .json: "JSON"
-        case .raw: String(localized: "Raw")
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
         case .hex: "Hex"
         }
     }
 }
+
+// MARK: - ResponseSelectionIntent
 
 private enum ResponseSelectionIntent {
     case automatic
@@ -749,22 +771,25 @@ enum HTTPSConnectionInsight: Equatable {
     case tunnelEstablished(statusCode: Int)
     case tlsInterceptionRejected
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .tunnelEstablished:
-            String(localized: "Content Not Inspected")
+            String(localized: "Content Not Inspected", bundle: RockxyLocalization.bundle)
         case .tlsInterceptionRejected:
-            String(localized: "Decryption Was Declined")
+            String(localized: "Decryption Was Declined", bundle: RockxyLocalization.bundle)
         }
     }
 
     var summary: String {
         switch self {
         case .tunnelEstablished:
-            String(localized: "HTTPS content was not inspected.")
+            String(localized: "HTTPS content was not inspected.", bundle: RockxyLocalization.bundle)
         case .tlsInterceptionRejected:
             String(
-                localized: "Rockxy kept the app connected by returning this host to a protected encrypted tunnel."
+                localized: "Rockxy kept the app connected by returning this host to a protected encrypted tunnel.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -773,11 +798,13 @@ enum HTTPSConnectionInsight: Equatable {
         switch self {
         case let .tunnelEstablished(statusCode):
             String(
-                localized: "Rockxy received status \(statusCode) and has no recent TLS rejection for this host."
+                localized: "Rockxy received status \(statusCode) and has no recent TLS rejection for this host.",
+                bundle: RockxyLocalization.bundle
             )
         case .tlsInterceptionRejected:
             String(
-                localized: "The app rejected Rockxy’s TLS handshake for this host. Certificate pinning is possible, but a custom trust policy can produce the same signal."
+                localized: "The app rejected Rockxy’s TLS handshake for this host. Certificate pinning is possible, but a custom trust policy can produce the same signal.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -785,10 +812,11 @@ enum HTTPSConnectionInsight: Equatable {
     var nextStep: String {
         switch self {
         case .tunnelEstablished:
-            String(localized: "Enable decryption below, then repeat the request.")
+            String(localized: "Enable decryption below, then repeat the request.", bundle: RockxyLocalization.bundle)
         case .tlsInterceptionRejected:
             String(
-                localized: "Retry decryption and repeat the request. If the app rejects it again, leave this host tunneled."
+                localized: "Retry decryption and repeat the request. If the app rejects it again, leave this host tunneled.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -819,6 +847,21 @@ enum ProtocolTabKind: Hashable {
     case grpc
 
     // MARK: Internal
+
+    var displayName: String {
+        switch self {
+        case .ai:
+            "AI"
+        case .websocket:
+            String(localized: "WebSocket", bundle: RockxyLocalization.bundle)
+        case .web3:
+            String(localized: "Web3", bundle: RockxyLocalization.bundle)
+        case .graphql:
+            String(localized: "GraphQL", bundle: RockxyLocalization.bundle)
+        case .grpc:
+            "gRPC"
+        }
+    }
 
     /// Returns the protocol/smart tabs that should be visible for a transaction.
     /// AI and Web3 stay visible even without metadata so their inspectors can render empty states.
@@ -883,21 +926,6 @@ enum ProtocolTabKind: Hashable {
             transaction.graphQLInfo != nil
         case .grpc:
             GRPCDetector.isGRPC(transaction: transaction)
-        }
-    }
-
-    var displayName: String {
-        switch self {
-        case .ai:
-            "AI"
-        case .websocket:
-            String(localized: "WebSocket")
-        case .web3:
-            String(localized: "Web3")
-        case .graphql:
-            String(localized: "GraphQL")
-        case .grpc:
-            "gRPC"
         }
     }
 }

@@ -13,7 +13,7 @@ enum UpstreamPACRoute: Equatable {
     var displayName: String {
         switch self {
         case .direct:
-            String(localized: "DIRECT")
+            String(localized: "DIRECT", bundle: RockxyLocalization.bundle)
         case let .proxy(type, host, port):
             "\(type.displayName) \(host):\(port)"
         }
@@ -26,7 +26,8 @@ typealias UpstreamPACResolverFunction = @Sendable (
     String,
     String,
     Int
-) -> EventLoopFuture<UpstreamPACRoute>
+)
+    -> EventLoopFuture<UpstreamPACRoute>
 
 // MARK: - UpstreamPACResolver
 
@@ -74,7 +75,10 @@ nonisolated enum UpstreamPACResolver {
 
         DispatchQueue.global(qos: .utility).async {
             guard let runLoop = CFRunLoopGetCurrent() else {
-                box.complete(.failure(.pacEvaluationFailed(String(localized: "Unable to start PAC evaluation."))))
+                box.complete(.failure(.pacEvaluationFailed(String(
+                    localized: "Unable to start PAC evaluation.",
+                    bundle: RockxyLocalization.bundle
+                ))))
                 retainedBox.release()
                 return
             }
@@ -240,7 +244,10 @@ private func upstreamPACResolverCallback(
 ) {
     let box = Unmanaged<PACEvaluationBox>.fromOpaque(client).takeUnretainedValue()
     if let error {
-        let message = CFErrorCopyDescription(error) as String? ?? String(localized: "Unknown PAC error")
+        let message = CFErrorCopyDescription(error) as String? ?? String(
+            localized: "Unknown PAC error",
+            bundle: RockxyLocalization.bundle
+        )
         box.complete(.failure(.pacEvaluationFailed(message)))
         return
     }

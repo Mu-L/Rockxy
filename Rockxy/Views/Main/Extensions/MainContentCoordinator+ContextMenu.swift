@@ -139,14 +139,14 @@ extension MainContentCoordinator {
 
     func promptComment(for transaction: HTTPTransaction) {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Add Note")
-        alert.informativeText = String(localized: "Enter a note for this request:")
-        alert.addButton(withTitle: String(localized: "OK"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.messageText = String(localized: "Add Note", bundle: RockxyLocalization.bundle)
+        alert.informativeText = String(localized: "Enter a note for this request:", bundle: RockxyLocalization.bundle)
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
 
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         input.stringValue = transaction.comment ?? ""
-        input.placeholderString = String(localized: "Note…")
+        input.placeholderString = String(localized: "Note…", bundle: RockxyLocalization.bundle)
         alert.accessoryView = input
 
         let response = alert.runModal()
@@ -272,8 +272,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to serialize HAR: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not create HAR data.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not create HAR data.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             return
         }
@@ -291,8 +294,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to export request as HAR: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not save HAR file.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not save HAR file.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -345,7 +351,10 @@ extension MainContentCoordinator {
 
         activeToast = ToastMessage(
             style: .success,
-            text: String(localized: "Removed \(favoriteTransactionDisplayName(transaction)) from \(section.displayName).")
+            text: String(
+                localized: "Removed \(favoriteTransactionDisplayName(transaction)) from \(section.displayName).",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 
@@ -358,8 +367,11 @@ extension MainContentCoordinator {
             data = try favoriteTransactionExportData(transaction, as: format)
         } catch {
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not create export data.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not create export data.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             return
         }
@@ -377,8 +389,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to export favorite transaction: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not write export file.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not write export file.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -386,7 +401,9 @@ extension MainContentCoordinator {
     func favoriteTransactionExportData(
         _ transaction: HTTPTransaction,
         as format: FavoriteTransactionExportFormat
-    ) throws -> Data {
+    )
+        throws -> Data
+    {
         switch format {
         case .rockxySession:
             let metadata = SessionSerializer.makeMetadata(
@@ -419,7 +436,9 @@ extension MainContentCoordinator {
     func favoriteTransactionDefaultExportName(
         _ transaction: HTTPTransaction,
         as format: FavoriteTransactionExportFormat
-    ) -> String {
+    )
+        -> String
+    {
         "\(favoriteTransactionFileStem(transaction)).\(format.fileExtension)"
     }
 
@@ -494,7 +513,8 @@ extension MainContentCoordinator {
             [.har]
         case .rawRequestAndResponse:
             [.plainText]
-        case .requestBody, .responseBody:
+        case .requestBody,
+             .responseBody:
             [.data]
         }
     }
@@ -557,14 +577,16 @@ private enum FavoriteTransactionExportError: LocalizedError {
     case missingRequestBody
     case missingResponseBody
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .missingResponse:
-            String(localized: "No response has been captured for this request.")
+            String(localized: "No response has been captured for this request.", bundle: RockxyLocalization.bundle)
         case .missingRequestBody:
-            String(localized: "This request has no body.")
+            String(localized: "This request has no body.", bundle: RockxyLocalization.bundle)
         case .missingResponseBody:
-            String(localized: "This response has no body.")
+            String(localized: "This response has no body.", bundle: RockxyLocalization.bundle)
         }
     }
 }

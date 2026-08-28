@@ -52,7 +52,8 @@ protocol AssistantLocalRuntimeInstalling: Sendable {
     func install(
         runtime: AssistantLocalRuntimeDescriptor,
         destinationDirectory: URL
-    ) -> AsyncThrowingStream<AssistantRuntimeInstallEvent, Error>
+    )
+        -> AsyncThrowingStream<AssistantRuntimeInstallEvent, Error>
 }
 
 // MARK: - AssistantRuntimeArtifactDownloadEvent
@@ -62,12 +63,15 @@ enum AssistantRuntimeArtifactDownloadEvent: Sendable {
     case completed(fileURL: URL)
 }
 
+// MARK: - AssistantRuntimeArtifactDownloading
+
 protocol AssistantRuntimeArtifactDownloading: Sendable {
     func download(
         from url: URL,
         to fileURL: URL,
         maximumBytes: Int64
-    ) -> AsyncThrowingStream<AssistantRuntimeArtifactDownloadEvent, Error>
+    )
+        -> AsyncThrowingStream<AssistantRuntimeArtifactDownloadEvent, Error>
 }
 
 // MARK: - AssistantProcessRunning
@@ -99,7 +103,9 @@ struct OllamaRuntimeInstaller: AssistantLocalRuntimeInstalling {
     func install(
         runtime: AssistantLocalRuntimeDescriptor,
         destinationDirectory: URL
-    ) -> AsyncThrowingStream<AssistantRuntimeInstallEvent, Error> {
+    )
+        -> AsyncThrowingStream<AssistantRuntimeInstallEvent, Error>
+    {
         AsyncThrowingStream { continuation in
             let task = Task.detached(priority: .userInitiated) {
                 do {
@@ -213,7 +219,9 @@ struct OllamaRuntimeInstaller: AssistantLocalRuntimeInstalling {
     private func validatedDestination(
         _ destinationDirectory: URL,
         runtime: AssistantLocalRuntimeDescriptor
-    ) throws -> URL {
+    )
+        throws -> URL
+    {
         guard destinationDirectory.isFileURL else {
             throw AssistantRuntimeInstallError.invalidDestination
         }
@@ -241,7 +249,9 @@ struct OllamaRuntimeInstaller: AssistantLocalRuntimeInstalling {
     private func validateArchive(
         _ archiveURL: URL,
         runtime: AssistantLocalRuntimeDescriptor
-    ) async throws {
+    )
+        async throws
+    {
         let entriesOutput = try await processRunner.run(
             executable: URL(fileURLWithPath: "/usr/bin/unzip"),
             arguments: ["-Z", "-1", archiveURL.path]
@@ -288,7 +298,9 @@ struct OllamaRuntimeInstaller: AssistantLocalRuntimeInstalling {
     private func validateApplication(
         _ applicationURL: URL,
         runtime: AssistantLocalRuntimeDescriptor
-    ) async throws -> String {
+    )
+        async throws -> String
+    {
         let resourceValues = try applicationURL.resourceValues(forKeys: [
             .isDirectoryKey,
             .isSymbolicLinkKey,
@@ -334,7 +346,9 @@ final class URLSessionAssistantRuntimeArtifactDownloader: AssistantRuntimeArtifa
         from url: URL,
         to fileURL: URL,
         maximumBytes: Int64
-    ) -> AsyncThrowingStream<AssistantRuntimeArtifactDownloadEvent, Error> {
+    )
+        -> AsyncThrowingStream<AssistantRuntimeArtifactDownloadEvent, Error>
+    {
         AsyncThrowingStream { continuation in
             let operation = AssistantRuntimeArtifactDownloadOperation(
                 sourceURL: url,
@@ -478,6 +492,7 @@ private final class AssistantRuntimeArtifactDownloadOperation: NSObject, URLSess
         queue.maxConcurrentOperationCount = 1
         return queue
     }()
+
     private var session: URLSession?
     private var dataTask: URLSessionDataTask?
     private var fileHandle: FileHandle?
@@ -591,38 +606,73 @@ enum AssistantRuntimeInstallError: LocalizedError, Equatable {
     case processOutputTooLarge
     case commandFailed(String, String)
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .insecureDownload:
-            String(localized: "Rockxy only installs local runtimes from an encrypted HTTPS source.")
+            String(
+                localized: "Rockxy only installs local runtimes from an encrypted HTTPS source.",
+                bundle: RockxyLocalization.bundle
+            )
         case .downloadRejected:
-            String(localized: "The runtime download server rejected the request.")
+            String(localized: "The runtime download server rejected the request.", bundle: RockxyLocalization.bundle)
         case .downloadTooLarge:
-            String(localized: "The runtime download exceeded Rockxy's safety limit.")
+            String(localized: "The runtime download exceeded Rockxy's safety limit.", bundle: RockxyLocalization.bundle)
         case .incompleteDownload:
-            String(localized: "The runtime download ended before the artifact was complete.")
+            String(
+                localized: "The runtime download ended before the artifact was complete.",
+                bundle: RockxyLocalization.bundle
+            )
         case .invalidDestination:
-            String(localized: "Choose a local folder where the runtime application can be installed.")
+            String(
+                localized: "Choose a local folder where the runtime application can be installed.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .destinationNotWritable(url):
-            String(localized: "Rockxy cannot write to \(url.path). Choose another install folder.")
+            String(
+                localized: "Rockxy cannot write to \(url.path). Choose another install folder.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .insufficientSpace(requiredBytes, availableBytes):
             String(
-                localized: "The selected volume needs at least \(Self.formatted(requiredBytes)) free; \(Self.formatted(availableBytes)) is available."
+                localized: "The selected volume needs at least \(Self.formatted(requiredBytes)) free; \(Self.formatted(availableBytes)) is available.",
+                bundle: RockxyLocalization.bundle
             )
         case let .applicationAlreadyExists(url):
-            String(localized: "An application already exists at \(url.path). Open it or choose another folder.")
+            String(
+                localized: "An application already exists at \(url.path). Open it or choose another folder.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unsafeArchive:
-            String(localized: "The downloaded runtime archive failed Rockxy's structure and size checks.")
+            String(
+                localized: "The downloaded runtime archive failed Rockxy's structure and size checks.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unexpectedApplication:
-            String(localized: "The downloaded application does not match the expected runtime identity.")
+            String(
+                localized: "The downloaded application does not match the expected runtime identity.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unexpectedSigner:
-            String(localized: "The downloaded application was not signed by the expected developer.")
+            String(
+                localized: "The downloaded application was not signed by the expected developer.",
+                bundle: RockxyLocalization.bundle
+            )
         case .processOutputTooLarge:
-            String(localized: "Runtime verification produced more output than Rockxy allows.")
+            String(
+                localized: "Runtime verification produced more output than Rockxy allows.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .commandFailed(command, detail):
-            String(localized: "Runtime setup failed while running \(command): \(detail)")
+            String(
+                localized: "Runtime setup failed while running \(command): \(detail)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
+
+    // MARK: Private
 
     private static func formatted(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)

@@ -10,7 +10,7 @@ struct SessionProvenance {
 
     var displayText: String {
         String(
-            localized: "Imported from \(fileName) (\(transactionCount) requests)"
+            localized: "Imported from \(fileName) (\(transactionCount) requests)", bundle: RockxyLocalization.bundle
         )
     }
 }

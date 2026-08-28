@@ -32,20 +32,14 @@ private struct AppIconView: View {
 
     // MARK: Private
 
-    @Environment(\.appUIDisplayMetrics) private var metrics
-
-    private var iconSize: CGFloat {
-        metrics.sidebarAppIconSize
+    private struct IconCacheKey: Hashable {
+        let name: String
+        let size: Int
     }
 
     private static var iconCache: [String: NSImage] = [:]
     private static var resizedIconCache: [IconCacheKey: NSImage] = [:]
     private static var missingIconNames: Set<String> = []
-
-    private struct IconCacheKey: Hashable {
-        let name: String
-        let size: Int
-    }
 
     private static let bundleIDMap: [String: String] = [
         "Chrome": "com.google.Chrome",
@@ -61,6 +55,12 @@ private struct AppIconView: View {
         "Figma": "com.figma.Desktop",
         "Postman": "com.postmanlabs.mac",
     ]
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
+
+    private var iconSize: CGFloat {
+        metrics.sidebarAppIconSize
+    }
 
     private var letter: String {
         String(name.prefix(1)).uppercased()
@@ -137,27 +137,27 @@ struct SidebarView: View {
 
     var body: some View {
         navigatorChrome
-        .sheet(isPresented: $isAddFavoritePresented) {
-            AddFavoriteView(
-                coordinator: coordinator,
-                isPresented: $isAddFavoritePresented
+            .sheet(isPresented: $isAddFavoritePresented) {
+                AddFavoriteView(
+                    coordinator: coordinator,
+                    isPresented: $isAddFavoritePresented
+                )
+            }
+            .sheet(item: $editingFocusSet) { focusSet in
+                FocusSetEditorSheet(
+                    initialValue: focusSet,
+                    transactions: coordinator.transactions,
+                    isCreating: !coordinator.activeWorkspace.focusSets.contains { $0.id == focusSet.id },
+                    onSave: saveFocusSetFromSidebar
+                )
+            }
+            .sheet(isPresented: $isMutedSourcesPresented) {
+                NoiseControlManagerSheet(coordinator: coordinator)
+            }
+            .background(
+                // Keep the sidebar invalidated when SSL proxying presentation changes.
+                EmptyView().id(coordinator.sslProxyingRefreshToken)
             )
-        }
-        .sheet(item: $editingFocusSet) { focusSet in
-            FocusSetEditorSheet(
-                initialValue: focusSet,
-                transactions: coordinator.transactions,
-                isCreating: !coordinator.activeWorkspace.focusSets.contains { $0.id == focusSet.id },
-                onSave: saveFocusSetFromSidebar
-            )
-        }
-        .sheet(isPresented: $isMutedSourcesPresented) {
-            NoiseControlManagerSheet(coordinator: coordinator)
-        }
-        .background(
-            // Keep the sidebar invalidated when SSL proxying presentation changes.
-            EmptyView().id(coordinator.sslProxyingRefreshToken)
-        )
     }
 
     // MARK: Private
@@ -179,70 +179,6 @@ struct SidebarView: View {
     @State private var expandedAppNames: Set<String> = []
     @State private var expandedDomainNodeIDs: Set<String> = []
     @Environment(\.appUIDisplayMetrics) private var metrics
-
-    @ViewBuilder
-    private var navigatorChrome: some View {
-        #if compiler(>=6.2)
-        if #available(macOS 26.0, *) {
-            navigatorList
-                .scrollEdgeEffectStyle(.soft, for: .vertical)
-                .safeAreaBar(edge: .top, spacing: 0) {
-                    navigatorPicker
-                }
-                .safeAreaBar(edge: .bottom, spacing: 0) {
-                    sidebarBottomBar
-                }
-        } else {
-            legacyNavigatorChrome
-        }
-        #else
-        legacyNavigatorChrome
-        #endif
-    }
-
-    private var legacyNavigatorChrome: some View {
-        VStack(spacing: 0) {
-            navigatorPicker
-            Divider()
-            navigatorList
-            Divider()
-            sidebarBottomBar
-        }
-    }
-
-    private var navigatorPicker: some View {
-        WorkspaceModeSegmentedControl(
-            selection: navigatorModeBinding,
-            segments: FocusNavigatorMode.allCases.map { mode in
-                WorkspaceModeSegment(
-                    value: mode,
-                    title: mode.title,
-                    systemImage: mode.systemImage
-                )
-            },
-            accessibilityLabel: String(localized: "Navigator")
-        )
-        .workspaceModeSwitcherStyle()
-    }
-
-    @ViewBuilder
-    private var navigatorList: some View {
-        switch coordinator.focusNavigatorMode {
-        case .browse:
-            browseList
-        case .focus:
-            focusList
-        case .library:
-            libraryList
-        }
-    }
-
-    private var sidebarBottomBar: some View {
-        SidebarBottomBar(
-            filterText: $sidebarFilterText,
-            isAddFavoritePresented: $isAddFavoritePresented
-        )
-    }
 
     private var sidebarBinding: Binding<SidebarItem?> {
         Binding(
@@ -290,6 +226,76 @@ struct SidebarView: View {
         SidebarSearchFilter.trafficSignals(TrafficSignal.allCases, query: sidebarFilterText)
     }
 
+    private var sidebarNavigationFont: Font {
+        .system(size: metrics.sidebarNavigationFontSize)
+    }
+
+    private var sidebarIconFont: Font {
+        .system(size: metrics.sidebarIconFontSize)
+    }
+
+    @ViewBuilder private var navigatorChrome: some View {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            navigatorList
+                .scrollEdgeEffectStyle(.soft, for: .vertical)
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    navigatorPicker
+                }
+                .safeAreaBar(edge: .bottom, spacing: 0) {
+                    sidebarBottomBar
+                }
+        } else {
+            legacyNavigatorChrome
+        }
+        #else
+        legacyNavigatorChrome
+        #endif
+    }
+
+    private var legacyNavigatorChrome: some View {
+        VStack(spacing: 0) {
+            navigatorPicker
+            Divider()
+            navigatorList
+            Divider()
+            sidebarBottomBar
+        }
+    }
+
+    private var navigatorPicker: some View {
+        WorkspaceModeSegmentedControl(
+            selection: navigatorModeBinding,
+            segments: FocusNavigatorMode.allCases.map { mode in
+                WorkspaceModeSegment(
+                    value: mode,
+                    title: mode.title,
+                    systemImage: mode.systemImage
+                )
+            },
+            accessibilityLabel: String(localized: "Navigator", bundle: RockxyLocalization.bundle)
+        )
+        .workspaceModeSwitcherStyle()
+    }
+
+    @ViewBuilder private var navigatorList: some View {
+        switch coordinator.focusNavigatorMode {
+        case .browse:
+            browseList
+        case .focus:
+            focusList
+        case .library:
+            libraryList
+        }
+    }
+
+    private var sidebarBottomBar: some View {
+        SidebarBottomBar(
+            filterText: $sidebarFilterText,
+            isAddFavoritePresented: $isAddFavoritePresented
+        )
+    }
+
     // MARK: - Sections
 
     private var browseList: some View {
@@ -308,12 +314,12 @@ struct SidebarView: View {
                 if focusSets.isEmpty {
                     Label(
                         SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? String(localized: "No Matching Focus Sets")
-                            : String(localized: "No Focus Sets"),
+                            ? String(localized: "No Matching Focus Sets", bundle: RockxyLocalization.bundle)
+                            : String(localized: "No Focus Sets", bundle: RockxyLocalization.bundle),
                         systemImage: "scope"
                     )
-                        .font(.system(size: metrics.sidebarNavigationFontSize, weight: .medium))
-                        .help(String(localized: "Create a reusable app, domain, or path scope."))
+                    .font(.system(size: metrics.sidebarNavigationFontSize, weight: .medium))
+                    .help(String(localized: "Create a reusable app, domain, or path scope.", bundle: RockxyLocalization.bundle))
                     .padding(.vertical, 4)
                 } else {
                     ForEach(focusSets) { focusSet in
@@ -329,18 +335,24 @@ struct SidebarView: View {
                                 : Color.clear
                         )
                         .contextMenu {
-                            Button(String(localized: "Apply")) { applyFocusSetFromSidebar(focusSet) }
+                            Button(String(localized: "Apply", bundle: RockxyLocalization.bundle)) {
+                                applyFocusSetFromSidebar(focusSet)
+                            }
                             Button(expandedFocusSetIDs.contains(focusSet.id)
-                                ? String(localized: "Collapse Rules")
-                                : String(localized: "Expand Rules"))
+                                ? String(localized: "Collapse Rules", bundle: RockxyLocalization.bundle)
+                                : String(localized: "Expand Rules", bundle: RockxyLocalization.bundle))
                             {
                                 toggleFocusSetExpansion(focusSet.id)
                             }
                             Divider()
-                            Button(String(localized: "Edit…")) { editingFocusSet = focusSet }
-                            Button(String(localized: "Duplicate")) { coordinator.duplicateFocusSet(focusSet) }
+                            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
+                                editingFocusSet = focusSet
+                            }
+                            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
+                                coordinator.duplicateFocusSet(focusSet)
+                            }
                             Divider()
-                            Button(String(localized: "Delete"), role: .destructive) {
+                            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                                 coordinator.deleteFocusSet(focusSet)
                             }
                         }
@@ -348,10 +360,10 @@ struct SidebarView: View {
                 }
             } header: {
                 sidebarSectionHeader(
-                    title: String(localized: "Focus Sets"),
+                    title: String(localized: "Focus Sets", bundle: RockxyLocalization.bundle),
                     actionTitle: nil,
                     actionSystemImage: "plus",
-                    actionLabel: String(localized: "Create Focus Set"),
+                    actionLabel: String(localized: "Create Focus Set", bundle: RockxyLocalization.bundle),
                     action: { editingFocusSet = coordinator.makeFocusSetFromCurrentScope() }
                 )
                 .padding(.top, 4)
@@ -361,10 +373,10 @@ struct SidebarView: View {
                 EmptyView()
             } header: {
                 sidebarSectionHeader(
-                    title: String(localized: "Noise Control"),
+                    title: String(localized: "Noise Control", bundle: RockxyLocalization.bundle),
                     actionTitle: nil,
                     actionSystemImage: "slider.horizontal.3",
-                    actionLabel: String(localized: "Configure Noise Control"),
+                    actionLabel: String(localized: "Configure Noise Control", bundle: RockxyLocalization.bundle),
                     action: { isMutedSourcesPresented = true }
                 )
             }
@@ -388,13 +400,202 @@ struct SidebarView: View {
                 signalRow(signal)
             }
         } header: {
-            Text(String(localized: "Signals"))
+            Text(String(localized: "Signals", bundle: RockxyLocalization.bundle))
         } footer: {
             if let activeSignal = coordinator.activeWorkspace.activeTrafficSignal {
                 Text(activeSignal.explanation)
                     .font(.system(size: metrics.sidebarSecondaryFontSize))
             }
         }
+    }
+
+    private var favoritesSection: some View {
+        Section {
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isPinnedExpanded)) {
+                let pinned = pinnedTransactions
+                if pinned.isEmpty {
+                    Text(
+                        SidebarSearchFilter.hasQuery(sidebarFilterText)
+                            ? String(localized: "No matching pinned items", bundle: RockxyLocalization.bundle)
+                            : String(localized: "No pinned items", bundle: RockxyLocalization.bundle)
+                    )
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: metrics.sidebarSecondaryFontSize))
+                    .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
+                } else {
+                    ForEach(pinned) { transaction in
+                        Label {
+                            Text(transaction.request.host + transaction.request.path)
+                                .font(sidebarNavigationFont)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: "pin.fill")
+                                .font(sidebarIconFont)
+                                .foregroundStyle(.orange)
+                        }
+                        .font(sidebarNavigationFont)
+                        .tag(SidebarItem.pinnedTransaction(id: transaction.id))
+                        .frame(minHeight: metrics.sidebarRowHeight)
+                        .contextMenu {
+                            favoriteTransactionContextMenu(transaction, section: .pinned)
+                        }
+                    }
+                }
+            } label: {
+                Label(String(localized: "Pinned", bundle: RockxyLocalization.bundle), systemImage: "pin.fill")
+                    .badge(pinnedTransactions.count)
+                    .tag(SidebarItem.allPinned)
+                    .frame(minHeight: metrics.sidebarRowHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { coordinator.selectSidebarItem(.allPinned) }
+            }
+
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isSavedExpanded)) {
+                let saved = savedTransactions
+                if saved.isEmpty {
+                    Text(
+                        SidebarSearchFilter.hasQuery(sidebarFilterText)
+                            ? String(localized: "No matching saved items", bundle: RockxyLocalization.bundle)
+                            : String(localized: "No saved items", bundle: RockxyLocalization.bundle)
+                    )
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: metrics.sidebarSecondaryFontSize))
+                    .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
+                } else {
+                    ForEach(saved) { transaction in
+                        Label {
+                            Text(transaction.request.host + transaction.request.path)
+                                .font(sidebarNavigationFont)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: "tray.full.fill")
+                                .font(sidebarIconFont)
+                        }
+                        .font(sidebarNavigationFont)
+                        .tag(SidebarItem.savedTransaction(id: transaction.id))
+                        .frame(minHeight: metrics.sidebarRowHeight)
+                        .contextMenu {
+                            favoriteTransactionContextMenu(transaction, section: .saved)
+                        }
+                    }
+                }
+            } label: {
+                Label(String(localized: "Saved", bundle: RockxyLocalization.bundle), systemImage: "tray.full.fill")
+                    .badge(savedTransactions.count)
+                    .tag(SidebarItem.allSaved)
+                    .frame(minHeight: metrics.sidebarRowHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { coordinator.selectSidebarItem(.allSaved) }
+            }
+
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isNotesExpanded)) {
+                let notes = notesTransactions
+                if notes.isEmpty {
+                    Text(
+                        SidebarSearchFilter.hasQuery(sidebarFilterText)
+                            ? String(localized: "No matching notes", bundle: RockxyLocalization.bundle)
+                            : String(localized: "No notes", bundle: RockxyLocalization.bundle)
+                    )
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: metrics.sidebarSecondaryFontSize))
+                    .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
+                } else {
+                    ForEach(notes) { transaction in
+                        Label {
+                            Text(transaction.request.host + transaction.request.path)
+                                .font(sidebarNavigationFont)
+                                .lineLimit(1)
+                        } icon: {
+                            Image(systemName: "note.text")
+                                .font(sidebarIconFont)
+                        }
+                        .font(sidebarNavigationFont)
+                        .tag(SidebarItem.noteTransaction(id: transaction.id))
+                        .frame(minHeight: metrics.sidebarRowHeight)
+                        .contextMenu {
+                            favoriteTransactionContextMenu(transaction, section: .notes)
+                        }
+                    }
+                }
+            } label: {
+                Label(String(localized: "Notes", bundle: RockxyLocalization.bundle), systemImage: "note.text")
+                    .badge(notesTransactions.count)
+                    .tag(SidebarItem.allNotes)
+                    .frame(minHeight: metrics.sidebarRowHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { coordinator.selectSidebarItem(.allNotes) }
+            }
+
+            ForEach(filteredFavorites, id: \.self) { item in
+                favoriteRow(item)
+            }
+        } header: {
+            Text(String(localized: "Favorites", bundle: RockxyLocalization.bundle))
+                .foregroundStyle(Theme.Sidebar.favoritesHeader)
+                .font(.system(size: metrics.sidebarSectionHeaderFontSize, weight: .semibold))
+        }
+        .headerProminence(.increased)
+    }
+
+    private var allSection: some View {
+        Section {
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isAppsExpanded)) {
+                ForEach(appNodes) { app in
+                    DisclosureGroup(isExpanded: appExpansionBinding(for: app.name)) {
+                        ForEach(app.domains, id: \.self) { domain in
+                            domainLabel(domain, requestCount: 0)
+                        }
+                    } label: {
+                        Label {
+                            Text(app.name)
+                                .font(sidebarNavigationFont)
+                        } icon: {
+                            AppIconView(name: app.name)
+                        }
+                        .font(sidebarNavigationFont)
+                        .badge(app.requestCount)
+                        .tag(SidebarItem.app(name: app.name, bundleId: nil))
+                        .frame(minHeight: metrics.sidebarRowHeight)
+                        .contextMenu { appContextMenu(app) }
+                    }
+                }
+            } label: {
+                Label(
+                    String(localized: "Apps", bundle: RockxyLocalization.bundle),
+                    systemImage: "square.stack.3d.up.fill"
+                )
+                .badge(appNodes.count)
+                .tag(SidebarItem.allApps)
+                .frame(minHeight: metrics.sidebarRowHeight)
+                .contentShape(Rectangle())
+                .onTapGesture { coordinator.selectSidebarItem(.allApps) }
+            }
+
+            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isDomainsExpanded)) {
+                ForEach(domainTree) { node in
+                    domainRow(node)
+                }
+            } label: {
+                Label(String(localized: "Domains", bundle: RockxyLocalization.bundle), systemImage: "globe")
+                    .badge(
+                        SidebarSearchFilter.hasQuery(sidebarFilterText)
+                            ? SidebarSearchFilter.domainMatchCount(
+                                coordinator.domainTree,
+                                query: sidebarFilterText
+                            )
+                            : coordinator.totalDomainCount
+                    )
+                    .tag(SidebarItem.allDomains)
+                    .frame(minHeight: metrics.sidebarRowHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { coordinator.selectSidebarItem(.allDomains) }
+            }
+        } header: {
+            Text(String(localized: "All", bundle: RockxyLocalization.bundle))
+                .foregroundStyle(Theme.Sidebar.sectionHeader)
+                .font(.system(size: metrics.sidebarSectionHeaderFontSize, weight: .semibold))
+        }
+        .headerProminence(.increased)
     }
 
     private func sidebarSectionHeader(
@@ -451,194 +652,8 @@ struct SidebarView: View {
         .buttonStyle(.plain)
         .listRowBackground(isActive ? Color.accentColor.opacity(0.12) : Color.clear)
         .help(isActive
-            ? String(localized: "Clear the \(signal.title) filter. \(signal.explanation)")
-            : String(localized: "Show \(signal.title) traffic. \(signal.explanation)"))
-    }
-
-    private var favoritesSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isPinnedExpanded)) {
-                let pinned = pinnedTransactions
-                if pinned.isEmpty {
-                    Text(
-                        SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? String(localized: "No matching pinned items")
-                            : String(localized: "No pinned items")
-                    )
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: metrics.sidebarSecondaryFontSize))
-                        .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
-                } else {
-                    ForEach(pinned) { transaction in
-                        Label {
-                            Text(transaction.request.host + transaction.request.path)
-                                .font(sidebarNavigationFont)
-                                .lineLimit(1)
-                        } icon: {
-                            Image(systemName: "pin.fill")
-                                .font(sidebarIconFont)
-                                .foregroundStyle(.orange)
-                        }
-                        .font(sidebarNavigationFont)
-                        .tag(SidebarItem.pinnedTransaction(id: transaction.id))
-                        .frame(minHeight: metrics.sidebarRowHeight)
-                        .contextMenu {
-                            favoriteTransactionContextMenu(transaction, section: .pinned)
-                        }
-                    }
-                }
-            } label: {
-                Label(String(localized: "Pinned"), systemImage: "pin.fill")
-                    .badge(pinnedTransactions.count)
-                    .tag(SidebarItem.allPinned)
-                    .frame(minHeight: metrics.sidebarRowHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture { coordinator.selectSidebarItem(.allPinned) }
-            }
-
-            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isSavedExpanded)) {
-                let saved = savedTransactions
-                if saved.isEmpty {
-                    Text(
-                        SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? String(localized: "No matching saved items")
-                            : String(localized: "No saved items")
-                    )
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: metrics.sidebarSecondaryFontSize))
-                        .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
-                } else {
-                    ForEach(saved) { transaction in
-                        Label {
-                            Text(transaction.request.host + transaction.request.path)
-                                .font(sidebarNavigationFont)
-                                .lineLimit(1)
-                        } icon: {
-                            Image(systemName: "tray.full.fill")
-                                .font(sidebarIconFont)
-                        }
-                        .font(sidebarNavigationFont)
-                        .tag(SidebarItem.savedTransaction(id: transaction.id))
-                        .frame(minHeight: metrics.sidebarRowHeight)
-                        .contextMenu {
-                            favoriteTransactionContextMenu(transaction, section: .saved)
-                        }
-                    }
-                }
-            } label: {
-                Label(String(localized: "Saved"), systemImage: "tray.full.fill")
-                    .badge(savedTransactions.count)
-                    .tag(SidebarItem.allSaved)
-                    .frame(minHeight: metrics.sidebarRowHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture { coordinator.selectSidebarItem(.allSaved) }
-            }
-
-            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isNotesExpanded)) {
-                let notes = notesTransactions
-                if notes.isEmpty {
-                    Text(
-                        SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? String(localized: "No matching notes")
-                            : String(localized: "No notes")
-                    )
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: metrics.sidebarSecondaryFontSize))
-                        .frame(minHeight: metrics.sidebarRowHeight, alignment: .center)
-                } else {
-                    ForEach(notes) { transaction in
-                        Label {
-                            Text(transaction.request.host + transaction.request.path)
-                                .font(sidebarNavigationFont)
-                                .lineLimit(1)
-                        } icon: {
-                            Image(systemName: "note.text")
-                                .font(sidebarIconFont)
-                        }
-                        .font(sidebarNavigationFont)
-                        .tag(SidebarItem.noteTransaction(id: transaction.id))
-                        .frame(minHeight: metrics.sidebarRowHeight)
-                        .contextMenu {
-                            favoriteTransactionContextMenu(transaction, section: .notes)
-                        }
-                    }
-                }
-            } label: {
-                Label(String(localized: "Notes"), systemImage: "note.text")
-                    .badge(notesTransactions.count)
-                    .tag(SidebarItem.allNotes)
-                    .frame(minHeight: metrics.sidebarRowHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture { coordinator.selectSidebarItem(.allNotes) }
-            }
-
-            ForEach(filteredFavorites, id: \.self) { item in
-                favoriteRow(item)
-            }
-        } header: {
-            Text(String(localized: "Favorites"))
-                .foregroundStyle(Theme.Sidebar.favoritesHeader)
-                .font(.system(size: metrics.sidebarSectionHeaderFontSize, weight: .semibold))
-        }
-        .headerProminence(.increased)
-    }
-
-    private var allSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isAppsExpanded)) {
-                ForEach(appNodes) { app in
-                    DisclosureGroup(isExpanded: appExpansionBinding(for: app.name)) {
-                        ForEach(app.domains, id: \.self) { domain in
-                            domainLabel(domain, requestCount: 0)
-                        }
-                    } label: {
-                        Label {
-                            Text(app.name)
-                                .font(sidebarNavigationFont)
-                        } icon: {
-                            AppIconView(name: app.name)
-                        }
-                        .font(sidebarNavigationFont)
-                        .badge(app.requestCount)
-                        .tag(SidebarItem.app(name: app.name, bundleId: nil))
-                        .frame(minHeight: metrics.sidebarRowHeight)
-                        .contextMenu { appContextMenu(app) }
-                    }
-                }
-            } label: {
-                Label(String(localized: "Apps"), systemImage: "square.stack.3d.up.fill")
-                    .badge(appNodes.count)
-                    .tag(SidebarItem.allApps)
-                    .frame(minHeight: metrics.sidebarRowHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture { coordinator.selectSidebarItem(.allApps) }
-            }
-
-            DisclosureGroup(isExpanded: searchAwareExpansionBinding(for: $isDomainsExpanded)) {
-                ForEach(domainTree) { node in
-                    domainRow(node)
-                }
-            } label: {
-                Label(String(localized: "Domains"), systemImage: "globe")
-                    .badge(
-                        SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? SidebarSearchFilter.domainMatchCount(
-                                coordinator.domainTree,
-                                query: sidebarFilterText
-                            )
-                            : coordinator.totalDomainCount
-                    )
-                    .tag(SidebarItem.allDomains)
-                    .frame(minHeight: metrics.sidebarRowHeight)
-                    .contentShape(Rectangle())
-                    .onTapGesture { coordinator.selectSidebarItem(.allDomains) }
-            }
-        } header: {
-            Text(String(localized: "All"))
-                .foregroundStyle(Theme.Sidebar.sectionHeader)
-                .font(.system(size: metrics.sidebarSectionHeaderFontSize, weight: .semibold))
-        }
-        .headerProminence(.increased)
+            ? String(localized: "Clear the \(signal.title) filter. \(signal.explanation)", bundle: RockxyLocalization.bundle)
+            : String(localized: "Show \(signal.title) traffic. \(signal.explanation)", bundle: RockxyLocalization.bundle))
     }
 
     @ViewBuilder
@@ -696,24 +711,6 @@ struct SidebarView: View {
         }
     }
 
-    // MARK: - Helpers
-
-    private func domainRow(_ node: DomainNode) -> AnyView {
-        if node.children.isEmpty {
-            return AnyView(domainLabel(node))
-        } else {
-            return AnyView(
-                DisclosureGroup(isExpanded: domainExpansionBinding(for: node.id)) {
-                    ForEach(node.children) { child in
-                        domainRow(child)
-                    }
-                } label: {
-                    domainLabel(node)
-                }
-            )
-        }
-    }
-
     private func domainLabel(_ domain: String, requestCount: Int) -> some View {
         domainLabel(
             DomainNode(
@@ -746,7 +743,7 @@ struct SidebarView: View {
                         .labelStyle(.titleAndIcon)
                         .font(.system(size: metrics.sidebarBadgeFontSize))
                         .foregroundStyle(.orange)
-                        .help(String(localized: "\(node.errorCount) failed or error responses"))
+                        .help(String(localized: "\(node.errorCount) failed or error responses", bundle: RockxyLocalization.bundle))
                 }
             }
         } icon: {
@@ -760,6 +757,416 @@ struct SidebarView: View {
         .frame(minHeight: metrics.sidebarRowHeight)
         .contextMenu { domainContextMenu(node.selectionDomain, pathPrefix: node.pathPrefix) }
         .help(domainHelpText(for: node))
+    }
+
+    // MARK: - Context Menus
+
+    @ViewBuilder
+    private func domainContextMenu(_ domain: String, pathPrefix: String? = nil) -> some View {
+        let item = pathPrefix.map { SidebarItem.domainPath(domain: domain, pathPrefix: $0) }
+            ?? SidebarItem.domainNode(domain: domain)
+        let isPinned = coordinator.isFavorite(item)
+
+        Button {
+            coordinator.toggleSidebarFavorite(item)
+        } label: {
+            Label(
+                isPinned ? String(localized: "Unpin", bundle: RockxyLocalization.bundle) : String(localized: "Pin", bundle: RockxyLocalization.bundle),
+                systemImage: isPinned ? "pin.slash" : "pin"
+            )
+        }
+
+        Button {
+            guard coordinator.workspaceStore.canCreateWorkspace else {
+                return
+            }
+            var filter = FilterCriteria.empty
+            filter.sidebarDomain = domain
+            filter.sidebarPathPrefix = pathPrefix
+            let title = pathPrefix.map { "\(domain)\($0)" } ?? domain
+            let ws = coordinator.workspaceStore.createWorkspace(title: title, filter: filter)
+            RockxyWorkspaceWindowManager.shared.openWorkspaceTab(coordinator: coordinator, workspaceID: ws.id)
+            RockxyWorkspaceWindowManager.shared.prepareWorkspaceContent(ws, coordinator: coordinator)
+        } label: {
+            Label(
+                String(localized: "Open in New Tab", bundle: RockxyLocalization.bundle),
+                systemImage: "plus.rectangle.on.rectangle"
+            )
+        }
+        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
+
+        Divider()
+
+        if coordinator.isSSLProxyingEnabled(for: domain) {
+            Button {
+                coordinator.disableSSLProxyingForDomain(domain)
+            } label: {
+                Label(
+                    String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
+            }
+        } else {
+            Button {
+                coordinator.enableSSLProxyingForDomain(domain)
+            } label: {
+                Label(
+                    String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
+            }
+        }
+
+        if coordinator.isInBypassList(domain) {
+            Button {
+                coordinator.removeFromBypassList(domain)
+            } label: {
+                Label(
+                    String(localized: "Remove from Full Proxy Bypass", bundle: RockxyLocalization.bundle),
+                    systemImage: "arrow.uturn.right"
+                )
+            }
+        } else {
+            Button {
+                coordinator.addToBypassList(domain)
+            } label: {
+                Label(
+                    String(localized: "Add to Full Proxy Bypass", bundle: RockxyLocalization.bundle),
+                    systemImage: "arrow.uturn.right"
+                )
+            }
+        }
+
+        Button {
+            coordinator.sortDomainTreeAlphabetically()
+        } label: {
+            Label(
+                String(localized: "Sort by Alphabet", bundle: RockxyLocalization.bundle),
+                systemImage: "textformat.abc"
+            )
+        }
+
+        Button {
+            coordinator.muteTrafficSource(.host(domain))
+            coordinator.focusNavigatorMode = .focus
+        } label: {
+            Label(String(localized: "Mute Source", bundle: RockxyLocalization.bundle), systemImage: "eye.slash")
+        }
+
+        Divider()
+
+        Menu {
+            Button {
+                coordinator.createBreakpointRuleForDomain(domain)
+            } label: {
+                Label(String(localized: "Breakpoint", bundle: RockxyLocalization.bundle), systemImage: "pause.circle")
+            }
+
+            Divider()
+
+            Button {
+                coordinator.createMapLocalRuleForDomain(domain)
+            } label: {
+                Label(String(localized: "Map Local", bundle: RockxyLocalization.bundle), systemImage: "doc")
+            }
+            Button {
+                coordinator.createMapRemoteRuleForDomain(domain)
+            } label: {
+                Label(
+                    String(localized: "Map Remote", bundle: RockxyLocalization.bundle),
+                    systemImage: "arrow.triangle.swap"
+                )
+            }
+
+            Divider()
+
+            Button {
+                coordinator.createBlockRuleForDomain(domain)
+            } label: {
+                Label(String(localized: "Block", bundle: RockxyLocalization.bundle), systemImage: "nosign")
+            }
+            Button {
+                coordinator.createAllowListRuleForDomain(domain)
+            } label: {
+                Label(
+                    String(localized: "Create Allow List Rule…", bundle: RockxyLocalization.bundle),
+                    systemImage: "line.3.horizontal.decrease.circle"
+                )
+            }
+
+            Divider()
+
+            Button {
+                coordinator.createNetworkConditionsRuleForDomain(domain)
+            } label: {
+                Label(
+                    String(localized: "Network Conditions", bundle: RockxyLocalization.bundle),
+                    systemImage: "wifi.exclamationmark"
+                )
+            }
+        } label: {
+            Label(String(localized: "Tools", bundle: RockxyLocalization.bundle), systemImage: "wrench")
+        }
+
+        Menu {
+            Button {
+                coordinator.copyDomainToClipboard(pathPrefix.map { "\(domain)\($0)" } ?? domain)
+            } label: {
+                Label(
+                    pathPrefix == nil
+                        ? String(localized: "Copy Domain", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Copy Path Filter", bundle: RockxyLocalization.bundle),
+                    systemImage: "doc.on.doc"
+                )
+            }
+            Button {
+                coordinator.exportTransactionsForDomain(domain, pathPrefix: pathPrefix)
+            } label: {
+                Label(
+                    String(localized: "Export Transactions", bundle: RockxyLocalization.bundle),
+                    systemImage: "square.and.arrow.up"
+                )
+            }
+        } label: {
+            Label(String(localized: "Export", bundle: RockxyLocalization.bundle), systemImage: "square.and.arrow.up")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            coordinator.removeDomainFromSidebar(domain, pathPrefix: pathPrefix)
+        } label: {
+            Label(String(localized: "Delete", bundle: RockxyLocalization.bundle), systemImage: "trash")
+        }
+    }
+
+    @ViewBuilder
+    private func favoriteTransactionContextMenu(
+        _ transaction: HTTPTransaction,
+        section: FavoriteTransactionSection
+    )
+        -> some View
+    {
+        let model = FavoriteTransactionContextMenuModel(
+            transaction: transaction,
+            section: section,
+            isSSLProxyingEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+        )
+
+        Button {
+            coordinator.openFavoriteTransactionInNewTab(transaction, from: section)
+        } label: {
+            Label(
+                String(localized: "Open in New Tab", bundle: RockxyLocalization.bundle),
+                systemImage: "plus.rectangle.on.rectangle"
+            )
+        }
+        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
+
+        Button {
+            coordinator.copyURL(for: transaction)
+        } label: {
+            Label(String(localized: "Copy URL", bundle: RockxyLocalization.bundle), systemImage: "doc.on.doc")
+        }
+
+        Button {
+            coordinator.copyCURL(for: transaction)
+        } label: {
+            Label(String(localized: "Copy cURL", bundle: RockxyLocalization.bundle), systemImage: "terminal")
+        }
+
+        Divider()
+
+        Button {
+            coordinator.toggleSSLProxying(for: transaction)
+        } label: {
+            Label(model.sslProxyingTitle, systemImage: "lock.shield")
+        }
+        .disabled(!model.canToggleSSLProxying)
+        .help(model.sslProxyingDisabledReason ?? "")
+
+        Menu {
+            favoriteTransactionToolsMenu(transaction, options: model.tools)
+        } label: {
+            Label(String(localized: "Tools", bundle: RockxyLocalization.bundle), systemImage: "wrench.and.screwdriver")
+        }
+
+        Menu {
+            favoriteTransactionExportMenu(transaction, options: model.exports)
+        } label: {
+            Label(String(localized: "Export", bundle: RockxyLocalization.bundle), systemImage: "square.and.arrow.up")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            coordinator.removeFavoriteTransaction(transaction, from: section)
+        } label: {
+            Label(model.deleteTitle, systemImage: "trash")
+        }
+    }
+
+    private func favoriteTransactionToolsMenu(
+        _ transaction: HTTPTransaction,
+        options: [FavoriteTransactionMenuOption<FavoriteTransactionToolAction>]
+    )
+        -> some View
+    {
+        ForEach(options, id: \.action) { option in
+            if option.action == .mapLocal || option.action == .blockList
+                || option.action == .networkConditions
+            {
+                Divider()
+            }
+
+            Button {
+                performFavoriteTransactionTool(option.action, for: transaction)
+            } label: {
+                Label(option.title, systemImage: option.systemImage)
+            }
+            .disabled(!option.isEnabled)
+            .help(option.disabledReason ?? "")
+        }
+    }
+
+    private func favoriteTransactionExportMenu(
+        _ transaction: HTTPTransaction,
+        options: [FavoriteTransactionMenuOption<FavoriteTransactionExportFormat>]
+    )
+        -> some View
+    {
+        ForEach(options, id: \.action) { option in
+            if option.action == .requestBody {
+                Divider()
+            }
+
+            Button {
+                coordinator.exportFavoriteTransaction(transaction, as: option.action)
+            } label: {
+                Label(option.title, systemImage: option.systemImage)
+            }
+            .disabled(!option.isEnabled)
+            .help(option.disabledReason ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func appContextMenu(_ app: AppInfo) -> some View {
+        let item = SidebarItem.app(name: app.name, bundleId: nil)
+        let isPinned = coordinator.isFavorite(item)
+        let isSSLProxyingEnabledForApp = coordinator.isSSLProxyingFullyEnabled(forAppNamed: app.name)
+
+        Button {
+            coordinator.toggleSidebarFavorite(item)
+        } label: {
+            Label(
+                isPinned ? String(localized: "Unpin", bundle: RockxyLocalization.bundle) : String(localized: "Pin", bundle: RockxyLocalization.bundle),
+                systemImage: isPinned ? "pin.slash" : "pin"
+            )
+        }
+
+        Button {
+            guard coordinator.workspaceStore.canCreateWorkspace else {
+                return
+            }
+            var filter = FilterCriteria.empty
+            filter.sidebarApp = app.name
+            let ws = coordinator.workspaceStore.createWorkspace(title: app.name, filter: filter)
+            RockxyWorkspaceWindowManager.shared.openWorkspaceTab(coordinator: coordinator, workspaceID: ws.id)
+            RockxyWorkspaceWindowManager.shared.prepareWorkspaceContent(ws, coordinator: coordinator)
+        } label: {
+            Label(
+                String(localized: "Open in New Tab", bundle: RockxyLocalization.bundle),
+                systemImage: "plus.rectangle.on.rectangle"
+            )
+        }
+        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
+
+        Divider()
+
+        if isSSLProxyingEnabledForApp {
+            Button {
+                coordinator.disableSSLProxyingForApp(app)
+            } label: {
+                Label(
+                    String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
+            }
+        } else {
+            Button {
+                coordinator.enableSSLProxyingForApp(app)
+            } label: {
+                Label(
+                    String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
+            }
+        }
+
+        Button {
+            coordinator.sortAppNodesAlphabetically()
+        } label: {
+            Label(
+                String(localized: "Sort by Alphabet", bundle: RockxyLocalization.bundle),
+                systemImage: "textformat.abc"
+            )
+        }
+
+        Button {
+            for domain in app.domains {
+                coordinator.muteTrafficSource(.host(domain))
+            }
+            coordinator.focusNavigatorMode = .focus
+        } label: {
+            Label(String(localized: "Mute App Sources", bundle: RockxyLocalization.bundle), systemImage: "eye.slash")
+        }
+
+        Divider()
+
+        Menu {
+            Button {
+                coordinator.copyDomainToClipboard(app.name)
+            } label: {
+                Label(String(localized: "Copy App Name", bundle: RockxyLocalization.bundle), systemImage: "doc.on.doc")
+            }
+            Button {
+                coordinator.exportTransactionsForApp(app.name)
+            } label: {
+                Label(
+                    String(localized: "Export Transactions", bundle: RockxyLocalization.bundle),
+                    systemImage: "square.and.arrow.up"
+                )
+            }
+        } label: {
+            Label(String(localized: "Export", bundle: RockxyLocalization.bundle), systemImage: "square.and.arrow.up")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            coordinator.removeAppFromSidebar(app.name)
+        } label: {
+            Label(String(localized: "Delete", bundle: RockxyLocalization.bundle), systemImage: "trash")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func domainRow(_ node: DomainNode) -> AnyView {
+        if node.children.isEmpty {
+            AnyView(domainLabel(node))
+        } else {
+            AnyView(
+                DisclosureGroup(isExpanded: domainExpansionBinding(for: node.id)) {
+                    ForEach(node.children) { child in
+                        domainRow(child)
+                    }
+                } label: {
+                    domainLabel(node)
+                }
+            )
+        }
     }
 
     private func domainExpansionBinding(for nodeID: String) -> Binding<Bool> {
@@ -849,269 +1256,6 @@ struct SidebarView: View {
         return node.selectionDomain
     }
 
-    private var sidebarNavigationFont: Font {
-        .system(size: metrics.sidebarNavigationFontSize)
-    }
-
-    private var sidebarIconFont: Font {
-        .system(size: metrics.sidebarIconFontSize)
-    }
-
-    // MARK: - Context Menus
-
-    @ViewBuilder
-    private func domainContextMenu(_ domain: String, pathPrefix: String? = nil) -> some View {
-        let item = pathPrefix.map { SidebarItem.domainPath(domain: domain, pathPrefix: $0) }
-            ?? SidebarItem.domainNode(domain: domain)
-        let isPinned = coordinator.isFavorite(item)
-
-        Button {
-            coordinator.toggleSidebarFavorite(item)
-        } label: {
-            Label(
-                isPinned ? String(localized: "Unpin") : String(localized: "Pin"),
-                systemImage: isPinned ? "pin.slash" : "pin"
-            )
-        }
-
-        Button {
-            guard coordinator.workspaceStore.canCreateWorkspace else {
-                return
-            }
-            var filter = FilterCriteria.empty
-            filter.sidebarDomain = domain
-            filter.sidebarPathPrefix = pathPrefix
-            let title = pathPrefix.map { "\(domain)\($0)" } ?? domain
-            let ws = coordinator.workspaceStore.createWorkspace(title: title, filter: filter)
-            RockxyWorkspaceWindowManager.shared.openWorkspaceTab(coordinator: coordinator, workspaceID: ws.id)
-            RockxyWorkspaceWindowManager.shared.prepareWorkspaceContent(ws, coordinator: coordinator)
-        } label: {
-            Label(String(localized: "Open in New Tab"), systemImage: "plus.rectangle.on.rectangle")
-        }
-        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
-
-        Divider()
-
-        if coordinator.isSSLProxyingEnabled(for: domain) {
-            Button {
-                coordinator.disableSSLProxyingForDomain(domain)
-            } label: {
-                Label(String(localized: "Disable SSL Proxying"), systemImage: "lock.shield")
-            }
-        } else {
-            Button {
-                coordinator.enableSSLProxyingForDomain(domain)
-            } label: {
-                Label(String(localized: "Enable SSL Proxying"), systemImage: "lock.shield")
-            }
-        }
-
-        if coordinator.isInBypassList(domain) {
-            Button {
-                coordinator.removeFromBypassList(domain)
-            } label: {
-                Label(String(localized: "Remove from Full Proxy Bypass"), systemImage: "arrow.uturn.right")
-            }
-        } else {
-            Button {
-                coordinator.addToBypassList(domain)
-            } label: {
-                Label(String(localized: "Add to Full Proxy Bypass"), systemImage: "arrow.uturn.right")
-            }
-        }
-
-        Button {
-            coordinator.sortDomainTreeAlphabetically()
-        } label: {
-            Label(String(localized: "Sort by Alphabet"), systemImage: "textformat.abc")
-        }
-
-        Button {
-            coordinator.muteTrafficSource(.host(domain))
-            coordinator.focusNavigatorMode = .focus
-        } label: {
-            Label(String(localized: "Mute Source"), systemImage: "eye.slash")
-        }
-
-        Divider()
-
-        Menu {
-            Button {
-                coordinator.createBreakpointRuleForDomain(domain)
-            } label: {
-                Label(String(localized: "Breakpoint"), systemImage: "pause.circle")
-            }
-
-            Divider()
-
-            Button {
-                coordinator.createMapLocalRuleForDomain(domain)
-            } label: {
-                Label(String(localized: "Map Local"), systemImage: "doc")
-            }
-            Button {
-                coordinator.createMapRemoteRuleForDomain(domain)
-            } label: {
-                Label(String(localized: "Map Remote"), systemImage: "arrow.triangle.swap")
-            }
-
-            Divider()
-
-            Button {
-                coordinator.createBlockRuleForDomain(domain)
-            } label: {
-                Label(String(localized: "Block"), systemImage: "nosign")
-            }
-            Button {
-                coordinator.createAllowListRuleForDomain(domain)
-            } label: {
-                Label(
-                    String(localized: "Create Allow List Rule…"),
-                    systemImage: "line.3.horizontal.decrease.circle"
-                )
-            }
-
-            Divider()
-
-            Button {
-                coordinator.createNetworkConditionsRuleForDomain(domain)
-            } label: {
-                Label(String(localized: "Network Conditions"), systemImage: "wifi.exclamationmark")
-            }
-        } label: {
-            Label(String(localized: "Tools"), systemImage: "wrench")
-        }
-
-        Menu {
-            Button {
-                coordinator.copyDomainToClipboard(pathPrefix.map { "\(domain)\($0)" } ?? domain)
-            } label: {
-                Label(
-                    pathPrefix == nil ? String(localized: "Copy Domain") : String(localized: "Copy Path Filter"),
-                    systemImage: "doc.on.doc"
-                )
-            }
-            Button {
-                coordinator.exportTransactionsForDomain(domain, pathPrefix: pathPrefix)
-            } label: {
-                Label(String(localized: "Export Transactions"), systemImage: "square.and.arrow.up")
-            }
-        } label: {
-            Label(String(localized: "Export"), systemImage: "square.and.arrow.up")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            coordinator.removeDomainFromSidebar(domain, pathPrefix: pathPrefix)
-        } label: {
-            Label(String(localized: "Delete"), systemImage: "trash")
-        }
-    }
-
-    @ViewBuilder
-    private func favoriteTransactionContextMenu(
-        _ transaction: HTTPTransaction,
-        section: FavoriteTransactionSection
-    ) -> some View {
-        let model = FavoriteTransactionContextMenuModel(
-            transaction: transaction,
-            section: section,
-            isSSLProxyingEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host)
-        )
-
-        Button {
-            coordinator.openFavoriteTransactionInNewTab(transaction, from: section)
-        } label: {
-            Label(String(localized: "Open in New Tab"), systemImage: "plus.rectangle.on.rectangle")
-        }
-        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
-
-        Button {
-            coordinator.copyURL(for: transaction)
-        } label: {
-            Label(String(localized: "Copy URL"), systemImage: "doc.on.doc")
-        }
-
-        Button {
-            coordinator.copyCURL(for: transaction)
-        } label: {
-            Label(String(localized: "Copy cURL"), systemImage: "terminal")
-        }
-
-        Divider()
-
-        Button {
-            coordinator.toggleSSLProxying(for: transaction)
-        } label: {
-            Label(model.sslProxyingTitle, systemImage: "lock.shield")
-        }
-        .disabled(!model.canToggleSSLProxying)
-        .help(model.sslProxyingDisabledReason ?? "")
-
-        Menu {
-            favoriteTransactionToolsMenu(transaction, options: model.tools)
-        } label: {
-            Label(String(localized: "Tools"), systemImage: "wrench.and.screwdriver")
-        }
-
-        Menu {
-            favoriteTransactionExportMenu(transaction, options: model.exports)
-        } label: {
-            Label(String(localized: "Export"), systemImage: "square.and.arrow.up")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            coordinator.removeFavoriteTransaction(transaction, from: section)
-        } label: {
-            Label(model.deleteTitle, systemImage: "trash")
-        }
-    }
-
-    @ViewBuilder
-    private func favoriteTransactionToolsMenu(
-        _ transaction: HTTPTransaction,
-        options: [FavoriteTransactionMenuOption<FavoriteTransactionToolAction>]
-    ) -> some View {
-        ForEach(options, id: \.action) { option in
-            if option.action == .mapLocal || option.action == .blockList
-                || option.action == .networkConditions
-            {
-                Divider()
-            }
-
-            Button {
-                performFavoriteTransactionTool(option.action, for: transaction)
-            } label: {
-                Label(option.title, systemImage: option.systemImage)
-            }
-            .disabled(!option.isEnabled)
-            .help(option.disabledReason ?? "")
-        }
-    }
-
-    @ViewBuilder
-    private func favoriteTransactionExportMenu(
-        _ transaction: HTTPTransaction,
-        options: [FavoriteTransactionMenuOption<FavoriteTransactionExportFormat>]
-    ) -> some View {
-        ForEach(options, id: \.action) { option in
-            if option.action == .requestBody {
-                Divider()
-            }
-
-            Button {
-                coordinator.exportFavoriteTransaction(transaction, as: option.action)
-            } label: {
-                Label(option.title, systemImage: option.systemImage)
-            }
-            .disabled(!option.isEnabled)
-            .help(option.disabledReason ?? "")
-        }
-    }
-
     private func performFavoriteTransactionTool(
         _ action: FavoriteTransactionToolAction,
         for transaction: HTTPTransaction
@@ -1129,92 +1273,6 @@ struct SidebarView: View {
             coordinator.createAllowListRule(for: transaction)
         case .networkConditions:
             coordinator.createNetworkConditionsRule(for: transaction)
-        }
-    }
-
-    @ViewBuilder
-    private func appContextMenu(_ app: AppInfo) -> some View {
-        let item = SidebarItem.app(name: app.name, bundleId: nil)
-        let isPinned = coordinator.isFavorite(item)
-        let isSSLProxyingEnabledForApp = coordinator.isSSLProxyingFullyEnabled(forAppNamed: app.name)
-
-        Button {
-            coordinator.toggleSidebarFavorite(item)
-        } label: {
-            Label(
-                isPinned ? String(localized: "Unpin") : String(localized: "Pin"),
-                systemImage: isPinned ? "pin.slash" : "pin"
-            )
-        }
-
-        Button {
-            guard coordinator.workspaceStore.canCreateWorkspace else {
-                return
-            }
-            var filter = FilterCriteria.empty
-            filter.sidebarApp = app.name
-            let ws = coordinator.workspaceStore.createWorkspace(title: app.name, filter: filter)
-            RockxyWorkspaceWindowManager.shared.openWorkspaceTab(coordinator: coordinator, workspaceID: ws.id)
-            RockxyWorkspaceWindowManager.shared.prepareWorkspaceContent(ws, coordinator: coordinator)
-        } label: {
-            Label(String(localized: "Open in New Tab"), systemImage: "plus.rectangle.on.rectangle")
-        }
-        .disabled(!coordinator.workspaceStore.canCreateWorkspace)
-
-        Divider()
-
-        if isSSLProxyingEnabledForApp {
-            Button {
-                coordinator.disableSSLProxyingForApp(app)
-            } label: {
-                Label(String(localized: "Disable SSL Proxying"), systemImage: "lock.shield")
-            }
-        } else {
-            Button {
-                coordinator.enableSSLProxyingForApp(app)
-            } label: {
-                Label(String(localized: "Enable SSL Proxying"), systemImage: "lock.shield")
-            }
-        }
-
-        Button {
-            coordinator.sortAppNodesAlphabetically()
-        } label: {
-            Label(String(localized: "Sort by Alphabet"), systemImage: "textformat.abc")
-        }
-
-        Button {
-            for domain in app.domains {
-                coordinator.muteTrafficSource(.host(domain))
-            }
-            coordinator.focusNavigatorMode = .focus
-        } label: {
-            Label(String(localized: "Mute App Sources"), systemImage: "eye.slash")
-        }
-
-        Divider()
-
-        Menu {
-            Button {
-                coordinator.copyDomainToClipboard(app.name)
-            } label: {
-                Label(String(localized: "Copy App Name"), systemImage: "doc.on.doc")
-            }
-            Button {
-                coordinator.exportTransactionsForApp(app.name)
-            } label: {
-                Label(String(localized: "Export Transactions"), systemImage: "square.and.arrow.up")
-            }
-        } label: {
-            Label(String(localized: "Export"), systemImage: "square.and.arrow.up")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            coordinator.removeAppFromSidebar(app.name)
-        } label: {
-            Label(String(localized: "Delete"), systemImage: "trash")
         }
     }
 }

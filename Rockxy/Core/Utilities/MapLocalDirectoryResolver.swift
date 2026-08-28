@@ -59,6 +59,48 @@ enum MapLocalDirectoryResolver {
     )
         -> Result<ResolvedFile, MapLocalError>
     {
+        let subpath = extractSubpath(requestPath: requestPath, urlPattern: urlPattern)
+        return serve(subpath: subpath, directoryPath: directoryPath)
+    }
+
+    /// Resolves a request to a local file using the authored match context the editor
+    /// persisted. Wildcard rules map the suffix after the authored prefix; regex rules
+    /// use the first capture group when one is present (Proxyman directory semantics).
+    /// Query and fragment are stripped before any filesystem access.
+    ///
+    /// - Returns: A `ResolvedFile` on success, or a `MapLocalError` on failure so the
+    ///   caller can fall back to the original upstream request.
+    static func resolve(
+        requestURL: String,
+        matchContext: MapLocalMatchContext,
+        directoryPath: String
+    )
+        -> Result<ResolvedFile, MapLocalError>
+    {
+        guard let subpath = extractSubpath(matchContext: matchContext, requestURL: requestURL) else {
+            return .failure(.fileNotFound(path: requestURL))
+        }
+        return serve(subpath: subpath, directoryPath: directoryPath)
+    }
+
+    // MARK: Private
+
+    private static let logger = Logger(
+        subsystem: RockxyIdentity.current.logSubsystem,
+        category: "MapLocalDirectoryResolver"
+    )
+
+    /// Maximum file size: 10 MB (same as MapLocalFileValidator).
+    private static let maxFileSize: UInt64 = 10 * 1_024 * 1_024
+
+    /// Serves the file addressed by `subpath` inside `directoryPath`, enforcing directory
+    /// existence, traversal containment, symlink containment, and the size limit.
+    private static func serve(
+        subpath: String,
+        directoryPath: String
+    )
+        -> Result<ResolvedFile, MapLocalError>
+    {
         let expanded = (directoryPath as NSString).expandingTildeInPath
         let dirURL = URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL
 
@@ -69,7 +111,6 @@ enum MapLocalDirectoryResolver {
             return .failure(.directoryNotFound)
         }
 
-        let subpath = extractSubpath(requestPath: requestPath, urlPattern: urlPattern)
         let targetURL = resolveTargetURL(dirURL: dirURL, subpath: subpath)
 
         let resolved = targetURL.resolvingSymlinksInPath()
@@ -82,35 +123,21 @@ enum MapLocalDirectoryResolver {
         }
 
         if !fm.fileExists(atPath: resolved.path) {
-            let indexURL = resolved.appendingPathComponent("index.html")
-            if fm.fileExists(atPath: indexURL.path) {
-                return loadFile(at: indexURL, dirRoot: resolvedDir)
-            }
             logger.info("Map local file not found: \(resolved.path)")
             return .failure(.fileNotFound(path: subpath))
         }
 
         var isDirTarget: ObjCBool = false
         if fm.fileExists(atPath: resolved.path, isDirectory: &isDirTarget), isDirTarget.boolValue {
-            let indexURL = resolved.appendingPathComponent("index.html")
-            if fm.fileExists(atPath: indexURL.path) {
-                return loadFile(at: indexURL, dirRoot: resolvedDir)
-            }
-            return .failure(.fileNotFound(path: "\(subpath)/index.html"))
+            // A directory target (including the mapped root reached by an empty suffix) never
+            // synthesizes an index file — the handler forwards the origin request instead. This
+            // matches the validated Proxyman directory behavior where `/dir/` falls through.
+            logger.info("Map local target is a directory, no index synthesis: \(resolved.path)")
+            return .failure(.fileNotFound(path: subpath))
         }
 
         return loadFile(at: resolved, dirRoot: resolvedDir)
     }
-
-    // MARK: Private
-
-    private static let logger = Logger(
-        subsystem: RockxyIdentity.current.logSubsystem,
-        category: "MapLocalDirectoryResolver"
-    )
-
-    /// Maximum file size: 10 MB (same as MapLocalFileValidator).
-    private static let maxFileSize: UInt64 = 10 * 1_024 * 1_024
 
     /// Extracts the subpath by stripping the URL pattern prefix from the request path.
     /// For a pattern like `https://cdn.example.com/static/.*` and request path `/static/js/app.js`,
@@ -159,10 +186,131 @@ enum MapLocalDirectoryResolver {
         return pattern
     }
 
-    /// Builds the target file URL from directory root and subpath, handling index.html fallback.
+    /// Extracts the subpath using the authored match context. Returns `nil` only when a
+    /// regex rule fails to compile or does not match — the caller treats that as a resolver
+    /// failure and falls back to the origin request.
+    private static func extractSubpath(matchContext: MapLocalMatchContext, requestURL: String) -> String? {
+        let requestPath = pathOnly(from: requestURL)
+
+        if matchContext.matchType == .regex,
+           let authored = matchContext.authoredPattern,
+           !authored.isEmpty
+        {
+            return regexCaptureSubpath(pattern: authored, requestURL: requestURL)
+        }
+
+        // Wildcard (or unspecified legacy) rules strip the authored prefix from the path.
+        let authored = matchContext.authoredPattern
+            ?? matchContext.compiledURLPattern
+            ?? ""
+        let prefix = wildcardPrefixPath(from: authored)
+        return stripPrefix(prefix, from: requestPath)
+    }
+
+    /// Returns the percent-decoded path component of a request URL (or raw path), with any
+    /// query or fragment removed so they can never enter a filesystem path.
+    private static func pathOnly(from requestURL: String) -> String {
+        if let components = URLComponents(string: requestURL) {
+            return components.path.isEmpty ? "/" : components.path
+        }
+        let stripped = requestURL.prefix { $0 != "?" && $0 != "#" }
+        return String(stripped)
+    }
+
+    /// Applies a regex rule to the request URL and returns the first capture group as the
+    /// subpath (Proxyman directory semantics). A capture group is REQUIRED: a regex that
+    /// matches but declares no capture group (or an empty one) fails so the handler falls back
+    /// to the origin rather than reinterpreting the whole request path as a docroot-relative
+    /// path. Query/fragment are always stripped.
+    private static func regexCaptureSubpath(
+        pattern: String,
+        requestURL: String
+    )
+        -> String?
+    {
+        guard case let .success(regex) = RegexValidator.compile(pattern) else {
+            logger.warning("Map local regex directory pattern failed to compile")
+            return nil
+        }
+        let target = String(requestURL.prefix(ProxyLimits.maxURILength))
+        let ns = target as NSString
+        guard let match = regex.firstMatch(in: target, range: NSRange(location: 0, length: ns.length)) else {
+            return nil
+        }
+        guard match.numberOfRanges > 1, match.range(at: 1).location != NSNotFound else {
+            logger.info("Map local regex directory pattern has no capture group; falling back to origin")
+            return nil
+        }
+        return sanitizeCapturedSubpath(ns.substring(with: match.range(at: 1)))
+    }
+
+    /// Normalizes a captured subpath: strip query/fragment, percent-decode, drop a leading
+    /// slash. Percent-decoding is intentional so traversal payloads collapse and get caught
+    /// by the containment check in `serve`.
+    private static func sanitizeCapturedSubpath(_ captured: String) -> String {
+        var value = String(captured.prefix { $0 != "?" && $0 != "#" })
+        value = value.removingPercentEncoding ?? value
+        if value.hasPrefix("/") {
+            value = String(value.dropFirst())
+        }
+        return value
+    }
+
+    /// Extracts the literal path prefix (everything before the first wildcard) from an
+    /// authored wildcard pattern or a legacy compiled regex pattern.
+    ///
+    /// In authored wildcard syntax both `*` (any run) and `?` (one character) are wildcards,
+    /// so the literal prefix ends at whichever appears first. That boundary is taken on the
+    /// raw pattern before any URL parsing, so a wildcard `?` is never mistaken for a query
+    /// separator (nor a `#` for a fragment). A compiled/legacy regex pattern carries escaped
+    /// metacharacters (`\.`, `\/`) or `.*` and may use `?` as a quantifier, so it keeps the
+    /// existing `*`-only boundary to avoid cutting a regex.
+    private static func wildcardPrefixPath(from pattern: String) -> String {
+        let looksCompiledRegex = pattern.contains(".*")
+            || pattern.contains("\\.")
+            || pattern.contains("\\/")
+
+        var literalPrefix = pattern
+        if !looksCompiledRegex,
+           let boundary = pattern.firstIndex(where: { $0 == "*" || $0 == "?" })
+        {
+            literalPrefix = String(pattern[..<boundary])
+        }
+
+        let path = extractPathFromPattern(literalPrefix)
+        let normalized = path
+            .replacingOccurrences(of: "\\.", with: ".")
+            .replacingOccurrences(of: "\\/", with: "/")
+            .replacingOccurrences(of: ".*", with: "*")
+        if let star = normalized.firstIndex(of: "*") {
+            return String(normalized[..<star])
+        }
+        return normalized
+    }
+
+    /// Strips a path prefix from the request path, returning the trailing subpath with no
+    /// leading slash. Mirrors the legacy extraction so both entry points behave identically.
+    private static func stripPrefix(_ prefix: String, from requestPath: String) -> String {
+        let trimmedPrefix = prefix.hasSuffix("/") ? String(prefix.dropLast()) : prefix
+        if !trimmedPrefix.isEmpty, requestPath.hasPrefix(trimmedPrefix) {
+            var sub = String(requestPath.dropFirst(trimmedPrefix.count))
+            if sub.hasPrefix("/") {
+                sub = String(sub.dropFirst())
+            }
+            return sub
+        }
+        if requestPath.hasPrefix("/") {
+            return String(requestPath.dropFirst())
+        }
+        return requestPath
+    }
+
+    /// Builds the target file URL from directory root and subpath. An empty suffix resolves to
+    /// the directory root itself, which `serve` rejects as a directory target — there is no
+    /// implicit index synthesis.
     private static func resolveTargetURL(dirURL: URL, subpath: String) -> URL {
         if subpath.isEmpty {
-            return dirURL.appendingPathComponent("index.html")
+            return dirURL
         }
         return dirURL.appendingPathComponent(subpath).standardizedFileURL
     }

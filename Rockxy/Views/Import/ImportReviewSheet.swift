@@ -72,7 +72,7 @@ struct ImportReviewSummary: Equatable {
     }
 
     var versionLabel: String? {
-        rockxyVersion.map { String(localized: "Rockxy v\($0)") }
+        rockxyVersion.map { String(localized: "Rockxy v\($0)", bundle: RockxyLocalization.bundle) }
     }
 
     var actionTitle: String {
@@ -85,15 +85,20 @@ struct ImportReviewSummary: Equatable {
         if isSessionEmpty {
             if isRockxySession {
                 return String(
-                    localized: "The current session is empty. Opening loads \(incomingRequestsLabel) and \(incomingLogsLabel)."
+                    localized: "The current session is empty. Opening loads \(incomingRequestsLabel) and \(incomingLogsLabel).",
+                    bundle: RockxyLocalization.bundle
                 )
             }
-            return String(localized: "The current session is empty. Importing loads \(incomingRequestsLabel).")
+            return String(
+                localized: "The current session is empty. Importing loads \(incomingRequestsLabel).",
+                bundle: RockxyLocalization.bundle
+            )
         }
         let currentRequests = ImportReviewCopy.requests(currentTransactionCount)
         let currentLogs = ImportReviewCopy.logEntries(currentLogCount)
         return String(
-            localized: "Importing replaces the entire current session — \(currentRequests) and \(currentLogs) — with this capture."
+            localized: "Importing replaces the entire current session — \(currentRequests) and \(currentLogs) — with this capture.",
+            bundle: RockxyLocalization.bundle
         )
     }
 }
@@ -102,43 +107,58 @@ struct ImportReviewSummary: Equatable {
 
 /// Truthful, testable copy for the import review surface.
 enum ImportReviewCopy {
-    static let subtitle = String(localized: "Review this capture before it loads into the current session.")
+    static var subtitle: String {
+        String(
+            localized: "Review this capture before it loads into the current session.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
 
-    static let replaceActionTitle = String(localized: "Replace Session")
+    static var replaceActionTitle: String {
+        String(localized: "Replace Session", bundle: RockxyLocalization.bundle)
+    }
 
     static func fileTypeLabel(_ type: ImportFileType) -> String {
         switch type {
         case .har:
-            String(localized: "HAR Archive (HTTP Archive 1.2)")
+            String(localized: "HAR Archive (HTTP Archive 1.2)", bundle: RockxyLocalization.bundle)
         case .rockxysession:
-            String(localized: "Rockxy Session")
+            String(localized: "Rockxy Session", bundle: RockxyLocalization.bundle)
         }
     }
 
     static func headerTitle(_ type: ImportFileType) -> String {
         switch type {
         case .har:
-            String(localized: "Import HAR Archive")
+            String(localized: "Import HAR Archive", bundle: RockxyLocalization.bundle)
         case .rockxysession:
-            String(localized: "Open Rockxy Session")
+            String(localized: "Open Rockxy Session", bundle: RockxyLocalization.bundle)
         }
     }
 
     static func primaryActionTitle(_ type: ImportFileType) -> String {
         switch type {
         case .har:
-            String(localized: "Import")
+            String(localized: "Import", bundle: RockxyLocalization.bundle)
         case .rockxysession:
-            String(localized: "Open Session")
+            String(localized: "Open Session", bundle: RockxyLocalization.bundle)
         }
     }
 
     static func requests(_ count: Int) -> String {
-        String(localized: "\(count) request\(count == 1 ? "" : "s")")
+        String(AttributedString(
+            localized: "^[\(count) request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     static func logEntries(_ count: Int) -> String {
-        String(localized: "\(count) log entr\(count == 1 ? "y" : "ies")")
+        String(AttributedString(
+            localized: "^[\(count) log entry](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }
 
@@ -214,18 +234,26 @@ struct ImportReviewSheet: View {
     private var summaryCard: some View {
         VStack(spacing: 0) {
             metadataRow(
-                String(localized: "File"),
+                String(localized: "File", bundle: RockxyLocalization.bundle),
                 summary.fileName,
                 identifier: "importReview.summary.file",
                 truncateMiddle: true
             )
             dividerLine
-            metadataRow(String(localized: "Type"), summary.fileTypeLabel, identifier: "importReview.summary.type")
-            dividerLine
-            metadataRow(String(localized: "Size"), summary.fileSizeLabel, identifier: "importReview.summary.size")
+            metadataRow(
+                String(localized: "Type", bundle: RockxyLocalization.bundle),
+                summary.fileTypeLabel,
+                identifier: "importReview.summary.type"
+            )
             dividerLine
             metadataRow(
-                String(localized: "Requests"),
+                String(localized: "Size", bundle: RockxyLocalization.bundle),
+                summary.fileSizeLabel,
+                identifier: "importReview.summary.size"
+            )
+            dividerLine
+            metadataRow(
+                String(localized: "Requests", bundle: RockxyLocalization.bundle),
                 summary.incomingRequestsLabel,
                 identifier: "importReview.summary.requests"
             )
@@ -233,7 +261,7 @@ struct ImportReviewSheet: View {
             if summary.isRockxySession {
                 dividerLine
                 metadataRow(
-                    String(localized: "Logs"),
+                    String(localized: "Logs", bundle: RockxyLocalization.bundle),
                     summary.incomingLogsLabel,
                     identifier: "importReview.summary.logs"
                 )
@@ -241,7 +269,7 @@ struct ImportReviewSheet: View {
                 if let capturedLabel {
                     dividerLine
                     metadataRow(
-                        String(localized: "Captured"),
+                        String(localized: "Captured", bundle: RockxyLocalization.bundle),
                         capturedLabel,
                         identifier: "importReview.summary.captured"
                     )
@@ -250,7 +278,7 @@ struct ImportReviewSheet: View {
                 if let version = summary.versionLabel {
                     dividerLine
                     metadataRow(
-                        String(localized: "Saved with"),
+                        String(localized: "Saved with", bundle: RockxyLocalization.bundle),
                         version,
                         identifier: "importReview.summary.version"
                     )
@@ -284,7 +312,7 @@ struct ImportReviewSheet: View {
             Button {
                 onCancel()
             } label: {
-                Text(String(localized: "Cancel"))
+                Text(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }

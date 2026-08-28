@@ -1,15 +1,13 @@
 import AppKit
 import SwiftUI
 
+// MARK: - InspectorBodyTextEditor
+
 /// NSTextView-backed body editor used by the inspector.
 /// Shows JSON/text payloads with code-like selection, cursor placement, line numbers,
 /// horizontal scrolling, and lightweight syntax coloring.
 struct InspectorBodyTextEditor: NSViewRepresentable {
-    let text: String
-    var editorID: String = UUID().uuidString
-    var editorSettings = InspectorTextEditorSettings()
-    var highlightContext: InspectorHighlightContext = .empty
-    var isEditable = true
+    // MARK: Lifecycle
 
     init(
         text: String,
@@ -33,72 +31,10 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
         )
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = makeScrollView(context: context)
-        context.coordinator.editorID = editorID
-        context.coordinator.scrollView = scrollView
-        configure(scrollView)
-        apply(text, to: scrollView, coordinator: context.coordinator)
-        applyInteractionSettings(to: scrollView.documentView as? NSTextView)
-        resetReadOnlyPreviewPosition(in: scrollView)
-        return scrollView
-    }
-
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        applyUpdate(to: nsView, coordinator: context.coordinator)
-    }
-
     // MARK: Internal
 
-    func applyUpdate(to nsView: NSScrollView, coordinator: Coordinator) {
-        guard let textView = nsView.documentView as? NSTextView else {
-            return
-        }
-        coordinator.editorID = editorID
-        coordinator.scrollView = nsView
-        applyInteractionSettings(to: textView)
-
-        let textChanged = textView.string != text
-        let settingsChanged = coordinator.lastEditorSettings != editorSettings
-        let highlightChanged = coordinator.lastHighlightIdentity != highlightContext.identity
-
-        if textChanged {
-            let selectedRange = textView.selectedRange()
-            let visibleOrigin = nsView.contentView.bounds.origin
-            apply(text, to: nsView, coordinator: coordinator)
-            textView.setSelectedRange(clamped(range: selectedRange, length: (text as NSString).length))
-            restoreVisibleOrigin(visibleOrigin, in: nsView)
-        } else if settingsChanged {
-            let selectedRange = textView.selectedRange()
-            let visibleOrigin = nsView.contentView.bounds.origin
-            applyEditorSettings(to: nsView)
-            coordinator.lastEditorSettings = editorSettings
-            textView.setSelectedRange(clamped(range: selectedRange, length: (text as NSString).length))
-            restoreVisibleOrigin(visibleOrigin, in: nsView)
-        } else if highlightChanged {
-            coordinator.scheduleHighlight(
-                text: text,
-                editorSettings: editorSettings,
-                highlightContext: highlightContext,
-                in: nsView
-            )
-        }
-        applyInteractionSettings(to: textView)
-        resetReadOnlyPreviewHorizontalPosition(in: nsView)
-    }
-
     final class Coordinator {
-        var highlightTask: Task<Void, Never>?
-        var lastHighlightIdentity = ""
-        var lastEditorSettings = InspectorTextEditorSettings()
-        var editorID = ""
-        weak var scrollView: NSScrollView?
-        private var scrollObserver: NSObjectProtocol?
-        private var previewPopover: NSPopover?
+        // MARK: Lifecycle
 
         init() {
             scrollObserver = NotificationCenter.default.addObserver(
@@ -118,6 +54,14 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
                 NotificationCenter.default.removeObserver(scrollObserver)
             }
         }
+
+        // MARK: Internal
+
+        var highlightTask: Task<Void, Never>?
+        var lastHighlightIdentity = ""
+        var lastEditorSettings = InspectorTextEditorSettings()
+        var editorID = ""
+        weak var scrollView: NSScrollView?
 
         @MainActor
         func showPreview(action: QuickPreviewAction, selection: String, relativeTo view: NSView) {
@@ -170,6 +114,11 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
             }
         }
 
+        // MARK: Private
+
+        private var scrollObserver: NSObjectProtocol?
+        private var previewPopover: NSPopover?
+
         private static func baseAttributedString(
             _ text: String,
             editorSettings: InspectorTextEditorSettings
@@ -191,23 +140,6 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
             let style = NSMutableParagraphStyle()
             style.defaultTabInterval = editorSettings.tabInterval
             return style
-        }
-
-        @MainActor
-        private func handleMinimapScroll(_ notification: Notification) {
-            guard let requestedID = notification.userInfo?["editorID"] as? String,
-                  requestedID == editorID,
-                  let fraction = notification.userInfo?["fraction"] as? CGFloat,
-                  let scrollView,
-                  let documentView = scrollView.documentView else
-            {
-                return
-            }
-            let visibleHeight = scrollView.contentView.bounds.height
-            let maxY = max(0, documentView.bounds.height - visibleHeight + scrollView.contentInsets.bottom)
-            let y = min(max(0, fraction), 1) * maxY
-            scrollView.contentView.scroll(to: NSPoint(x: scrollView.contentView.bounds.origin.x, y: y))
-            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
 
         nonisolated private static func highlightSpans(for text: String) -> [HighlightSpan] {
@@ -254,6 +186,23 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
             }
         }
 
+        @MainActor
+        private func handleMinimapScroll(_ notification: Notification) {
+            guard let requestedID = notification.userInfo?["editorID"] as? String,
+                  requestedID == editorID,
+                  let fraction = notification.userInfo?["fraction"] as? CGFloat,
+                  let scrollView,
+                  let documentView = scrollView.documentView else
+            {
+                return
+            }
+            let visibleHeight = scrollView.contentView.bounds.height
+            let maxY = max(0, documentView.bounds.height - visibleHeight + scrollView.contentInsets.bottom)
+            let y = min(max(0, fraction), 1) * maxY
+            scrollView.contentView.scroll(to: NSPoint(x: scrollView.contentView.bounds.origin.x, y: y))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+
         private func clamped(range: NSRange, length: Int) -> NSRange {
             guard range.location != NSNotFound else {
                 return NSRange(location: 0, length: 0)
@@ -262,6 +211,178 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
             let upperBound = min(range.location + range.length, length)
             return NSRange(location: location, length: max(0, upperBound - location))
         }
+    }
+
+    let text: String
+    var editorID: String = UUID().uuidString
+    var editorSettings = InspectorTextEditorSettings()
+    var highlightContext: InspectorHighlightContext = .empty
+    var isEditable = true
+
+    static func applyEditorSettings(_ editorSettings: InspectorTextEditorSettings, to scrollView: NSScrollView) {
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return
+        }
+        scrollView.clipsToBounds = true
+        scrollView.contentView.clipsToBounds = true
+        textView.clipsToBounds = true
+        scrollView.hasHorizontalScroller = !editorSettings.wordWrap
+        scrollView.contentInsets = NSEdgeInsets(
+            top: 0,
+            left: 0,
+            bottom: editorSettings.scrollBeyondLastLine ? 160 : 0,
+            right: 0
+        )
+
+        textView.font = editorSettings.appKitFont
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.isHorizontallyResizable = !editorSettings.wordWrap
+        textView.autoresizingMask = editorSettings.wordWrap ? [.width] : []
+        textView.layoutManager?.showsInvisibleCharacters = editorSettings.showInvisibles
+        textView.layoutManager?.showsControlCharacters = editorSettings.showInvisibles
+
+        if let ruler = scrollView.verticalRulerView as? ScriptCodeEditorRulerView {
+            ruler.applyEditorSettings(editorSettings)
+        } else {
+            scrollView.verticalRulerView?.needsDisplay = true
+        }
+        scrollView.tile()
+
+        if editorSettings.wordWrap {
+            textView.frame.size.width = max(scrollView.contentView.bounds.width, 1)
+            textView.textContainer?.containerSize = NSSize(
+                width: max(scrollView.contentView.bounds.width, 0),
+                height: CGFloat.greatestFiniteMagnitude
+            )
+            textView.textContainer?.widthTracksTextView = true
+        } else {
+            textView.frame.size.width = max(textView.frame.width, scrollView.contentView.bounds.width)
+            textView.textContainer?.containerSize = NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+            textView.textContainer?.widthTracksTextView = false
+        }
+        scrollView.tile()
+        applyTextStorageSettings(editorSettings, to: textView)
+        textView.layoutManager?.invalidateLayout(
+            forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count),
+            actualCharacterRange: nil
+        )
+        textView.needsDisplay = true
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = makeScrollView(context: context)
+        context.coordinator.editorID = editorID
+        context.coordinator.scrollView = scrollView
+        configure(scrollView)
+        apply(text, to: scrollView, coordinator: context.coordinator)
+        applyInteractionSettings(to: scrollView.documentView as? NSTextView)
+        resetReadOnlyPreviewPosition(in: scrollView)
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        applyUpdate(to: nsView, coordinator: context.coordinator)
+    }
+
+    func applyUpdate(to nsView: NSScrollView, coordinator: Coordinator) {
+        guard let textView = nsView.documentView as? NSTextView else {
+            return
+        }
+        coordinator.editorID = editorID
+        coordinator.scrollView = nsView
+        applyInteractionSettings(to: textView)
+
+        let textChanged = textView.string != text
+        let settingsChanged = coordinator.lastEditorSettings != editorSettings
+        let highlightChanged = coordinator.lastHighlightIdentity != highlightContext.identity
+
+        if textChanged {
+            let selectedRange = textView.selectedRange()
+            let visibleOrigin = nsView.contentView.bounds.origin
+            apply(text, to: nsView, coordinator: coordinator)
+            textView.setSelectedRange(clamped(range: selectedRange, length: (text as NSString).length))
+            restoreVisibleOrigin(visibleOrigin, in: nsView)
+        } else if settingsChanged {
+            let selectedRange = textView.selectedRange()
+            let visibleOrigin = nsView.contentView.bounds.origin
+            applyEditorSettings(to: nsView)
+            coordinator.lastEditorSettings = editorSettings
+            textView.setSelectedRange(clamped(range: selectedRange, length: (text as NSString).length))
+            restoreVisibleOrigin(visibleOrigin, in: nsView)
+        } else if highlightChanged {
+            coordinator.scheduleHighlight(
+                text: text,
+                editorSettings: editorSettings,
+                highlightContext: highlightContext,
+                in: nsView
+            )
+        }
+        applyInteractionSettings(to: textView)
+        resetReadOnlyPreviewHorizontalPosition(in: nsView)
+    }
+
+    // MARK: Private
+
+    private struct HighlightSpan: Sendable {
+        let range: NSRange
+        let role: HighlightRole
+    }
+
+    private enum HighlightRole: Sendable {
+        case string
+        case key
+        case number
+        case bool
+        case null
+        case bracket
+        case status
+        case header
+
+        // MARK: Internal
+
+        @MainActor var color: NSColor {
+            switch self {
+            case .string: Theme.JSON.stringNS
+            case .key: Theme.JSON.keyNS
+            case .number: Theme.JSON.numberNS
+            case .bool: Theme.JSON.boolNS
+            case .null: Theme.JSON.nullNS
+            case .bracket: Theme.JSON.bracketNS
+            case .status: Theme.JSON.statusNS
+            case .header: Theme.JSON.headerNS
+            }
+        }
+    }
+
+    private static func applyTextStorageSettings(
+        _ editorSettings: InspectorTextEditorSettings,
+        to textView: NSTextView
+    ) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.defaultTabInterval = editorSettings.tabInterval
+        let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+        textView.typingAttributes = [
+            .font: editorSettings.appKitFont,
+            .foregroundColor: NSColor.textColor,
+            .backgroundColor: NSColor.textBackgroundColor,
+            .paragraphStyle: paragraphStyle,
+        ]
+        guard fullRange.length > 0, let textStorage = textView.textStorage else {
+            return
+        }
+        textStorage.beginEditing()
+        textStorage.addAttributes([
+            .font: editorSettings.appKitFont,
+            .paragraphStyle: paragraphStyle,
+        ], range: fullRange)
+        textStorage.endEditing()
     }
 
     private func configure(_ scrollView: NSScrollView) {
@@ -313,7 +434,10 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
         textStorage.addLayoutManager(layoutManager)
         layoutManager.addTextContainer(textContainer)
 
-        let textView = InspectorSelectableTextView(frame: NSRect(origin: .zero, size: contentSize), textContainer: textContainer)
+        let textView = InspectorSelectableTextView(
+            frame: NSRect(origin: .zero, size: contentSize),
+            textContainer: textContainer
+        )
         textView.previewHandler = { [weak coordinator = context.coordinator] action, selection, view in
             Task { @MainActor in
                 coordinator?.showPreview(action: action, selection: selection, relativeTo: view)
@@ -352,77 +476,6 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
 
     private func applyEditorSettings(to scrollView: NSScrollView) {
         Self.applyEditorSettings(editorSettings, to: scrollView)
-    }
-
-    static func applyEditorSettings(_ editorSettings: InspectorTextEditorSettings, to scrollView: NSScrollView) {
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return
-        }
-        scrollView.clipsToBounds = true
-        scrollView.contentView.clipsToBounds = true
-        textView.clipsToBounds = true
-        scrollView.hasHorizontalScroller = !editorSettings.wordWrap
-        scrollView.contentInsets = NSEdgeInsets(
-            top: 0,
-            left: 0,
-            bottom: editorSettings.scrollBeyondLastLine ? 160 : 0,
-            right: 0
-        )
-
-        textView.font = editorSettings.appKitFont
-        textView.textContainerInset = NSSize(width: 8, height: 8)
-        textView.isHorizontallyResizable = !editorSettings.wordWrap
-        textView.autoresizingMask = editorSettings.wordWrap ? [.width] : []
-        textView.layoutManager?.showsInvisibleCharacters = editorSettings.showInvisibles
-        textView.layoutManager?.showsControlCharacters = editorSettings.showInvisibles
-
-        if let ruler = scrollView.verticalRulerView as? ScriptCodeEditorRulerView {
-            ruler.applyEditorSettings(editorSettings)
-        } else {
-            scrollView.verticalRulerView?.needsDisplay = true
-        }
-        scrollView.tile()
-
-        if editorSettings.wordWrap {
-            textView.frame.size.width = max(scrollView.contentView.bounds.width, 1)
-            textView.textContainer?.containerSize = NSSize(
-                width: max(scrollView.contentView.bounds.width, 0),
-                height: CGFloat.greatestFiniteMagnitude
-            )
-            textView.textContainer?.widthTracksTextView = true
-        } else {
-            textView.frame.size.width = max(textView.frame.width, scrollView.contentView.bounds.width)
-            textView.textContainer?.containerSize = NSSize(
-                width: CGFloat.greatestFiniteMagnitude,
-                height: CGFloat.greatestFiniteMagnitude
-            )
-            textView.textContainer?.widthTracksTextView = false
-        }
-        scrollView.tile()
-        applyTextStorageSettings(editorSettings, to: textView)
-        textView.layoutManager?.invalidateLayout(forCharacterRange: NSRange(location: 0, length: textView.string.utf16.count), actualCharacterRange: nil)
-        textView.needsDisplay = true
-    }
-
-    private static func applyTextStorageSettings(_ editorSettings: InspectorTextEditorSettings, to textView: NSTextView) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.defaultTabInterval = editorSettings.tabInterval
-        let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
-        textView.typingAttributes = [
-            .font: editorSettings.appKitFont,
-            .foregroundColor: NSColor.textColor,
-            .backgroundColor: NSColor.textBackgroundColor,
-            .paragraphStyle: paragraphStyle,
-        ]
-        guard fullRange.length > 0, let textStorage = textView.textStorage else {
-            return
-        }
-        textStorage.beginEditing()
-        textStorage.addAttributes([
-            .font: editorSettings.appKitFont,
-            .paragraphStyle: paragraphStyle,
-        ], range: fullRange)
-        textStorage.endEditing()
     }
 
     private func paragraphStyle(for editorSettings: InspectorTextEditorSettings) -> NSParagraphStyle {
@@ -479,35 +532,6 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
         scrollView.reflectScrolledClipView(clipView)
     }
 
-    private struct HighlightSpan: Sendable {
-        let range: NSRange
-        let role: HighlightRole
-    }
-
-    private enum HighlightRole: Sendable {
-        case string
-        case key
-        case number
-        case bool
-        case null
-        case bracket
-        case status
-        case header
-
-        @MainActor var color: NSColor {
-            switch self {
-            case .string: Theme.JSON.stringNS
-            case .key: Theme.JSON.keyNS
-            case .number: Theme.JSON.numberNS
-            case .bool: Theme.JSON.boolNS
-            case .null: Theme.JSON.nullNS
-            case .bracket: Theme.JSON.bracketNS
-            case .status: Theme.JSON.statusNS
-            case .header: Theme.JSON.headerNS
-            }
-        }
-    }
-
     private func clamped(range: NSRange, length: Int) -> NSRange {
         guard range.location != NSNotFound else {
             return NSRange(location: 0, length: 0)
@@ -521,6 +545,8 @@ struct InspectorBodyTextEditor: NSViewRepresentable {
 // MARK: - InspectorSelectableTextView
 
 final class InspectorSelectableTextView: NSTextView {
+    // MARK: Internal
+
     var previewHandler: ((QuickPreviewAction, String, NSView) -> Void)?
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -537,14 +563,18 @@ final class InspectorSelectableTextView: NSTextView {
 
         let submenu = NSMenu()
         for action in actions {
-            let item = NSMenuItem(title: action.displayName, action: #selector(handleQuickPreview(_:)), keyEquivalent: "")
+            let item = NSMenuItem(
+                title: action.displayName,
+                action: #selector(handleQuickPreview(_:)),
+                keyEquivalent: ""
+            )
             item.target = self
             item.representedObject = action.rawValue
             submenu.addItem(item)
         }
 
         let parent = NSMenuItem(
-            title: String(localized: "Text Selection: View as"),
+            title: String(localized: "Text Selection: View as", bundle: RockxyLocalization.bundle),
             action: nil,
             keyEquivalent: ""
         )
@@ -552,6 +582,8 @@ final class InspectorSelectableTextView: NSTextView {
         menu.addItem(parent)
         return menu
     }
+
+    // MARK: Private
 
     private var selectedText: String {
         let range = selectedRange()
@@ -564,7 +596,8 @@ final class InspectorSelectableTextView: NSTextView {
         return (string as NSString).substring(with: range)
     }
 
-    @objc private func handleQuickPreview(_ sender: NSMenuItem) {
+    @objc
+    private func handleQuickPreview(_ sender: NSMenuItem) {
         guard let rawValue = sender.representedObject as? String,
               let action = QuickPreviewAction(rawValue: rawValue) else
         {
@@ -577,6 +610,8 @@ final class InspectorSelectableTextView: NSTextView {
 // MARK: - AsyncInspectorTextEditor
 
 struct AsyncInspectorTextEditor: View {
+    // MARK: Internal
+
     let renderID: String
     var highlightContext: InspectorHighlightContext = .empty
     let render: @Sendable () -> InspectorTextRenderResult
@@ -585,7 +620,10 @@ struct AsyncInspectorTextEditor: View {
         Group {
             switch state {
             case .loading:
-                InspectorLoadingStateView(title: String(localized: "Rendering Body..."))
+                InspectorLoadingStateView(title: String(
+                    localized: "Rendering Body...",
+                    bundle: RockxyLocalization.bundle
+                ))
             case let .loaded(result):
                 loadedContent(result)
             }
@@ -594,6 +632,8 @@ struct AsyncInspectorTextEditor: View {
             await renderCurrentText()
         }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
     @State private var state: InspectorTextLoadState = .loading
@@ -640,6 +680,8 @@ struct AsyncInspectorTextEditor: View {
 // MARK: - InspectorTextMinimapView
 
 struct InspectorTextMinimapView: View {
+    // MARK: Internal
+
     let text: String
     let editorID: String
 
@@ -680,9 +722,13 @@ struct InspectorTextMinimapView: View {
                         )
                     }
             )
-            .help(String(localized: "Click or drag to scroll body text"))
+            .help(String(localized: "Click or drag to scroll body text", bundle: RockxyLocalization.bundle))
         }
     }
+
+    // MARK: Private
+
+    private static let maxLines = 900
 
     private var sampledLines: [String] {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -692,8 +738,6 @@ struct InspectorTextMinimapView: View {
         let step = max(1, lines.count / Self.maxLines)
         return stride(from: 0, to: lines.count, by: step).map { lines[$0] }
     }
-
-    private static let maxLines = 900
 }
 
 private extension Notification.Name {
@@ -703,6 +747,8 @@ private extension Notification.Name {
 // MARK: - AsyncHexDumpView
 
 struct AsyncHexDumpView: View {
+    // MARK: Internal
+
     let data: Data
     let renderID: String
 
@@ -710,7 +756,10 @@ struct AsyncHexDumpView: View {
         Group {
             switch state {
             case .loading:
-                InspectorLoadingStateView(title: String(localized: "Rendering Hex..."))
+                InspectorLoadingStateView(title: String(
+                    localized: "Rendering Hex...",
+                    bundle: RockxyLocalization.bundle
+                ))
             case let .loaded(text):
                 HexDumpView(hexText: text)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -720,6 +769,8 @@ struct AsyncHexDumpView: View {
             await renderCurrentHex()
         }
     }
+
+    // MARK: Private
 
     @State private var state: AsyncHexDumpState = .loading
 
@@ -739,6 +790,8 @@ struct AsyncHexDumpView: View {
 // MARK: - InspectorLoadingStateView
 
 struct InspectorLoadingStateView: View {
+    // MARK: Internal
+
     let title: String
 
     var body: some View {
@@ -752,6 +805,8 @@ struct InspectorLoadingStateView: View {
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }
@@ -780,26 +835,25 @@ private enum AsyncHexDumpState: Sendable {
 // MARK: - InspectorTransactionSnapshot
 
 struct InspectorTransactionSnapshot: Sendable {
-    let id: UUID
-    let request: InspectorRequestSnapshot
-    let response: InspectorResponseSnapshot?
+    // MARK: Lifecycle
 
     init(transaction: HTTPTransaction) {
         id = transaction.id
         request = InspectorRequestSnapshot(request: transaction.request)
         response = transaction.response.map(InspectorResponseSnapshot.init(response:))
     }
+
+    // MARK: Internal
+
+    let id: UUID
+    let request: InspectorRequestSnapshot
+    let response: InspectorResponseSnapshot?
 }
 
 // MARK: - InspectorRequestSnapshot
 
 struct InspectorRequestSnapshot: Sendable {
-    let method: String
-    let path: String
-    let host: String
-    let httpVersion: String
-    let headers: [InspectorHeaderSnapshot]
-    let body: Data?
+    // MARK: Lifecycle
 
     init(request: HTTPRequestData) {
         method = request.method
@@ -809,17 +863,21 @@ struct InspectorRequestSnapshot: Sendable {
         headers = request.headers.map(InspectorHeaderSnapshot.init(header:))
         body = request.body
     }
+
+    // MARK: Internal
+
+    let method: String
+    let path: String
+    let host: String
+    let httpVersion: String
+    let headers: [InspectorHeaderSnapshot]
+    let body: Data?
 }
 
 // MARK: - InspectorResponseSnapshot
 
 struct InspectorResponseSnapshot: Sendable {
-    let statusCode: Int
-    let statusMessage: String
-    let headers: [InspectorHeaderSnapshot]
-    let body: Data?
-    let displayBody: Data?
-    let contentType: ContentType?
+    // MARK: Lifecycle
 
     init(response: HTTPResponseData) {
         statusCode = response.statusCode
@@ -833,6 +891,17 @@ struct InspectorResponseSnapshot: Sendable {
         contentType = response.contentType
     }
 
+    // MARK: Internal
+
+    let statusCode: Int
+    let statusMessage: String
+    let headers: [InspectorHeaderSnapshot]
+    let body: Data?
+    let displayBody: Data?
+    let contentType: ContentType?
+
+    // MARK: Private
+
     private static func decodedDisplayBody(_ body: Data?, contentEncoding: String?) -> Data? {
         guard let body else {
             return nil
@@ -844,18 +913,24 @@ struct InspectorResponseSnapshot: Sendable {
 // MARK: - InspectorHeaderSnapshot
 
 struct InspectorHeaderSnapshot: Sendable {
-    let name: String
-    let value: String
+    // MARK: Lifecycle
 
     init(header: HTTPHeader) {
         name = header.name
         value = header.value
     }
+
+    // MARK: Internal
+
+    let name: String
+    let value: String
 }
 
 // MARK: - InspectorPayloadFormatter
 
 enum InspectorPayloadFormatter {
+    // MARK: Internal
+
     static func rawRequest(_ request: InspectorRequestSnapshot) -> String {
         var raw = "\(request.method) \(request.path) \(request.httpVersion)\r\n"
         raw += "Host: \(request.host)\r\n"
@@ -896,11 +971,13 @@ enum InspectorPayloadFormatter {
             return .text(text)
         }
         return .unavailable(
-            title: String(localized: "Binary Body"),
+            title: String(localized: "Binary Body", bundle: RockxyLocalization.bundle),
             systemImage: "doc",
             description: SizeFormatter.format(bytes: body.count)
         )
     }
+
+    // MARK: Private
 
     private static func prettyJSONString(from data: Data, sortedKeys: Bool) -> String? {
         guard let object = try? JSONSerialization.jsonObject(with: data) else {

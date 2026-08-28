@@ -221,11 +221,17 @@ enum InvestigationContextBuilderError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .noTransactions:
-            String(localized: "No captured requests are available for review.")
+            String(localized: "No captured requests are available for review.", bundle: RockxyLocalization.bundle)
         case .payloadExceedsLimit:
-            String(localized: "The reviewed context exceeds Rockxy's outbound size limit.")
+            String(
+                localized: "The reviewed context exceeds Rockxy's outbound size limit.",
+                bundle: RockxyLocalization.bundle
+            )
         case .invalidEncoding:
-            String(localized: "Rockxy could not render the reviewed context as UTF-8.")
+            String(
+                localized: "Rockxy could not render the reviewed context as UTF-8.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

@@ -53,13 +53,16 @@ struct AddAllowListRuleSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                Text(isEditing ? String(localized: "Edit Allow Rule") : String(localized: "New Allow Rule"))
-                    .font(
-                        .system(
-                            size: max(15, toolMetrics.bodyFontSize + 2),
-                            weight: .semibold
-                        )
+                Text(isEditing ? String(localized: "Edit Allow Rule", bundle: RockxyLocalization.bundle) : String(
+                    localized: "New Allow Rule",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(
+                    .system(
+                        size: max(15, toolMetrics.bodyFontSize + 2),
+                        weight: .semibold
                     )
+                )
 
                 provenanceBanner
 
@@ -77,7 +80,7 @@ struct AddAllowListRuleSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -127,7 +130,10 @@ struct AddAllowListRuleSheet: View {
     }
 
     private var primaryButtonTitle: String {
-        isEditing ? String(localized: "Save") : String(localized: "Add")
+        isEditing ? String(localized: "Save", bundle: RockxyLocalization.bundle) : String(
+            localized: "Add",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var trimmedName: String {
@@ -153,6 +159,10 @@ struct AddAllowListRuleSheet: View {
         return nil
     }
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     @ViewBuilder private var provenanceBanner: some View {
         if let context = quickCreateContext {
             HStack(spacing: 6) {
@@ -165,18 +175,23 @@ struct AddAllowListRuleSheet: View {
                         if let method = context.sourceMethod {
                             Text(
                                 String(
-                                    localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")"
+                                    localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")",
+                                    bundle: RockxyLocalization.bundle
                                 )
                             )
                         } else {
                             Text(
                                 String(
-                                    localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")"
+                                    localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")",
+                                    bundle: RockxyLocalization.bundle
                                 )
                             )
                         }
                     case .domainQuickCreate:
-                        Text(String(localized: "Created from domain: \(context.sourceHost)"))
+                        Text(String(
+                            localized: "Created from domain: \(context.sourceHost)",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     }
                 }
                 .font(toolMetrics.secondaryFont())
@@ -195,7 +210,7 @@ struct AddAllowListRuleSheet: View {
 
     private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
@@ -216,18 +231,18 @@ struct AddAllowListRuleSheet: View {
 
     private var identityFields: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-            fieldGroup(String(localized: "Name")) {
-                TextField(String(localized: "Untitled"), text: $ruleName)
+            fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                TextField(String(localized: "Untitled", bundle: RockxyLocalization.bundle), text: $ruleName)
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(String(localized: "Rule name"))
+                    .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
             }
             .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-            fieldGroup(String(localized: "URL pattern")) {
+            fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                 TextField("https://example.com/api/*", text: $urlPattern)
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
-                    .accessibilityLabel(String(localized: "URL pattern"))
+                    .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
 
                 if let validationMessage {
                     Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
@@ -241,7 +256,7 @@ struct AddAllowListRuleSheet: View {
 
     private var methodAndMatchRow: some View {
         HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-            inlineField(String(localized: "Method")) {
+            inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
                         Button {
@@ -255,11 +270,11 @@ struct AddAllowListRuleSheet: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "HTTP Method"))
+                .accessibilityLabel(String(localized: "HTTP Method", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(90))
             }
 
-            inlineField(String(localized: "Match type")) {
+            inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(RuleMatchType.allCases, id: \.self) { type in
                         Button {
@@ -273,12 +288,12 @@ struct AddAllowListRuleSheet: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Match Type"))
+                .accessibilityLabel(String(localized: "Match Type", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(175))
             }
 
             if matchType == .wildcard {
-                Text(String(localized: "Support wildcard * and ?."))
+                Text(String(localized: "Support wildcard * and ?.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -290,15 +305,18 @@ struct AddAllowListRuleSheet: View {
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                .toggleStyle(.checkbox)
-                .font(toolMetrics.font())
+            Toggle(
+                String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
+                isOn: $includeSubpaths
+            )
+            .toggleStyle(.checkbox)
+            .font(toolMetrics.font())
         }
     }
 
     private var captureEffectSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Capture Effect"))
+            Text(String(localized: "Capture Effect", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
@@ -306,12 +324,13 @@ struct AddAllowListRuleSheet: View {
                     .foregroundStyle(.green)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Record matching traffic"))
+                    Text(String(localized: "Record matching traffic", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .medium))
                     Text(
                         String(
                             localized:
-                            "Matching requests appear in the session. Other traffic continues through the proxy without being recorded."
+                            "Matching requests appear in the session. Other traffic continues through the proxy without being recorded.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .font(toolMetrics.secondaryFont())
@@ -396,27 +415,29 @@ struct AddAllowListRuleSheet: View {
         }
     }
 
-    private func provenanceDescription(_ context: AllowListEditorContext) -> String {
-        switch context.origin {
-        case .selectedTransaction:
-            if let method = context.sourceMethod {
-                return String(localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")")
-            }
-            return String(localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")")
-        case .domainQuickCreate:
-            return String(localized: "Created from domain: \(context.sourceHost)")
-        }
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     private func footerButtonLabel(_ title: String) -> some View {
         Text(title)
             .frame(
                 width: max(64, toolMetrics.footerButtonWidth - toolMetrics.controlSpacing * 3),
                 height: max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
             )
+    }
+
+    private func provenanceDescription(_ context: AllowListEditorContext) -> String {
+        switch context.origin {
+        case .selectedTransaction:
+            if let method = context.sourceMethod {
+                return String(
+                    localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")",
+                    bundle: RockxyLocalization.bundle
+                )
+            }
+            return String(
+                localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")",
+                bundle: RockxyLocalization.bundle
+            )
+        case .domainQuickCreate:
+            return String(localized: "Created from domain: \(context.sourceHost)", bundle: RockxyLocalization.bundle)
+        }
     }
 }

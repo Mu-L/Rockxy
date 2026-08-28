@@ -208,10 +208,15 @@ final class ProtobufMappingRuleStore {
 enum ProtobufMappingRuleStoreError: LocalizedError, Equatable {
     case ruleNoLongerExists
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .ruleNoLongerExists:
-            String(localized: "This mapping definition was deleted in another window.")
+            String(
+                localized: "This mapping definition was deleted in another window.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

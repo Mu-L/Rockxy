@@ -23,8 +23,8 @@ struct ProxyToolbarContent: ToolbarContent {
             } label: {
                 Label(
                     coordinator.isProxyRunning
-                        ? String(localized: "Stop")
-                        : String(localized: "Start"),
+                        ? String(localized: "Stop", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Start", bundle: RockxyLocalization.bundle),
                     systemImage: coordinator.isProxyRunning ? "stop.fill" : "play.fill"
                 )
             }
@@ -33,9 +33,9 @@ struct ProxyToolbarContent: ToolbarContent {
             Button {
                 openWindow(id: "developerSetupHub")
             } label: {
-                Label(String(localized: "Dev Hub"), systemImage: "command")
+                Label(String(localized: "Dev Hub", bundle: RockxyLocalization.bundle), systemImage: "command")
             }
-            .help(String(localized: "Open Developer Setup"))
+            .help(String(localized: "Open Developer Setup", bundle: RockxyLocalization.bundle))
 
             Divider()
 
@@ -43,14 +43,17 @@ struct ProxyToolbarContent: ToolbarContent {
                 coordinator.toggleInspectorBottom()
             } label: {
                 Label(
-                    String(localized: "Bottom Inspector"),
+                    String(localized: "Bottom Inspector", bundle: RockxyLocalization.bundle),
                     systemImage: "rectangle.split.1x2"
                 )
             }
             .help(
                 coordinator.canToggleBottomInspector
-                    ? String(localized: "Show or hide the bottom inspector panel")
-                    : String(localized: "Select a request to use the bottom inspector")
+                    ? String(localized: "Show or hide the bottom inspector panel", bundle: RockxyLocalization.bundle)
+                    : String(
+                        localized: "Select a request to use the bottom inspector",
+                        bundle: RockxyLocalization.bundle
+                    )
             )
             .disabled(!coordinator.canToggleBottomInspector)
 
@@ -58,11 +61,11 @@ struct ProxyToolbarContent: ToolbarContent {
                 coordinator.toggleInspectorRight()
             } label: {
                 Label(
-                    String(localized: "Context Dock"),
+                    String(localized: "Context Dock", bundle: RockxyLocalization.bundle),
                     systemImage: "sidebar.trailing"
                 )
             }
-            .help(String(localized: "Show or hide the Context Dock"))
+            .help(String(localized: "Show or hide the Context Dock", bundle: RockxyLocalization.bundle))
         }
 
         // Center: status indicator

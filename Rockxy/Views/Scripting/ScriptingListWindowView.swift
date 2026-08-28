@@ -17,17 +17,17 @@ struct ScriptingListWindowView: View {
                 Button(deletionButtonTitle(for: row), role: .destructive) {
                     confirmDeletion(row)
                 }
-                Button(String(localized: "Cancel"), role: .cancel) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                     pendingDeletion = nil
                 }
             } message: { row in
                 Text(deletionMessage(for: row))
             }
             .alert(
-                String(localized: "Scripting"),
+                String(localized: "Scripting", bundle: RockxyLocalization.bundle),
                 isPresented: operationErrorPresented
             ) {
-                Button(String(localized: "OK")) { viewModel.operationError = nil }
+                Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { viewModel.operationError = nil }
             } message: {
                 if let operationError = viewModel.operationError {
                     Text(operationError)
@@ -128,26 +128,31 @@ struct ScriptingListWindowView: View {
     private var infoBannerMessage: String {
         guard viewModel.toolEnabled else {
             return String(
-                localized: "Scripting is off. Enabled scripts are kept, but none run until you turn Scripting on."
+                localized: "Scripting is off. Enabled scripts are kept, but none run until you turn Scripting on.",
+                bundle: RockxyLocalization.bundle
             )
         }
         if enabledScriptCount == 0 {
             return String(
-                localized: "Scripting is on, but no script is enabled. Traffic passes through unchanged."
+                localized: "Scripting is on, but no script is enabled. Traffic passes through unchanged.",
+                bundle: RockxyLocalization.bundle
             )
         }
         if activeScriptCount == 0 {
             return String(
-                localized: "Enabled scripts are not active. Review the Status column before testing traffic."
+                localized: "Enabled scripts are not active. Review the Status column before testing traffic.",
+                bundle: RockxyLocalization.bundle
             )
         }
         if viewModel.advanceAllowChaining {
             return String(
-                localized: "Matching scripts can run in sequence. A block or mock result ends the chain."
+                localized: "Matching scripts can run in sequence. A block or mock result ends the chain.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return String(
-            localized: "Rockxy stops after the first matching script returns a result."
+            localized: "Rockxy stops after the first matching script returns a result.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -155,28 +160,38 @@ struct ScriptingListWindowView: View {
         guard case let .script(id) = viewModel.selectedRowID,
               let script = viewModel.plugins.first(where: { $0.id == id }) else
         {
-            return String(localized: "Enable Script")
+            return String(localized: "Enable Script", bundle: RockxyLocalization.bundle)
         }
         return script.isEnabled
-            ? String(localized: "Disable Script")
-            : String(localized: "Enable Script")
+            ? String(localized: "Disable Script", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable Script", bundle: RockxyLocalization.bundle)
     }
 
     private var footerHint: String {
         let count = isSearching
             ? "\(visibleScriptCount) of \(viewModel.plugins.count)"
             : "\(viewModel.plugins.count)"
-        return String(localized: "\(count) scripts  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder")
+        return String(
+            localized: "\(count) scripts  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var statusText: String {
         guard viewModel.toolEnabled else {
-            return String(localized: "SCRIPTING OFF")
+            return String(localized: "SCRIPTING OFF", bundle: RockxyLocalization.bundle)
         }
         if activeScriptCount == 0 {
-            return String(localized: "NO ACTIVE SCRIPTS")
+            return String(localized: "NO ACTIVE SCRIPTS", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "\(activeScriptCount) ACTIVE")
+        return String(localized: "\(activeScriptCount) ACTIVE", bundle: RockxyLocalization.bundle)
+    }
+
+    private var statusCapsuleTint: Color {
+        if !viewModel.toolEnabled {
+            return .secondary
+        }
+        return activeScriptCount == 0 ? .orange : .green
     }
 
     private var layout: some View {
@@ -221,21 +236,27 @@ struct ScriptingListWindowView: View {
                     get: { viewModel.toolEnabled },
                     set: { viewModel.setToolEnabled($0) }
                 )) {
-                    Text(String(localized: "Enable Scripting"))
+                    Text(String(localized: "Enable Scripting", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .medium))
                 }
                 .toggleStyle(.checkbox)
                 .controlSize(toggleControlSize)
 
-                Text(String(localized: "Rewrite requests and responses with JavaScript before they continue."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Rewrite requests and responses with JavaScript before they continue.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
             HStack(spacing: 6) {
-                Picker(String(localized: "Search field"), selection: $viewModel.filterColumn) {
+                Picker(
+                    String(localized: "Search field", bundle: RockxyLocalization.bundle),
+                    selection: $viewModel.filterColumn
+                ) {
                     ForEach(ScriptListFilterColumn.allCases) { column in
                         Text(column.title).tag(column)
                     }
@@ -245,12 +266,15 @@ struct ScriptingListWindowView: View {
                 .font(toolMetrics.font())
                 .frame(minHeight: toolMetrics.formControlHeight)
 
-                TextField(String(localized: "Search scripts"), text: $viewModel.filterText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(toolMetrics.font())
-                    .frame(width: 220, height: toolMetrics.formControlHeight)
-                    .focused($searchIsFocused)
-                    .accessibilityLabel(String(localized: "Search scripts"))
+                TextField(
+                    String(localized: "Search scripts", bundle: RockxyLocalization.bundle),
+                    text: $viewModel.filterText
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(toolMetrics.font())
+                .frame(width: 220, height: toolMetrics.formControlHeight)
+                .focused($searchIsFocused)
+                .accessibilityLabel(String(localized: "Search scripts", bundle: RockxyLocalization.bundle))
             }
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -285,7 +309,7 @@ struct ScriptingListWindowView: View {
     private var tableContent: some View {
         Table(viewModel.filteredDisplayRows, selection: selectedRow) {
             TableColumn(
-                Text(String(localized: "Enabled"))
+                Text(String(localized: "Enabled", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { row in
                 enabledCell(for: row)
@@ -294,7 +318,7 @@ struct ScriptingListWindowView: View {
             .alignment(.center)
 
             TableColumn(
-                Text(String(localized: "Name"))
+                Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { row in
                 nameCell(for: row)
@@ -305,7 +329,7 @@ struct ScriptingListWindowView: View {
             )
 
             TableColumn(
-                Text(String(localized: "Method"))
+                Text(String(localized: "Method", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { row in
                 if case let .script(script) = row.kind {
@@ -318,7 +342,7 @@ struct ScriptingListWindowView: View {
             .width(max(84, toolMetrics.tableHeaderFontSize * 4.8))
 
             TableColumn(
-                Text(String(localized: "Matching Rule"))
+                Text(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { row in
                 if case let .script(script) = row.kind {
@@ -331,7 +355,7 @@ struct ScriptingListWindowView: View {
             )
 
             TableColumn(
-                Text(String(localized: "Status"))
+                Text(String(localized: "Status", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { row in
                 if case let .script(script) = row.kind {
@@ -356,13 +380,19 @@ struct ScriptingListWindowView: View {
             if viewModel.filteredDisplayRows.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No Matching Scripts")
-                        : String(localized: "No Scripts"),
+                        ? String(localized: "No Matching Scripts", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Scripts", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "curlybraces",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different name, method, or matching rule.")
-                            : String(localized: "Click + or press ⌘N to create a script.")
+                            ? String(
+                                localized: "Try a different name, method, or matching rule.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Click + or press ⌘N to create a script.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -415,7 +445,7 @@ struct ScriptingListWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
             .disabled(viewModel.isCreatingOrDuplicating)
-            .accessibilityLabel(String(localized: "New Script"))
+            .accessibilityLabel(String(localized: "New Script", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor))
@@ -432,7 +462,7 @@ struct ScriptingListWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRowID == nil)
-            .accessibilityLabel(String(localized: "Delete Selected"))
+            .accessibilityLabel(String(localized: "Delete Selected", bundle: RockxyLocalization.bundle))
         }
         .foregroundStyle(.primary)
         .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
@@ -446,25 +476,25 @@ struct ScriptingListWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New Script")) {
+            Button(String(localized: "New Script", bundle: RockxyLocalization.bundle)) {
                 createNewScript()
             }
             .keyboardShortcut("n", modifiers: .command)
             .disabled(viewModel.isCreatingOrDuplicating)
 
-            Button(String(localized: "New Folder")) {
+            Button(String(localized: "New Folder", bundle: RockxyLocalization.bundle)) {
                 viewModel.createNewFolder()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
 
             Divider()
 
-            Button(String(localized: "Edit Script")) {
+            Button(String(localized: "Edit Script", bundle: RockxyLocalization.bundle)) {
                 openEditorForSelection()
             }
             .disabled(!isScriptSelected)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 Task { await viewModel.duplicateSelection() }
             }
             .keyboardShortcut("d", modifiers: .command)
@@ -475,14 +505,14 @@ struct ScriptingListWindowView: View {
             }
             .disabled(!isScriptSelected)
 
-            Button(String(localized: "Rename Folder")) {
+            Button(String(localized: "Rename Folder", bundle: RockxyLocalization.bundle)) {
                 viewModel.beginRenameSelectedFolder()
             }
             .disabled(!isFolderSelected)
 
             Divider()
 
-            Button(String(localized: "Focus Search")) {
+            Button(String(localized: "Focus Search", bundle: RockxyLocalization.bundle)) {
                 searchIsFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
@@ -491,25 +521,28 @@ struct ScriptingListWindowView: View {
                 get: { viewModel.advanceAllowChaining },
                 set: { viewModel.setAdvanceAllowChaining($0) }
             )) {
-                Text(String(localized: "Run Every Matching Script"))
+                Text(String(localized: "Run Every Matching Script", bundle: RockxyLocalization.bundle))
             }
             Toggle(isOn: Binding(
                 get: { viewModel.advanceAllowSystemEnvVars },
                 set: { viewModel.setAdvanceAllowSystemEnvVars($0) }
             )) {
-                Text(String(localized: "Allow Scripts to Read System Environment Variables"))
+                Text(String(
+                    localized: "Allow Scripts to Read System Environment Variables",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 requestDeletionOfSelection()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRowID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -528,13 +561,6 @@ struct ScriptingListWindowView: View {
             .rockxyChipStyle(tint: statusCapsuleTint, isActive: viewModel.toolEnabled)
     }
 
-    private var statusCapsuleTint: Color {
-        if !viewModel.toolEnabled {
-            return .secondary
-        }
-        return activeScriptCount == 0 ? .orange : .green
-    }
-
     private func enabledCell(for row: ScriptListDisplayRow) -> some View {
         HStack {
             Spacer()
@@ -545,7 +571,10 @@ struct ScriptingListWindowView: View {
                     .toggleStyle(.checkbox)
                     .controlSize(toggleControlSize)
                     .disabled(folder.scriptIDs.contains(where: viewModel.mutatingScriptIDs.contains))
-                    .accessibilityLabel(String(localized: "Toggle all scripts in \(folder.name)"))
+                    .accessibilityLabel(String(
+                        localized: "Toggle all scripts in \(folder.name)",
+                        bundle: RockxyLocalization.bundle
+                    ))
             case let .script(script):
                 Toggle("", isOn: Binding(
                     get: { script.isEnabled },
@@ -559,8 +588,8 @@ struct ScriptingListWindowView: View {
                 .disabled(viewModel.mutatingScriptIDs.contains(script.id))
                 .accessibilityLabel(
                     script.isEnabled
-                        ? String(localized: "Disable \(script.name)")
-                        : String(localized: "Enable \(script.name)")
+                        ? String(localized: "Disable \(script.name)", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Enable \(script.name)", bundle: RockxyLocalization.bundle)
                 )
             }
             Spacer()
@@ -587,8 +616,8 @@ struct ScriptingListWindowView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(
                     folder.expanded
-                        ? String(localized: "Collapse \(folder.name)")
-                        : String(localized: "Expand \(folder.name)")
+                        ? String(localized: "Collapse \(folder.name)", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Expand \(folder.name)", bundle: RockxyLocalization.bundle)
                 )
 
                 Image(systemName: "folder.fill")
@@ -621,7 +650,8 @@ struct ScriptingListWindowView: View {
                 Spacer().frame(width: row.indent == 0 ? disclosureSlotWidth : 0)
                 Image(systemName: "curlybraces")
                     .foregroundStyle(.secondary)
-                Text(script.name.isEmpty ? String(localized: "Untitled") : script.name)
+                Text(script.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : script
+                    .name)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundStyle(script.isEnabled ? Color.primary : Color.secondary)
@@ -642,7 +672,7 @@ struct ScriptingListWindowView: View {
                 .foregroundStyle(script.isEnabled ? Color.primary : Color.secondary)
                 .help(pattern)
         } else {
-            Text(String(localized: "<Missing URL>"))
+            Text(String(localized: "<Missing URL>", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font())
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
@@ -665,28 +695,15 @@ struct ScriptingListWindowView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func statusColor(for status: ScriptListRuntimeStatus) -> Color {
-        switch status {
-        case .active:
-            .green
-        case .error:
-            .red
-        case .loading:
-            .orange
-        case .disabled:
-            .secondary
-        }
-    }
-
     @ViewBuilder
     private func rowContextMenu(for row: ScriptListRowID) -> some View {
         switch row {
         case .script:
-            Button(String(localized: "Edit Script")) {
+            Button(String(localized: "Edit Script", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRowID = row
                 openEditorForSelection()
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRowID = row
                 Task { await viewModel.duplicateSelection() }
             }
@@ -697,18 +714,31 @@ struct ScriptingListWindowView: View {
                 }
             }
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 requestDeletion(row)
             }
         case .folder:
-            Button(String(localized: "Rename Folder")) {
+            Button(String(localized: "Rename Folder", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRowID = row
                 viewModel.beginRenameSelectedFolder()
             }
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 requestDeletion(row)
             }
+        }
+    }
+
+    private func statusColor(for status: ScriptListRuntimeStatus) -> Color {
+        switch status {
+        case .active:
+            .green
+        case .error:
+            .red
+        case .loading:
+            .orange
+        case .disabled:
+            .secondary
         }
     }
 
@@ -774,11 +804,11 @@ struct ScriptingListWindowView: View {
         guard case let .script(id) = row,
               let script = viewModel.plugins.first(where: { $0.id == id }) else
         {
-            return String(localized: "Enable Script")
+            return String(localized: "Enable Script", bundle: RockxyLocalization.bundle)
         }
         return script.isEnabled
-            ? String(localized: "Disable Script")
-            : String(localized: "Enable Script")
+            ? String(localized: "Disable Script", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable Script", bundle: RockxyLocalization.bundle)
     }
 
     // MARK: - Deletion confirmation
@@ -804,19 +834,19 @@ struct ScriptingListWindowView: View {
     private func deletionTitle(for row: ScriptListRowID?) -> String {
         switch row {
         case .folder:
-            String(localized: "Delete Folder?")
+            String(localized: "Delete Folder?", bundle: RockxyLocalization.bundle)
         case .script,
              .none:
-            String(localized: "Delete Script?")
+            String(localized: "Delete Script?", bundle: RockxyLocalization.bundle)
         }
     }
 
     private func deletionButtonTitle(for row: ScriptListRowID) -> String {
         switch row {
         case .folder:
-            String(localized: "Delete Folder")
+            String(localized: "Delete Folder", bundle: RockxyLocalization.bundle)
         case .script:
-            String(localized: "Delete Script")
+            String(localized: "Delete Script", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -824,27 +854,30 @@ struct ScriptingListWindowView: View {
         switch row {
         case let .folder(id):
             String(
-                localized: "“\(folderName(for: id))” will be removed. Scripts inside it are kept and moved to the top level."
+                localized: "“\(folderName(for: id))” will be removed. Scripts inside it are kept and moved to the top level.",
+                bundle: RockxyLocalization.bundle
             )
         case let .script(id):
             String(
-                localized: "“\(scriptName(for: id))” will be removed from disk. This cannot be undone."
+                localized: "“\(scriptName(for: id))” will be removed from disk. This cannot be undone.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
 
     private func scriptName(for id: String) -> String {
         let name = viewModel.plugins.first(where: { $0.id == id })?.name ?? ""
-        return name.isEmpty ? String(localized: "Untitled") : name
+        return name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : name
     }
 
     private func folderName(for id: UUID) -> String {
         for row in viewModel.displayRows {
             if case let .folder(folder) = row.kind, folder.id == id {
-                return folder.name.isEmpty ? String(localized: "Untitled") : folder.name
+                return folder.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : folder
+                    .name
             }
         }
-        return String(localized: "Untitled")
+        return String(localized: "Untitled", bundle: RockxyLocalization.bundle)
     }
 
     private func allChildrenBinding(for folder: ScriptFolder) -> Binding<Bool> {

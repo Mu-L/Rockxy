@@ -9,7 +9,7 @@ struct WorkspaceStateTests {
     @Test("Default workspace initializes with expected defaults")
     func defaultInit() {
         let workspace = WorkspaceState()
-        #expect(workspace.title == String(localized: "All Traffic"))
+        #expect(workspace.title == String(localized: "All Traffic", bundle: RockxyLocalization.bundle))
         #expect(workspace.isClosable == true)
         #expect(workspace.activeMainTab == .traffic)
         #expect(workspace.sidebarSelection == nil)

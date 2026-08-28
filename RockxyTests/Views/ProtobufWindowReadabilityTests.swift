@@ -31,10 +31,10 @@ struct ProtobufWindowReadabilityTests {
             "minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)", "Not applied",
             "focused($focusedField", "inlineError", "footerButtonLabel", ".keyboardShortcut(.cancelAction)",
             ".keyboardShortcut(.defaultAction)", "withEditedFields", "Missing Schema", "ViewThatFits",
-            ".accessibilityLabel(String(localized: \"HTTP method\"))",
-            ".accessibilityLabel(String(localized: \"Match type\"))",
-            ".accessibilityLabel(String(localized: \"Local schema\"))",
-            ".accessibilityLabel(String(localized: \"Payload encoding\"))",
+            ".accessibilityLabel(String(localized: \"HTTP method\", bundle: RockxyLocalization.bundle))",
+            ".accessibilityLabel(String(localized: \"Match type\", bundle: RockxyLocalization.bundle))",
+            ".accessibilityLabel(String(localized: \"Local schema\", bundle: RockxyLocalization.bundle))",
+            ".accessibilityLabel(String(localized: \"Payload encoding\", bundle: RockxyLocalization.bundle))",
         ])
         forbid(mapping, [
             ".frame(width: 1_240, height: 660)", "Test your Rule", "questionmark.circle",
@@ -60,7 +60,10 @@ struct ProtobufWindowReadabilityTests {
             "onOpenToolWindow(\"protobufSettings\")", "Wire-format heuristic",
             "Field numbers are inferred heuristically",
         ])
-        forbid(grpc, ["Add Descriptor", "protobufSchemaList", "Schema: heuristic fallback", "Schema needed for field names"])
+        forbid(
+            grpc,
+            ["Add Descriptor", "protobufSchemaList", "Schema: heuristic fallback", "Schema needed for field names"]
+        )
 
         require(app, [".defaultSize(width: 940, height: 620)", ".defaultSize(width: 820, height: 560)"])
     }

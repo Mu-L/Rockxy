@@ -128,6 +128,22 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private var clientSourcePort: UInt16?
     private var requestBodyLimitState = RequestBodyLimitState()
 
+    /// Builds an `HTTPResponseData` from a resolved Map Local payload, deriving the standard
+    /// reason phrase when the payload did not carry one.
+    nonisolated private static func mapLocalResponse(
+        from payload: MapLocalResponseResolver.Payload
+    )
+        -> HTTPResponseData
+    {
+        let message = payload.statusMessage ?? HTTPResponseStatus(statusCode: payload.statusCode).reasonPhrase
+        return HTTPResponseData(
+            statusCode: payload.statusCode,
+            statusMessage: message,
+            headers: payload.headers,
+            body: payload.body
+        )
+    }
+
     nonisolated private func makeTransactionCallback(
         for matchedRule: ProxyRule?
     )
@@ -189,7 +205,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                             head: head,
                             requestData: requestData,
                             callback: callback,
-                            urlPattern: matchedRule.matchCondition.urlPattern
+                            matchContext: MapLocalMatchContext(matchCondition: matchedRule.matchCondition)
                         )
                         return
                     case .throttle,
@@ -223,7 +239,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                     head: head,
                     requestData: requestData,
                     callback: self.makeTransactionCallback(for: breakpointRule),
-                    urlPattern: breakpointRule.matchCondition.urlPattern
+                    matchContext: MapLocalMatchContext(matchCondition: breakpointRule.matchCondition)
                 )
                 return
             }
@@ -235,7 +251,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                     head: head,
                     requestData: requestData,
                     callback: callback,
-                    urlPattern: matchedRule.matchCondition.urlPattern
+                    matchContext: MapLocalMatchContext(matchCondition: matchedRule.matchCondition)
                 )
                 return
             }
@@ -323,26 +339,19 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         )
     }
 
-    nonisolated private func extractPath(from uri: String) -> String {
-        if let urlComponents = URLComponents(string: uri) {
-            return urlComponents.path.isEmpty ? "/" : urlComponents.path
-        }
-        return uri
-    }
-
     nonisolated private func handleRuleAction(
         _ action: RuleAction,
         context: ChannelHandlerContext,
         head: HTTPRequestHead,
         requestData: HTTPRequestData,
         callback: @escaping @Sendable (HTTPTransaction) -> Void,
-        urlPattern: String? = nil
+        matchContext: MapLocalMatchContext? = nil
     ) {
         switch action {
         case let .block(statusCode):
             sendErrorResponse(context: context, status: statusCode, requestData: requestData, callback: callback)
 
-        case let .mapLocal(filePath, statusCode, isDirectory, delayMs):
+        case let .mapLocal(filePath, statusCode, isDirectory, delayMs, responseHeaders):
             let performMapLocal = { [weak self] in
                 guard let self else {
                     return
@@ -350,17 +359,21 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                 if isDirectory {
                     self.handleMapLocalDirectory(
                         context: context,
+                        head: head,
                         directoryPath: filePath,
                         statusCode: statusCode,
+                        responseHeaders: responseHeaders,
                         requestData: requestData,
                         callback: callback,
-                        urlPattern: urlPattern ?? ""
+                        matchContext: matchContext ?? MapLocalMatchContext(matchCondition: RuleMatchCondition())
                     )
                 } else {
                     self.handleMapLocal(
                         context: context,
+                        head: head,
                         filePath: filePath,
                         statusCode: statusCode,
+                        responseHeaders: responseHeaders,
                         requestData: requestData,
                         callback: callback
                     )
@@ -458,59 +471,81 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
 
     nonisolated private func handleMapLocal(
         context: ChannelHandlerContext,
+        head: HTTPRequestHead,
         filePath: String,
         statusCode: Int,
+        responseHeaders: [HTTPHeader],
         requestData: HTTPRequestData,
         callback: @escaping @Sendable (HTTPTransaction) -> Void
     ) {
         guard let data = MapLocalFileValidator.loadFileData(at: filePath) else {
-            sendErrorResponse(context: context, status: 404, requestData: requestData, callback: callback)
+            // Missing / unreadable / oversized target — serve the origin instead of a
+            // synthesized 404 so a broken mapping degrades to normal traffic.
+            proxyHandlerLogger.info("Map local file unavailable, falling back to origin")
+            forwardRequest(context: context, head: head, requestData: requestData, callback: callback)
             return
         }
 
-        let status = HTTPResponseStatus(statusCode: statusCode)
-        let mimeType = MimeTypeResolver.mimeType(for: filePath)
-        let responseData = HTTPResponseData(
-            statusCode: statusCode,
-            statusMessage: status.reasonPhrase,
-            headers: [
-                HTTPHeader(name: "Content-Length", value: "\(data.count)"),
-                HTTPHeader(name: "Content-Type", value: mimeType),
-            ],
-            body: data
+        let outcome = MapLocalResponseResolver.resolve(
+            fileData: data,
+            actionStatusCode: statusCode,
+            configuredHeaders: responseHeaders,
+            inferredContentType: MimeTypeResolver.mimeType(for: filePath)
         )
-        sendResponse(context: context, responseData: responseData, requestData: requestData, callback: callback)
+        switch outcome {
+        case let .serve(payload):
+            sendResponse(
+                context: context,
+                responseData: Self.mapLocalResponse(from: payload),
+                requestData: requestData,
+                callback: callback
+            )
+        case .fallbackToOrigin:
+            // Invalid status or a malformed HTTP-message-looking file — forward the origin.
+            proxyHandlerLogger.info("Map local response invalid, falling back to origin")
+            forwardRequest(context: context, head: head, requestData: requestData, callback: callback)
+        }
     }
 
     nonisolated private func handleMapLocalDirectory(
         context: ChannelHandlerContext,
+        head: HTTPRequestHead,
         directoryPath: String,
         statusCode: Int,
+        responseHeaders: [HTTPHeader],
         requestData: HTTPRequestData,
         callback: @escaping @Sendable (HTTPTransaction) -> Void,
-        urlPattern: String
+        matchContext: MapLocalMatchContext
     ) {
-        let requestPath = extractPath(from: requestData.url.absoluteString)
         let result = MapLocalDirectoryResolver.resolve(
-            requestPath: requestPath,
-            urlPattern: urlPattern,
+            requestURL: requestData.url.absoluteString,
+            matchContext: matchContext,
             directoryPath: directoryPath
         )
         switch result {
         case let .success(file):
-            let status = HTTPResponseStatus(statusCode: statusCode)
-            let responseData = HTTPResponseData(
-                statusCode: statusCode,
-                statusMessage: status.reasonPhrase,
-                headers: [
-                    HTTPHeader(name: "Content-Length", value: "\(file.data.count)"),
-                    HTTPHeader(name: "Content-Type", value: file.mimeType),
-                ],
-                body: file.data
+            let outcome = MapLocalResponseResolver.resolve(
+                fileData: file.data,
+                actionStatusCode: statusCode,
+                configuredHeaders: responseHeaders,
+                inferredContentType: file.mimeType
             )
-            sendResponse(context: context, responseData: responseData, requestData: requestData, callback: callback)
+            switch outcome {
+            case let .serve(payload):
+                sendResponse(
+                    context: context,
+                    responseData: Self.mapLocalResponse(from: payload),
+                    requestData: requestData,
+                    callback: callback
+                )
+            case .fallbackToOrigin:
+                proxyHandlerLogger.info("Map local directory response invalid, falling back to origin")
+                forwardRequest(context: context, head: head, requestData: requestData, callback: callback)
+            }
         case .failure:
-            sendErrorResponse(context: context, status: 404, requestData: requestData, callback: callback)
+            // Unresolved / invalid target — fall back to the origin request.
+            proxyHandlerLogger.info("Map local directory unresolved, falling back to origin")
+            forwardRequest(context: context, head: head, requestData: requestData, callback: callback)
         }
     }
 

@@ -151,6 +151,7 @@
           "development/security",
           "development/design-decisions",
           "development/code-style",
+          "development/localization",
           "development/building"
         ]
       },

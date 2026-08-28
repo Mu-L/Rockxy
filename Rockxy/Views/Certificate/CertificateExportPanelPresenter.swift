@@ -5,6 +5,8 @@ import Foundation
 
 @MainActor
 struct CertificateExportPanelPresenter {
+    // MARK: Internal
+
     func export(format: CertificateExportFormat) {
         Task {
             do {
@@ -26,17 +28,22 @@ struct CertificateExportPanelPresenter {
                     AppSettingsManager.shared.updateLastExportedRootCAPath(url.path)
                 }
                 showAlert(
-                    title: String(localized: "Certificate Exported"),
-                    message: String(localized: "Rockxy saved the certificate export successfully.")
+                    title: String(localized: "Certificate Exported", bundle: RockxyLocalization.bundle),
+                    message: String(
+                        localized: "Rockxy saved the certificate export successfully.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             } catch {
                 showAlert(
-                    title: String(localized: "Export Failed"),
+                    title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
                     message: error.localizedDescription
                 )
             }
         }
     }
+
+    // MARK: Private
 
     private func confirmPrivateExportIfNeeded(_ payload: CertificateExportPayload) -> Bool {
         guard payload.containsPrivateMaterial else {
@@ -45,12 +52,13 @@ struct CertificateExportPanelPresenter {
 
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = String(localized: "Export Private Certificate Material?")
+        alert.messageText = String(localized: "Export Private Certificate Material?", bundle: RockxyLocalization.bundle)
         alert.informativeText = String(
-            localized: "This export includes private key material. Store it securely and only share it with people or systems you trust."
+            localized: "This export includes private key material. Store it securely and only share it with people or systems you trust.",
+            bundle: RockxyLocalization.bundle
         )
-        alert.addButton(withTitle: String(localized: "Export"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.addButton(withTitle: String(localized: "Export", bundle: RockxyLocalization.bundle))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
         return alert.runModal() == .alertFirstButtonReturn
     }
 
@@ -59,7 +67,7 @@ struct CertificateExportPanelPresenter {
         panel.nameFieldStringValue = defaultFileName
         panel.allowedContentTypes = format.allowedContentTypes
         panel.canCreateDirectories = true
-        panel.title = String(localized: "Export Certificate")
+        panel.title = String(localized: "Export Certificate", bundle: RockxyLocalization.bundle)
         return panel.runModal() == .OK ? panel.url : nil
     }
 
@@ -67,7 +75,7 @@ struct CertificateExportPanelPresenter {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 }

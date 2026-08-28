@@ -18,11 +18,11 @@ enum TrafficExportFormat: String, CaseIterable {
     var title: String {
         switch self {
         case .har:
-            String(localized: "Export as HAR")
+            String(localized: "Export as HAR", bundle: RockxyLocalization.bundle)
         case .openAPIYAML:
-            String(localized: "Export as OpenAPI YAML")
+            String(localized: "Export as OpenAPI YAML", bundle: RockxyLocalization.bundle)
         case .openAPIHTML:
-            String(localized: "Export as OpenAPI HTML")
+            String(localized: "Export as OpenAPI HTML", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -40,7 +40,8 @@ enum TrafficExportFormat: String, CaseIterable {
         switch self {
         case .har:
             String(
-                localized: "HAR files can include captured URLs, headers, cookies, authorization and query values, and request/response bodies. Review the file before sharing."
+                localized: "HAR files can include captured URLs, headers, cookies, authorization and query values, and request/response bodies. Review the file before sharing.",
+                bundle: RockxyLocalization.bundle
             )
         case .openAPIYAML,
              .openAPIHTML:
@@ -48,7 +49,7 @@ enum TrafficExportFormat: String, CaseIterable {
                 localized: """
                 OpenAPI infers schemas, hosts, and paths. Captured sensitive header and example values aren't \
                 exported; recognized sensitive query and body fields are omitted.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -56,10 +57,16 @@ enum TrafficExportFormat: String, CaseIterable {
     var subtitle: String {
         switch self {
         case .har:
-            String(localized: "Choose which captured transactions to save in this HAR archive.")
+            String(
+                localized: "Choose which captured transactions to save in this HAR archive.",
+                bundle: RockxyLocalization.bundle
+            )
         case .openAPIYAML,
              .openAPIHTML:
-            String(localized: "Choose which eligible HTTP requests to use for the inferred OpenAPI document.")
+            String(
+                localized: "Choose which eligible HTTP requests to use for the inferred OpenAPI document.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -266,17 +273,17 @@ struct ExportScopeContext: Identifiable {
     func label(for scope: ExportScope) -> String {
         switch (format.isOpenAPI, scope) {
         case (false, .all):
-            String(localized: "All Transactions")
+            String(localized: "All Transactions", bundle: RockxyLocalization.bundle)
         case (false, .filtered):
-            String(localized: "Visible / Filtered")
+            String(localized: "Visible / Filtered", bundle: RockxyLocalization.bundle)
         case (false, .selected):
-            String(localized: "Selected")
+            String(localized: "Selected", bundle: RockxyLocalization.bundle)
         case (true, .all):
-            String(localized: "All Captured Requests")
+            String(localized: "All Captured Requests", bundle: RockxyLocalization.bundle)
         case (true, .filtered):
-            String(localized: "Visible / Filtered Requests")
+            String(localized: "Visible / Filtered Requests", bundle: RockxyLocalization.bundle)
         case (true, .selected):
-            String(localized: "Selected Requests")
+            String(localized: "Selected Requests", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -285,9 +292,16 @@ struct ExportScopeContext: Identifiable {
     func countSummary(for scope: ExportScope) -> String {
         let snapshot = snapshot(for: scope)
         if !format.isOpenAPI {
-            return String(localized: "\(snapshot.total) transaction\(snapshot.total == 1 ? "" : "s")")
+            return String(AttributedString(
+                localized: "^[\(snapshot.total) transaction](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
-        return String(localized: "\(snapshot.eligibleCount) included · \(snapshot.skippedCount) skipped")
+        return String(
+            localized: "\(snapshot.eligibleCount) included · \(snapshot.skippedCount) skipped",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     /// Extra skipped-detail note for OpenAPI scopes that drop ineligible rows.
@@ -296,7 +310,13 @@ struct ExportScopeContext: Identifiable {
         guard format.isOpenAPI, skipped > 0 else {
             return nil
         }
-        return String(localized: "\(skipped) request\(skipped == 1 ? "" : "s") can't be inferred and will be skipped")
+        return String(
+            AttributedString(
+                localized: "^[\(skipped) request](inflect: true) can't be inferred and will be skipped",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters
+        )
     }
 
     /// Truthful reason a scope is unavailable, or `nil` when it is selectable.
@@ -307,20 +327,23 @@ struct ExportScopeContext: Identifiable {
         switch scope {
         case .all:
             return allSnapshot.total == 0
-                ? String(localized: "No captured traffic to export")
-                : String(localized: "No OpenAPI-eligible requests captured")
+                ? String(localized: "No captured traffic to export", bundle: RockxyLocalization.bundle)
+                : String(localized: "No OpenAPI-eligible requests captured", bundle: RockxyLocalization.bundle)
         case .filtered:
             if !hasActiveFilter {
-                return String(localized: "No active filter")
+                return String(localized: "No active filter", bundle: RockxyLocalization.bundle)
             }
             return filteredSnapshot.total == 0
-                ? String(localized: "The active filter matches no requests")
-                : String(localized: "No OpenAPI-eligible requests in the active filter")
+                ? String(localized: "The active filter matches no requests", bundle: RockxyLocalization.bundle)
+                : String(
+                    localized: "No OpenAPI-eligible requests in the active filter",
+                    bundle: RockxyLocalization.bundle
+                )
         case .selected:
             if !hasSelection {
-                return String(localized: "No requests selected")
+                return String(localized: "No requests selected", bundle: RockxyLocalization.bundle)
             }
-            return String(localized: "No OpenAPI-eligible requests selected")
+            return String(localized: "No OpenAPI-eligible requests selected", bundle: RockxyLocalization.bundle)
         }
     }
 

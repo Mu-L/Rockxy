@@ -17,9 +17,9 @@ struct BodyInspectorView: View {
             }
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Body"),
+                String(localized: "No Body", bundle: RockxyLocalization.bundle),
                 systemImage: "doc",
-                description: String(localized: "This response has no body")
+                description: String(localized: "This response has no body", bundle: RockxyLocalization.bundle)
             )
         }
     }

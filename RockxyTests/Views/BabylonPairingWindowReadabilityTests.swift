@@ -19,11 +19,17 @@ struct BabylonPairingWindowReadabilityTests {
         let app = try readProjectFile("Rockxy/RockxyApp.swift")
 
         let sceneStart = try #require(
-            app.range(of: "Window(String(localized: \"Babylon Pairing\"), id: \"babylonPairing\")")
+            app
+                .range(
+                    of: "Window(String(localized: \"Babylon Pairing\", bundle: RockxyLocalization.bundle), id: \"babylonPairing\")"
+                )
         )
         let scenesAfter = app[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Babylon Runtime\"), id: \"babylonRuntime\")")
+            scenesAfter
+                .range(
+                    of: "Window(String(localized: \"Babylon Runtime\", bundle: RockxyLocalization.bundle), id: \"babylonRuntime\")"
+                )
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
 
@@ -71,12 +77,12 @@ struct BabylonPairingWindowReadabilityTests {
             "BabylonPairingAvailability(",
             "listenerStatus: receiver.listenerStatus",
             "hasToken: !store.token.isEmpty",
-            "String(localized: \"Stopped\")",
-            "String(localized: \"Starting…\")",
-            "String(localized: \"Waiting for Network\")",
-            "String(localized: \"Ready\")",
-            "String(localized: \"Not Ready\")",
-            "String(localized: \"Unavailable\")",
+            "localized: \"Stopped\"",
+            "localized: \"Starting…\"",
+            "localized: \"Waiting for Network\"",
+            "localized: \"Ready\"",
+            "localized: \"Not Ready\"",
+            "localized: \"Unavailable\"",
             "case .tokenMissing",
         ])
         // Ready copy is scoped to accepting local-network connections — it must not
@@ -91,10 +97,10 @@ struct BabylonPairingWindowReadabilityTests {
 
         // Bonjour service + port + honest open-connection terminology.
         require(source, [
-            "String(localized: \"Bonjour Service\")",
+            "localized: \"Bonjour Service\"",
             "BabylonCaptureProtocol.serviceType",
             "BabylonCaptureProtocol.port",
-            "String(localized: \"Open Connections\")",
+            "localized: \"Open Connections\"",
             "Open connections may still be authenticating.",
         ])
         forbid(source, [
@@ -106,7 +112,7 @@ struct BabylonPairingWindowReadabilityTests {
 
         // Real listener-only Retry action wired to the receiver seam.
         require(source, [
-            "String(localized: \"Retry Listener\")",
+            "localized: \"Retry Listener\"",
             "receiver.retryListener()",
         ])
 
@@ -118,9 +124,9 @@ struct BabylonPairingWindowReadabilityTests {
             "Image(systemName: isTokenRevealed ? \"eye.slash\" : \"eye\")",
             ".textSelection(.enabled)",
             ".textSelection(.disabled)",
-            "String(localized: \"Show Token\")",
-            "String(localized: \"Hide Token\")",
-            ".accessibilityLabel(String(localized: \"Pairing token\"))",
+            "localized: \"Show Token\"",
+            "localized: \"Hide Token\"",
+            ".accessibilityLabel(String(localized: \"Pairing token\", bundle: RockxyLocalization.bundle))",
             ".frame(width: toolMetrics.compactButtonSize, height: toolMetrics.compactButtonSize)",
             ".accessibilityHidden(true)",
         ])
@@ -132,13 +138,14 @@ struct BabylonPairingWindowReadabilityTests {
 
         // Equal-dimension Copy / Regenerate footer buttons + local copy feedback.
         require(source, [
-            "didCopyToken ? String(localized: \"Copied\") : String(localized: \"Copy\")",
-            "actionButtonLabel(String(localized: \"Regenerate…\"))",
+            "didCopyToken ? String(localized: \"Copied\", bundle: RockxyLocalization.bundle) : String(",
+            "localized: \"Copy\"",
+            "actionButtonLabel(String(localized: \"Regenerate…\", bundle: RockxyLocalization.bundle))",
             "private func actionButtonLabel",
             "didCopyToken",
-            "String(localized: \"Copied\")",
+            "String(localized: \"Copied\", bundle: RockxyLocalization.bundle)",
             ".disabled(store.token.isEmpty)",
-            "String(localized: \"Pairing token copied\")",
+            "String(localized: \"Pairing token copied\", bundle: RockxyLocalization.bundle)",
             ".privacySensitive()",
         ])
 
@@ -155,7 +162,8 @@ struct BabylonPairingWindowReadabilityTests {
         let actionsBody = source[actionsStart.lowerBound...]
         let actionsEnd = try #require(actionsBody.range(of: "private var tokenUnavailableRow"))
         let actionsSource = actionsBody[..<actionsEnd.lowerBound]
-        #expect(actionsSource.contains("actionButtonLabel(String(localized: \"Regenerate…\"))"))
+        #expect(actionsSource
+            .contains("actionButtonLabel(String(localized: \"Regenerate…\", bundle: RockxyLocalization.bundle))"))
         #expect(
             actionsSource.components(separatedBy: ".disabled(store.token.isEmpty)").count - 1 == 1,
             "Regenerate must not be disabled by an empty token"

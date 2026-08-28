@@ -14,10 +14,12 @@ enum CustomCertificateStatusTone: Equatable {
 enum CustomCertificateFileError: LocalizedError, Equatable {
     case fileTooLarge
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .fileTooLarge:
-            String(localized: "Certificate files must be 16 MB or smaller.")
+            String(localized: "Certificate files must be 16 MB or smaller.", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -58,11 +60,11 @@ final class CustomCertificatesViewModel {
         var title: String {
             switch self {
             case .root:
-                String(localized: "Root Certificate")
+                String(localized: "Root Certificate", bundle: RockxyLocalization.bundle)
             case .server:
-                String(localized: "Server Certificates")
+                String(localized: "Server Certificates", bundle: RockxyLocalization.bundle)
             case .client:
-                String(localized: "Client Certificates")
+                String(localized: "Client Certificates", bundle: RockxyLocalization.bundle)
             }
         }
 
@@ -103,17 +105,6 @@ final class CustomCertificatesViewModel {
 
     let manager: CustomCertificateManager
 
-    var mode: Mode = .root {
-        didSet {
-            guard oldValue != mode else {
-                return
-            }
-            if isImporting {
-                importGeneration += 1
-            }
-            reconcileSelection()
-        }
-    }
     var selectedServerID: UUID?
     var selectedClientID: UUID?
     var errorMessage: String?
@@ -134,6 +125,18 @@ final class CustomCertificatesViewModel {
     private(set) var rootRefreshGeneration = 0
     private(set) var importGeneration = 0
     private(set) var customRootAvailability: Bool?
+
+    var mode: Mode = .root {
+        didSet {
+            guard oldValue != mode else {
+                return
+            }
+            if isImporting {
+                importGeneration += 1
+            }
+            reconcileSelection()
+        }
+    }
 
     var isBusy: Bool {
         isImporting || isDeleting
@@ -178,43 +181,43 @@ final class CustomCertificatesViewModel {
             return activeRootEntry.displayName
         }
         return rootStatus == .unavailable
-            ? String(localized: "No Root Certificate")
-            : String(localized: "Rockxy Default Root Certificate")
+            ? String(localized: "No Root Certificate", bundle: RockxyLocalization.bundle)
+            : String(localized: "Rockxy Default Root Certificate", bundle: RockxyLocalization.bundle)
     }
 
     var rootSubtitle: String {
         switch rootStatus {
         case .customVerifying:
-            String(localized: "Rockxy is verifying this custom root certificate and its private key.")
+            String(localized: "Rockxy is verifying this custom root certificate and its private key.", bundle: RockxyLocalization.bundle)
         case .customActive:
-            String(localized: "Rockxy signs generated host certificates with this imported root.")
+            String(localized: "Rockxy signs generated host certificates with this imported root.", bundle: RockxyLocalization.bundle)
         case .customUnavailable:
-            String(localized: "Rockxy cannot access this custom root certificate and its private key.")
+            String(localized: "Rockxy cannot access this custom root certificate and its private key.", bundle: RockxyLocalization.bundle)
         case .installedTrusted,
              .installedNotTrusted,
              .generated:
-            String(localized: "Rockxy signs generated host certificates with its default root.")
+            String(localized: "Rockxy signs generated host certificates with its default root.", bundle: RockxyLocalization.bundle)
         case .unavailable:
-            String(localized: "No root certificate is loaded. HTTPS interception is unavailable.")
+            String(localized: "No root certificate is loaded. HTTPS interception is unavailable.", bundle: RockxyLocalization.bundle)
         }
     }
 
     var rootStatusText: String {
         switch rootStatus {
         case .customVerifying:
-            String(localized: "Verifying Custom Root…")
+            String(localized: "Verifying Custom Root…", bundle: RockxyLocalization.bundle)
         case .customActive:
-            String(localized: "Custom Root Active")
+            String(localized: "Custom Root Active", bundle: RockxyLocalization.bundle)
         case .customUnavailable:
-            String(localized: "Custom Root Unavailable")
+            String(localized: "Custom Root Unavailable", bundle: RockxyLocalization.bundle)
         case .installedTrusted:
-            String(localized: "Installed & Trusted")
+            String(localized: "Installed & Trusted", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "Installed, Trust Not Verified")
+            String(localized: "Installed, Trust Not Verified", bundle: RockxyLocalization.bundle)
         case .generated:
-            String(localized: "Generated, Not Installed")
+            String(localized: "Generated, Not Installed", bundle: RockxyLocalization.bundle)
         case .unavailable:
-            String(localized: "No Default Root Available")
+            String(localized: "No Default Root Available", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -259,7 +262,7 @@ final class CustomCertificatesViewModel {
     }
 
     var primaryDestructiveTitle: String {
-        mode == .root ? String(localized: "Revert to Default…") : String(localized: "Delete…")
+        mode == .root ? String(localized: "Revert to Default…", bundle: RockxyLocalization.bundle) : String(localized: "Delete…", bundle: RockxyLocalization.bundle)
     }
 
     var canPerformPrimaryDestructive: Bool {
@@ -325,22 +328,34 @@ final class CustomCertificatesViewModel {
             guard let entry = selectedServerEntry else {
                 return
             }
-            pendingDeletion = certificateDeletionRequest(for: entry, role: String(localized: "server"))
+            pendingDeletion = certificateDeletionRequest(
+                for: entry,
+                role: String(localized: "server", bundle: RockxyLocalization.bundle)
+            )
         case .client:
             guard let entry = selectedClientEntry else {
                 return
             }
-            pendingDeletion = certificateDeletionRequest(for: entry, role: String(localized: "client"))
+            pendingDeletion = certificateDeletionRequest(
+                for: entry,
+                role: String(localized: "client", bundle: RockxyLocalization.bundle)
+            )
         }
     }
 
     func requestDeletion(certificateID id: UUID) {
         if let entry = serverEntries.first(where: { $0.id == id }) {
             selectedServerID = id
-            pendingDeletion = certificateDeletionRequest(for: entry, role: String(localized: "server"))
+            pendingDeletion = certificateDeletionRequest(
+                for: entry,
+                role: String(localized: "server", bundle: RockxyLocalization.bundle)
+            )
         } else if let entry = clientEntries.first(where: { $0.id == id }) {
             selectedClientID = id
-            pendingDeletion = certificateDeletionRequest(for: entry, role: String(localized: "client"))
+            pendingDeletion = certificateDeletionRequest(
+                for: entry,
+                role: String(localized: "client", bundle: RockxyLocalization.bundle)
+            )
         }
     }
 
@@ -368,13 +383,13 @@ final class CustomCertificatesViewModel {
             reload()
             reconcileSelection()
             statusMessage = request.target == .revertRoot
-                ? String(localized: "Rockxy is using its default root certificate.")
-                : String(localized: "Certificate deleted.")
+                ? String(localized: "Rockxy is using its default root certificate.", bundle: RockxyLocalization.bundle)
+                : String(localized: "Certificate deleted.", bundle: RockxyLocalization.bundle)
             statusTone = .success
         } catch {
             isDeleting = false
             errorMessage = error.localizedDescription
-            statusMessage = String(localized: "The certificate was not changed.")
+            statusMessage = String(localized: "The certificate was not changed.", bundle: RockxyLocalization.bundle)
             statusTone = .error
         }
     }
@@ -474,7 +489,7 @@ final class CustomCertificatesViewModel {
             let item: CertificatePreviewItem? = material.certificate.flatMap { certificate in
                 try? CertificatePreviewItem(
                     certificate: certificate,
-                    displayName: String(localized: "Rockxy Default Root Certificate"),
+                    displayName: String(localized: "Rockxy Default Root Certificate", bundle: RockxyLocalization.bundle),
                     fingerprintSHA256: snapshot.fingerprintSHA256
                 )
             }
@@ -494,9 +509,7 @@ final class CustomCertificatesViewModel {
                 customRootAvailability: customRootAvailability,
                 generation: generation
             ) {
-                rootLoadErrorMessage = String(
-                    localized: "Rockxy could not load the default root certificate details."
-                )
+                rootLoadErrorMessage = String(localized: "Rockxy could not load the default root certificate details.", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -546,6 +559,25 @@ final class CustomCertificatesViewModel {
         }
     }
 
+    nonisolated private static func readBoundedData(from url: URL) throws -> Data {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let values = try url.resourceValues(forKeys: [.fileSizeKey])
+        if let fileSize = values.fileSize, fileSize > 16 * 1_024 * 1_024 {
+            throw CustomCertificateFileError.fileTooLarge
+        }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        guard data.count <= 16 * 1_024 * 1_024 else {
+            throw CustomCertificateFileError.fileTooLarge
+        }
+        return data
+    }
+
     private func runImport(
         kind: CustomCertificateKind,
         rawHost: String?,
@@ -561,7 +593,7 @@ final class CustomCertificatesViewModel {
         if kind != .root {
             let raw = rawHost ?? ""
             if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                errorMessage = String(localized: "Enter a host pattern for this certificate before importing.")
+                errorMessage = String(localized: "Enter a host pattern for this certificate before importing.", bundle: RockxyLocalization.bundle)
                 return
             }
             if let message = SSLHostPatternValidation.message(for: raw) {
@@ -592,14 +624,14 @@ final class CustomCertificatesViewModel {
             if generation == importGeneration, mode == modeAtStart {
                 mode = Self.mode(for: metadata.kind)
                 select(imported: metadata)
-                statusMessage = String(localized: "Imported \(metadata.displayName).")
+                statusMessage = String(localized: "Imported \(metadata.displayName).", bundle: RockxyLocalization.bundle)
                 statusTone = .success
             }
         } catch {
             isImporting = false
             if generation == importGeneration {
                 errorMessage = error.localizedDescription
-                statusMessage = String(localized: "No certificate was imported.")
+                statusMessage = String(localized: "No certificate was imported.", bundle: RockxyLocalization.bundle)
                 statusTone = .error
             }
         }
@@ -641,25 +673,6 @@ final class CustomCertificatesViewModel {
         reconcileSelection()
     }
 
-    nonisolated private static func readBoundedData(from url: URL) throws -> Data {
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        let values = try url.resourceValues(forKeys: [.fileSizeKey])
-        if let fileSize = values.fileSize, fileSize > 16 * 1_024 * 1_024 {
-            throw CustomCertificateFileError.fileTooLarge
-        }
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        guard data.count <= 16 * 1_024 * 1_024 else {
-            throw CustomCertificateFileError.fileTooLarge
-        }
-        return data
-    }
-
     private func entries(for mode: Mode) -> [CustomCertificateMetadata] {
         switch mode {
         case .root:
@@ -685,15 +698,15 @@ final class CustomCertificatesViewModel {
     private func revertRootRequest(for entry: CustomCertificateMetadata) -> DeletionRequest {
         DeletionRequest(
             target: .revertRoot,
-            title: String(localized: "Revert to Default Root Certificate?"),
+            title: String(localized: "Revert to Default Root Certificate?", bundle: RockxyLocalization.bundle),
             message: String(
                 localized: """
                 Rockxy will remove the custom root certificate “\(entry.displayName)” and resume signing \
                 intercepted TLS connections with its generated root. Existing custom server and client \
                 certificates are kept.
-                """
+                """, bundle: RockxyLocalization.bundle
             ),
-            confirmLabel: String(localized: "Revert")
+            confirmLabel: String(localized: "Revert", bundle: RockxyLocalization.bundle)
         )
     }
 
@@ -703,17 +716,17 @@ final class CustomCertificatesViewModel {
     )
         -> DeletionRequest
     {
-        let hostClause = entry.hostPattern.map { String(localized: " for the host pattern \($0)") } ?? ""
+        let hostClause = entry.hostPattern.map { String(localized: " for the host pattern \($0)", bundle: RockxyLocalization.bundle) } ?? ""
         return DeletionRequest(
             target: .certificate(entry.id),
-            title: String(localized: "Delete Certificate?"),
+            title: String(localized: "Delete Certificate?", bundle: RockxyLocalization.bundle),
             message: String(
                 localized: """
                 Rockxy will remove the custom \(role) certificate “\(entry.displayName)”\(hostClause) and \
                 delete its private key from the Keychain. This cannot be undone.
-                """
+                """, bundle: RockxyLocalization.bundle
             ),
-            confirmLabel: String(localized: "Delete")
+            confirmLabel: String(localized: "Delete", bundle: RockxyLocalization.bundle)
         )
     }
 }

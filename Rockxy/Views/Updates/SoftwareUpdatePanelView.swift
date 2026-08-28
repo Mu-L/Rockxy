@@ -34,20 +34,23 @@ struct SoftwareUpdatePanelView: View {
     private var supportingText: String? {
         switch controller.phase {
         case .checking:
-            String(localized: "You can cancel this check at any time.")
+            String(localized: "You can cancel this check at any time.", bundle: RockxyLocalization.bundle)
         case .available,
              .readyToInstall:
-            String(localized: "Updates are signed and verified before Rockxy installs them.")
+            String(
+                localized: "Updates are signed and verified before Rockxy installs them.",
+                bundle: RockxyLocalization.bundle
+            )
         case .downloading:
-            String(localized: "Downloading the signed update.")
+            String(localized: "Downloading the signed update.", bundle: RockxyLocalization.bundle)
         case .extracting:
-            String(localized: "Preparing the update on your Mac.")
+            String(localized: "Preparing the update on your Mac.", bundle: RockxyLocalization.bundle)
         case .installing:
-            String(localized: "Rockxy will relaunch after installation completes.")
+            String(localized: "Rockxy will relaunch after installation completes.", bundle: RockxyLocalization.bundle)
         case .noUpdate:
-            String(localized: "You can still review the full release history.")
+            String(localized: "You can still review the full release history.", bundle: RockxyLocalization.bundle)
         case .error:
-            String(localized: "No captured traffic is sent with update reports.")
+            String(localized: "No captured traffic is sent with update reports.", bundle: RockxyLocalization.bundle)
         case .hidden:
             nil
         }
@@ -75,12 +78,12 @@ struct SoftwareUpdatePanelView: View {
         switch controller.phase {
         case let .available(context):
             if context.isInformationOnly {
-                String(localized: "Learn More")
+                String(localized: "Learn More", bundle: RockxyLocalization.bundle)
             } else {
-                String(localized: "Install Update")
+                String(localized: "Install Update", bundle: RockxyLocalization.bundle)
             }
         default:
-            String(localized: "Continue")
+            String(localized: "Continue", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -127,13 +130,13 @@ struct SoftwareUpdatePanelView: View {
             updateDialog(
                 symbol: "arrow.down.circle.fill",
                 symbolTint: .accentColor,
-                title: String(localized: "A new version of Rockxy is available."),
+                title: String(localized: "A new version of Rockxy is available.", bundle: RockxyLocalization.bundle),
                 summary: context.summary,
-                notesLabel: String(localized: "Release Notes"),
+                notesLabel: String(localized: "Release Notes", bundle: RockxyLocalization.bundle),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: context.buildNumber,
-                    fallback: String(localized: "Latest")
+                    fallback: String(localized: "Latest", bundle: RockxyLocalization.bundle)
                 ),
                 notes: context.releaseNotes,
                 progress: nil
@@ -142,26 +145,37 @@ struct SoftwareUpdatePanelView: View {
         case let .downloading(context, bytesReceived, expectedBytes):
             progressDialog(
                 context: context,
-                title: String(localized: "Downloading Rockxy \(context.latestVersion)…"),
-                summary: String(
-                    localized: "Rockxy is downloading the signed update and verifying it before installation."
+                title: String(
+                    localized: "Downloading Rockxy \(context.latestVersion)…",
+                    bundle: RockxyLocalization.bundle
                 ),
-                detailLabel: String(localized: "Download Details"),
+                summary: String(
+                    localized: "Rockxy is downloading the signed update and verifying it before installation.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                detailLabel: String(localized: "Download Details", bundle: RockxyLocalization.bundle),
                 detailMessage: downloadProgressDescription(received: bytesReceived, expected: expectedBytes),
-                progressLabel: String(localized: "Downloading update…"),
+                progressLabel: String(localized: "Downloading update…", bundle: RockxyLocalization.bundle),
                 progress: progressValue(received: bytesReceived, expected: expectedBytes)
             )
 
         case let .extracting(context, progress):
             progressDialog(
                 context: context,
-                title: String(localized: "Preparing Rockxy \(context.latestVersion)…"),
-                summary: String(
-                    localized: "Rockxy is extracting the update and preparing the app bundle for installation."
+                title: String(
+                    localized: "Preparing Rockxy \(context.latestVersion)…",
+                    bundle: RockxyLocalization.bundle
                 ),
-                detailLabel: String(localized: "Preparation Details"),
-                detailMessage: String(localized: "Preparing the app bundle and installation metadata."),
-                progressLabel: String(localized: "Preparing update…"),
+                summary: String(
+                    localized: "Rockxy is extracting the update and preparing the app bundle for installation.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                detailLabel: String(localized: "Preparation Details", bundle: RockxyLocalization.bundle),
+                detailMessage: String(
+                    localized: "Preparing the app bundle and installation metadata.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                progressLabel: String(localized: "Preparing update…", bundle: RockxyLocalization.bundle),
                 progress: progress
             )
 
@@ -169,15 +183,19 @@ struct SoftwareUpdatePanelView: View {
             updateDialog(
                 symbol: "checkmark.circle.fill",
                 symbolTint: .green,
-                title: String(localized: "Rockxy \(context.latestVersion) is ready to install."),
-                summary: String(
-                    localized: "The update has been downloaded and verified. Install now to relaunch into the latest version."
+                title: String(
+                    localized: "Rockxy \(context.latestVersion) is ready to install.",
+                    bundle: RockxyLocalization.bundle
                 ),
-                notesLabel: String(localized: "Release Notes"),
+                summary: String(
+                    localized: "The update has been downloaded and verified. Install now to relaunch into the latest version.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                notesLabel: String(localized: "Release Notes", bundle: RockxyLocalization.bundle),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: context.buildNumber,
-                    fallback: String(localized: "Ready")
+                    fallback: String(localized: "Ready", bundle: RockxyLocalization.bundle)
                 ),
                 notes: context.releaseNotes,
                 progress: nil
@@ -186,18 +204,31 @@ struct SoftwareUpdatePanelView: View {
         case let .installing(context, applicationTerminated):
             progressDialog(
                 context: context,
-                title: String(localized: "Installing Rockxy \(context.latestVersion)…"),
+                title: String(
+                    localized: "Installing Rockxy \(context.latestVersion)…",
+                    bundle: RockxyLocalization.bundle
+                ),
                 summary: applicationTerminated
-                    ? String(localized: "Rockxy is finishing the installation and will relaunch automatically.")
+                    ? String(
+                        localized: "Rockxy is finishing the installation and will relaunch automatically.",
+                        bundle: RockxyLocalization.bundle
+                    )
                     :
                     String(
-                        localized: "Rockxy is waiting for the app to terminate so installation can finish safely."
+                        localized: "Rockxy is waiting for the app to terminate so installation can finish safely.",
+                        bundle: RockxyLocalization.bundle
                     ),
-                detailLabel: String(localized: "Installation Details"),
+                detailLabel: String(localized: "Installation Details", bundle: RockxyLocalization.bundle),
                 detailMessage: applicationTerminated
-                    ? String(localized: "Installing the new version and preparing to relaunch.")
-                    : String(localized: "Waiting for the running app process to exit before replacing the bundle."),
-                progressLabel: String(localized: "Installing update…"),
+                    ? String(
+                        localized: "Installing the new version and preparing to relaunch.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(
+                        localized: "Waiting for the running app process to exit before replacing the bundle.",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                progressLabel: String(localized: "Installing update…", bundle: RockxyLocalization.bundle),
                 progress: applicationTerminated ? 0.8 : nil
             )
 
@@ -205,9 +236,9 @@ struct SoftwareUpdatePanelView: View {
             updateDialog(
                 symbol: "checkmark.circle.fill",
                 symbolTint: .green,
-                title: String(localized: "Rockxy is up to date."),
+                title: String(localized: "Rockxy is up to date.", bundle: RockxyLocalization.bundle),
                 summary: context.summary,
-                notesLabel: String(localized: "Release Notes"),
+                notesLabel: String(localized: "Release Notes", bundle: RockxyLocalization.bundle),
                 notesVersionLabel: versionPanelLabel(
                     version: context.latestVersion,
                     buildNumber: nil,
@@ -229,14 +260,17 @@ struct SoftwareUpdatePanelView: View {
             ProgressView()
                 .controlSize(.large)
 
-            Text(String(localized: "Checking for updates"))
+            Text(String(localized: "Checking for updates", bundle: RockxyLocalization.bundle))
                 .font(sectionTitleFont)
 
-            Text(String(localized: "Rockxy is comparing your current build against the signed update feed."))
-                .font(toolMetrics.font())
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
+            Text(String(
+                localized: "Rockxy is comparing your current build against the signed update feed.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.font())
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 420)
 
             Spacer()
         }
@@ -285,7 +319,7 @@ struct SoftwareUpdatePanelView: View {
                         set: { updater.setAutomaticallyDownloadsUpdates($0) }
                     )
                 ) {
-                    Text(String(localized: "Automatically download future updates"))
+                    Text(String(localized: "Automatically download future updates", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font())
                 }
                 .toggleStyle(.checkbox)
@@ -307,7 +341,7 @@ struct SoftwareUpdatePanelView: View {
     @ViewBuilder private var footerButtons: some View {
         switch controller.phase {
         case .checking:
-            Button(String(localized: "Cancel")) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                 controller.chooseLater()
             }
             .keyboardShortcut(.cancelAction)
@@ -316,17 +350,17 @@ struct SoftwareUpdatePanelView: View {
             if toolMetrics.bodyFontSize >= 20 {
                 VStack(alignment: .trailing, spacing: 8) {
                     HStack(spacing: 8) {
-                        Button(String(localized: "Skip This Version")) {
+                        Button(String(localized: "Skip This Version", bundle: RockxyLocalization.bundle)) {
                             controller.chooseSkip()
                         }
-                        Button(String(localized: "Later")) {
+                        Button(String(localized: "Later", bundle: RockxyLocalization.bundle)) {
                             controller.chooseLater()
                         }
                         .keyboardShortcut(.cancelAction)
                     }
                     HStack(spacing: 8) {
                         if let url = detailURL {
-                            Button(String(localized: "View Full Change Log")) {
+                            Button(String(localized: "View Full Change Log", bundle: RockxyLocalization.bundle)) {
                                 controller.openDetailURL(url)
                             }
                         }
@@ -339,15 +373,15 @@ struct SoftwareUpdatePanelView: View {
                     }
                 }
             } else {
-                Button(String(localized: "Skip This Version")) {
+                Button(String(localized: "Skip This Version", bundle: RockxyLocalization.bundle)) {
                     controller.chooseSkip()
                 }
-                Button(String(localized: "Later")) {
+                Button(String(localized: "Later", bundle: RockxyLocalization.bundle)) {
                     controller.chooseLater()
                 }
                 .keyboardShortcut(.cancelAction)
                 if let url = detailURL {
-                    Button(String(localized: "View Full Change Log")) {
+                    Button(String(localized: "View Full Change Log", bundle: RockxyLocalization.bundle)) {
                         controller.openDetailURL(url)
                     }
                 }
@@ -360,7 +394,7 @@ struct SoftwareUpdatePanelView: View {
             }
 
         case .downloading:
-            Button(String(localized: "Cancel Download")) {
+            Button(String(localized: "Cancel Download", bundle: RockxyLocalization.bundle)) {
                 controller.chooseLater()
             }
             .keyboardShortcut(.cancelAction)
@@ -372,17 +406,17 @@ struct SoftwareUpdatePanelView: View {
             if toolMetrics.bodyFontSize >= 20 {
                 VStack(alignment: .trailing, spacing: 8) {
                     HStack(spacing: 8) {
-                        Button(String(localized: "Later")) {
+                        Button(String(localized: "Later", bundle: RockxyLocalization.bundle)) {
                             controller.chooseLater()
                         }
                         .keyboardShortcut(.cancelAction)
                         if let url = detailURL {
-                            Button(String(localized: "View Full Change Log")) {
+                            Button(String(localized: "View Full Change Log", bundle: RockxyLocalization.bundle)) {
                                 controller.openDetailURL(url)
                             }
                         }
                     }
-                    Button(String(localized: "Install and Relaunch")) {
+                    Button(String(localized: "Install and Relaunch", bundle: RockxyLocalization.bundle)) {
                         controller.chooseInstall()
                     }
                     .keyboardShortcut(.defaultAction)
@@ -390,16 +424,16 @@ struct SoftwareUpdatePanelView: View {
                     .controlSize(.large)
                 }
             } else {
-                Button(String(localized: "Later")) {
+                Button(String(localized: "Later", bundle: RockxyLocalization.bundle)) {
                     controller.chooseLater()
                 }
                 .keyboardShortcut(.cancelAction)
                 if let url = detailURL {
-                    Button(String(localized: "View Full Change Log")) {
+                    Button(String(localized: "View Full Change Log", bundle: RockxyLocalization.bundle)) {
                         controller.openDetailURL(url)
                     }
                 }
-                Button(String(localized: "Install and Relaunch")) {
+                Button(String(localized: "Install and Relaunch", bundle: RockxyLocalization.bundle)) {
                     controller.chooseInstall()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -409,18 +443,18 @@ struct SoftwareUpdatePanelView: View {
 
         case let .installing(_, applicationTerminated):
             if !applicationTerminated {
-                Button(String(localized: "Retry Termination")) {
+                Button(String(localized: "Retry Termination", bundle: RockxyLocalization.bundle)) {
                     controller.retryTermination()
                 }
             }
 
         case .noUpdate:
             if let url = detailURL {
-                Button(String(localized: "View Full Change Log")) {
+                Button(String(localized: "View Full Change Log", bundle: RockxyLocalization.bundle)) {
                     controller.openDetailURL(url)
                 }
             }
-            Button(String(localized: "Done")) {
+            Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                 controller.acknowledgeAndDismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -429,11 +463,11 @@ struct SoftwareUpdatePanelView: View {
 
         case .error:
             if let url = detailURL {
-                Button(String(localized: "Open Change Log")) {
+                Button(String(localized: "Open Change Log", bundle: RockxyLocalization.bundle)) {
                     controller.openDetailURL(url)
                 }
             }
-            Button(String(localized: "Done")) {
+            Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                 controller.acknowledgeAndDismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -497,7 +531,7 @@ struct SoftwareUpdatePanelView: View {
             notesVersionLabel: versionPanelLabel(
                 version: context.latestVersion,
                 buildNumber: context.buildNumber,
-                fallback: String(localized: "Installing")
+                fallback: String(localized: "Installing", bundle: RockxyLocalization.bundle)
             ),
             notes: .plainText(detailMessage),
             progress: ProgressPresentation(
@@ -519,17 +553,20 @@ struct SoftwareUpdatePanelView: View {
 
             if let recoverySuggestion = context.recoverySuggestion {
                 releaseNotesGroup(
-                    label: String(localized: "Recovery Suggestion"),
-                    versionLabel: String(localized: "Error Details"),
+                    label: String(localized: "Recovery Suggestion", bundle: RockxyLocalization.bundle),
+                    versionLabel: String(localized: "Error Details", bundle: RockxyLocalization.bundle),
                     content: .plainText(recoverySuggestion)
                 )
                 .layoutPriority(1)
             } else {
                 releaseNotesGroup(
-                    label: String(localized: "Update Details"),
-                    versionLabel: String(localized: "Error Details"),
+                    label: String(localized: "Update Details", bundle: RockxyLocalization.bundle),
+                    versionLabel: String(localized: "Error Details", bundle: RockxyLocalization.bundle),
                     content: .unavailable(
-                        String(localized: "No additional recovery guidance is available for this error.")
+                        String(
+                            localized: "No additional recovery guidance is available for this error.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 )
                 .layoutPriority(1)
@@ -627,7 +664,7 @@ struct SoftwareUpdatePanelView: View {
         case .loading:
             VStack(spacing: 12) {
                 ProgressView()
-                Text(String(localized: "Loading release notes…"))
+                Text(String(localized: "Loading release notes…", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font())
                     .foregroundStyle(.secondary)
             }
@@ -637,15 +674,21 @@ struct SoftwareUpdatePanelView: View {
         case .html,
              .plainText:
             if let attributedText = content.nativeDisplayAttributedString(
-                fallbackMessage: String(localized: "Release notes are unavailable for this update."),
+                fallbackMessage: String(
+                    localized: "Release notes are unavailable for this update.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 font: releaseNotesFont
             ) {
                 NativeReleaseNotesTextView(attributedText: attributedText)
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: "Release notes are unavailable for this update."))
-                        .font(toolMetrics.font())
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "Release notes are unavailable for this update.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.font())
+                    .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(18)
@@ -659,7 +702,7 @@ struct SoftwareUpdatePanelView: View {
                     .textSelection(.enabled)
 
                 if let detailURL {
-                    Button(String(localized: "Open Full Change Log")) {
+                    Button(String(localized: "Open Full Change Log", bundle: RockxyLocalization.bundle)) {
                         controller.openDetailURL(detailURL)
                     }
                     .buttonStyle(.link)
@@ -701,10 +744,10 @@ struct SoftwareUpdatePanelView: View {
 
     private func versionPanelLabel(version: String?, buildNumber: String?, fallback: String) -> String {
         if let version, let buildNumber, !buildNumber.isEmpty {
-            return String(localized: "Version \(version) (\(buildNumber))")
+            return String(localized: "Version \(version) (\(buildNumber))", bundle: RockxyLocalization.bundle)
         }
         if let version, !version.isEmpty {
-            return String(localized: "Version \(version)")
+            return String(localized: "Version \(version)", bundle: RockxyLocalization.bundle)
         }
         return fallback
     }
@@ -728,12 +771,18 @@ struct SoftwareUpdatePanelView: View {
         case let .downloading(_, bytesReceived, expectedBytes):
             downloadProgressDescription(received: bytesReceived, expected: expectedBytes)
         case .extracting:
-            String(localized: "Preparing the new app bundle and installation metadata.")
+            String(
+                localized: "Preparing the new app bundle and installation metadata.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .installing(_, applicationTerminated):
             if applicationTerminated {
-                String(localized: "Finishing installation and relaunch preparation.")
+                String(localized: "Finishing installation and relaunch preparation.", bundle: RockxyLocalization.bundle)
             } else {
-                String(localized: "Waiting for the running app process to terminate safely.")
+                String(
+                    localized: "Waiting for the running app process to terminate safely.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         default:
             nil

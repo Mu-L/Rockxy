@@ -24,7 +24,13 @@ enum HeaderModifyPhase: String, Codable, CaseIterable {
 /// The action to perform when a `ProxyRule` matches a request.
 enum RuleAction {
     case breakpoint(phase: BreakpointRulePhase = .both)
-    case mapLocal(filePath: String, statusCode: Int = 200, isDirectory: Bool = false, delayMs: Int = 0)
+    case mapLocal(
+        filePath: String,
+        statusCode: Int = 200,
+        isDirectory: Bool = false,
+        delayMs: Int = 0,
+        responseHeaders: [HTTPHeader] = []
+    )
     case mapRemote(configuration: MapRemoteConfiguration)
     case block(statusCode: Int)
     case throttle(delayMs: Int)
@@ -58,7 +64,7 @@ extension RuleAction {
         switch self {
         case let .breakpoint(phase):
             "Breakpoint (\(phase.rawValue.capitalized))"
-        case let .mapLocal(filePath, _, isDirectory, _):
+        case let .mapLocal(filePath, _, isDirectory, _, _):
             isDirectory ? "Map Local Directory" : "Map Local (\((filePath as NSString).lastPathComponent))"
         case .mapRemote:
             "Map Remote"
@@ -89,6 +95,7 @@ extension RuleAction: Codable {
         case operations
         case phase
         case preset
+        case responseHeaders
     }
 
     private enum ActionType: String, Codable {
@@ -114,7 +121,15 @@ extension RuleAction: Codable {
             let statusCode = try container.decodeIfPresent(Int.self, forKey: .statusCode) ?? 200
             let isDirectory = try container.decodeIfPresent(Bool.self, forKey: .isDirectory) ?? false
             let delayMs = try container.decodeIfPresent(Int.self, forKey: .delayMs) ?? 0
-            self = .mapLocal(filePath: filePath, statusCode: statusCode, isDirectory: isDirectory, delayMs: delayMs)
+            let responseHeaders = try container
+                .decodeIfPresent([HTTPHeader].self, forKey: .responseHeaders) ?? []
+            self = .mapLocal(
+                filePath: filePath,
+                statusCode: statusCode,
+                isDirectory: isDirectory,
+                delayMs: delayMs,
+                responseHeaders: responseHeaders
+            )
         case .mapRemote:
             if let config = try container.decodeIfPresent(MapRemoteConfiguration.self, forKey: .configuration) {
                 self = .mapRemote(configuration: config)
@@ -151,7 +166,7 @@ extension RuleAction: Codable {
         case let .breakpoint(phase):
             try container.encode(ActionType.breakpoint, forKey: .type)
             try container.encode(phase, forKey: .phase)
-        case let .mapLocal(filePath, statusCode, isDirectory, delayMs):
+        case let .mapLocal(filePath, statusCode, isDirectory, delayMs, responseHeaders):
             try container.encode(ActionType.mapLocal, forKey: .type)
             try container.encode(filePath, forKey: .filePath)
             try container.encode(statusCode, forKey: .statusCode)
@@ -162,6 +177,11 @@ extension RuleAction: Codable {
             // round-trip. Zero stays omitted for backward compatibility with older rules.
             if delayMs != 0 {
                 try container.encode(delayMs, forKey: .delayMs)
+            }
+            // Omit an empty header list so pre-existing rules stay byte-identical after a
+            // load/save cycle and older builds keep decoding these rules unchanged.
+            if !responseHeaders.isEmpty {
+                try container.encode(responseHeaders, forKey: .responseHeaders)
             }
         case let .mapRemote(configuration):
             try container.encode(ActionType.mapRemote, forKey: .type)

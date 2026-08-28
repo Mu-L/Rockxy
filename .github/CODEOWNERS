@@ -12,3 +12,9 @@
 /.github/CODEOWNERS @LocNguyenHuu
 /.github/tools/ @LocNguyenHuu
 /releases/ @LocNguyenHuu
+
+# String catalogs are the canonical translation source. Anyone may open a PR to
+# add or improve a language; a maintainer review protects placeholder integrity,
+# key hygiene, and the app-wide source strings. This gates review, not authorship.
+*.xcstrings @LocNguyenHuu
+/docs/development/localization.mdx @LocNguyenHuu

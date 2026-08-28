@@ -12,14 +12,14 @@ extension MainContentCoordinator {
         guard !debugAssistantConversationHasContextMismatch() else {
             activeToast = ToastMessage(
                 style: .warning,
-                text: String(localized: "Restore this conversation's traffic or start a new conversation.")
+                text: String(localized: "Restore this conversation's traffic or start a new conversation.", bundle: RockxyLocalization.bundle)
             )
             return
         }
         guard prompt.utf8.count <= DebugAssistantConversationLimits.maximumPromptBytes else {
             activeToast = ToastMessage(
                 style: .warning,
-                text: String(localized: "Shorten this message before sending it to the Assistant.")
+                text: String(localized: "Shorten this message before sending it to the Assistant.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -130,9 +130,7 @@ extension MainContentCoordinator {
         {
             activeToast = ToastMessage(
                 style: .warning,
-                text: String(
-                    localized: "Unpin another Assistant conversation before pinning this one."
-                )
+                text: String(localized: "Unpin another Assistant conversation before pinning this one.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -153,7 +151,7 @@ extension MainContentCoordinator {
         let selectedTransactions = debugAssistantSelectedTransactions()
         guard !selectedTransactions.isEmpty else {
             workspace.debugAssistantState = .failed(
-                message: String(localized: "Select at least one request to investigate.")
+                message: String(localized: "Select at least one request to investigate.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -169,7 +167,7 @@ extension MainContentCoordinator {
         {
             activeToast = ToastMessage(
                 style: .warning,
-                text: String(localized: "Restore this conversation's traffic or start a new conversation.")
+                text: String(localized: "Restore this conversation's traffic or start a new conversation.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -288,7 +286,7 @@ extension MainContentCoordinator {
         }
         guard !snapshots.isEmpty else {
             workspace.debugAssistantState = .failed(
-                message: String(localized: "The captured requests are no longer available for review.")
+                message: String(localized: "The captured requests are no longer available for review.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -647,9 +645,7 @@ extension MainContentCoordinator {
                 currentWorkspace.isPreparingDebugAssistantReviewOverride = false
                 self.activeToast = ToastMessage(
                     style: .warning,
-                    text: String(
-                        localized: "Rockxy could not include the excluded traffic. The reviewed data is unchanged."
-                    )
+                    text: String(localized: "Rockxy could not include the excluded traffic. The reviewed data is unchanged.", bundle: RockxyLocalization.bundle)
                 )
             }
         }
@@ -667,7 +663,7 @@ extension MainContentCoordinator {
         guard !debugAssistantConversationHasContextMismatch() else {
             activeToast = ToastMessage(
                 style: .warning,
-                text: String(localized: "Restore this conversation's traffic before following up.")
+                text: String(localized: "Restore this conversation's traffic before following up.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -679,17 +675,17 @@ extension MainContentCoordinator {
 
         workspace.debugAssistantDraft = switch result?.recipe {
         case .explainRequest:
-            String(localized: "What should I inspect next in Rockxy?")
+            String(localized: "What should I inspect next in Rockxy?", bundle: RockxyLocalization.bundle)
         case .explainFailure:
-            String(localized: "Show me how to verify the leading cause in Rockxy.")
+            String(localized: "Show me how to verify the leading cause in Rockxy.", bundle: RockxyLocalization.bundle)
         case .compareWithSuccess:
-            String(localized: "Which captured difference should I verify first?")
+            String(localized: "Which captured difference should I verify first?", bundle: RockxyLocalization.bundle)
         case .checkAuthentication:
-            String(localized: "What authentication evidence should I verify next?")
+            String(localized: "What authentication evidence should I verify next?", bundle: RockxyLocalization.bundle)
         case .prepareBugReport:
-            String(localized: "What should I add before sharing this bug report?")
+            String(localized: "What should I add before sharing this bug report?", bundle: RockxyLocalization.bundle)
         case nil:
-            String(localized: "What should I inspect next in Rockxy?")
+            String(localized: "What should I inspect next in Rockxy?", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -704,7 +700,7 @@ extension MainContentCoordinator {
         guard let transaction = transaction(for: id) else {
             activeToast = ToastMessage(
                 style: .error,
-                text: String(localized: "That captured request is no longer available.")
+                text: String(localized: "That captured request is no longer available.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -747,7 +743,7 @@ extension MainContentCoordinator {
         {
             activeToast = ToastMessage(
                 style: .error,
-                text: String(localized: "Select the original request and run the investigation again.")
+                text: String(localized: "Select the original request and run the investigation again.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -882,7 +878,7 @@ extension MainContentCoordinator {
         {
             activeToast = ToastMessage(
                 style: .error,
-                text: String(localized: "The original captured traffic is no longer available.")
+                text: String(localized: "The original captured traffic is no longer available.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -892,7 +888,7 @@ extension MainContentCoordinator {
         guard availableIDs.contains(primary.id) else {
             activeToast = ToastMessage(
                 style: .error,
-                text: String(localized: "The original captured traffic is no longer available.")
+                text: String(localized: "The original captured traffic is no longer available.", bundle: RockxyLocalization.bundle)
             )
             return
         }
@@ -931,7 +927,7 @@ extension MainContentCoordinator {
               settings.debugAssistantModelAccessEnabled else
         {
             workspace.modelInvestigationState = .failed(
-                message: String(localized: "Enable model access in AI Assistant Settings before sending data.")
+                message: String(localized: "Enable model access in AI Assistant Settings before sending data.", bundle: RockxyLocalization.bundle)
             )
             return nil
         }
@@ -940,7 +936,7 @@ extension MainContentCoordinator {
               settings.assistantProviderConfiguration == configuration else
         {
             workspace.modelInvestigationState = .failed(
-                message: String(localized: "The provider configuration changed. Review the outbound data again.")
+                message: String(localized: "The provider configuration changed. Review the outbound data again.", bundle: RockxyLocalization.bundle)
             )
             dismissDebugAssistantReview()
             return nil
@@ -949,9 +945,7 @@ extension MainContentCoordinator {
               AssistantTrustPolicy.isReviewedScopeValid(pack, for: result) else
         {
             workspace.modelInvestigationState = .failed(
-                message: String(
-                    localized: "The traffic scope changed. Review the exact data again before model access."
-                )
+                message: String(localized: "The traffic scope changed. Review the exact data again before model access.", bundle: RockxyLocalization.bundle)
             )
             dismissDebugAssistantReview()
             return nil
@@ -1061,7 +1055,7 @@ extension MainContentCoordinator {
         workspace.debugAssistantMessages.removeAll()
         workspace.debugAssistantDraft = ""
         workspace.debugAssistantConversationID = UUID()
-        workspace.debugAssistantConversationTitle = String(localized: "New Conversation")
+        workspace.debugAssistantConversationTitle = String(localized: "New Conversation", bundle: RockxyLocalization.bundle)
         workspace.debugAssistantConversationCreatedAt = Date()
         workspace.debugAssistantConversationUpdatedAt = Date()
         workspace.debugAssistantConversationContext = nil

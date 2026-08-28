@@ -60,15 +60,23 @@ struct WelcomeViewModelTests {
     @Test("helper action labels remain aligned with HelperManager states")
     func helperActionLabelsMatchManager() {
         let cases: [(HelperManager.HelperStatus, HelperManager.SigningIssue?, String?)] = [
-            (.notInstalled, nil, String(localized: "Install")),
-            (.requiresApproval, nil, String(localized: "Open Settings")),
+            (.notInstalled, nil, String(localized: "Install", bundle: RockxyLocalization.bundle)),
+            (.requiresApproval, nil, String(localized: "Open Settings", bundle: RockxyLocalization.bundle)),
             (.installedCompatible, nil, nil),
-            (.installedOutdated, nil, String(localized: "Update")),
-            (.installedIncompatible, nil, String(localized: "Update")),
-            (.unreachable, nil, String(localized: "Retry")),
-            (.signingMismatch, .applicationMustReopen, String(localized: "Quit Rockxy")),
+            (.installedOutdated, nil, String(localized: "Update", bundle: RockxyLocalization.bundle)),
+            (.installedIncompatible, nil, String(localized: "Update", bundle: RockxyLocalization.bundle)),
+            (.unreachable, nil, String(localized: "Retry", bundle: RockxyLocalization.bundle)),
+            (
+                .signingMismatch,
+                .applicationMustReopen,
+                String(localized: "Quit Rockxy", bundle: RockxyLocalization.bundle)
+            ),
             (.signingMismatch, .appSignatureInvalid(detail: "x"), nil),
-            (.signingMismatch, .identityMismatch(appSigner: "a", helperSigner: "b"), String(localized: "Reinstall")),
+            (
+                .signingMismatch,
+                .identityMismatch(appSigner: "a", helperSigner: "b"),
+                String(localized: "Reinstall", bundle: RockxyLocalization.bundle)
+            ),
             (.signingMismatch, nil, nil),
         ]
 

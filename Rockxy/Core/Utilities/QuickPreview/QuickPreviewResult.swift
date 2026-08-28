@@ -8,12 +8,14 @@ enum QuickPreviewAction: String, CaseIterable, Sendable {
     case keyValue
     case decodeJWT
 
+    // MARK: Internal
+
     var displayName: String {
         switch self {
-        case .prettifyJSON: String(localized: "Prettify JSON")
-        case .decodeBase64: String(localized: "Decode Base64")
-        case .keyValue: String(localized: "Display as Key-Value")
-        case .decodeJWT: String(localized: "Decode JWT")
+        case .prettifyJSON: String(localized: "Prettify JSON", bundle: RockxyLocalization.bundle)
+        case .decodeBase64: String(localized: "Decode Base64", bundle: RockxyLocalization.bundle)
+        case .keyValue: String(localized: "Display as Key-Value", bundle: RockxyLocalization.bundle)
+        case .decodeJWT: String(localized: "Decode JWT", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -26,6 +28,8 @@ enum QuickPreviewResult: Equatable, Sendable {
     case keyValue(title: String, rows: [QuickPreviewKeyValueRow])
     case jwt(JWTPreview)
     case error(title: String, message: String)
+
+    // MARK: Internal
 
     var copyText: String {
         switch self {
@@ -45,13 +49,17 @@ enum QuickPreviewResult: Equatable, Sendable {
 // MARK: - QuickPreviewKeyValueRow
 
 struct QuickPreviewKeyValueRow: Equatable, Identifiable, Sendable {
-    let id: String
-    let key: String
-    let value: String
+    // MARK: Lifecycle
 
     init(key: String, value: String) {
         self.id = key
         self.key = key
         self.value = value
     }
+
+    // MARK: Internal
+
+    let id: String
+    let key: String
+    let value: String
 }

@@ -20,6 +20,15 @@ private enum MapLocalFileSource: Equatable {
     case externalReference
 }
 
+// MARK: - MapLocalExternalFileInterpretation
+
+private enum MapLocalExternalFileInterpretation: Equatable {
+    case uninspected
+    case rawBody
+    case fullHTTPMessage(hasBinaryBody: Bool)
+    case malformedHTTPMessage
+}
+
 // MARK: - MapLocalEditorViewModel
 
 @MainActor @Observable
@@ -39,6 +48,9 @@ final class MapLocalEditorViewModel {
     var filePath = ""
     var directoryPath = ""
     var httpMessageText = MapLocalHTTPMessage.defaultMessage(statusCode: 200)
+    var testURLText = ""
+    var testMethod: MapLocalHTTPMethod = .get
+    private(set) var testResult: MapLocalRuleTestResult?
     var errorMessage: String?
 
     private(set) var existingID: UUID?
@@ -63,6 +75,30 @@ final class MapLocalEditorViewModel {
         fileSource == .generated
     }
 
+    var isExternalFullHTTPMessage: Bool {
+        if targetMode == .localFile, case .fullHTTPMessage = externalFileInterpretation {
+            return true
+        }
+        return false
+    }
+
+    var externalFullMessageHasBinaryBody: Bool {
+        if case let .fullHTTPMessage(hasBinaryBody) = externalFileInterpretation {
+            return hasBinaryBody
+        }
+        return false
+    }
+
+    var externalFileValidationMessage: String? {
+        guard targetMode == .localFile, externalFileInterpretation == .malformedHTTPMessage else {
+            return nil
+        }
+        return String(
+            localized: "This file starts like an HTTP response but is malformed. Rockxy will continue to the origin until the file is corrected.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
     var isSelectedFileAvailable: Bool {
         guard !filePath.isEmpty else {
             return false
@@ -72,7 +108,10 @@ final class MapLocalEditorViewModel {
     }
 
     var responseContentType: String {
-        MimeTypeResolver.mimeType(for: filePath)
+        let configured = MapLocalHTTPMessage.parse(httpMessageText).headers.first {
+            $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame
+        }?.value
+        return configured ?? MimeTypeResolver.mimeType(for: filePath)
     }
 
     var responseStatusCode: Int {
@@ -84,12 +123,38 @@ final class MapLocalEditorViewModel {
             MapLocalHTTPMessage.parse(httpMessageText).body
         }
         set {
+            let parsed = MapLocalHTTPMessage.parse(httpMessageText)
             httpMessageText = MapLocalHTTPMessage.message(
-                statusCode: responseStatusCode,
-                contentType: responseContentType,
+                statusCode: parsed.statusCode,
+                headers: parsed.headers,
                 body: newValue
             )
         }
+    }
+
+    /// The host whose HTTPS traffic must be intercepted before a Map Local rule can run.
+    /// Regex patterns are intentionally excluded because inferring a safe host from an
+    /// arbitrary regular expression would be misleading.
+    var httpsTargetHost: String? {
+        guard matchType == .wildcard else {
+            return nil
+        }
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: trimmed),
+              components.scheme?.lowercased() == "https",
+              let host = components.host,
+              !host.isEmpty,
+              !host.contains("*"), !host.contains("?") else
+        {
+            return nil
+        }
+        return host
+    }
+
+    var isHTTPSPattern: Bool {
+        urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .hasPrefix("https://")
     }
 
     var windowTitle: String {
@@ -113,6 +178,7 @@ final class MapLocalEditorViewModel {
             && !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && isTargetValid
             && RegexValidator.compile(urlPatternForSaving()).isSuccess
+            && directoryRegexCaptureIsValid
     }
 
     var urlValidationMessage: String? {
@@ -125,6 +191,24 @@ final class MapLocalEditorViewModel {
         return nil
     }
 
+    var directoryRegexValidationMessage: String? {
+        guard targetMode == .localDirectory, matchType == .regex,
+              !urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              RegexValidator.compile(urlPatternForSaving()).isSuccess,
+              !directoryRegexCaptureIsValid else
+        {
+            return nil
+        }
+        return String(
+            localized: "Regex directory rules need a capture group, such as /assets/(.*), to choose a file inside the directory.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
+    var visibleTestResult: MapLocalRuleTestResult? {
+        testedConfiguration == currentTestConfiguration ? testResult : nil
+    }
+
     var delayMs: Int {
         if delayPreset == .custom {
             return max(0, customDelaySeconds) * 1_000
@@ -133,6 +217,7 @@ final class MapLocalEditorViewModel {
     }
 
     func load(context: MapLocalEditorContext) {
+        resetTransientState()
         existingID = context.existingRule?.id
         originalRule = context.existingRule
         draft = context.draft
@@ -153,30 +238,79 @@ final class MapLocalEditorViewModel {
         panel.canChooseDirectories = targetMode == .localDirectory
         panel.allowsMultipleSelection = false
         panel.message = targetMode == .localDirectory
-            ? String(localized: "Select a local directory to serve files from")
-            : String(localized: "Select a local file to serve for matched requests")
+            ? String(localized: "Select a local directory to serve files from", bundle: RockxyLocalization.bundle)
+            : String(localized: "Select a local file to serve for matched requests", bundle: RockxyLocalization.bundle)
 
         if panel.runModal() == .OK, let url = panel.url {
             if targetMode == .localDirectory {
                 directoryPath = url.path(percentEncoded: false)
                 localDirectoryEnabled = true
+                externalFileInterpretation = .uninspected
             } else {
-                filePath = url.path(percentEncoded: false)
-                localFileEnabled = true
-                // A user-selected file is referenced as-is: never load it into the
-                // editable buffer and never rewrite it when the rule is saved.
-                fileSource = .externalReference
+                selectExternalFile(at: url.path(percentEncoded: false))
             }
         }
     }
 
+    /// Selects a user-owned file without taking ownership of its bytes. Keeping this
+    /// transition separate from `NSOpenPanel` also makes stale-preview behavior testable.
+    func selectExternalFile(at path: String) {
+        let actionMessage = externalActionMessageForNextSelection()
+        filePath = path
+        localFileEnabled = true
+        fileSource = .externalReference
+        externalActionMessageText = actionMessage
+        // Restore the rule-owned metadata before inspecting the new file. Otherwise a
+        // malformed/raw file selected after a full-response file would retain that old
+        // file's authoritative preview and could persist stale status/headers.
+        httpMessageText = actionMessage
+        let parsed = MapLocalHTTPMessage.parse(actionMessage)
+        loadExternalFilePreview(
+            path: path,
+            actionStatusCode: parsed.statusCode,
+            responseHeaders: parsed.headers
+        )
+    }
+
     func setResponseStatusCode(_ statusCode: Int) {
         let normalizedStatus = min(max(statusCode, 100), 599)
+        let parsed = MapLocalHTTPMessage.parse(httpMessageText)
         httpMessageText = MapLocalHTTPMessage.message(
             statusCode: normalizedStatus,
-            contentType: responseContentType,
-            body: responseBodyText
+            headers: parsed.headers,
+            body: parsed.body
         )
+    }
+
+    func testRule() {
+        testedConfiguration = currentTestConfiguration
+        let candidate = testURLText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: candidate), let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", url.host != nil else
+        {
+            testResult = .invalidURL
+            return
+        }
+
+        let condition = RuleMatchCondition(
+            urlPattern: urlPatternForSaving(),
+            sourceURLPattern: urlText.trimmingCharacters(in: .whitespacesAndNewlines),
+            method: method.ruleValue,
+            matchType: matchType == .regex ? .regex : .wildcard,
+            includeSubpaths: matchType == .wildcard ? includeSubpaths : false
+        )
+        let runtimePattern = condition.runtimeURLPattern ?? urlPatternForSaving()
+        switch RegexValidator.compile(runtimePattern) {
+        case let .failure(error):
+            testResult = .invalidPattern(error.localizedDescription)
+        case let .success(regex):
+            testResult = condition.matches(
+                method: testMethod.rawValue,
+                url: url,
+                headers: [],
+                compiledPattern: regex
+            ) ? .matched : .notMatched
+        }
     }
 
     func showSelectedPathInFinder() {
@@ -204,7 +338,10 @@ final class MapLocalEditorViewModel {
 
     func makeRule() -> ProxyRule? {
         guard isSaveEnabled else {
-            errorMessage = String(localized: "Complete the matching rule and local target before saving.")
+            errorMessage = String(
+                localized: "Complete the matching rule and local target before saving.",
+                bundle: RockxyLocalization.bundle
+            )
             return nil
         }
 
@@ -226,6 +363,8 @@ final class MapLocalEditorViewModel {
         condition.matchType = matchType == .regex ? .regex : .wildcard
         condition.includeSubpaths = matchType == .wildcard ? includeSubpaths : false
 
+        let parsedResponse = MapLocalHTTPMessage.parse(actionResponseMessageForSaving)
+
         return ProxyRule(
             id: existingID ?? UUID(),
             name: name,
@@ -233,9 +372,10 @@ final class MapLocalEditorViewModel {
             matchCondition: condition,
             action: .mapLocal(
                 filePath: targetMode == .localDirectory ? directoryPath : filePath,
-                statusCode: statusCodeFromText(),
+                statusCode: parsedResponse.statusCode,
                 isDirectory: targetMode == .localDirectory,
-                delayMs: delayMs
+                delayMs: delayMs,
+                responseHeaders: parsedResponse.headers
             ),
             priority: originalRule?.priority ?? 0
         )
@@ -246,11 +386,23 @@ final class MapLocalEditorViewModel {
         guard matchType == .wildcard else {
             return trimmed
         }
-        let pattern = includeSubpaths && !trimmed.hasSuffix("*") ? "\(trimmed)*" : trimmed
-        return MapLocalPatternFormatter.wildcardToRegex(pattern)
+        return RulePatternBuilder.regexSource(
+            rawPattern: trimmed,
+            matchType: .wildcard,
+            includeSubpaths: includeSubpaths
+        )
     }
 
     // MARK: Private
+
+    private struct RuleTestConfiguration: Equatable {
+        let authoredPattern: String
+        let method: MapLocalHTTPMethod
+        let matchType: MapLocalMatchType
+        let includeSubpaths: Bool
+        let testURL: String
+        let testMethod: MapLocalHTTPMethod
+    }
 
     /// Root directory Rockxy owns for generated Map Local response files.
     private static var mapLocalDirectoryRoot: URL {
@@ -260,6 +412,40 @@ final class MapLocalEditorViewModel {
     }
 
     private var fileSource: MapLocalFileSource = .generated
+    private var externalFileInterpretation: MapLocalExternalFileInterpretation = .uninspected
+    /// Rule-owned fallback status/headers kept separate from a full HTTP file's read-only
+    /// authoritative preview. This is what Rockxy persists for the action if the file later
+    /// becomes a raw body.
+    private var externalActionMessageText: String?
+    private var testedConfiguration: RuleTestConfiguration?
+
+    private var actionResponseMessageForSaving: String {
+        if isExternalFullHTTPMessage, let externalActionMessageText {
+            return externalActionMessageText
+        }
+        return httpMessageText
+    }
+
+    private var currentTestConfiguration: RuleTestConfiguration {
+        RuleTestConfiguration(
+            authoredPattern: urlText,
+            method: method,
+            matchType: matchType,
+            includeSubpaths: includeSubpaths,
+            testURL: testURLText,
+            testMethod: testMethod
+        )
+    }
+
+    private var directoryRegexCaptureIsValid: Bool {
+        guard targetMode == .localDirectory, matchType == .regex else {
+            return true
+        }
+        guard case let .success(regex) = RegexValidator.compile(urlPatternForSaving()) else {
+            return false
+        }
+        return regex.numberOfCaptureGroups > 0
+    }
 
     private var isTargetValid: Bool {
         switch targetMode {
@@ -327,6 +513,8 @@ final class MapLocalEditorViewModel {
         directoryPath = ""
         httpMessageText = MapLocalHTTPMessage.defaultMessage(statusCode: 200)
         fileSource = .generated
+        externalFileInterpretation = .uninspected
+        externalActionMessageText = nil
     }
 
     private func load(draft: MapLocalDraft) {
@@ -340,18 +528,29 @@ final class MapLocalEditorViewModel {
         } else {
             urlText = "https://\(draft.sourceHost)/*"
         }
+        // A transaction quick-create should be immediately testable against that
+        // transaction. Never retain the tester URL or result from a previous editor.
+        testURLText = urlText
+        testMethod = method == .any ? .get : method
 
         // Seed an app-owned generated file using the inferred extension.
         filePath = Self.generatedMapLocalFilePath(fileExtension: draft.inferredExtension)
 
         let status = draft.responseStatusCode ?? 200
+        let responseHeaders = draft.responseHeaders.isEmpty
+            ? [
+                HTTPHeader(
+                    name: "Content-Type",
+                    value: draft.responseContentType ?? MimeTypeResolver.mimeType(for: filePath)
+                ),
+            ]
+            : draft.responseHeaders
         guard let body = draft.responseBody, !body.isEmpty else {
             if draft.responseStatusCode != nil {
                 // No body but a captured status — reflect it in the template.
-                let contentType = draft.responseContentType ?? "application/json; charset=utf-8"
                 httpMessageText = MapLocalHTTPMessage.message(
                     statusCode: status,
-                    contentType: contentType,
+                    headers: responseHeaders,
                     body: "{\n  \"status\": \"ok\"\n}"
                 )
             }
@@ -359,23 +558,31 @@ final class MapLocalEditorViewModel {
             return
         }
 
-        let contentType = draft.responseContentType ?? MimeTypeResolver.mimeType(for: filePath)
         if let bodyText = String(data: body, encoding: .utf8) {
-            httpMessageText = MapLocalHTTPMessage.message(statusCode: status, contentType: contentType, body: bodyText)
+            httpMessageText = MapLocalHTTPMessage.message(
+                statusCode: status,
+                headers: responseHeaders,
+                body: bodyText
+            )
             fileSource = .generated
         } else {
             // Binary payload — keep the raw bytes for byte-identical persistence and
             // show a header-only preview (never a fallback JSON/empty-UTF-8 conversion).
-            httpMessageText = MapLocalHTTPMessage.message(statusCode: status, contentType: contentType, body: "")
+            httpMessageText = MapLocalHTTPMessage.message(
+                statusCode: status,
+                headers: responseHeaders,
+                body: ""
+            )
             fileSource = .capturedBinary(body)
         }
     }
 
     private func load(existingRule rule: ProxyRule) {
+        externalFileInterpretation = .uninspected
         name = rule.name.isEmpty ? "Untitled" : rule.name
         loadURLMetadata(from: rule.matchCondition)
         method = MapLocalHTTPMethod(ruleMethod: rule.matchCondition.method)
-        if case let .mapLocal(path, statusCode, isDirectory, delayMs) = rule.action {
+        if case let .mapLocal(path, statusCode, isDirectory, delayMs, responseHeaders) = rule.action {
             targetMode = isDirectory ? .localDirectory : .localFile
             filePath = isDirectory ? "" : path
             directoryPath = isDirectory ? path : ""
@@ -386,41 +593,70 @@ final class MapLocalEditorViewModel {
                 customDelaySeconds = max(0, delayMs / 1_000)
             }
             if isDirectory {
+                let headers = responseHeaders.isEmpty
+                    ? [HTTPHeader(name: "Content-Type", value: "application/octet-stream")]
+                    : responseHeaders
+                httpMessageText = MapLocalHTTPMessage.message(
+                    statusCode: statusCode,
+                    headers: headers,
+                    body: ""
+                )
                 fileSource = .externalReference
+                externalFileInterpretation = .uninspected
+                externalActionMessageText = nil
             } else {
-                loadExistingFile(path: path, statusCode: statusCode)
+                loadExistingFile(path: path, statusCode: statusCode, responseHeaders: responseHeaders)
             }
         }
     }
 
-    private func loadExistingFile(path: String, statusCode: Int) {
+    private func resetTransientState() {
+        testURLText = ""
+        testMethod = .get
+        testResult = nil
+        testedConfiguration = nil
+        errorMessage = nil
+    }
+
+    private func loadExistingFile(path: String, statusCode: Int, responseHeaders: [HTTPHeader]) {
+        let headers = responseHeaders.isEmpty
+            ? [HTTPHeader(name: "Content-Type", value: MimeTypeResolver.mimeType(for: path))]
+            : responseHeaders
         guard Self.isAppOwnedPath(path) else {
-            // External references are never loaded into the editor or rewritten.
+            // External references are inspected through the same bounded runtime resolver
+            // for an accurate preview, but are never rewritten.
             httpMessageText = MapLocalHTTPMessage.message(
                 statusCode: statusCode,
-                contentType: MimeTypeResolver.mimeType(for: path),
+                headers: headers,
                 body: ""
             )
             fileSource = .externalReference
+            externalActionMessageText = httpMessageText
+            loadExternalFilePreview(
+                path: path,
+                actionStatusCode: statusCode,
+                responseHeaders: headers
+            )
             return
         }
 
         if let data = MapLocalFileValidator.loadFileData(at: path) {
-            let contentType = MimeTypeResolver.mimeType(for: path)
             if let body = String(data: data, encoding: .utf8) {
                 httpMessageText = MapLocalHTTPMessage.message(
                     statusCode: statusCode,
-                    contentType: contentType,
+                    headers: headers,
                     body: body
                 )
                 fileSource = .generated
+                externalActionMessageText = nil
             } else {
                 httpMessageText = MapLocalHTTPMessage.message(
                     statusCode: statusCode,
-                    contentType: contentType,
+                    headers: headers,
                     body: ""
                 )
                 fileSource = .capturedBinary(data)
+                externalActionMessageText = nil
             }
             return
         }
@@ -428,12 +664,54 @@ final class MapLocalEditorViewModel {
         let fileExists = FileManager.default.fileExists(atPath: path)
         httpMessageText = MapLocalHTTPMessage.message(
             statusCode: statusCode,
-            contentType: MimeTypeResolver.mimeType(for: path),
+            headers: headers,
             body: ""
         )
         // A missing app-owned target may be recreated. Existing data that failed
         // validation stays read-only so Save cannot destroy an oversized or unsafe file.
         fileSource = fileExists ? .externalReference : .generated
+        externalFileInterpretation = .uninspected
+        externalActionMessageText = fileExists ? httpMessageText : nil
+    }
+
+    private func externalActionMessageForNextSelection() -> String {
+        if isExternalFullHTTPMessage, let externalActionMessageText {
+            return externalActionMessageText
+        }
+        return httpMessageText
+    }
+
+    private func loadExternalFilePreview(
+        path: String,
+        actionStatusCode: Int,
+        responseHeaders: [HTTPHeader]
+    ) {
+        externalFileInterpretation = .uninspected
+        guard let data = MapLocalFileValidator.loadFileData(at: path) else {
+            return
+        }
+
+        let looksLikeHTTPMessage = data.starts(with: Data("HTTP/".utf8))
+        let outcome = MapLocalResponseResolver.resolve(
+            fileData: data,
+            actionStatusCode: actionStatusCode,
+            configuredHeaders: responseHeaders,
+            inferredContentType: MimeTypeResolver.mimeType(for: path)
+        )
+        switch outcome {
+        case .fallbackToOrigin:
+            externalFileInterpretation = looksLikeHTTPMessage ? .malformedHTTPMessage : .rawBody
+        case let .serve(payload) where looksLikeHTTPMessage:
+            let bodyText = String(data: payload.body, encoding: .utf8)
+            httpMessageText = MapLocalHTTPMessage.message(
+                statusCode: payload.statusCode,
+                headers: payload.headers,
+                body: bodyText ?? ""
+            )
+            externalFileInterpretation = .fullHTTPMessage(hasBinaryBody: bodyText == nil && !payload.body.isEmpty)
+        case .serve:
+            externalFileInterpretation = .rawBody
+        }
     }
 
     /// Restores the editor's URL fields, preferring authored metadata when present
@@ -455,10 +733,6 @@ final class MapLocalEditorViewModel {
             matchType = .regex
         }
         includeSubpaths = false
-    }
-
-    private func statusCodeFromText() -> Int {
-        MapLocalHTTPMessage.parse(httpMessageText).statusCode
     }
 
     private func saveLocalFileIfNeeded() throws {
@@ -496,6 +770,12 @@ private extension Result where Success == NSRegularExpression, Failure == RegexV
 // MARK: - MapLocalHTTPMessage
 
 enum MapLocalHTTPMessage {
+    struct ParsedResponse: Equatable {
+        let statusCode: Int
+        let headers: [HTTPHeader]
+        let body: String
+    }
+
     static func defaultMessage(statusCode: Int) -> String {
         message(
             statusCode: statusCode,
@@ -505,21 +785,51 @@ enum MapLocalHTTPMessage {
     }
 
     static func message(statusCode: Int, contentType: String, body: String) -> String {
-        let status = HTTPURLResponse.localizedString(forStatusCode: statusCode).uppercased()
-        return "HTTP/1.1 \(statusCode) \(status)\nContent-Type: \(contentType)\n\n\(body)"
+        message(
+            statusCode: statusCode,
+            headers: [HTTPHeader(name: "Content-Type", value: contentType)],
+            body: body
+        )
     }
 
-    static func parse(_ text: String) -> (statusCode: Int, body: String) {
+    static func message(statusCode: Int, headers: [HTTPHeader], body: String) -> String {
+        let status = HTTPResponseStatusLookup.reasonPhrase(for: statusCode)
+            ?? HTTPURLResponse.localizedString(forStatusCode: statusCode).localizedCapitalized
+        let headerText = headers
+            .map { "\($0.name): \($0.value)" }
+            .joined(separator: "\n")
+        let separator = headerText.isEmpty ? "" : "\n"
+        return "HTTP/1.1 \(statusCode) \(status)\n\(headerText)\(separator)\n\(body)"
+    }
+
+    static func parse(_ text: String) -> ParsedResponse {
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-        let lines = normalized.components(separatedBy: "\n")
+        let headerBlock: Substring
+        let body: String
+        if let range = normalized.range(of: "\n\n") {
+            headerBlock = normalized[..<range.lowerBound]
+            body = String(normalized[range.upperBound...])
+        } else {
+            headerBlock = Substring(normalized)
+            body = ""
+        }
+        let lines = headerBlock.split(separator: "\n", omittingEmptySubsequences: false)
         let statusCode = lines.first
             .flatMap { line in
                 line.split(separator: " ").dropFirst().first.flatMap { Int($0) }
             } ?? 200
 
-        if let range = normalized.range(of: "\n\n") {
-            return (statusCode, String(normalized[range.upperBound...]))
+        let headers = lines.dropFirst().compactMap { line -> HTTPHeader? in
+            guard let separator = line.firstIndex(of: ":") else {
+                return nil
+            }
+            let name = line[..<separator].trimmingCharacters(in: .whitespaces)
+            let value = line[line.index(after: separator)...].trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else {
+                return nil
+            }
+            return HTTPHeader(name: name, value: value)
         }
-        return (statusCode, normalized)
+        return ParsedResponse(statusCode: min(max(statusCode, 100), 599), headers: headers, body: body)
     }
 }

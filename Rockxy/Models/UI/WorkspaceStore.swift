@@ -56,7 +56,7 @@ final class WorkspaceStore {
 
     @discardableResult
     func createWorkspace(
-        title: String = String(localized: "New Tab"),
+        title: String = String(localized: "New Tab", bundle: RockxyLocalization.bundle),
         filter: FilterCriteria = .empty
     )
         -> WorkspaceState
@@ -167,7 +167,7 @@ final class WorkspaceStore {
         {
             return nil
         }
-        let suffix = " " + String(localized: "Copy")
+        let suffix = " " + String(localized: "Copy", bundle: RockxyLocalization.bundle)
         let maximumBaseCount = max(
             1,
             ProjectStructuralLimits.nameGraphemeRange.upperBound - suffix.count
@@ -213,7 +213,8 @@ final class WorkspaceStore {
 
     func renameWorkspace(id: UUID, to newTitle: String) {
         guard let workspace = workspaces.first(where: { $0.id == id }),
-              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(newTitle) else {
+              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(newTitle) else
+        {
             Self.logger.warning("Refused to rename a workspace with an invalid title")
             return
         }

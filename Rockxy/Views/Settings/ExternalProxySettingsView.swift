@@ -61,26 +61,57 @@ struct ExternalProxySettingsView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var endpointSectionTitle: String {
+        switch viewModel.draft.selectedProtocol {
+        case .automatic:
+            String(localized: "Automatic Configuration", bundle: RockxyLocalization.bundle)
+        case .http:
+            String(localized: "HTTP Proxy", bundle: RockxyLocalization.bundle)
+        case .https:
+            String(localized: "HTTPS Proxy", bundle: RockxyLocalization.bundle)
+        case .socks5:
+            String(localized: "SOCKS5 Proxy", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private var protocolBinding: Binding<ExternalProxyProtocolSelection> {
+        Binding(
+            get: { viewModel.draft.selectedProtocol },
+            set: { selection in
+                guard selection != .socks5 || viewModel.canSelectSOCKS5 else {
+                    return
+                }
+                viewModel.draft.selectedProtocol = selection
+            }
+        )
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "External Proxy"))
+                Text(String(localized: "External Proxy", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "Route eligible captured traffic through an upstream proxy."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Route eligible captured traffic through an upstream proxy.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
             Toggle(
-                String(localized: "Enable External Proxy"),
+                String(localized: "Enable External Proxy", bundle: RockxyLocalization.bundle),
                 isOn: draftBinding(\.isEnabled)
             )
             .toggleStyle(.switch)
             .accessibilityHint(
-                String(localized: "Changes take effect only after you apply these settings.")
+                String(
+                    localized: "Changes take effect only after you apply these settings.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -100,7 +131,7 @@ struct ExternalProxySettingsView: View {
                     Applied settings affect new eligible captured connections. Upstream bypass entries are still \
                     captured by Rockxy; Rockxy connects to those destinations directly instead of using the upstream \
                     proxy.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -116,12 +147,12 @@ struct ExternalProxySettingsView: View {
 
     private var protocolSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Protocol"))
+            Text(String(localized: "Protocol", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             if toolMetrics.bodyFontSize >= 20 {
                 Picker(
-                    String(localized: "Upstream proxy protocol"),
+                    String(localized: "Upstream proxy protocol", bundle: RockxyLocalization.bundle),
                     selection: protocolBinding
                 ) {
                     protocolOptions
@@ -131,11 +162,14 @@ struct ExternalProxySettingsView: View {
                 .frame(width: toolMetrics.menuWidth(360))
                 .accessibilityHint(fieldAccessibilityHint(
                     for: .protocolSelection,
-                    fallback: String(localized: "Select the upstream proxy protocol.")
+                    fallback: String(
+                        localized: "Select the upstream proxy protocol.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 ))
             } else {
                 Picker(
-                    String(localized: "Upstream proxy protocol"),
+                    String(localized: "Upstream proxy protocol", bundle: RockxyLocalization.bundle),
                     selection: protocolBinding
                 ) {
                     protocolOptions
@@ -144,15 +178,19 @@ struct ExternalProxySettingsView: View {
                 .pickerStyle(.segmented)
                 .accessibilityHint(fieldAccessibilityHint(
                     for: .protocolSelection,
-                    fallback: String(localized: "Select the upstream proxy protocol.")
+                    fallback: String(
+                        localized: "Select the upstream proxy protocol.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 ))
             }
 
             if !viewModel.canSelectSOCKS5 {
                 PolicyLockNotice(
-                    title: String(localized: "SOCKS5 unavailable"),
+                    title: String(localized: "SOCKS5 unavailable", bundle: RockxyLocalization.bundle),
                     message: String(
-                        localized: "This build keeps SOCKS5 visible for configuration compatibility, but it cannot be selected or applied."
+                        localized: "This build keeps SOCKS5 visible for configuration compatibility, but it cannot be selected or applied.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             }
@@ -163,7 +201,6 @@ struct ExternalProxySettingsView: View {
         .panelStyle()
     }
 
-    @ViewBuilder
     private var protocolOptions: some View {
         ForEach(ExternalProxyProtocolSelection.allCases) { protocolSelection in
             Text(protocolOptionName(protocolSelection))
@@ -190,43 +227,36 @@ struct ExternalProxySettingsView: View {
         .panelStyle()
     }
 
-    private var endpointSectionTitle: String {
-        switch viewModel.draft.selectedProtocol {
-        case .automatic:
-            String(localized: "Automatic Configuration")
-        case .http:
-            String(localized: "HTTP Proxy")
-        case .https:
-            String(localized: "HTTPS Proxy")
-        case .socks5:
-            String(localized: "SOCKS5 Proxy")
-        }
-    }
-
     private var pacConfiguration: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "PAC URL"))
+            Text(String(localized: "PAC URL", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font())
             TextField(
-                String(localized: "https://proxy.example.com/proxy.pac"),
+                String(localized: "https://proxy.example.com/proxy.pac", bundle: RockxyLocalization.bundle),
                 text: draftBinding(\.pacURL)
             )
             .textFieldStyle(.roundedBorder)
             .font(toolMetrics.font())
             .frame(height: toolMetrics.formControlHeight)
             .focused($focusedField, equals: .pacURL)
-            .accessibilityLabel(String(localized: "Proxy automatic configuration URL"))
+            .accessibilityLabel(String(
+                localized: "Proxy automatic configuration URL",
+                bundle: RockxyLocalization.bundle
+            ))
             .accessibilityHint(fieldAccessibilityHint(
                 for: .pacURL,
-                fallback: String(localized: "Enter an HTTP or HTTPS PAC file URL.")
+                fallback: String(localized: "Enter an HTTP or HTTPS PAC file URL.", bundle: RockxyLocalization.bundle)
             ))
 
             if let message = viewModel.validationMessage(for: .pacURL) {
                 validationText(message)
             } else {
-                Text(String(localized: "Rockxy downloads this PAC file when resolving a new route."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Rockxy downloads this PAC file when resolving a new route.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -235,39 +265,45 @@ struct ExternalProxySettingsView: View {
         VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
             HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Host"))
+                    Text(String(localized: "Host", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font())
                     TextField(
-                        String(localized: "proxy.example.com"),
+                        String(localized: "proxy.example.com", bundle: RockxyLocalization.bundle),
                         text: draftBinding(\.host)
                     )
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font())
                     .frame(height: toolMetrics.formControlHeight)
                     .focused($focusedField, equals: .host)
-                    .accessibilityLabel(String(localized: "Upstream proxy host"))
+                    .accessibilityLabel(String(localized: "Upstream proxy host", bundle: RockxyLocalization.bundle))
                     .accessibilityHint(fieldAccessibilityHint(
                         for: .host,
-                        fallback: String(localized: "Enter a hostname or IP address without a URL scheme.")
+                        fallback: String(
+                            localized: "Enter a hostname or IP address without a URL scheme.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     ))
                     fieldError(.host)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Port"))
+                    Text(String(localized: "Port", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font())
                     TextField(
-                        String(localized: "8080"),
+                        String(localized: "8080", bundle: RockxyLocalization.bundle),
                         text: draftBinding(\.portText)
                     )
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
                     .frame(width: toolMetrics.fieldWidth(110), height: toolMetrics.formControlHeight)
                     .focused($focusedField, equals: .port)
-                    .accessibilityLabel(String(localized: "Upstream proxy port"))
+                    .accessibilityLabel(String(localized: "Upstream proxy port", bundle: RockxyLocalization.bundle))
                     .accessibilityHint(fieldAccessibilityHint(
                         for: .port,
-                        fallback: String(localized: "Enter a port between 1 and 65535.")
+                        fallback: String(
+                            localized: "Enter a port between 1 and 65535.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     ))
                     fieldError(.port)
                 }
@@ -282,34 +318,37 @@ struct ExternalProxySettingsView: View {
     private var authenticationSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
             Toggle(
-                String(localized: "Proxy requires authentication"),
+                String(localized: "Proxy requires authentication", bundle: RockxyLocalization.bundle),
                 isOn: draftBinding(\.usesAuthentication)
             )
             .toggleStyle(.checkbox)
             .disabled(viewModel.isAuthenticationToggleDisabled)
             .accessibilityHint(fieldAccessibilityHint(
                 for: .authentication,
-                fallback: String(localized: "Use saved credentials for the upstream proxy.")
+                fallback: String(
+                    localized: "Use saved credentials for the upstream proxy.",
+                    bundle: RockxyLocalization.bundle
+                )
             ))
 
             if !viewModel.canEnableAuthentication {
                 PolicyLockNotice(
-                    title: String(localized: "Authentication unavailable"),
+                    title: String(localized: "Authentication unavailable", bundle: RockxyLocalization.bundle),
                     message: String(
                         localized:
                         """
                         This build does not allow upstream proxy credentials. Existing saved credentials remain in \
                         secure storage until authentication is removed and applied.
-                        """
+                        """, bundle: RockxyLocalization.bundle
                     )
                 )
             } else if viewModel.draft.usesAuthentication {
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(String(localized: "Username"))
+                        Text(String(localized: "Username", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.font())
                         TextField(
-                            String(localized: "Username"),
+                            String(localized: "Username", bundle: RockxyLocalization.bundle),
                             text: draftBinding(\.username)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -318,18 +357,24 @@ struct ExternalProxySettingsView: View {
                         .focused($focusedField, equals: .username)
                         .accessibilityHint(fieldAccessibilityHint(
                             for: .username,
-                            fallback: String(localized: "Enter the upstream proxy username.")
+                            fallback: String(
+                                localized: "Enter the upstream proxy username.",
+                                bundle: RockxyLocalization.bundle
+                            )
                         ))
                         fieldError(.username)
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(String(localized: "Password"))
+                        Text(String(localized: "Password", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.font())
                         SecureField(
                             viewModel.draft.hasStoredCredentials
-                                ? String(localized: "Leave blank to keep saved password")
-                                : String(localized: "Password"),
+                                ? String(
+                                    localized: "Leave blank to keep saved password",
+                                    bundle: RockxyLocalization.bundle
+                                )
+                                : String(localized: "Password", bundle: RockxyLocalization.bundle),
                             text: draftBinding(\.password)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -339,8 +384,14 @@ struct ExternalProxySettingsView: View {
                         .accessibilityHint(fieldAccessibilityHint(
                             for: .password,
                             fallback: viewModel.draft.hasStoredCredentials
-                                ? String(localized: "Leave blank to keep the saved password.")
-                                : String(localized: "Enter the upstream proxy password.")
+                                ? String(
+                                    localized: "Leave blank to keep the saved password.",
+                                    bundle: RockxyLocalization.bundle
+                                )
+                                : String(
+                                    localized: "Enter the upstream proxy password.",
+                                    bundle: RockxyLocalization.bundle
+                                )
                         ))
                         fieldError(.password)
                     }
@@ -354,14 +405,15 @@ struct ExternalProxySettingsView: View {
     private var bypassSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
             HStack {
-                Text(String(localized: "Upstream Bypass"))
+                Text(String(localized: "Upstream Bypass", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
 
                 Spacer()
 
                 Text(
                     String(
-                        localized: "\(viewModel.bypassEntriesUsed) of \(viewModel.bypassEntriesLimit) entries"
+                        localized: "\(viewModel.bypassEntriesUsed) of \(viewModel.bypassEntriesLimit) entries",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.metadataFont(weight: .medium))
@@ -383,24 +435,31 @@ struct ExternalProxySettingsView: View {
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
                 .focused($focusedField, equals: .bypass)
-                .accessibilityLabel(String(localized: "Upstream proxy bypass host patterns"))
+                .accessibilityLabel(String(
+                    localized: "Upstream proxy bypass host patterns",
+                    bundle: RockxyLocalization.bundle
+                ))
                 .accessibilityHint(fieldAccessibilityHint(
                     for: .bypass,
-                    fallback: String(localized: "Separate host patterns with commas or new lines.")
+                    fallback: String(
+                        localized: "Separate host patterns with commas or new lines.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 ))
 
             fieldError(.bypass)
 
             Text(
                 String(
-                    localized: "Separate host patterns with commas or new lines. Wildcards * and ? are supported; duplicates are removed when applied."
+                    localized: "Separate host patterns with commas or new lines. Wildcards * and ? are supported; duplicates are removed when applied.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
 
             Toggle(
-                String(localized: "Always bypass the upstream proxy for localhost"),
+                String(localized: "Always bypass the upstream proxy for localhost", bundle: RockxyLocalization.bundle),
                 isOn: draftBinding(\.bypassLocalhost)
             )
             .toggleStyle(.checkbox)
@@ -409,8 +468,7 @@ struct ExternalProxySettingsView: View {
         .panelStyle()
     }
 
-    @ViewBuilder
-    private var statusSection: some View {
+    @ViewBuilder private var statusSection: some View {
         if viewModel.hasExternalConflict {
             HStack(alignment: .center, spacing: toolMetrics.controlSpacing) {
                 Image(systemName: "arrow.triangle.2.circlepath")
@@ -418,18 +476,19 @@ struct ExternalProxySettingsView: View {
 
                 Text(
                     String(
-                        localized: "The saved Upstream Proxy configuration changed while you were editing."
+                        localized: "The saved Upstream Proxy configuration changed while you were editing.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
 
                 Spacer()
 
-                Button(String(localized: "Keep Editing")) {
+                Button(String(localized: "Keep Editing", bundle: RockxyLocalization.bundle)) {
                     viewModel.keepEditingAfterExternalChange()
                 }
 
-                Button(String(localized: "Reload")) {
+                Button(String(localized: "Reload", bundle: RockxyLocalization.bundle)) {
                     viewModel.reloadExternalConfiguration()
                 }
             }
@@ -446,8 +505,8 @@ struct ExternalProxySettingsView: View {
         HStack(spacing: toolMetrics.controlSpacing) {
             Text(
                 viewModel.isDirty
-                    ? String(localized: "Unsaved changes")
-                    : String(localized: "Saved configuration")
+                    ? String(localized: "Unsaved changes", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Saved configuration", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
@@ -465,8 +524,8 @@ struct ExternalProxySettingsView: View {
         HStack(spacing: Theme.Layout.controlSpacing) {
             Button(
                 viewModel.isTesting
-                    ? String(localized: "Testing…")
-                    : String(localized: "Test Connection")
+                    ? String(localized: "Testing…", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Test Connection", bundle: RockxyLocalization.bundle)
             ) {
                 Task {
                     await viewModel.testConnection()
@@ -478,14 +537,14 @@ struct ExternalProxySettingsView: View {
             Button {
                 dismiss()
             } label: {
-                footerButtonLabel(String(localized: "Cancel"))
+                footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
             }
             .keyboardShortcut(.cancelAction)
 
             Button {
                 applyAndDismiss()
             } label: {
-                footerButtonLabel(String(localized: "Apply"))
+                footerButtonLabel(String(localized: "Apply", bundle: RockxyLocalization.bundle))
             }
             .keyboardShortcut(.defaultAction)
             .rockxyGlassButtonStyle(prominent: true)
@@ -498,36 +557,6 @@ struct ExternalProxySettingsView: View {
             .frame(
                 width: toolMetrics.footerButtonWidth - (toolMetrics.controlSpacing * 3)
             )
-    }
-
-    private var protocolBinding: Binding<ExternalProxyProtocolSelection> {
-        Binding(
-            get: { viewModel.draft.selectedProtocol },
-            set: { selection in
-                guard selection != .socks5 || viewModel.canSelectSOCKS5 else {
-                    return
-                }
-                viewModel.draft.selectedProtocol = selection
-            }
-        )
-    }
-
-    private func protocolOptionName(
-        _ selection: ExternalProxyProtocolSelection
-    ) -> String {
-        guard selection == .socks5, !viewModel.canSelectSOCKS5 else {
-            return selection.displayName
-        }
-        return String(localized: "\(selection.displayName) — Unavailable")
-    }
-
-    private func draftBinding<Value>(
-        _ keyPath: WritableKeyPath<ExternalProxySettingsDraft, Value>
-    ) -> Binding<Value> {
-        Binding(
-            get: { viewModel.draft[keyPath: keyPath] },
-            set: { viewModel.draft[keyPath: keyPath] = $0 }
-        )
     }
 
     @ViewBuilder
@@ -544,10 +573,34 @@ struct ExternalProxySettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    private func protocolOptionName(
+        _ selection: ExternalProxyProtocolSelection
+    )
+        -> String
+    {
+        guard selection == .socks5, !viewModel.canSelectSOCKS5 else {
+            return selection.displayName
+        }
+        return String(localized: "\(selection.displayName) — Unavailable", bundle: RockxyLocalization.bundle)
+    }
+
+    private func draftBinding<Value>(
+        _ keyPath: WritableKeyPath<ExternalProxySettingsDraft, Value>
+    )
+        -> Binding<Value>
+    {
+        Binding(
+            get: { viewModel.draft[keyPath: keyPath] },
+            set: { viewModel.draft[keyPath: keyPath] = $0 }
+        )
+    }
+
     private func fieldAccessibilityHint(
         for field: UpstreamProxySettingsField,
         fallback: String
-    ) -> String {
+    )
+        -> String
+    {
         viewModel.validationMessage(for: field) ?? fallback
     }
 
@@ -565,6 +618,8 @@ struct ExternalProxySettingsView: View {
 // MARK: - StatusDisclosure
 
 private struct StatusDisclosure: View {
+    // MARK: Internal
+
     let status: UpstreamProxySettingsStatus
 
     var body: some View {
@@ -579,6 +634,8 @@ private struct StatusDisclosure: View {
         }
         .accessibilityElement(children: .combine)
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

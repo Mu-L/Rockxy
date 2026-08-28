@@ -80,39 +80,41 @@ final class MapRemoteEditorViewModel {
         guard !trimmed.isEmpty, !isPortValid else {
             return nil
         }
-        return String(localized: "Port must be a number from 1 to 65535.")
+        return String(localized: "Port must be a number from 1 to 65535.", bundle: RockxyLocalization.bundle)
     }
 
     var hostValidationMessage: String? {
         guard !trimmedHost.isEmpty, !isHostValid else {
             return nil
         }
-        return String(localized: "Enter a host only. Put the port in the Port field.")
+        return String(
+            localized: "Enter a host only. Put the port in the Port field.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     var schemeValidationMessage: String? {
         guard !destScheme.isEmpty, !isSchemeValid else {
             return nil
         }
-        return String(localized: "Map Remote supports HTTP and HTTPS destinations.")
+        return String(localized: "Map Remote supports HTTP and HTTPS destinations.", bundle: RockxyLocalization.bundle)
     }
 
     var destinationValidationMessage: String? {
         guard !hasAnyDestination else {
             return nil
         }
-        return String(localized: "Add at least one destination override.")
+        return String(localized: "Add at least one destination override.", bundle: RockxyLocalization.bundle)
     }
 
     /// A truthful description of the resulting destination. When a draft source URL is
     /// available it renders the concrete merged URL; otherwise it lists the configured
     /// overrides and notes that unset components are inherited from the request.
     var destinationSummary: String {
-        let summary: String
-        if let source = draft?.sourceURL {
-            summary = mergedDestination(onto: source)
+        let summary: String = if let source = draft?.sourceURL {
+            mergedDestination(onto: source)
         } else {
-            summary = overrideDescription()
+            overrideDescription()
         }
         guard preserveOriginalURL else {
             return summary
@@ -142,7 +144,10 @@ final class MapRemoteEditorViewModel {
     func applyDestinationURL(_ input: String) -> Bool {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            urlParseError = String(localized: "Enter a URL to fill the destination fields.")
+            urlParseError = String(
+                localized: "Enter a URL to fill the destination fields.",
+                bundle: RockxyLocalization.bundle
+            )
             urlFillConfirmation = nil
             return false
         }
@@ -156,7 +161,8 @@ final class MapRemoteEditorViewModel {
               components.fragment == nil else
         {
             urlParseError = String(
-                localized: "Enter a full HTTP or HTTPS URL without credentials or a fragment."
+                localized: "Enter a full HTTP or HTTPS URL without credentials or a fragment.",
+                bundle: RockxyLocalization.bundle
             )
             urlFillConfirmation = nil
             return false
@@ -172,7 +178,7 @@ final class MapRemoteEditorViewModel {
         }
         destQuery = components.percentEncodedQuery ?? ""
         urlParseError = nil
-        urlFillConfirmation = String(localized: "Destination fields filled.")
+        urlFillConfirmation = String(localized: "Destination fields filled.", bundle: RockxyLocalization.bundle)
         return true
     }
 
@@ -189,7 +195,8 @@ final class MapRemoteEditorViewModel {
             let accepted = await gate.addRule(rule)
             guard accepted else {
                 errorMessage = String(
-                    localized: "The active Map Remote rule limit was reached. Disable another rule and try again."
+                    localized: "The active Map Remote rule limit was reached. Disable another rule and try again.",
+                    bundle: RockxyLocalization.bundle
                 )
                 return false
             }
@@ -203,7 +210,10 @@ final class MapRemoteEditorViewModel {
 
     func makeRule() -> ProxyRule? {
         guard isSaveEnabled else {
-            errorMessage = String(localized: "Complete the matching rule and destination before saving.")
+            errorMessage = String(
+                localized: "Complete the matching rule and destination before saving.",
+                bundle: RockxyLocalization.bundle
+            )
             return nil
         }
 
@@ -282,6 +292,8 @@ final class MapRemoteEditorViewModel {
 
     // MARK: Private
 
+    private static let supportedSchemes: Set<String> = ["http", "https"]
+
     private var parsedPort: Int? {
         Int(destPort.trimmingCharacters(in: .whitespacesAndNewlines))
     }
@@ -350,6 +362,33 @@ final class MapRemoteEditorViewModel {
         normalizedHost.contains(":") ? "[\(normalizedHost)]" : normalizedHost
     }
 
+    private static func isIPv6Address(_ host: String) -> Bool {
+        #if canImport(Darwin)
+        var address = in6_addr()
+        return host.withCString { inet_pton(AF_INET6, $0, &address) } == 1
+        #else
+        return false
+        #endif
+    }
+
+    private static func hasValidHostnameLabels(_ host: String) -> Bool {
+        let normalized = host.hasSuffix(".") ? String(host.dropLast()) : host
+        guard !normalized.isEmpty else {
+            return false
+        }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        return normalized.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+            guard !label.isEmpty,
+                  label.count <= 63,
+                  label.first != "-",
+                  label.last != "-" else
+            {
+                return false
+            }
+            return label.unicodeScalars.allSatisfy { allowed.contains($0) }
+        }
+    }
+
     private func overrideDescription() -> String {
         var parts: [String] = []
         if !destScheme.isEmpty {
@@ -373,10 +412,16 @@ final class MapRemoteEditorViewModel {
             parts.append("request target → original")
         }
         guard !parts.isEmpty else {
-            return String(localized: "Add at least one destination override before saving.")
+            return String(
+                localized: "Add at least one destination override before saving.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         let overrides = parts.joined(separator: ", ")
-        return String(localized: "Overrides \(overrides). Other components are kept from the request.")
+        return String(
+            localized: "Overrides \(overrides). Other components are kept from the request.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func percentEncodedQueryForPreview(_ query: String) -> String {
@@ -489,35 +534,6 @@ final class MapRemoteEditorViewModel {
     private func nilIfBlank(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private static let supportedSchemes: Set<String> = ["http", "https"]
-
-    private static func isIPv6Address(_ host: String) -> Bool {
-        #if canImport(Darwin)
-        var address = in6_addr()
-        return host.withCString { inet_pton(AF_INET6, $0, &address) } == 1
-        #else
-        return false
-        #endif
-    }
-
-    private static func hasValidHostnameLabels(_ host: String) -> Bool {
-        let normalized = host.hasSuffix(".") ? String(host.dropLast()) : host
-        guard !normalized.isEmpty else {
-            return false
-        }
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        return normalized.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
-            guard !label.isEmpty,
-                  label.count <= 63,
-                  label.first != "-",
-                  label.last != "-" else
-            {
-                return false
-            }
-            return label.unicodeScalars.allSatisfy { allowed.contains($0) }
-        }
     }
 }
 

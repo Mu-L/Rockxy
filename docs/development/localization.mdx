@@ -1,0 +1,117 @@
+---
+title: "Localization"
+description: "How Rockxy is localized, how to add or improve a language, and the catalog hygiene rules contributors must follow"
+---
+
+Rockxy uses native Xcode **String Catalogs** (`.xcstrings`). The catalogs checked
+into the repository are the single source of truth for every translation. There is
+an app-language picker under **Settings › Appearance › Language**. **System Default**
+follows the macOS language; choosing another bundled language updates the running
+Rockxy UI immediately without stopping capture or reopening the app.
+
+The picker reads the localizations available in the application bundle instead of
+hardcoding a language list, so a newly contributed and shipped catalog appears there
+automatically.
+
+## Where the strings live
+
+| Catalog | Covers |
+|---|---|
+| `Rockxy/Localizable.xcstrings` | All in-app UI strings |
+| `Rockxy/InfoPlist.xcstrings` | `Info.plist` user-facing text (e.g. the Local Network usage prompt) |
+
+The source language is **English (`en`)**. The first shipped translation is
+**Simplified Chinese (`zh-Hans`)**. `knownRegions` in `Rockxy.xcodeproj/project.pbxproj`
+lists every language the project builds.
+
+## Writing localizable code
+
+Use compile-time-extractable APIs so Xcode can find every string automatically:
+
+```swift
+Text("Start Proxy")                        // SwiftUI literals auto-localize
+String(localized: "Request Body Options")  // explicit localization
+LocalizedStringResource("Make Rockxy reachable from the device")
+```
+
+Rules that keep extraction clean and translations safe:
+
+- **No dynamic keys.** Never build a key from a runtime value
+  (`String(localized: String.LocalizationValue(name))`, `"\(count) item\(count == 1 ? "" : "s")"`).
+  The compiler cannot extract these and translators never see them. Pass a
+  `LocalizedStringResource` literal into helpers instead of a `String`.
+- **Pluralization** uses Apple's automatic grammar agreement, not a hand-rolled
+  `"s"` suffix:
+
+  ```swift
+  String(localized: "^[\(count) request](inflect: true)")
+  ```
+
+  For languages such as Chinese that have no plural inflection, the translated
+  string is used verbatim — which is exactly why the ternary approach was unsafe.
+- **Never translate identifiers.** URLs, routes, MIME types, header names
+  (`Content-Type`), format tokens, code fragments, keyboard notation (`⌘K`), file
+  extensions, and product/protocol names stay verbatim. If a whole string is an
+  identifier, mark the catalog entry **Don't Translate** (`"shouldTranslate": false`),
+  or keep it out of a localized API.
+- **Comments are for translators.** Add a `comment` to any catalog entry whose
+  meaning is ambiguous out of context, and to flag tokens that must stay verbatim.
+
+## Adding or improving a language
+
+Anyone may contribute a language through a normal reviewed pull request:
+
+1. Open `Rockxy/Localizable.xcstrings` (and `InfoPlist.xcstrings`) in Xcode.
+2. Add your language from the catalog's **+** control, or edit an existing one.
+3. Translate every entry. Preserve, exactly:
+   - placeholders and their **order** (`%@`, `%lld`, positional `%1$@` / `%2$lld`),
+   - plural / device variations,
+   - leading/trailing whitespace and newlines,
+   - Markdown and HTML fragments,
+   - keyboard notation, file extensions, and technical/product terms.
+4. Run the validator (below) until it is clean.
+5. Open a PR against `develop`. A maintainer reviews every `.xcstrings` change
+   (see `.github/CODEOWNERS`) — this protects placeholder integrity and the shared
+   English source, and does **not** block your contribution.
+
+Translations may land as a first pass and be refined later, but a language should
+not be advertised as supported until its **runtime coverage is complete** — every
+translatable entry has a non-empty value.
+
+## Validation
+
+Run the deterministic validator before pushing. It needs no secrets and no Xcode
+project, so it runs the same way locally and in CI:
+
+```bash
+# Validate the default catalogs, requiring full zh-Hans coverage
+python3 .github/tools/validate_xcstrings.py
+
+# Check a different language (or several)
+python3 .github/tools/validate_xcstrings.py --require zh-Hans,de
+
+# Skip the optional xcstringstool compile (e.g. on a non-macOS machine)
+python3 .github/tools/validate_xcstrings.py --no-compile
+```
+
+The validator checks: valid JSON, `sourceLanguage == en`, full coverage for the
+required languages, no empty values, and placeholder parity between the source and
+every translation. When Xcode's toolchain is available it also compiles each catalog
+with `xcrun xcstringstool compile`. You can compile a catalog by hand too:
+
+```bash
+xcrun xcstringstool compile --output-directory /tmp/xcstrings Rockxy/Localizable.xcstrings
+```
+
+CI runs this validator on every pull request in the `Localization Catalogs` job.
+Because the check carries no secrets and no write access, it runs safely on fork
+PRs without exposing them to privileged jobs.
+
+## Translation platforms are mirrors only
+
+If the project ever adopts an external translation platform, it is **only a mirror**.
+The Git-tracked `.xcstrings` catalogs remain canonical. Any platform integration must
+land translations the same way a human does — by opening a reviewed pull request that
+edits the catalogs — and must never push directly to the repository or bypass the
+maintainer review gate. Configure such tooling through the project owner; do not add
+platform credentials or account details to the repository.

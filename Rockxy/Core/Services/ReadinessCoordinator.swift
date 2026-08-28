@@ -16,13 +16,13 @@ enum CertReadiness: Equatable {
     var localizedDescription: String {
         switch self {
         case .notGenerated:
-            String(localized: "Root CA not generated")
+            String(localized: "Root CA not generated", bundle: RockxyLocalization.bundle)
         case .generatedNotInstalled:
-            String(localized: "Root CA generated but not installed")
+            String(localized: "Root CA generated but not installed", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "Root CA installed but not trusted")
+            String(localized: "Root CA installed but not trusted", bundle: RockxyLocalization.bundle)
         case .trusted:
-            String(localized: "Root CA trusted")
+            String(localized: "Root CA trusted", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -52,13 +52,13 @@ struct ReadinessWarning: Equatable {
         var title: String {
             switch self {
             case .retry:
-                String(localized: "Retry")
+                String(localized: "Retry", bundle: RockxyLocalization.bundle)
             case .openGeneralSettings:
-                String(localized: "Open Certificate Settings")
+                String(localized: "Open Certificate Settings", bundle: RockxyLocalization.bundle)
             case .openAdvancedProxySettings:
-                String(localized: "Open Advanced Proxy Settings")
+                String(localized: "Open Advanced Proxy Settings", bundle: RockxyLocalization.bundle)
             case .reinstallAndTrust:
-                String(localized: "Install & Trust Certificate")
+                String(localized: "Install & Trust Certificate", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -131,7 +131,7 @@ final class ReadinessCoordinator {
                 localized: """
                 HTTPS interception is unavailable because the Rockxy Root CA is not trusted. \
                 HTTP traffic and logs are still captured.
-                """
+                """, bundle: RockxyLocalization.bundle
             ),
             action: .reinstallAndTrust,
             isDismissible: false
@@ -251,7 +251,7 @@ final class ReadinessCoordinator {
     func refresh() async {
         await refreshCertState()
         refreshHelperState()
-        refreshProxyMode(isEnabled: await systemProxyEnabledProbe())
+        await refreshProxyMode(isEnabled: systemProxyEnabledProbe())
         recomputeWarning()
     }
 
@@ -261,7 +261,7 @@ final class ReadinessCoordinator {
         await HelperManager.shared.checkStatus()
         await refreshCertState(performValidation: true)
         refreshHelperState()
-        refreshProxyMode(isEnabled: await systemProxyEnabledProbe())
+        await refreshProxyMode(isEnabled: systemProxyEnabledProbe())
         recomputeWarning()
         Self.logger.debug("ReadinessCoordinator deep-refreshed all state")
     }
@@ -463,7 +463,7 @@ final class ReadinessCoordinator {
                     localized: """
                     VPN or iCloud Private Relay detected (\(iface)). \
                     Traffic may not be captured. Disable VPN/Private Relay to use Rockxy.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 ),
                 action: nil,
                 isDismissible: true
@@ -476,17 +476,17 @@ final class ReadinessCoordinator {
     private func directModeWarning() -> ReadinessWarning? {
         let reason = switch helperReadiness {
         case .notInstalled:
-            String(localized: "the helper tool is not installed")
+            String(localized: "the helper tool is not installed", bundle: RockxyLocalization.bundle)
         case .requiresApproval:
-            String(localized: "the helper tool still needs approval")
+            String(localized: "the helper tool still needs approval", bundle: RockxyLocalization.bundle)
         case .installedOutdated:
-            String(localized: "the helper tool needs to be updated")
+            String(localized: "the helper tool needs to be updated", bundle: RockxyLocalization.bundle)
         case .installedIncompatible:
-            String(localized: "the helper tool version is incompatible")
+            String(localized: "the helper tool version is incompatible", bundle: RockxyLocalization.bundle)
         case .unreachable:
-            String(localized: "the helper tool is unreachable")
+            String(localized: "the helper tool is unreachable", bundle: RockxyLocalization.bundle)
         case .installedCompatible:
-            String(localized: "the helper tool could not be used")
+            String(localized: "the helper tool could not be used", bundle: RockxyLocalization.bundle)
         case .signingMismatch:
             HelperManager.signingMismatchWarningReason(issue: helperSigningIssue)
         }
@@ -497,7 +497,7 @@ final class ReadinessCoordinator {
                 Rockxy is using direct macOS proxy changes because \(reason). \
                 If Rockxy or Xcode stops unexpectedly, your Mac may stay behind a dead proxy until \
                 Rockxy restores it. Install or repair the helper tool for safer automatic cleanup.
-                """
+                """, bundle: RockxyLocalization.bundle
             ),
             action: .openAdvancedProxySettings,
             isDismissible: false
@@ -513,14 +513,14 @@ final class ReadinessCoordinator {
                 localized: """
                 Multiple HTTPS hosts rejected the proxy certificate. \
                 Restart your browser to pick up the new Rockxy Root CA trust settings.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         } else {
             String(
                 localized: """
                 Multiple HTTPS hosts rejected the proxy certificate. \
                 Check that the Rockxy Root CA is trusted in Keychain Access, then restart your browser.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         }
 

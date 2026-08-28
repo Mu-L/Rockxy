@@ -17,9 +17,9 @@ enum ProxymanSSLImporter {
         var errorDescription: String? {
             switch self {
             case .invalidFormat:
-                String(localized: "The file is not a valid SSL settings export.")
+                String(localized: "The file is not a valid SSL settings export.", bundle: RockxyLocalization.bundle)
             case .noHostsFound:
-                String(localized: "No usable hosts found in the imported file.")
+                String(localized: "No usable hosts found in the imported file.", bundle: RockxyLocalization.bundle)
             }
         }
     }

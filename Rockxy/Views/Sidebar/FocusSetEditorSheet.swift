@@ -75,24 +75,30 @@ struct FocusSetEditorSheet: View {
 
     private var matchSummary: String {
         if draft.ruleCount == 0 {
-            return String(localized: "Add an include or exclude condition to preview matches")
+            return String(
+                localized: "Add an include or exclude condition to preview matches",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return matchCount == 1
-            ? String(localized: "1 matching request")
-            : String(localized: "\(matchCount) matching requests")
+            ? String(localized: "1 matching request", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(matchCount) matching requests", bundle: RockxyLocalization.bundle)
     }
 
     private var sheetHeader: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(isCreating
-                    ? String(localized: "Create Focus Set")
-                    : String(localized: "Edit Focus Set"))
+                    ? String(localized: "Create Focus Set", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Edit Focus Set", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
-                Text(String(localized: "Save a reusable view of the traffic relevant to one task."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Save a reusable view of the traffic relevant to one task.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
@@ -110,34 +116,39 @@ struct FocusSetEditorSheet: View {
                 Divider()
 
                 conditionGroup(
-                    title: String(localized: "Include"),
+                    title: String(localized: "Include", bundle: RockxyLocalization.bundle),
                     description: String(
-                        localized: "A request must match every condition you set. Empty fields match any value."
+                        localized: "A request must match every condition you set. Empty fields match any value.",
+                        bundle: RockxyLocalization.bundle
                     )
                 ) {
                     applicationCondition
                     conditionDivider
                     suggestionCondition(
-                        title: String(localized: "Domain"),
-                        placeholder: String(localized: "Any domain"),
-                        hint: String(localized: "Matches this domain and its subdomains, such as api.example.com."),
-                        pickerTitle: String(localized: "Choose Captured Domain"),
-                        searchPrompt: String(localized: "Search captured domains"),
-                        emptySelectionTitle: String(localized: "Any Domain"),
+                        title: String(localized: "Domain", bundle: RockxyLocalization.bundle),
+                        placeholder: String(localized: "Any domain", bundle: RockxyLocalization.bundle),
+                        hint: String(
+                            localized: "Matches this domain and its subdomains, such as api.example.com.",
+                            bundle: RockxyLocalization.bundle
+                        ),
+                        pickerTitle: String(localized: "Choose Captured Domain", bundle: RockxyLocalization.bundle),
+                        searchPrompt: String(localized: "Search captured domains", bundle: RockxyLocalization.bundle),
+                        emptySelectionTitle: String(localized: "Any Domain", bundle: RockxyLocalization.bundle),
                         text: $draft.domain,
                         suggestions: suggestions.domains,
                         kind: .domain
                     )
                     conditionDivider
                     suggestionCondition(
-                        title: String(localized: "Path Prefix"),
-                        placeholder: String(localized: "Any path"),
+                        title: String(localized: "Path Prefix", bundle: RockxyLocalization.bundle),
+                        placeholder: String(localized: "Any path", bundle: RockxyLocalization.bundle),
                         hint: String(
-                            localized: "Matches URL paths that begin with this value, such as /v1/orders."
+                            localized: "Matches URL paths that begin with this value, such as /v1/orders.",
+                            bundle: RockxyLocalization.bundle
                         ),
-                        pickerTitle: String(localized: "Choose Captured Path"),
-                        searchPrompt: String(localized: "Search captured paths"),
-                        emptySelectionTitle: String(localized: "Any Path"),
+                        pickerTitle: String(localized: "Choose Captured Path", bundle: RockxyLocalization.bundle),
+                        searchPrompt: String(localized: "Search captured paths", bundle: RockxyLocalization.bundle),
+                        emptySelectionTitle: String(localized: "Any Path", bundle: RockxyLocalization.bundle),
                         text: $draft.pathPrefix,
                         suggestions: suggestions.paths,
                         kind: .path
@@ -147,30 +158,37 @@ struct FocusSetEditorSheet: View {
                 Divider()
 
                 conditionGroup(
-                    title: String(localized: "Exclude"),
+                    title: String(localized: "Exclude", bundle: RockxyLocalization.bundle),
                     description: String(
-                        localized: "Matching requests are hidden after the include conditions are applied."
+                        localized: "Matching requests are hidden after the include conditions are applied.",
+                        bundle: RockxyLocalization.bundle
                     )
                 ) {
                     suggestionCondition(
-                        title: String(localized: "Domain"),
-                        placeholder: String(localized: "No excluded domain"),
-                        hint: String(localized: "Hides this domain and its subdomains from the Focus Set."),
-                        pickerTitle: String(localized: "Choose Excluded Domain"),
-                        searchPrompt: String(localized: "Search captured domains"),
-                        emptySelectionTitle: String(localized: "No Excluded Domain"),
+                        title: String(localized: "Domain", bundle: RockxyLocalization.bundle),
+                        placeholder: String(localized: "No excluded domain", bundle: RockxyLocalization.bundle),
+                        hint: String(
+                            localized: "Hides this domain and its subdomains from the Focus Set.",
+                            bundle: RockxyLocalization.bundle
+                        ),
+                        pickerTitle: String(localized: "Choose Excluded Domain", bundle: RockxyLocalization.bundle),
+                        searchPrompt: String(localized: "Search captured domains", bundle: RockxyLocalization.bundle),
+                        emptySelectionTitle: String(localized: "No Excluded Domain", bundle: RockxyLocalization.bundle),
                         text: $draft.excludedDomain,
                         suggestions: suggestions.domains,
                         kind: .domain
                     )
                     conditionDivider
                     suggestionCondition(
-                        title: String(localized: "Path Prefix"),
-                        placeholder: String(localized: "No excluded path"),
-                        hint: String(localized: "Hides URL paths that begin with this value from the Focus Set."),
-                        pickerTitle: String(localized: "Choose Excluded Path"),
-                        searchPrompt: String(localized: "Search captured paths"),
-                        emptySelectionTitle: String(localized: "No Excluded Path"),
+                        title: String(localized: "Path Prefix", bundle: RockxyLocalization.bundle),
+                        placeholder: String(localized: "No excluded path", bundle: RockxyLocalization.bundle),
+                        hint: String(
+                            localized: "Hides URL paths that begin with this value from the Focus Set.",
+                            bundle: RockxyLocalization.bundle
+                        ),
+                        pickerTitle: String(localized: "Choose Excluded Path", bundle: RockxyLocalization.bundle),
+                        searchPrompt: String(localized: "Search captured paths", bundle: RockxyLocalization.bundle),
+                        emptySelectionTitle: String(localized: "No Excluded Path", bundle: RockxyLocalization.bundle),
                         text: $draft.excludedPathPrefix,
                         suggestions: suggestions.paths,
                         kind: .path
@@ -187,16 +205,20 @@ struct FocusSetEditorSheet: View {
 
     private var nameField: some View {
         VStack(alignment: .leading, spacing: 7) {
-            conditionRow(title: String(localized: "Name")) {
-                TextField(String(localized: "For example: Checkout API"), text: $draft.name)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(height: toolMetrics.formControlHeight)
-                    .accessibilityIdentifier("focusSetEditor.name")
+            conditionRow(title: String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                TextField(
+                    String(localized: "For example: Checkout API", bundle: RockxyLocalization.bundle),
+                    text: $draft.name
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(height: toolMetrics.formControlHeight)
+                .accessibilityIdentifier("focusSetEditor.name")
             }
 
             Text(
                 String(
-                    localized: "Focus Sets are available in every Project. Saving applies this set to the current Traffic Tab."
+                    localized: "Focus Sets are available in every Project. Saving applies this set to the current Traffic Tab.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -208,8 +230,11 @@ struct FocusSetEditorSheet: View {
 
     private var applicationCondition: some View {
         conditionRow(
-            title: String(localized: "Application"),
-            hint: String(localized: "Only includes traffic captured from the selected application.")
+            title: String(localized: "Application", bundle: RockxyLocalization.bundle),
+            hint: String(
+                localized: "Only includes traffic captured from the selected application.",
+                bundle: RockxyLocalization.bundle
+            )
         ) {
             CapturedApplicationSelectionField(
                 selection: $draft.appName,
@@ -229,10 +254,13 @@ struct FocusSetEditorSheet: View {
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(matchCount == 0 ? Color.orange : Color.secondary)
             Spacer()
-            Button(String(localized: "Cancel"), role: .cancel) { dismiss() }
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
                 .rockxyGlassButtonStyle()
-            Button(isCreating ? String(localized: "Create") : String(localized: "Save")) {
+            Button(isCreating ? String(localized: "Create", bundle: RockxyLocalization.bundle) : String(
+                localized: "Save",
+                bundle: RockxyLocalization.bundle
+            )) {
                 draft.name = trimmedName
                 onSave(draft)
                 dismiss()

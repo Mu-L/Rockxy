@@ -4,6 +4,8 @@ import Testing
 // MARK: - CustomCertificatesWindowReadabilityTests
 
 struct CustomCertificatesWindowReadabilityTests {
+    // MARK: Internal
+
     @Test("Custom Certificates uses a compact native hierarchy without a duplicate title")
     func nativeHierarchyHasNoDuplicateTitle() throws {
         let source = try readProjectFile("Rockxy/Views/Certificate/CustomCertificatesView.swift")
@@ -16,7 +18,7 @@ struct CustomCertificatesWindowReadabilityTests {
         #expect(source.contains(".confirmationDialog("))
         #expect(source.contains(".onDeleteCommand"))
         #expect(source.contains("HelpLink(destination: helpURL)"))
-        #expect(!source.contains("Text(String(localized: \"Custom Certificates\"))"))
+        #expect(!source.contains("Text(String(localized: \"Custom Certificates\", bundle: RockxyLocalization.bundle))"))
         #expect(!source.contains("private var toolbar"))
         #expect(!source.contains(".frame(width: 560)"))
         #expect(!source.contains(".font(.title3)"))

@@ -15,7 +15,7 @@ struct CommentsTabView: View {
                 .font(.system(size: metrics.primaryFontSize))
                 .scrollContentBackground(.hidden)
                 .padding(8)
-                .accessibilityLabel(String(localized: "Request note"))
+                .accessibilityLabel(String(localized: "Request note", bundle: RockxyLocalization.bundle))
 
             Divider()
 
@@ -27,8 +27,8 @@ struct CommentsTabView: View {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .disabled(!isDirty)
-                .help(String(localized: "Save Note"))
-                .accessibilityLabel(String(localized: "Save Note"))
+                .help(String(localized: "Save Note", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Save Note", bundle: RockxyLocalization.bundle))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)

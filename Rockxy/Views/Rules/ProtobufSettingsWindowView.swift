@@ -78,13 +78,15 @@ struct ProtobufSettingsWindowView: View {
 
     // MARK: Private
 
-    private static let capabilityNotice = String(
-        localized:
-        """
-        These mapping definitions are stored locally on this Mac. This build decodes Protobuf with \
-        heuristics only — saved mappings and schemas are not applied to captured traffic.
-        """
-    )
+    private static var capabilityNotice: String {
+        String(
+            localized:
+            """
+            These mapping definitions are stored locally on this Mac. This build decodes Protobuf with \
+            heuristics only — saved mappings and schemas are not applied to captured traffic.
+            """, bundle: RockxyLocalization.bundle
+        )
+    }
 
     @Environment(\.openWindow) private var openWindow
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -95,9 +97,9 @@ struct ProtobufSettingsWindowView: View {
     private var footerHint: String {
         let count = mappingStore.rules.count
         let countText = count == 1
-            ? String(localized: "1 definition")
-            : String(localized: "\(count) definitions")
-        return "\(countText) · ⌘N \(String(localized: "New")) · ⌘↩ \(String(localized: "Edit"))"
+            ? String(localized: "1 definition", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(count) definitions", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
@@ -107,11 +109,14 @@ struct ProtobufSettingsWindowView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Protobuf Mapping"))
+                Text(String(localized: "Protobuf Mapping", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
-                Text(String(localized: "Associate a request pattern with a Protobuf message type and schema."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Associate a request pattern with a Protobuf message type and schema.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -123,14 +128,14 @@ struct ProtobufSettingsWindowView: View {
 
     private var rulesTable: some View {
         Table(mappingStore.rules, selection: $mappingStore.selectedRuleID) {
-            TableColumn(String(localized: "Runtime")) { _ in
-                Text(String(localized: "Not applied"))
+            TableColumn(String(localized: "Runtime", bundle: RockxyLocalization.bundle)) { _ in
+                Text(String(localized: "Not applied", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
             .width(min: 94, ideal: 110)
 
-            TableColumn(String(localized: "URL")) { rule in
+            TableColumn(String(localized: "URL", bundle: RockxyLocalization.bundle)) { rule in
                 Text(rule.urlPattern)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -139,25 +144,26 @@ struct ProtobufSettingsWindowView: View {
             }
             .width(min: 160, ideal: 240)
 
-            TableColumn(String(localized: "Method")) { rule in
+            TableColumn(String(localized: "Method", bundle: RockxyLocalization.bundle)) { rule in
                 Text(rule.method.displayName)
             }
             .width(min: max(96, toolMetrics.bodyFontSize * 6), ideal: max(120, toolMetrics.bodyFontSize * 8))
 
-            TableColumn(String(localized: "Payload")) { rule in
+            TableColumn(String(localized: "Payload", bundle: RockxyLocalization.bundle)) { rule in
                 Text(rule.payloadEncoding.displayName)
             }
             .width(min: max(120, toolMetrics.bodyFontSize * 8), ideal: max(150, toolMetrics.bodyFontSize * 10))
 
-            TableColumn(String(localized: "Message Type")) { rule in
-                Text(rule.messageType.isEmpty ? String(localized: "Auto") : rule.messageType)
+            TableColumn(String(localized: "Message Type", bundle: RockxyLocalization.bundle)) { rule in
+                Text(rule.messageType.isEmpty ? String(localized: "Auto", bundle: RockxyLocalization.bundle) : rule
+                    .messageType)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             .width(min: 150, ideal: 190)
 
-            TableColumn(String(localized: "Schema")) { rule in
+            TableColumn(String(localized: "Schema", bundle: RockxyLocalization.bundle)) { rule in
                 schemaCell(for: rule)
             }
             .width(min: 150, ideal: 180)
@@ -172,9 +178,12 @@ struct ProtobufSettingsWindowView: View {
         .overlay {
             if mappingStore.rules.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "No Mapping Definitions"),
+                    String(localized: "No Mapping Definitions", bundle: RockxyLocalization.bundle),
                     systemImage: "doc.text.magnifyingglass",
-                    description: Text(String(localized: "Click \"+\" or press ⌘N to add a definition."))
+                    description: Text(String(
+                        localized: "Click \"+\" or press ⌘N to add a definition.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 )
             }
         }
@@ -220,7 +229,7 @@ struct ProtobufSettingsWindowView: View {
 
     private var footerActions: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            Button(String(localized: "Local Schemas…")) {
+            Button(String(localized: "Local Schemas…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "protobufSchemaList")
             }
             .rockxyGlassButtonStyle()
@@ -240,8 +249,8 @@ struct ProtobufSettingsWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Definition"))
-            .accessibilityLabel(String(localized: "New mapping definition"))
+            .help(String(localized: "New Definition", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "New mapping definition", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -259,8 +268,11 @@ struct ProtobufSettingsWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(mappingStore.selectedRuleID == nil)
-            .help(String(localized: "Delete Definition"))
-            .accessibilityLabel(String(localized: "Delete selected mapping definition"))
+            .help(String(localized: "Delete Definition", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(
+                localized: "Delete selected mapping definition",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -273,17 +285,17 @@ struct ProtobufSettingsWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New…")) {
+            Button(String(localized: "New…", bundle: RockxyLocalization.bundle)) {
                 editorSession = ProtobufRuleEditorSession(mode: .create)
             }
 
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 openEditorForSelection()
             }
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(mappingStore.selectedRuleID == nil)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 mappingStore.duplicateSelectedRule()
             }
             .keyboardShortcut("d", modifiers: .command)
@@ -291,13 +303,13 @@ struct ProtobufSettingsWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 mappingStore.removeSelectedRule()
             }
             .disabled(mappingStore.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -331,14 +343,14 @@ struct ProtobufSettingsWindowView: View {
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first, mappingStore.rules.contains(where: { $0.id == id }) {
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 openEditorForRule(id)
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 mappingStore.duplicateRule(id: id)
             }
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 mappingStore.removeRule(id: id)
             }
         }
@@ -395,7 +407,8 @@ private struct ProtobufRuleEditorSheet: View {
                         .font(toolMetrics.font(weight: .medium))
                     Text(
                         String(
-                            localized: "This saved definition is not applied to captured traffic in this build."
+                            localized: "This saved definition is not applied to captured traffic in this build.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .font(toolMetrics.secondaryFont())
@@ -440,18 +453,18 @@ private struct ProtobufRuleEditorSheet: View {
     private var editorTitle: String {
         switch session.mode {
         case .create:
-            String(localized: "New Mapping Definition")
+            String(localized: "New Mapping Definition", bundle: RockxyLocalization.bundle)
         case .edit:
-            String(localized: "Edit Mapping Definition")
+            String(localized: "Edit Mapping Definition", bundle: RockxyLocalization.bundle)
         }
     }
 
     private var sessionButtonTitle: String {
         switch session.mode {
         case .create:
-            String(localized: "Add")
+            String(localized: "Add", bundle: RockxyLocalization.bundle)
         case .edit:
-            String(localized: "Save")
+            String(localized: "Save", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -471,43 +484,46 @@ private struct ProtobufRuleEditorSheet: View {
 
     private var matchingRuleSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Matching Rule"))
+            Text(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                fieldGroup(String(localized: "URL pattern")) {
+                fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                     TextField("/v1/*", text: $urlPattern)
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
                         .focused($focusedField, equals: .url)
-                        .accessibilityLabel(String(localized: "URL pattern"))
+                        .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
                 }
 
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                        inlineField(String(localized: "Method")) {
+                        inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                             methodPicker
                         }
-                        inlineField(String(localized: "Match type")) {
+                        inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                             matchTypePicker
                         }
                         wildcardHint
                         Spacer()
                     }
                     VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                        inlineField(String(localized: "Method")) {
+                        inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                             methodPicker
                         }
-                        inlineField(String(localized: "Match type")) {
+                        inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                             matchTypePicker
                         }
                         wildcardHint
                     }
                 }
 
-                Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
+                Toggle(
+                    String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
+                    isOn: $includeSubpaths
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
             }
             .padding(.horizontal, toolMetrics.formHorizontalPadding - 2)
             .padding(.vertical, toolMetrics.formVerticalPadding - 2)
@@ -532,7 +548,7 @@ private struct ProtobufRuleEditorSheet: View {
             width: max(toolMetrics.menuWidth(140), toolMetrics.bodyFontSize * 8),
             height: toolMetrics.formControlHeight
         )
-        .accessibilityLabel(String(localized: "HTTP method"))
+        .accessibilityLabel(String(localized: "HTTP method", bundle: RockxyLocalization.bundle))
     }
 
     private var matchTypePicker: some View {
@@ -547,12 +563,12 @@ private struct ProtobufRuleEditorSheet: View {
             width: max(toolMetrics.menuWidth(160), toolMetrics.bodyFontSize * 10),
             height: toolMetrics.formControlHeight
         )
-        .accessibilityLabel(String(localized: "Match type"))
+        .accessibilityLabel(String(localized: "Match type", bundle: RockxyLocalization.bundle))
     }
 
     @ViewBuilder private var wildcardHint: some View {
         if matchType == .wildcard {
-            Text(String(localized: "Supports * and ?."))
+            Text(String(localized: "Supports * and ?.", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
@@ -560,16 +576,17 @@ private struct ProtobufRuleEditorSheet: View {
 
     private var protobufSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Protobuf"))
+            Text(String(localized: "Protobuf", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                    inlineField(String(localized: "Schema")) {
+                    inlineField(String(localized: "Schema", bundle: RockxyLocalization.bundle)) {
                         Picker("", selection: $schemaID) {
-                            Text(String(localized: "Not selected")).tag(UUID?.none)
+                            Text(String(localized: "Not selected", bundle: RockxyLocalization.bundle)).tag(UUID?.none)
                             if let schemaID, !schemas.contains(where: { $0.id == schemaID }) {
-                                Text(String(localized: "Missing Schema")).tag(Optional(schemaID))
+                                Text(String(localized: "Missing Schema", bundle: RockxyLocalization.bundle))
+                                    .tag(Optional(schemaID))
                             }
                             ForEach(schemas) { schema in
                                 Text(schema.fileName).tag(Optional(schema.id))
@@ -581,26 +598,32 @@ private struct ProtobufRuleEditorSheet: View {
                             width: max(toolMetrics.menuWidth(240), toolMetrics.bodyFontSize * 12),
                             height: toolMetrics.formControlHeight
                         )
-                        .accessibilityLabel(String(localized: "Local schema"))
+                        .accessibilityLabel(String(localized: "Local schema", bundle: RockxyLocalization.bundle))
                     }
                     if schemaReference == .missing {
-                        Label(String(localized: "Missing Schema"), systemImage: "exclamationmark.triangle.fill")
-                            .font(toolMetrics.secondaryFont())
-                            .foregroundStyle(.orange)
+                        Label(
+                            String(localized: "Missing Schema", bundle: RockxyLocalization.bundle),
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.orange)
                     }
                     Spacer()
                 }
 
-                fieldGroup(String(localized: "Message type")) {
+                fieldGroup(String(localized: "Message type", bundle: RockxyLocalization.bundle)) {
                     TextField("package.Message", text: $messageType)
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
                         .focused($focusedField, equals: .messageType)
-                        .accessibilityLabel(String(localized: "Message type"))
+                        .accessibilityLabel(String(localized: "Message type", bundle: RockxyLocalization.bundle))
                 }
 
                 Toggle(
-                    String(localized: "Use different message types for request and response"),
+                    String(
+                        localized: "Use different message types for request and response",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     isOn: $useDifferentMessageTypes
                 )
                 .toggleStyle(.checkbox)
@@ -608,24 +631,30 @@ private struct ProtobufRuleEditorSheet: View {
 
                 if useDifferentMessageTypes {
                     HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                        fieldGroup(String(localized: "Request")) {
+                        fieldGroup(String(localized: "Request", bundle: RockxyLocalization.bundle)) {
                             TextField("package.Request", text: $requestMessageType)
                                 .textFieldStyle(.roundedBorder)
                                 .font(toolMetrics.font(monospaced: true))
                                 .focused($focusedField, equals: .requestMessageType)
-                                .accessibilityLabel(String(localized: "Request message type"))
+                                .accessibilityLabel(String(
+                                    localized: "Request message type",
+                                    bundle: RockxyLocalization.bundle
+                                ))
                         }
-                        fieldGroup(String(localized: "Response")) {
+                        fieldGroup(String(localized: "Response", bundle: RockxyLocalization.bundle)) {
                             TextField("package.Response", text: $responseMessageType)
                                 .textFieldStyle(.roundedBorder)
                                 .font(toolMetrics.font(monospaced: true))
                                 .focused($focusedField, equals: .responseMessageType)
-                                .accessibilityLabel(String(localized: "Response message type"))
+                                .accessibilityLabel(String(
+                                    localized: "Response message type",
+                                    bundle: RockxyLocalization.bundle
+                                ))
                         }
                     }
                 }
 
-                inlineField(String(localized: "Payload")) {
+                inlineField(String(localized: "Payload", bundle: RockxyLocalization.bundle)) {
                     if toolMetrics.bodyFontSize >= 20 {
                         Picker("", selection: $payloadEncoding) {
                             payloadEncodingOptions
@@ -636,7 +665,7 @@ private struct ProtobufRuleEditorSheet: View {
                             width: max(toolMetrics.menuWidth(240), toolMetrics.bodyFontSize * 12),
                             height: toolMetrics.formControlHeight
                         )
-                        .accessibilityLabel(String(localized: "Payload encoding"))
+                        .accessibilityLabel(String(localized: "Payload encoding", bundle: RockxyLocalization.bundle))
                     } else {
                         Picker("", selection: $payloadEncoding) {
                             payloadEncodingOptions
@@ -645,7 +674,7 @@ private struct ProtobufRuleEditorSheet: View {
                         .pickerStyle(.radioGroup)
                         .horizontalRadioGroupLayout()
                         .frame(minHeight: toolMetrics.formControlHeight)
-                        .accessibilityLabel(String(localized: "Payload encoding"))
+                        .accessibilityLabel(String(localized: "Payload encoding", bundle: RockxyLocalization.bundle))
                     }
                 }
             }
@@ -660,7 +689,7 @@ private struct ProtobufRuleEditorSheet: View {
         }
     }
 
-    @ViewBuilder private var payloadEncodingOptions: some View {
+    private var payloadEncodingOptions: some View {
         ForEach(ProtobufPayloadEncoding.allCases) { encoding in
             Text(encoding.displayName).tag(encoding)
         }
@@ -680,7 +709,7 @@ private struct ProtobufRuleEditorSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 

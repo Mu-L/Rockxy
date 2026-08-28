@@ -49,7 +49,7 @@ struct DebugAssistantEngine {
             id: "flow:\(primary.id):request.identity",
             kind: .observed,
             title: "\(primary.request.method) \(requestTarget(primary))",
-            detail: String(localized: "Captured request method and destination."),
+            detail: String(localized: "Captured request method and destination.", bundle: RockxyLocalization.bundle),
             sourceTransactionID: primary.id
         )]
 
@@ -58,15 +58,18 @@ struct DebugAssistantEngine {
                 id: "flow:\(primary.id):response.status",
                 kind: .observed,
                 title: "HTTP \(response.statusCode) \(response.statusMessage)",
-                detail: String(localized: "Captured response status."),
+                detail: String(localized: "Captured response status.", bundle: RockxyLocalization.bundle),
                 sourceTransactionID: primary.id
             ))
         } else {
             evidence.append(InvestigationEvidence(
                 id: "flow:\(primary.id):response.unavailable",
                 kind: .unknown,
-                title: String(localized: "No completed response was captured"),
-                detail: String(localized: "Rockxy cannot confirm the request outcome from this transaction."),
+                title: String(localized: "No completed response was captured", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Rockxy cannot confirm the request outcome from this transaction.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -75,9 +78,10 @@ struct DebugAssistantEngine {
             evidence.append(InvestigationEvidence(
                 id: "flow:\(primary.id):protocol.connect",
                 kind: .derived,
-                title: String(localized: "CONNECT opens a proxy tunnel"),
+                title: String(localized: "CONNECT opens a proxy tunnel", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "The CONNECT exchange establishes a tunnel; application HTTPS payloads belong to traffic inside that tunnel."
+                    localized: "The CONNECT exchange establishes a tunnel; application HTTPS payloads belong to traffic inside that tunnel.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 sourceTransactionID: primary.id
             ))
@@ -90,31 +94,43 @@ struct DebugAssistantEngine {
                 scopeTransactionIDs: scope.map(\.id),
                 scopeSummary: scopeSummary(selectedCount: selected.count, requestCount: scope.count),
                 summary: tunnelWasEstablished
-                    ? String(localized: "This CONNECT request established a proxy tunnel to \(connectTarget(primary)).")
+                    ? String(
+                        localized: "This CONNECT request established a proxy tunnel to \(connectTarget(primary)).",
+                        bundle: RockxyLocalization.bundle
+                    )
                     :
                     String(
-                        localized: "This CONNECT request asked the proxy to open a tunnel to \(connectTarget(primary))."
+                        localized: "This CONNECT request asked the proxy to open a tunnel to \(connectTarget(primary)).",
+                        bundle: RockxyLocalization.bundle
                     ),
                 evidence: evidence,
                 nextStep: tunnelWasEstablished
                     ? String(
-                        localized: "No CONNECT failure is shown. Inspect the HTTPS requests inside this tunnel only if the app still behaved unexpectedly."
+                        localized: "No CONNECT failure is shown. Inspect the HTTPS requests inside this tunnel only if the app still behaved unexpectedly.",
+                        bundle: RockxyLocalization.bundle
                     )
                     :
                     String(
-                        localized: "Inspect the captured status and transport state to determine why the tunnel was not established."
+                        localized: "Inspect the captured status and transport state to determine why the tunnel was not established.",
+                        bundle: RockxyLocalization.bundle
                     )
             )
         }
 
         let outcome = if let status = primary.statusCode {
             if primary.isSuccessful {
-                String(localized: "The captured response was HTTP \(status), so Rockxy shows a completed request.")
+                String(
+                    localized: "The captured response was HTTP \(status), so Rockxy shows a completed request.",
+                    bundle: RockxyLocalization.bundle
+                )
             } else {
-                String(localized: "The captured response was HTTP \(status).")
+                String(localized: "The captured response was HTTP \(status).", bundle: RockxyLocalization.bundle)
             }
         } else {
-            String(localized: "Rockxy did not capture a completed response for this request.")
+            String(
+                localized: "Rockxy did not capture a completed response for this request.",
+                bundle: RockxyLocalization.bundle
+            )
         }
 
         return InvestigationResult(
@@ -123,17 +139,20 @@ struct DebugAssistantEngine {
             scopeTransactionIDs: scope.map(\.id),
             scopeSummary: scopeSummary(selectedCount: selected.count, requestCount: scope.count),
             summary: String(
-                localized: "This \(primary.request.method) request targets \(requestTarget(primary)). \(outcome)"
+                localized: "This \(primary.request.method) request targets \(requestTarget(primary)). \(outcome)",
+                bundle: RockxyLocalization.bundle
             ),
             evidence: evidence,
             nextStep: primary.isSuccessful
                 ?
                 String(
-                    localized: "No failure is proven by this exchange. Open Details only if you want to inspect headers, timing, or payloads."
+                    localized: "No failure is proven by this exchange. Open Details only if you want to inspect headers, timing, or payloads.",
+                    bundle: RockxyLocalization.bundle
                 )
                 :
                 String(
-                    localized: "Open Details to inspect the response, timing, and nearby requests before drawing a conclusion."
+                    localized: "Open Details to inspect the response, timing, and nearby requests before drawing a conclusion.",
+                    bundle: RockxyLocalization.bundle
                 )
         )
     }
@@ -159,15 +178,21 @@ struct DebugAssistantEngine {
                 id: "flow:\(primary.id):response.status",
                 kind: .observed,
                 title: "HTTP \(response.statusCode)",
-                detail: String(localized: "Captured response status \(response.statusMessage)."),
+                detail: String(
+                    localized: "Captured response status \(response.statusMessage).",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         } else {
             evidence.append(.init(
                 id: "flow:\(primary.id):response.unavailable",
                 kind: .unknown,
-                title: String(localized: "No completed response was captured"),
-                detail: String(localized: "Rockxy cannot inspect response headers or payload for this request."),
+                title: String(localized: "No completed response was captured", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Rockxy cannot inspect response headers or payload for this request.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -176,8 +201,11 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):response.header.retry-after",
                 kind: .observed,
-                title: String(localized: "Retry-After: \(retryAfter)"),
-                detail: String(localized: "The response explicitly supplied a retry delay."),
+                title: String(localized: "Retry-After: \(retryAfter)", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "The response explicitly supplied a retry delay.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -189,8 +217,14 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "scope:repeated-requests",
                 kind: .derived,
-                title: String(localized: "\(repeated.count) similar requests in \(formatDuration(interval))"),
-                detail: String(localized: "Same host, method, and path in the bounded investigation scope."),
+                title: String(
+                    localized: "\(repeated.count) similar requests in \(formatDuration(interval))",
+                    bundle: RockxyLocalization.bundle
+                ),
+                detail: String(
+                    localized: "Same host, method, and path in the bounded investigation scope.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -199,8 +233,8 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):timing.total",
                 kind: .observed,
-                title: String(localized: "Completed in \(formatDuration(duration))"),
-                detail: String(localized: "Captured total request duration."),
+                title: String(localized: "Completed in \(formatDuration(duration))", bundle: RockxyLocalization.bundle),
+                detail: String(localized: "Captured total request duration.", bundle: RockxyLocalization.bundle),
                 sourceTransactionID: primary.id
             ))
         }
@@ -209,17 +243,21 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):inference.rate-limit",
                 kind: .inferred,
-                title: String(localized: "Rate limiting is the leading hypothesis"),
+                title: String(localized: "Rate limiting is the leading hypothesis", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "HTTP 429 and nearby repeated requests support this hypothesis; application policy remains unknown."
+                    localized: "HTTP 429 and nearby repeated requests support this hypothesis; application policy remains unknown.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 sourceTransactionID: primary.id
             ))
             evidence.append(.init(
                 id: "flow:\(primary.id):unknown.retry-policy",
                 kind: .unknown,
-                title: String(localized: "Application retry policy is not visible"),
-                detail: String(localized: "Captured traffic cannot confirm whether the client retries automatically."),
+                title: String(localized: "Application retry policy is not visible", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Captured traffic cannot confirm whether the client retries automatically.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -228,9 +266,10 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):unknown.truncated-response",
                 kind: .unknown,
-                title: String(localized: "Response body is incomplete"),
+                title: String(localized: "Response body is incomplete", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "Rockxy withholds body-level conclusions because capture truncated the response."
+                    localized: "Rockxy withholds body-level conclusions because capture truncated the response.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 sourceTransactionID: primary.id
             ))
@@ -265,19 +304,24 @@ struct DebugAssistantEngine {
                 recipe: .compareWithSuccess,
                 selectedTransactionID: primary.id,
                 scopeTransactionIDs: [primary.id],
-                scopeSummary: String(localized: "Selected request"),
-                summary: String(localized: "No comparable successful request was found in the current session."),
+                scopeSummary: String(localized: "Selected request", bundle: RockxyLocalization.bundle),
+                summary: String(
+                    localized: "No comparable successful request was found in the current session.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 evidence: [InvestigationEvidence(
                     id: "flow:\(primary.id):unknown.comparison",
                     kind: .unknown,
-                    title: String(localized: "Successful baseline unavailable"),
+                    title: String(localized: "Successful baseline unavailable", bundle: RockxyLocalization.bundle),
                     detail: String(
-                        localized: "Capture another request with the same method and path, or select exactly two requests."
+                        localized: "Capture another request with the same method and path, or select exactly two requests.",
+                        bundle: RockxyLocalization.bundle
                     ),
                     sourceTransactionID: primary.id
                 )],
                 nextStep: String(
-                    localized: "Select a successful request with the same method and path, then run Compare again."
+                    localized: "Select a successful request with the same method and path, then run Compare again.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -286,14 +330,20 @@ struct DebugAssistantEngine {
             InvestigationEvidence(
                 id: "flow:\(primary.id):comparison.status",
                 kind: .observed,
-                title: String(localized: "Selected: HTTP \(primary.statusCode.map(String.init) ?? "—")"),
+                title: String(
+                    localized: "Selected: HTTP \(primary.statusCode.map(String.init) ?? "—")",
+                    bundle: RockxyLocalization.bundle
+                ),
                 detail: primary.request.host + primary.request.path,
                 sourceTransactionID: primary.id
             ),
             InvestigationEvidence(
                 id: "flow:\(comparison.id):comparison.status",
                 kind: .observed,
-                title: String(localized: "Baseline: HTTP \(comparison.statusCode.map(String.init) ?? "—")"),
+                title: String(
+                    localized: "Baseline: HTTP \(comparison.statusCode.map(String.init) ?? "—")",
+                    bundle: RockxyLocalization.bundle
+                ),
                 detail: comparison.request.host + comparison.request.path,
                 sourceTransactionID: comparison.id
             ),
@@ -305,9 +355,18 @@ struct DebugAssistantEngine {
                 id: "scope:comparison.duration",
                 kind: .derived,
                 title: difference >= 0
-                    ? String(localized: "Selected request was \(formatDuration(difference)) slower")
-                    : String(localized: "Selected request was \(formatDuration(abs(difference))) faster"),
-                detail: String(localized: "Difference between captured total durations."),
+                    ? String(
+                        localized: "Selected request was \(formatDuration(difference)) slower",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(
+                        localized: "Selected request was \(formatDuration(abs(difference))) faster",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                detail: String(
+                    localized: "Difference between captured total durations.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -319,7 +378,10 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "scope:comparison.request-headers",
                 kind: .derived,
-                title: String(localized: "\(missing.count) baseline request headers are absent"),
+                title: String(
+                    localized: "\(missing.count) baseline request headers are absent",
+                    bundle: RockxyLocalization.bundle
+                ),
                 detail: missing.prefix(4).joined(separator: ", "),
                 sourceTransactionID: primary.id
             ))
@@ -329,10 +391,16 @@ struct DebugAssistantEngine {
             recipe: .compareWithSuccess,
             selectedTransactionID: primary.id,
             scopeTransactionIDs: [primary.id, comparison.id],
-            scopeSummary: String(localized: "2 compared requests"),
-            summary: String(localized: "The selected request differs from a captured successful baseline."),
+            scopeSummary: String(localized: "2 compared requests", bundle: RockxyLocalization.bundle),
+            summary: String(
+                localized: "The selected request differs from a captured successful baseline.",
+                bundle: RockxyLocalization.bundle
+            ),
             evidence: evidence,
-            nextStep: String(localized: "Open the selected request in Compose and review every change before sending.")
+            nextStep: String(
+                localized: "Open the selected request in Compose and review every change before sending.",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 
@@ -356,25 +424,26 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):request.header.authorization",
                 kind: .observed,
-                title: String(localized: "Authorization header is present"),
-                detail: String(localized: "The credential value remains hidden."),
+                title: String(localized: "Authorization header is present", bundle: RockxyLocalization.bundle),
+                detail: String(localized: "The credential value remains hidden.", bundle: RockxyLocalization.bundle),
                 sourceTransactionID: primary.id
             ))
         } else if hasCookie {
             evidence.append(.init(
                 id: "flow:\(primary.id):request.header.cookie",
                 kind: .observed,
-                title: String(localized: "Cookie-based credentials may be present"),
-                detail: String(localized: "Cookie values remain hidden."),
+                title: String(localized: "Cookie-based credentials may be present", bundle: RockxyLocalization.bundle),
+                detail: String(localized: "Cookie values remain hidden.", bundle: RockxyLocalization.bundle),
                 sourceTransactionID: primary.id
             ))
         } else {
             evidence.append(.init(
                 id: "flow:\(primary.id):unknown.authentication-input",
                 kind: .unknown,
-                title: String(localized: "No common credential header was captured"),
+                title: String(localized: "No common credential header was captured", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "Authentication may use a query value, body field, client certificate, or external state."
+                    localized: "Authentication may use a query value, body field, client certificate, or external state.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 sourceTransactionID: primary.id
             ))
@@ -384,19 +453,26 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):response.status.auth",
                 kind: .observed,
-                title: String(localized: "Server returned HTTP \(status)"),
+                title: String(localized: "Server returned HTTP \(status)", bundle: RockxyLocalization.bundle),
                 detail: status == 401
-                    ? String(localized: "The request was not authenticated.")
-                    : String(localized: "The authenticated identity may not have permission."),
+                    ? String(localized: "The request was not authenticated.", bundle: RockxyLocalization.bundle)
+                    : String(
+                        localized: "The authenticated identity may not have permission.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                 sourceTransactionID: primary.id
             ))
             if hasAuthorization || hasCookie {
                 evidence.append(.init(
                     id: "flow:\(primary.id):inference.auth-rejected",
                     kind: .inferred,
-                    title: String(localized: "Credential rejection or insufficient scope is likely"),
+                    title: String(
+                        localized: "Credential rejection or insufficient scope is likely",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     detail: String(
-                        localized: "A credential signal was present, but captured traffic cannot verify its validity or server-side policy."
+                        localized: "A credential signal was present, but captured traffic cannot verify its validity or server-side policy.",
+                        bundle: RockxyLocalization.bundle
                     ),
                     sourceTransactionID: primary.id
                 ))
@@ -407,7 +483,7 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):response.header.www-authenticate",
                 kind: .observed,
-                title: String(localized: "Authentication challenge captured"),
+                title: String(localized: "Authentication challenge captured", bundle: RockxyLocalization.bundle),
                 detail: bounded(challenge, characters: 160),
                 sourceTransactionID: primary.id
             ))
@@ -421,7 +497,8 @@ struct DebugAssistantEngine {
             summary: authenticationSummary(primary, hasCredentialSignal: hasAuthorization || hasCookie),
             evidence: evidence,
             nextStep: String(
-                localized: "Compare the credential scheme and required scope without exposing the credential value."
+                localized: "Compare the credential scheme and required scope without exposing the credential value.",
+                bundle: RockxyLocalization.bundle
             )
         )
     }
@@ -449,8 +526,11 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):bug-report.status",
                 kind: .observed,
-                title: String(localized: "HTTP \(status) response"),
-                detail: primary.response?.statusMessage ?? String(localized: "Captured response"),
+                title: String(localized: "HTTP \(status) response", bundle: RockxyLocalization.bundle),
+                detail: primary.response?.statusMessage ?? String(
+                    localized: "Captured response",
+                    bundle: RockxyLocalization.bundle
+                ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -458,8 +538,8 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):bug-report.client",
                 kind: .observed,
-                title: String(localized: "Captured from \(clientApp)"),
-                detail: String(localized: "Client attribution reported by Rockxy."),
+                title: String(localized: "Captured from \(clientApp)", bundle: RockxyLocalization.bundle),
+                detail: String(localized: "Client attribution reported by Rockxy.", bundle: RockxyLocalization.bundle),
                 sourceTransactionID: primary.id
             ))
         }
@@ -467,9 +547,12 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "flow:\(primary.id):bug-report.rule",
                 kind: .observed,
-                title: String(localized: "Rule affected this request: \(rule)"),
+                title: String(localized: "Rule affected this request: \(rule)", bundle: RockxyLocalization.bundle),
                 detail: primary
-                    .matchedRuleActionSummary ?? String(localized: "Review the matched rule before sharing."),
+                    .matchedRuleActionSummary ?? String(
+                        localized: "Review the matched rule before sharing.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                 sourceTransactionID: primary.id
             ))
         }
@@ -479,9 +562,15 @@ struct DebugAssistantEngine {
             selectedTransactionID: primary.id,
             scopeTransactionIDs: scope.map(\.id),
             scopeSummary: scopeSummary(selectedCount: selected.count, requestCount: scope.count),
-            summary: String(localized: "Rockxy prepared a bounded evidence package for this captured failure."),
+            summary: String(
+                localized: "Rockxy prepared a bounded evidence package for this captured failure.",
+                bundle: RockxyLocalization.bundle
+            ),
             evidence: evidence,
-            nextStep: String(localized: "Review the exact redacted payload before copying or sharing any evidence.")
+            nextStep: String(
+                localized: "Review the exact redacted payload before copying or sharing any evidence.",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 
@@ -521,20 +610,41 @@ struct DebugAssistantEngine {
         switch primary.statusCode {
         case 429:
             if repeatedCount > 1 {
-                return String(localized: "Server returned HTTP 429 after repeated requests.")
+                return String(
+                    localized: "Server returned HTTP 429 after repeated requests.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "Server returned HTTP 429 for the selected request.")
+            return String(
+                localized: "Server returned HTTP 429 for the selected request.",
+                bundle: RockxyLocalization.bundle
+            )
         case let status? where status >= 500:
-            return String(localized: "Server returned HTTP \(status) for the selected request.")
+            return String(
+                localized: "Server returned HTTP \(status) for the selected request.",
+                bundle: RockxyLocalization.bundle
+            )
         case 401,
              403:
-            return String(localized: "The selected request was rejected by an authentication or authorization check.")
+            return String(
+                localized: "The selected request was rejected by an authentication or authorization check.",
+                bundle: RockxyLocalization.bundle
+            )
         case let status? where status >= 400:
-            return String(localized: "Server returned HTTP \(status) for the selected request.")
+            return String(
+                localized: "Server returned HTTP \(status) for the selected request.",
+                bundle: RockxyLocalization.bundle
+            )
         case nil where primary.isFailed:
-            return String(localized: "The selected request failed before a completed response was captured.")
+            return String(
+                localized: "The selected request failed before a completed response was captured.",
+                bundle: RockxyLocalization.bundle
+            )
         default:
-            return String(localized: "Rockxy found no captured HTTP failure status for the selected request.")
+            return String(
+                localized: "Rockxy found no captured HTTP failure status for the selected request.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -546,15 +656,25 @@ struct DebugAssistantEngine {
     {
         if primary.statusCode == 401 {
             return hasCredentialSignal
-                ? String(localized: "A credential signal was present, but the server did not authenticate it.")
-                : String(localized: "The server requested authentication and no common credential header was captured.")
+                ? String(
+                    localized: "A credential signal was present, but the server did not authenticate it.",
+                    bundle: RockxyLocalization.bundle
+                )
+                : String(
+                    localized: "The server requested authentication and no common credential header was captured.",
+                    bundle: RockxyLocalization.bundle
+                )
         }
         if primary.statusCode == 403 {
             return String(
-                localized: "The server denied access; captured traffic cannot verify the required permission policy."
+                localized: "The server denied access; captured traffic cannot verify the required permission policy.",
+                bundle: RockxyLocalization.bundle
             )
         }
-        return String(localized: "Rockxy found no captured 401 or 403 response for this request.")
+        return String(
+            localized: "Rockxy found no captured 401 or 403 response for this request.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func nextStepForFailure(_ primary: InvestigationTransactionSnapshot) -> String {
@@ -563,28 +683,43 @@ struct DebugAssistantEngine {
            !primary.isFailed
         {
             return String(
-                localized: "No CONNECT failure is shown. Inspect the tunneled HTTPS requests only if the app still behaved unexpectedly."
+                localized: "No CONNECT failure is shown. Inspect the tunneled HTTPS requests only if the app still behaved unexpectedly.",
+                bundle: RockxyLocalization.bundle
             )
         }
         switch primary.statusCode {
         case 401:
             return primary.requestHeader(named: "Authorization") != nil
-                ? String(localized: "Refresh or replace the credential, then retry the request.")
-                : String(localized: "Add the required authentication credential, then retry the request.")
+                ? String(
+                    localized: "Refresh or replace the credential, then retry the request.",
+                    bundle: RockxyLocalization.bundle
+                )
+                : String(
+                    localized: "Add the required authentication credential, then retry the request.",
+                    bundle: RockxyLocalization.bundle
+                )
         case 403:
             return String(
-                localized: "Check that the credential has permission for this endpoint, then retry the request."
+                localized: "Check that the credential has permission for this endpoint, then retry the request.",
+                bundle: RockxyLocalization.bundle
             )
         case 429:
             return primary.responseHeader(named: "Retry-After") != nil
-                ? String(localized: "Wait for the server-specified Retry-After delay, then retry the request once.")
-                : String(localized: "Wait briefly, then retry the request once.")
+                ? String(
+                    localized: "Wait for the server-specified Retry-After delay, then retry the request once.",
+                    bundle: RockxyLocalization.bundle
+                )
+                : String(localized: "Wait briefly, then retry the request once.", bundle: RockxyLocalization.bundle)
         case let status? where status >= 500:
             return String(
-                localized: "Retry once. If it fails again, compare the server response with a successful request."
+                localized: "Retry once. If it fails again, compare the server response with a successful request.",
+                bundle: RockxyLocalization.bundle
             )
         default:
-            return String(localized: "Open the request details and check the highlighted evidence.")
+            return String(
+                localized: "Open the request details and check the highlighted evidence.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -601,12 +736,15 @@ struct DebugAssistantEngine {
 
     private func scopeSummary(selectedCount: Int, requestCount: Int) -> String {
         if selectedCount > 1 {
-            return String(localized: "\(selectedCount) selected requests")
+            return String(localized: "\(selectedCount) selected requests", bundle: RockxyLocalization.bundle)
         }
         let relatedCount = max(0, requestCount - 1)
         return relatedCount == 0
-            ? String(localized: "Selected request")
-            : String(localized: "Selected request + \(relatedCount) related requests")
+            ? String(localized: "Selected request", bundle: RockxyLocalization.bundle)
+            : String(
+                localized: "Selected request + \(relatedCount) related requests",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -634,7 +772,7 @@ enum DebugAssistantEngineError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .noSelection:
-            String(localized: "Select at least one request to investigate.")
+            String(localized: "Select at least one request to investigate.", bundle: RockxyLocalization.bundle)
         }
     }
 }

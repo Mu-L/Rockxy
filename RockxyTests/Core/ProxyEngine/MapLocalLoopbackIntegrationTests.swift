@@ -1,0 +1,839 @@
+import Darwin
+import Foundation
+import NIOCore
+import NIOHTTP1
+import NIOPosix
+@testable import Rockxy
+import Testing
+
+// MARK: - MapLocalLoopbackIntegrationTests
+
+/// Network-level integration tests for Map Local rules.
+///
+/// Each test boots a deterministic local origin fixture plus a real `ProxyServer` on
+/// ephemeral loopback ports, installs Map Local rules through an isolated `RuleEngine`
+/// instance, and drives explicit-proxy plain-HTTP requests through the proxy. Because the
+/// tests own their `RuleEngine`/`ProxyServer` instances and never touch `RuleEngine.shared`
+/// or the macOS system proxy, there is no global rule state to preserve — teardown only has
+/// to stop the two servers and delete the temp fixtures.
+@Suite(.serialized)
+struct MapLocalLoopbackIntegrationTests {
+    @Test("Matching URL is served from the local file with configured status, headers, and body")
+    func matchingURLServedLocally() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let file = try harness.writeFixtureFile(
+                named: "mapped.json",
+                contents: Data(#"{"source":"map-local"}"#.utf8)
+            )
+            await harness.addRule(harness.mapLocalRule(
+                name: "Mapped",
+                path: "/mapped",
+                filePath: file.path,
+                statusCode: 201,
+                responseHeaders: [
+                    HTTPHeader(name: "Content-Type", value: "application/json"),
+                    HTTPHeader(name: "X-Rockxy-Map", value: "local"),
+                ]
+            ))
+
+            let response = try await harness.get("/mapped")
+
+            #expect(response.status == 201)
+            #expect(response.body == Data(#"{"source":"map-local"}"#.utf8))
+            #expect(response.headerValue("X-Rockxy-Map") == "local")
+            #expect(response.headerValue("Content-Type") == "application/json")
+            // Content-Length is always recomputed from the served bytes.
+            #expect(response.headerValue("Content-Length") == "22")
+            // The origin must not have been reached.
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+        }
+    }
+
+    @Test("Non-matching URL passes through the proxy to the origin")
+    func nonMatchingURLReachesOrigin() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let file = try harness.writeFixtureFile(named: "mapped.txt", contents: Data("LOCAL".utf8))
+            await harness.addRule(harness.mapLocalRule(
+                name: "Mapped",
+                path: "/mapped",
+                filePath: file.path
+            ))
+
+            let response = try await harness.get("/live")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(response.body == Data("origin:/live".utf8))
+        }
+    }
+
+    @Test("Matched rule with a missing local file falls back to the origin")
+    func missingLocalFileFallsBackToOrigin() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let missingPath = harness.fixtureDirectory
+                .appendingPathComponent("does-not-exist-\(UUID().uuidString).json").path
+            await harness.addRule(harness.mapLocalRule(
+                name: "Broken Mapping",
+                path: "/fallback",
+                filePath: missingPath,
+                statusCode: 201
+            ))
+
+            let response = try await harness.get("/fallback")
+
+            // A broken mapping degrades to normal traffic rather than a synthesized error.
+            #expect(response.status == 200)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(response.body == Data("origin:/fallback".utf8))
+        }
+    }
+
+    @Test("Binary file is served byte-for-byte with a recomputed Content-Length")
+    func binaryFileServedExactly() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let bytes = Data([0x00, 0x01, 0xFF, 0x7F, 0x89, 0x50, 0x4E, 0x47])
+            let file = try harness.writeFixtureFile(named: "payload.bin", contents: bytes)
+            await harness.addRule(harness.mapLocalRule(
+                name: "Binary",
+                path: "/payload",
+                filePath: file.path,
+                statusCode: 200
+            ))
+
+            let response = try await harness.get("/payload")
+
+            #expect(response.status == 200)
+            #expect(response.body == bytes)
+            #expect(response.headerValue("Content-Length") == "8")
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+        }
+    }
+
+    @Test("Empty file is served with a zero Content-Length")
+    func emptyFileServed() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let file = try harness.writeFixtureFile(named: "empty.txt", contents: Data())
+            await harness.addRule(harness.mapLocalRule(
+                name: "Empty",
+                path: "/empty",
+                filePath: file.path,
+                // Use a body-capable status so the wire-level assertion can verify Rockxy's
+                // recomputed zero length. HTTP clients are allowed to strip Content-Length
+                // from 204 No Content responses regardless of the handler's payload headers.
+                statusCode: 200
+            ))
+
+            let response = try await harness.get("/empty")
+
+            #expect(response.status == 200)
+            #expect(response.body.isEmpty)
+            #expect(response.headerValue("Content-Length") == "0")
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+        }
+    }
+
+    @Test("Directory mapping serves a nested subpath from the local directory")
+    func directoryMappingServesSubpath() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            _ = try harness.writeFixtureFile(
+                named: "app.js",
+                contents: Data("console.log('local');".utf8)
+            )
+            await harness.addRule(harness.mapLocalDirectoryRule(
+                name: "Assets",
+                pathPrefix: "/assets",
+                directoryPath: harness.fixtureDirectory.path
+            ))
+
+            let response = try await harness.get("/assets/app.js")
+
+            #expect(response.status == 200)
+            #expect(response.body == Data("console.log('local');".utf8))
+            #expect(response.headerValue("Content-Type") == "application/javascript")
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+        }
+    }
+
+    @Test("Directory mapping with a missing subpath falls back to the origin")
+    func directoryMappingMissingFallsBack() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            await harness.addRule(harness.mapLocalDirectoryRule(
+                name: "Assets",
+                pathPrefix: "/assets",
+                directoryPath: harness.fixtureDirectory.path
+            ))
+
+            let response = try await harness.get("/assets/missing.js")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(response.body == Data("origin:/assets/missing.js".utf8))
+        }
+    }
+
+    @Test("First matching rule wins when several rules match the same URL")
+    func firstMatchOrderIsHonored() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let firstFile = try harness.writeFixtureFile(named: "first.txt", contents: Data("FIRST".utf8))
+            let secondFile = try harness.writeFixtureFile(named: "second.txt", contents: Data("SECOND".utf8))
+
+            // Both rules match /ordered; the earlier-installed rule must win.
+            await harness.addRule(harness.mapLocalRule(
+                name: "First",
+                path: "/ordered",
+                filePath: firstFile.path,
+                statusCode: 201
+            ))
+            await harness.addRule(harness.mapLocalRule(
+                name: "Second",
+                path: "/ordered",
+                filePath: secondFile.path,
+                statusCode: 202
+            ))
+
+            let response = try await harness.get("/ordered")
+
+            #expect(response.status == 201)
+            #expect(response.body == Data("FIRST".utf8))
+        }
+    }
+
+    @Test("Trailing ? wildcard maps a one-character path but lets a trailing query reach the origin")
+    func trailingQuestionMarkWildcardQueryReachesOrigin() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let file = try harness.writeFixtureFile(named: "item.txt", contents: Data("MAPPED".utf8))
+            // Authored wildcard `/api/item?` (single-character `?`), includeSubpaths = false.
+            await harness.addRule(harness.mapLocalRule(
+                name: "Item",
+                path: "/api/item?",
+                filePath: file.path
+            ))
+
+            // `item` + exactly one character maps locally.
+            let mapped = try await harness.get("/api/items")
+            #expect(mapped.status == 200)
+            #expect(mapped.body == Data("MAPPED".utf8))
+            #expect(mapped.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+
+            // Two characters is not one character — reaches the origin.
+            let twoChar = try await harness.get("/api/itemss")
+            #expect(twoChar.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+
+            // The wildcard already consumed the boundary character, so a trailing query must NOT
+            // map — it reaches the origin (the validated failure #1).
+            let query = try await harness.get("/api/items?x=1")
+            #expect(query.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(query.body == Data("origin:/api/items".utf8))
+        }
+    }
+
+    @Test("A local file containing a full HTTP message serves that status, headers, and body")
+    func fullHTTPMessageFileIsServed() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let message = Data("""
+            HTTP/1.1 203 Non-Authoritative Information\r
+            Content-Type: application/problem+json\r
+            Set-Cookie: session=one\r
+            X-Map-Local: Rockxy\r
+            \r
+            {"from":"file"}
+            """.utf8)
+            let file = try harness.writeFixtureFile(named: "message.http", contents: message)
+            // The rule's own status (500) must be ignored — the file message wins.
+            await harness.addRule(harness.mapLocalRule(
+                name: "Message",
+                path: "/message",
+                filePath: file.path,
+                statusCode: 500
+            ))
+
+            let response = try await harness.get("/message")
+
+            #expect(response.status == 203)
+            #expect(response.body == Data(#"{"from":"file"}"#.utf8))
+            #expect(response.headerValue("Content-Type") == "application/problem+json")
+            #expect(response.headerValue("X-Map-Local") == "Rockxy")
+            #expect(response.headerValue("Set-Cookie") == "session=one")
+            // Content-Length is recomputed from the served body, not trusted from the file.
+            #expect(response.headerValue("Content-Length") == "\(Data(#"{"from":"file"}"#.utf8).count)")
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+        }
+    }
+
+    @Test("A rule with an out-of-range status falls back to the origin instead of emitting it")
+    func invalidStatusFallsBackToOrigin() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let file = try harness.writeFixtureFile(named: "raw.txt", contents: Data("RAW".utf8))
+            // 999 is not a valid HTTP status; a programmatic/imported rule must not emit it.
+            await harness.addRule(harness.mapLocalRule(
+                name: "Invalid Status",
+                path: "/invalid-status",
+                filePath: file.path,
+                statusCode: 999
+            ))
+
+            let response = try await harness.get("/invalid-status")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(response.body == Data("origin:/invalid-status".utf8))
+        }
+    }
+
+    @Test("Directory mapping does not synthesize index.html for the mapped root")
+    func directoryRootDoesNotSynthesizeIndex() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            _ = try harness.writeFixtureFile(named: "index.html", contents: Data("<html>local</html>".utf8))
+            await harness.addRule(harness.mapLocalDirectoryRule(
+                name: "Assets",
+                pathPrefix: "/assets",
+                directoryPath: harness.fixtureDirectory.path
+            ))
+
+            // `/assets/` resolves to an empty suffix (the directory root). No index synthesis —
+            // the request falls through to the origin (validated failure #2).
+            let response = try await harness.get("/assets/")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+            #expect(response.body == Data("origin:/assets/".utf8))
+        }
+    }
+
+    @Test("Concurrent directory hits and missing-target fallbacks all complete without hanging")
+    func concurrentDirectoryHitsAndFallbacks() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            // Six real files plus six missing targets, interleaved across concurrent requests.
+            for index in 0 ..< 6 {
+                _ = try harness.writeFixtureFile(
+                    named: "file\(index).txt",
+                    contents: Data("local-\(index)".utf8)
+                )
+            }
+            await harness.addRule(harness.mapLocalDirectoryRule(
+                name: "Assets",
+                pathPrefix: "/assets",
+                directoryPath: harness.fixtureDirectory.path
+            ))
+
+            try await withThrowingTaskGroup(of: (Int, Bool, ProxyHTTPResponse).self) { group in
+                for index in 0 ..< 12 {
+                    let isHit = index % 2 == 0
+                    let fileIndex = index / 2
+                    group.addTask {
+                        let path = isHit ? "/assets/file\(fileIndex).txt" : "/assets/missing\(index).txt"
+                        let response = try await harness.get(path)
+                        return (fileIndex, isHit, response)
+                    }
+                }
+
+                var completed = 0
+                for try await (fileIndex, isHit, response) in group {
+                    completed += 1
+                    if isHit {
+                        // Directory hit served from the local file, origin never reached.
+                        #expect(response.status == 200)
+                        #expect(response.body == Data("local-\(fileIndex)".utf8))
+                        #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+                    } else {
+                        // Missing target falls back to the origin.
+                        #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == "true")
+                    }
+                }
+                // Every one of the 12 concurrent requests completed — no serialization deadlock.
+                #expect(completed == 12)
+            }
+        }
+    }
+}
+
+// MARK: - MapLocalLoopbackHarness
+
+/// Owns an isolated `RuleEngine`, a real `ProxyServer`, a deterministic local origin
+/// fixture, and a temp directory for Map Local files. Every collaborator is instance-scoped
+/// so the harness never mutates shared rule state or the macOS system proxy.
+private actor MapLocalLoopbackHarness {
+    // MARK: Lifecycle
+
+    private init(
+        engine: RuleEngine,
+        proxyServer: ProxyServer,
+        proxyPort: Int,
+        origin: MapLocalOriginFixtureServer,
+        fixtureDirectory: URL
+    ) {
+        self.engine = engine
+        self.proxyServer = proxyServer
+        self.proxyPort = proxyPort
+        self.origin = origin
+        self.fixtureDirectory = fixtureDirectory
+    }
+
+    // MARK: Internal
+
+    static let originMarkerHeader = "X-Rockxy-Origin"
+
+    nonisolated let fixtureDirectory: URL
+
+    static func start() async throws -> MapLocalLoopbackHarness {
+        let fixtureDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MapLocalLoopback-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fixtureDirectory, withIntermediateDirectories: true)
+
+        let origin = try await MapLocalOriginFixtureServer.start()
+        let engine = RuleEngine()
+        let proxyPort = try Self.reserveLoopbackPort()
+        let proxyServer = ProxyServer(
+            configuration: ProxyConfiguration(port: proxyPort, listenAddress: "127.0.0.1", listenIPv6: false),
+            ruleEngine: engine
+        )
+
+        do {
+            try await proxyServer.start()
+        } catch {
+            await origin.stop()
+            try? FileManager.default.removeItem(at: fixtureDirectory)
+            throw error
+        }
+
+        return MapLocalLoopbackHarness(
+            engine: engine,
+            proxyServer: proxyServer,
+            proxyPort: proxyPort,
+            origin: origin,
+            fixtureDirectory: fixtureDirectory
+        )
+    }
+
+    /// Starts a harness, runs the body against it, and always awaits full teardown (both
+    /// servers stopped, temp fixtures removed) — even if the body throws.
+    static func run(_ body: (MapLocalLoopbackHarness) async throws -> Void) async throws {
+        let harness = try await start()
+        do {
+            try await body(harness)
+        } catch {
+            await harness.stop()
+            throw error
+        }
+        await harness.stop()
+    }
+
+    func stop() async {
+        await proxyServer.stop()
+        await origin.stop()
+        try? FileManager.default.removeItem(at: fixtureDirectory)
+    }
+
+    func addRule(_ rule: ProxyRule) async {
+        await engine.addRule(rule)
+    }
+
+    /// Builds a Map Local rule whose wildcard pattern matches exactly one absolute request URL
+    /// (`http://127.0.0.1:<originPort><path>`), anchored so sibling paths do not match.
+    nonisolated func mapLocalRule(
+        name: String,
+        path: String,
+        filePath: String,
+        statusCode: Int = 200,
+        responseHeaders: [HTTPHeader] = []
+    )
+        -> ProxyRule
+    {
+        let absolute = origin.absoluteURLString(path: path)
+        return ProxyRule(
+            name: name,
+            matchCondition: RuleMatchCondition(
+                urlPattern: absolute,
+                sourceURLPattern: absolute,
+                matchType: .wildcard,
+                includeSubpaths: false
+            ),
+            action: .mapLocal(
+                filePath: filePath,
+                statusCode: statusCode,
+                responseHeaders: responseHeaders
+            )
+        )
+    }
+
+    /// Builds a Map Local *directory* rule whose authored wildcard matches
+    /// `http://127.0.0.1:<originPort>/<prefix>/*` and serves matching subpaths from
+    /// `directoryPath`.
+    nonisolated func mapLocalDirectoryRule(
+        name: String,
+        pathPrefix: String,
+        directoryPath: String,
+        statusCode: Int = 200
+    )
+        -> ProxyRule
+    {
+        let base = origin.absoluteURLString(path: pathPrefix)
+        let authored = base.hasSuffix("/") ? "\(base)*" : "\(base)/*"
+        return ProxyRule(
+            name: name,
+            matchCondition: RuleMatchCondition(
+                urlPattern: authored,
+                sourceURLPattern: authored,
+                matchType: .wildcard,
+                includeSubpaths: true
+            ),
+            action: .mapLocal(
+                filePath: directoryPath,
+                statusCode: statusCode,
+                isDirectory: true
+            )
+        )
+    }
+
+    nonisolated func writeFixtureFile(named name: String, contents: Data) throws -> URL {
+        let url = fixtureDirectory.appendingPathComponent(name)
+        try contents.write(to: url)
+        return url
+    }
+
+    /// Sends an explicit-proxy `GET` for `path` and returns the parsed response.
+    ///
+    /// Uses a raw NIO HTTP/1.1 client that connects straight to the proxy and writes an
+    /// absolute-form request line (`GET http://127.0.0.1:<originPort><path> HTTP/1.1`). This
+    /// avoids URLSession's automatic loopback-proxy bypass, so the request is guaranteed to
+    /// traverse the proxy and exercise the rule engine.
+    func get(_ path: String) async throws -> ProxyHTTPResponse {
+        let absolute = origin.absoluteURLString(path: path)
+        return try await ProxyHTTPClient.get(
+            absoluteURL: absolute,
+            host: origin.host,
+            originPort: origin.boundPort,
+            proxyHost: "127.0.0.1",
+            proxyPort: proxyPort
+        )
+    }
+
+    // MARK: Private
+
+    private let engine: RuleEngine
+    private let proxyServer: ProxyServer
+    private let proxyPort: Int
+    private let origin: MapLocalOriginFixtureServer
+
+    private static func reserveLoopbackPort() throws -> Int {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else {
+            throw MapLocalLoopbackError.socket("Unable to create reservation socket.")
+        }
+        defer { close(fd) }
+
+        var reuse: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = 0
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bindResult == 0 else {
+            throw MapLocalLoopbackError.socket("Unable to bind reservation socket.")
+        }
+
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let nameResult = withUnsafeMutablePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getsockname(fd, $0, &length)
+            }
+        }
+        guard nameResult == 0 else {
+            throw MapLocalLoopbackError.socket("Unable to inspect reservation socket port.")
+        }
+        return Int(UInt16(bigEndian: addr.sin_port))
+    }
+}
+
+// MARK: - MapLocalOriginFixtureServer
+
+/// Minimal deterministic origin. Any request is answered `200` with body `origin:<path>` and a
+/// distinctive `X-Rockxy-Origin: true` marker header so tests can prove a request reached the
+/// origin rather than being served from a local file.
+private actor MapLocalOriginFixtureServer {
+    // MARK: Internal
+
+    nonisolated let host = "127.0.0.1"
+    nonisolated let portBox = MapLocalPortBox()
+
+    nonisolated var boundPort: Int {
+        portBox.value
+    }
+
+    static func start() async throws -> MapLocalOriginFixtureServer {
+        let server = MapLocalOriginFixtureServer()
+        try await server.startListening()
+        return server
+    }
+
+    nonisolated func absoluteURLString(path: String) -> String {
+        let normalized = path.hasPrefix("/") ? path : "/\(path)"
+        return "http://\(host):\(boundPort)\(normalized)"
+    }
+
+    func stop() async {
+        let channel = serverChannel
+        serverChannel = nil
+        if let channel {
+            try? await channel.close().get()
+        }
+        if let eventLoopGroup {
+            try? await eventLoopGroup.shutdownGracefully()
+        }
+        eventLoopGroup = nil
+    }
+
+    // MARK: Private
+
+    private var eventLoopGroup: MultiThreadedEventLoopGroup?
+    private var serverChannel: Channel?
+
+    private func startListening() async throws {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        eventLoopGroup = group
+        do {
+            let channel = try await ServerBootstrap(group: group)
+                .serverChannelOption(.backlog, value: 16)
+                .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
+                .childChannelInitializer { channel in
+                    channel.pipeline.configureHTTPServerPipeline().flatMap {
+                        channel.pipeline
+                            .addHandler(MapLocalOriginHandler(markerHeader: MapLocalLoopbackHarness.originMarkerHeader))
+                    }
+                }
+                .childChannelOption(.socketOption(.so_reuseaddr), value: 1)
+                .bind(host: host, port: 0)
+                .get()
+            guard let boundPort = channel.localAddress?.port else {
+                try await channel.close().get()
+                throw MapLocalLoopbackError.socket("Unable to inspect origin fixture port.")
+            }
+            serverChannel = channel
+            portBox.value = boundPort
+        } catch {
+            try? await group.shutdownGracefully()
+            eventLoopGroup = nil
+            throw error
+        }
+    }
+}
+
+// MARK: - MapLocalPortBox
+
+private final class MapLocalPortBox: @unchecked Sendable {
+    // MARK: Internal
+
+    var value: Int {
+        get { lock.withLock { storedValue } }
+        set { lock.withLock { storedValue = newValue } }
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var storedValue = 0
+}
+
+// MARK: - MapLocalOriginHandler
+
+private final class MapLocalOriginHandler: ChannelInboundHandler, @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(markerHeader: String) {
+        self.markerHeader = markerHeader
+    }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPServerRequestPart
+    typealias OutboundOut = HTTPServerResponsePart
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        switch unwrapInboundIn(data) {
+        case let .head(head):
+            requestPath = URLComponents(string: head.uri)?.path ?? head.uri
+        case .body:
+            break
+        case .end:
+            respond(context: context)
+            requestPath = nil
+        }
+    }
+
+    // MARK: Private
+
+    private let markerHeader: String
+    private var requestPath: String?
+
+    private func respond(context: ChannelHandlerContext) {
+        let path = requestPath ?? "/"
+        var buffer = context.channel.allocator.buffer(capacity: path.utf8.count + 8)
+        buffer.writeString("origin:\(path)")
+
+        var headers = HTTPHeaders()
+        headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
+        headers.add(name: markerHeader, value: "true")
+        headers.add(name: "Content-Length", value: "\(buffer.readableBytes)")
+        headers.add(name: "Connection", value: "close")
+
+        let head = HTTPResponseHead(version: .http1_1, status: .ok, headers: headers)
+        context.write(wrapOutboundOut(.head(head)), promise: nil)
+        context.write(wrapOutboundOut(.body(.byteBuffer(buffer))), promise: nil)
+        context.writeAndFlush(wrapOutboundOut(.end(nil))).whenComplete { _ in
+            context.close(promise: nil)
+        }
+    }
+}
+
+// MARK: - ProxyHTTPResponse
+
+/// The parsed result of a single proxied HTTP exchange.
+private struct ProxyHTTPResponse: Sendable {
+    let status: Int
+    let headers: HTTPHeaders
+    let body: Data
+
+    /// Case-insensitive header lookup (first occurrence).
+    func headerValue(_ name: String) -> String? {
+        headers.first(name: name)
+    }
+}
+
+// MARK: - ProxyHTTPClient
+
+/// Minimal explicit-proxy HTTP/1.1 client built on NIO. Connects directly to the proxy and
+/// writes an absolute-form request line so the request always traverses the proxy — unlike
+/// `URLSession`, which silently bypasses proxies for loopback destinations.
+private enum ProxyHTTPClient {
+    static func get(
+        absoluteURL: String,
+        host: String,
+        originPort: Int,
+        proxyHost: String,
+        proxyPort: Int
+    )
+        async throws -> ProxyHTTPResponse
+    {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        var headers = HTTPHeaders()
+        headers.add(name: "Host", value: "\(host):\(originPort)")
+        headers.add(name: "Connection", value: "close")
+        let requestHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: absoluteURL, headers: headers)
+
+        let promise = group.next().makePromise(of: ProxyHTTPResponse.self)
+        let bootstrap = ClientBootstrap(group: group)
+            .connectTimeout(.seconds(10))
+            .channelInitializer { channel in
+                channel.pipeline.addHTTPClientHandlers().flatMap {
+                    channel.pipeline.addHandler(
+                        ProxyClientResponseHandler(requestHead: requestHead, promise: promise)
+                    )
+                }
+            }
+
+        let channel: Channel
+        do {
+            channel = try await bootstrap.connect(host: proxyHost, port: proxyPort).get()
+        } catch {
+            promise.fail(error)
+            try? await group.shutdownGracefully()
+            throw MapLocalLoopbackError.connectionFailed(error.localizedDescription)
+        }
+
+        // Fail-safe so a stuck proxy cannot hang the test indefinitely.
+        let timeout = channel.eventLoop.scheduleTask(in: .seconds(12)) {
+            promise.fail(MapLocalLoopbackError.timeout)
+        }
+
+        do {
+            let response = try await promise.futureResult.get()
+            timeout.cancel()
+            try? await channel.close().get()
+            try? await group.shutdownGracefully()
+            return response
+        } catch {
+            timeout.cancel()
+            try? await channel.close().get()
+            try? await group.shutdownGracefully()
+            throw error
+        }
+    }
+}
+
+// MARK: - ProxyClientResponseHandler
+
+private final class ProxyClientResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(requestHead: HTTPRequestHead, promise: EventLoopPromise<ProxyHTTPResponse>) {
+        self.requestHead = requestHead
+        self.promise = promise
+    }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundOut = HTTPClientRequestPart
+
+    func channelActive(context: ChannelHandlerContext) {
+        context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
+        context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        switch unwrapInboundIn(data) {
+        case let .head(head):
+            status = Int(head.status.code)
+            headers = head.headers
+        case var .body(buffer):
+            if let bytes = buffer.readBytes(length: buffer.readableBytes) {
+                body.append(contentsOf: bytes)
+            }
+        case .end:
+            promise.succeed(ProxyHTTPResponse(status: status, headers: headers, body: body))
+            context.close(promise: nil)
+        }
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        promise.fail(error)
+        context.close(promise: nil)
+    }
+
+    // MARK: Private
+
+    private let requestHead: HTTPRequestHead
+    private let promise: EventLoopPromise<ProxyHTTPResponse>
+    private var status = 0
+    private var headers = HTTPHeaders()
+    private var body = Data()
+}
+
+// MARK: - MapLocalLoopbackError
+
+private enum MapLocalLoopbackError: Error, CustomStringConvertible {
+    case socket(String)
+    case connectionFailed(String)
+    case timeout
+
+    // MARK: Internal
+
+    var description: String {
+        switch self {
+        case let .socket(message):
+            message
+        case let .connectionFailed(message):
+            "Unable to connect to the proxy: \(message)"
+        case .timeout:
+            "Timed out waiting for the proxied response."
+        }
+    }
+}

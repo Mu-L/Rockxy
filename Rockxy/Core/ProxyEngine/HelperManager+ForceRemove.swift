@@ -5,13 +5,16 @@ extension HelperManager {
         case applicationMustReopen
         case appSignatureInvalid
 
+        // MARK: Internal
+
         var errorDescription: String? {
             switch self {
             case .applicationMustReopen:
                 HelperManager.applicationMustReopenMessage
             case .appSignatureInvalid:
                 String(
-                    localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
+                    localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again.",
+                    bundle: RockxyLocalization.bundle
                 )
             }
         }
@@ -60,21 +63,21 @@ extension HelperManager {
             nil
         case .installedOutdated,
              .installedIncompatible:
-            String(localized: "Update")
+            String(localized: "Update", bundle: RockxyLocalization.bundle)
         case .notInstalled:
-            String(localized: "Install")
+            String(localized: "Install", bundle: RockxyLocalization.bundle)
         case .requiresApproval:
-            String(localized: "Open Settings")
+            String(localized: "Open Settings", bundle: RockxyLocalization.bundle)
         case .unreachable:
-            String(localized: "Retry")
+            String(localized: "Retry", bundle: RockxyLocalization.bundle)
         case .signingMismatch:
             switch signingIssue {
             case .applicationMustReopen:
-                String(localized: "Quit Rockxy")
+                String(localized: "Quit Rockxy", bundle: RockxyLocalization.bundle)
             case .appSignatureInvalid:
                 nil
             case .identityMismatch:
-                String(localized: "Reinstall")
+                String(localized: "Reinstall", bundle: RockxyLocalization.bundle)
             case nil:
                 nil
             }
@@ -85,17 +88,22 @@ extension HelperManager {
     nonisolated static func signingMismatchWarningReason(issue: SigningIssue?) -> String {
         switch issue {
         case .applicationMustReopen:
-            String(localized: "Rockxy needs to be reopened before it can use the helper tool")
+            String(
+                localized: "Rockxy needs to be reopened before it can use the helper tool",
+                bundle: RockxyLocalization.bundle
+            )
         case .appSignatureInvalid:
             String(
-                localized: "Rockxy could not verify this app copy \u{2014} install a fresh copy before using the helper tool"
+                localized: "Rockxy could not verify this app copy \u{2014} install a fresh copy before using the helper tool",
+                bundle: RockxyLocalization.bundle
             )
         case .identityMismatch:
             String(
-                localized: "the installed helper does not match this copy of Rockxy \u{2014} reinstall it before continuing"
+                localized: "the installed helper does not match this copy of Rockxy \u{2014} reinstall it before continuing",
+                bundle: RockxyLocalization.bundle
             )
         case nil:
-            String(localized: "the helper tool has a signing issue")
+            String(localized: "the helper tool has a signing issue", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -103,21 +111,38 @@ extension HelperManager {
         case commandFailed(exitCode: Int32, output: String)
         case commandTerminated(signal: Int32, output: String)
 
+        // MARK: Internal
+
         var errorDescription: String? {
             switch self {
             case let .commandFailed(exitCode, output):
                 if output.localizedCaseInsensitiveContains("User canceled") {
-                    return String(localized: "The administrator authorization prompt was cancelled.")
+                    return String(
+                        localized: "The administrator authorization prompt was cancelled.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 }
                 if output.isEmpty {
-                    return String(localized: "Force reset failed with exit code \(exitCode).")
+                    return String(
+                        localized: "Force reset failed with exit code \(exitCode).",
+                        bundle: RockxyLocalization.bundle
+                    )
                 }
-                return String(localized: "Force reset failed with exit code \(exitCode): \(output)")
+                return String(
+                    localized: "Force reset failed with exit code \(exitCode): \(output)",
+                    bundle: RockxyLocalization.bundle
+                )
             case let .commandTerminated(signal, output):
                 if output.isEmpty {
-                    return String(localized: "Force reset was interrupted by signal \(signal).")
+                    return String(
+                        localized: "Force reset was interrupted by signal \(signal).",
+                        bundle: RockxyLocalization.bundle
+                    )
                 }
-                return String(localized: "Force reset was interrupted by signal \(signal): \(output)")
+                return String(
+                    localized: "Force reset was interrupted by signal \(signal): \(output)",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         }
     }
@@ -131,11 +156,14 @@ extension HelperManager {
                 return String(
                     localized: """
                     Rockxy removed stale helper files and asked macOS to reset Login and Background Items data.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             }
 
-            return String(localized: "Rockxy removed stale helper files and launchd registration state.")
+            return String(
+                localized: "Rockxy removed stale helper files and launchd registration state.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -152,60 +180,60 @@ extension HelperManager {
         var localizedSummary: String {
             switch finalStatus {
             case .installedCompatible:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy reinstalled the helper from the current app bundle and verified that it is reachable.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .requiresApproval:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy re-registered the helper from the current app bundle. macOS still needs you to approve it in System Settings > Login Items.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .installedOutdated:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy reinstalled the helper, but the installed helper still appears older than this app build.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .installedIncompatible:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy reinstalled the helper, but its protocol version is not compatible with this app build.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .unreachable:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy reinstalled the helper, but macOS has not made the XPC service reachable yet.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .signingMismatch:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy reinstalled the helper, but the app and helper signing identities still do not match.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             case .notInstalled:
-                return String(
+                String(
                     localized: """
                     \(removal.localizedSummary)
 
                     Rockxy removed stale helper state, but the helper is not installed.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             }
         }
@@ -265,7 +293,9 @@ extension HelperManager {
 
     nonisolated static func shouldUseLegacyInstallFallbackForCurrentBundle(
         bundleURL: URL = Bundle.main.bundleURL
-    ) -> Bool {
+    )
+        -> Bool
+    {
         let path = bundleURL.path
         return path.contains("/DerivedData/") && path.contains("/Build/Products/")
     }

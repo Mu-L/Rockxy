@@ -9,34 +9,26 @@ enum FavoriteTransactionSection: String, CaseIterable {
     case saved
     case notes
 
+    // MARK: Internal
+
     var deleteTitle: String {
         switch self {
-        case .pinned, .saved:
-            String(localized: "Delete")
+        case .pinned,
+             .saved:
+            String(localized: "Delete", bundle: RockxyLocalization.bundle)
         case .notes:
-            String(localized: "Remove Note")
+            String(localized: "Remove Note", bundle: RockxyLocalization.bundle)
         }
     }
 
     var displayName: String {
         switch self {
         case .pinned:
-            String(localized: "Pinned")
+            String(localized: "Pinned", bundle: RockxyLocalization.bundle)
         case .saved:
-            String(localized: "Saved")
+            String(localized: "Saved", bundle: RockxyLocalization.bundle)
         case .notes:
-            String(localized: "Notes")
-        }
-    }
-
-    func sidebarItem(for id: UUID) -> SidebarItem {
-        switch self {
-        case .pinned:
-            .pinnedTransaction(id: id)
-        case .saved:
-            .savedTransaction(id: id)
-        case .notes:
-            .noteTransaction(id: id)
+            String(localized: "Notes", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -48,6 +40,17 @@ enum FavoriteTransactionSection: String, CaseIterable {
             .allSaved
         case .notes:
             .allNotes
+        }
+    }
+
+    func sidebarItem(for id: UUID) -> SidebarItem {
+        switch self {
+        case .pinned:
+            .pinnedTransaction(id: id)
+        case .saved:
+            .savedTransaction(id: id)
+        case .notes:
+            .noteTransaction(id: id)
         }
     }
 }
@@ -62,20 +65,22 @@ enum FavoriteTransactionToolAction: String, CaseIterable {
     case allowList
     case networkConditions
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .breakpoint:
-            String(localized: "Breakpoint...")
+            String(localized: "Breakpoint...", bundle: RockxyLocalization.bundle)
         case .mapLocal:
-            String(localized: "Map Local...")
+            String(localized: "Map Local...", bundle: RockxyLocalization.bundle)
         case .mapRemote:
-            String(localized: "Map Remote...")
+            String(localized: "Map Remote...", bundle: RockxyLocalization.bundle)
         case .blockList:
-            String(localized: "Block List...")
+            String(localized: "Block List...", bundle: RockxyLocalization.bundle)
         case .allowList:
-            String(localized: "Allow List...")
+            String(localized: "Allow List...", bundle: RockxyLocalization.bundle)
         case .networkConditions:
-            String(localized: "Network Conditions...")
+            String(localized: "Network Conditions...", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -106,18 +111,20 @@ enum FavoriteTransactionExportFormat: String, CaseIterable {
     case requestBody
     case responseBody
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .rockxySession:
-            String(localized: "as Rockxy Session...")
+            String(localized: "as Rockxy Session...", bundle: RockxyLocalization.bundle)
         case .har:
-            String(localized: "as HAR (HTTP Archive)...")
+            String(localized: "as HAR (HTTP Archive)...", bundle: RockxyLocalization.bundle)
         case .rawRequestAndResponse:
-            String(localized: "Raw Request & Response...")
+            String(localized: "Raw Request & Response...", bundle: RockxyLocalization.bundle)
         case .requestBody:
-            String(localized: "Request Body...")
+            String(localized: "Request Body...", bundle: RockxyLocalization.bundle)
         case .responseBody:
-            String(localized: "Response Body...")
+            String(localized: "Response Body...", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -144,7 +151,8 @@ enum FavoriteTransactionExportFormat: String, CaseIterable {
             "har"
         case .rawRequestAndResponse:
             "txt"
-        case .requestBody, .responseBody:
+        case .requestBody,
+             .responseBody:
             "bin"
         }
     }
@@ -153,11 +161,7 @@ enum FavoriteTransactionExportFormat: String, CaseIterable {
 // MARK: - FavoriteTransactionMenuOption
 
 struct FavoriteTransactionMenuOption<Action: Hashable>: Hashable {
-    let action: Action
-    let title: String
-    let systemImage: String
-    let isEnabled: Bool
-    let disabledReason: String?
+    // MARK: Lifecycle
 
     init(
         action: Action,
@@ -172,18 +176,20 @@ struct FavoriteTransactionMenuOption<Action: Hashable>: Hashable {
         self.isEnabled = isEnabled
         self.disabledReason = disabledReason
     }
+
+    // MARK: Internal
+
+    let action: Action
+    let title: String
+    let systemImage: String
+    let isEnabled: Bool
+    let disabledReason: String?
 }
 
 // MARK: - FavoriteTransactionContextMenuModel
 
 struct FavoriteTransactionContextMenuModel: Hashable {
-    let section: FavoriteTransactionSection
-    let deleteTitle: String
-    let sslProxyingTitle: String
-    let canToggleSSLProxying: Bool
-    let sslProxyingDisabledReason: String?
-    let tools: [FavoriteTransactionMenuOption<FavoriteTransactionToolAction>]
-    let exports: [FavoriteTransactionMenuOption<FavoriteTransactionExportFormat>]
+    // MARK: Lifecycle
 
     init(
         transaction: HTTPTransaction,
@@ -193,12 +199,15 @@ struct FavoriteTransactionContextMenuModel: Hashable {
         self.section = section
         self.deleteTitle = section.deleteTitle
         self.sslProxyingTitle = isSSLProxyingEnabled
-            ? String(localized: "Disable SSL Proxying")
-            : String(localized: "Enable SSL Proxying")
+            ? String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle)
 
         let hasHost = !transaction.request.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         self.canToggleSSLProxying = hasHost
-        self.sslProxyingDisabledReason = hasHost ? nil : String(localized: "This request has no host.")
+        self.sslProxyingDisabledReason = hasHost ? nil : String(
+            localized: "This request has no host.",
+            bundle: RockxyLocalization.bundle
+        )
 
         self.tools = FavoriteTransactionToolAction.allCases.map {
             FavoriteTransactionMenuOption(action: $0, title: $0.title, systemImage: $0.systemImage)
@@ -221,7 +230,10 @@ struct FavoriteTransactionContextMenuModel: Hashable {
                 systemImage: FavoriteTransactionExportFormat.rawRequestAndResponse.systemImage,
                 isEnabled: transaction.response != nil,
                 disabledReason: transaction.response == nil
-                    ? String(localized: "No response has been captured for this request.")
+                    ? String(
+                        localized: "No response has been captured for this request.",
+                        bundle: RockxyLocalization.bundle
+                    )
                     : nil
             ),
             FavoriteTransactionMenuOption(
@@ -230,7 +242,7 @@ struct FavoriteTransactionContextMenuModel: Hashable {
                 systemImage: FavoriteTransactionExportFormat.requestBody.systemImage,
                 isEnabled: transaction.request.body != nil,
                 disabledReason: transaction.request.body == nil
-                    ? String(localized: "This request has no body.")
+                    ? String(localized: "This request has no body.", bundle: RockxyLocalization.bundle)
                     : nil
             ),
             FavoriteTransactionMenuOption(
@@ -239,9 +251,19 @@ struct FavoriteTransactionContextMenuModel: Hashable {
                 systemImage: FavoriteTransactionExportFormat.responseBody.systemImage,
                 isEnabled: transaction.response?.body != nil,
                 disabledReason: transaction.response?.body == nil
-                    ? String(localized: "This response has no body.")
+                    ? String(localized: "This response has no body.", bundle: RockxyLocalization.bundle)
                     : nil
             ),
         ]
     }
+
+    // MARK: Internal
+
+    let section: FavoriteTransactionSection
+    let deleteTitle: String
+    let sslProxyingTitle: String
+    let canToggleSSLProxying: Bool
+    let sslProxyingDisabledReason: String?
+    let tools: [FavoriteTransactionMenuOption<FavoriteTransactionToolAction>]
+    let exports: [FavoriteTransactionMenuOption<FavoriteTransactionExportFormat>]
 }

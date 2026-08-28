@@ -188,7 +188,7 @@ final class AllowListWindowViewModel {
         }
         let copy = AllowListRule(
             id: UUID(),
-            name: String(localized: "Copy of \(original.name)"),
+            name: String(localized: "Copy of \(original.name)", bundle: RockxyLocalization.bundle),
             isEnabled: original.isEnabled,
             rawPattern: original.rawPattern,
             method: original.method,
@@ -314,18 +314,18 @@ struct AllowListWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { importError = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { importError = nil }
         } message: {
             if let error = importError {
                 Text(error)
             }
         }
         .alert(
-            String(localized: "Replace Allow List Rules?"),
+            String(localized: "Replace Allow List Rules?", bundle: RockxyLocalization.bundle),
             isPresented: $showImportConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Choose File…")) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Choose File…", bundle: RockxyLocalization.bundle)) {
                 showImporter = true
             }
         } message: {
@@ -353,7 +353,7 @@ struct AllowListWindowView: View {
     @State private var showImportConfirmation = false
     @State private var exportDocument: AllowListJSONDocument?
     @State private var importError: String?
-    @State private var operationAlertTitle = String(localized: "Import Failed")
+    @State private var operationAlertTitle = String(localized: "Import Failed", bundle: RockxyLocalization.bundle)
     @State private var importSource: AllowListImportSource = .rockxyJSON
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
@@ -361,18 +361,69 @@ struct AllowListWindowView: View {
         guard let id = viewModel.selectedRuleID,
               let rule = viewModel.manager.rules.first(where: { $0.id == id }) else
         {
-            return String(localized: "Enable Rule")
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
         return rule.isEnabled
-            ? String(localized: "Disable Rule")
-            : String(localized: "Enable Rule")
+            ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
+    }
+
+    private var isCapturingNothing: Bool {
+        viewModel.isAllowListActive && viewModel.effectiveRuleCount == 0
+    }
+
+    private var infoBannerMessage: String {
+        if isCapturingNothing {
+            return String(
+                localized:
+                "Allow List is on, but no valid enabled rule can match. Rockxy will not record traffic until a rule is enabled.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(
+            localized:
+            "Allow List controls what Rockxy records in the session. Non-matching traffic is still forwarded normally.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
+    private var footerHint: String {
+        let countText = viewModel.searchText.isEmpty
+            ? "\(viewModel.ruleCount) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
+            : String(
+                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
+                bundle: RockxyLocalization.bundle
+            )
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var importConfirmationMessage: String {
+        switch importSource {
+        case .rockxyJSON:
+            String(
+                localized:
+                "Importing replaces all current rules and applies the Allow List on/off state stored in the file.",
+                bundle: RockxyLocalization.bundle
+            )
+        case .proxyman,
+             .charlesProxy:
+            String(
+                localized:
+                "Migrating replaces all current rules. Rockxy keeps the current Allow List on/off state.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Toggle(
-                    String(localized: "Enable Allow List"),
+                    String(localized: "Enable Allow List", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { viewModel.isAllowListActive },
                         set: { viewModel.setActive($0) }
@@ -383,23 +434,27 @@ struct AllowListWindowView: View {
                 .help(
                     String(
                         localized:
-                        "When off, Rockxy captures all traffic. Individual Allow List rules keep their enabled state."
+                        "When off, Rockxy captures all traffic. Individual Allow List rules keep their enabled state.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
 
-                Text(String(localized: "Capture and display only traffic that matches an enabled rule."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Capture and display only traffic that matches an enabled rule.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Allow List rules"))
+                .accessibilityLabel(String(localized: "Search Allow List rules", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -426,23 +481,6 @@ struct AllowListWindowView: View {
         }
     }
 
-    private var isCapturingNothing: Bool {
-        viewModel.isAllowListActive && viewModel.effectiveRuleCount == 0
-    }
-
-    private var infoBannerMessage: String {
-        if isCapturingNothing {
-            return String(
-                localized:
-                "Allow List is on, but no valid enabled rule can match. Rockxy will not record traffic until a rule is enabled."
-            )
-        }
-        return String(
-            localized:
-            "Allow List controls what Rockxy records in the session. Non-matching traffic is still forwarded normally."
-        )
-    }
-
     private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             addRemoveControl
@@ -457,8 +495,8 @@ struct AllowListWindowView: View {
 
             Text(
                 viewModel.isAllowListActive
-                    ? "\(viewModel.effectiveRuleCount) \(String(localized: "ACTIVE"))"
-                    : String(localized: "ALLOW LIST OFF")
+                    ? "\(viewModel.effectiveRuleCount) \(String(localized: "ACTIVE", bundle: RockxyLocalization.bundle))"
+                    : String(localized: "ALLOW LIST OFF", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
             .padding(.horizontal, 12)
@@ -468,13 +506,6 @@ struct AllowListWindowView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
         .rockxyFunctionalBar()
-    }
-
-    private var footerHint: String {
-        let countText = viewModel.searchText.isEmpty
-            ? "\(viewModel.ruleCount) \(String(localized: "rules"))"
-            : String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
     }
 
     private var addRemoveControl: some View {
@@ -490,7 +521,7 @@ struct AllowListWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -507,7 +538,7 @@ struct AllowListWindowView: View {
             }
             .buttonStyle(.plain)
             .disabled(viewModel.selectedRuleID == nil)
-            .help(String(localized: "Delete Rule"))
+            .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
         }
         .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -519,20 +550,20 @@ struct AllowListWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New…")) {
+            Button(String(localized: "New…", bundle: RockxyLocalization.bundle)) {
                 viewModel.presentNewRuleEditor()
             }
             .keyboardShortcut("n", modifiers: .command)
 
             Divider()
 
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 openEditorForSelection()
             }
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.duplicateSelected()
             }
             .keyboardShortcut("d", modifiers: .command)
@@ -548,35 +579,35 @@ struct AllowListWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Export Settings…")) {
+            Button(String(localized: "Export Settings…", bundle: RockxyLocalization.bundle)) {
                 prepareExport()
             }
             .disabled(viewModel.manager.rules.isEmpty)
 
-            Button(String(localized: "Import Rockxy Settings…")) {
+            Button(String(localized: "Import Rockxy Settings…", bundle: RockxyLocalization.bundle)) {
                 requestImport(from: .rockxyJSON)
             }
 
-            Menu(String(localized: "Migrate from Another Proxy")) {
-                Button(String(localized: "Proxyman Settings…")) {
+            Menu(String(localized: "Migrate from Another Proxy", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Proxyman Settings…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .proxyman)
                 }
 
-                Button(String(localized: "Charles Proxy Settings…")) {
+                Button(String(localized: "Charles Proxy Settings…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .charlesProxy)
                 }
             }
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -586,18 +617,14 @@ struct AllowListWindowView: View {
         .fixedSize()
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     @ViewBuilder
     private func contextMenuItems(for id: UUID) -> some View {
-        Button(String(localized: "Edit…")) {
+        Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
             openEditorForRule(id)
         }
         .keyboardShortcut(.return, modifiers: .command)
 
-        Button(String(localized: "Duplicate")) {
+        Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
             viewModel.selectedRuleID = id
             viewModel.duplicateSelected()
         }
@@ -610,7 +637,7 @@ struct AllowListWindowView: View {
 
         Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
+        Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
             viewModel.selectedRuleID = id
             viewModel.removeSelected()
         }
@@ -619,9 +646,12 @@ struct AllowListWindowView: View {
 
     private func enableDisableLabel(for id: UUID) -> String {
         guard let rule = viewModel.manager.rules.first(where: { $0.id == id }) else {
-            return String(localized: "Enable Rule")
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
-        return rule.isEnabled ? String(localized: "Disable Rule") : String(localized: "Enable Rule")
+        return rule.isEnabled ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle) : String(
+            localized: "Enable Rule",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func openEditorForSelection() {
@@ -656,24 +686,9 @@ struct AllowListWindowView: View {
             exportDocument = try AllowListJSONDocument(data: viewModel.exportRulesJSON())
             showExporter = true
         } catch {
-            operationAlertTitle = String(localized: "Export Failed")
+            operationAlertTitle = String(localized: "Export Failed", bundle: RockxyLocalization.bundle)
             importError = error.localizedDescription
             Self.logger.error("Allow list export failed: \(error.localizedDescription)")
-        }
-    }
-
-    private var importConfirmationMessage: String {
-        switch importSource {
-        case .rockxyJSON:
-            String(
-                localized:
-                "Importing replaces all current rules and applies the Allow List on/off state stored in the file."
-            )
-        case .proxyman, .charlesProxy:
-            String(
-                localized:
-                "Migrating replaces all current rules. Rockxy keeps the current Allow List on/off state."
-            )
         }
     }
 
@@ -683,7 +698,7 @@ struct AllowListWindowView: View {
     }
 
     private func handleImport(_ result: Result<[URL], Error>) {
-        operationAlertTitle = String(localized: "Import Failed")
+        operationAlertTitle = String(localized: "Import Failed", bundle: RockxyLocalization.bundle)
         switch result {
         case let .success(urls):
             guard let url = urls.first else {
@@ -699,7 +714,7 @@ struct AllowListWindowView: View {
                 let resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
                 if let fileSize = resourceValues.fileSize, fileSize > Self.maxImportFileBytes {
                     importError = String(
-                        localized: "File is too large to import (max 1 MB)."
+                        localized: "File is too large to import (max 1 MB).", bundle: RockxyLocalization.bundle
                     )
                     return
                 }
@@ -722,7 +737,7 @@ struct AllowListWindowView: View {
     }
 }
 
-// MARK: - AllowListTableView
+// MARK: - AllowListTableLayout
 
 private enum AllowListTableLayout {
     static let enabledWidth: CGFloat = 66
@@ -730,6 +745,8 @@ private enum AllowListTableLayout {
     static let methodWidth: CGFloat = 90
     static let contentInset: CGFloat = 10
 }
+
+// MARK: - AllowListTableView
 
 private struct AllowListTableView<ContextMenuContent: View>: View {
     // MARK: Internal
@@ -755,14 +772,20 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
                             .foregroundStyle(.secondary)
                         Text(
                             isSearching
-                                ? String(localized: "No matching rules")
-                                : String(localized: "No Allow List rules")
+                                ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                                : String(localized: "No Allow List rules", bundle: RockxyLocalization.bundle)
                         )
                         .font(toolMetrics.font(weight: .medium))
                         Text(
                             isSearching
-                                ? String(localized: "Try a different name, method, or URL pattern.")
-                                : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                                ? String(
+                                    localized: "Try a different name, method, or URL pattern.",
+                                    bundle: RockxyLocalization.bundle
+                                )
+                                : String(
+                                    localized: "Click \"+\" or press ⌘N to create a rule.",
+                                    bundle: RockxyLocalization.bundle
+                                )
                         )
                         .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.secondary)
@@ -805,23 +828,29 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var columnHeader: some View {
         HStack(spacing: 0) {
             columnHeaderCell(
-                String(localized: "Enabled"),
+                String(localized: "Enabled", bundle: RockxyLocalization.bundle),
                 width: AllowListTableLayout.enabledWidth
             )
             columnHeaderCell(
-                String(localized: "Name"),
+                String(localized: "Name", bundle: RockxyLocalization.bundle),
                 width: AllowListTableLayout.nameWidth,
                 alignment: .center
             )
             columnHeaderCell(
-                String(localized: "Method"),
+                String(localized: "Method", bundle: RockxyLocalization.bundle),
                 width: AllowListTableLayout.methodWidth,
                 leadingInset: AllowListTableLayout.contentInset
             )
-            Text(String(localized: "Matching Rule"))
+            Text(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle))
                 .padding(.leading, AllowListTableLayout.contentInset)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -833,20 +862,6 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
         .overlay(alignment: .bottom) {
             Divider()
         }
-    }
-
-    private func columnHeaderCell(
-        _ title: String,
-        width: CGFloat,
-        alignment: Alignment = .leading,
-        leadingInset: CGFloat = 0
-    ) -> some View {
-        Text(title)
-            .padding(.leading, leadingInset)
-            .frame(width: width, alignment: alignment)
-            .overlay(alignment: .trailing) {
-                tableDivider
-            }
     }
 
     private var tableDivider: some View {
@@ -872,19 +887,27 @@ private struct AllowListTableView<ContextMenuContent: View>: View {
         .allowsHitTesting(false)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    private func columnHeaderCell(
+        _ title: String,
+        width: CGFloat,
+        alignment: Alignment = .leading,
+        leadingInset: CGFloat = 0
+    )
+        -> some View
+    {
+        Text(title)
+            .padding(.leading, leadingInset)
+            .frame(width: width, alignment: alignment)
+            .overlay(alignment: .trailing) {
+                tableDivider
+            }
     }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 }
 
 // MARK: - AllowListTableRow
 
 private struct AllowListTableRow: View {
     // MARK: Internal
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     let rule: AllowListRule
     let isSelected: Bool
@@ -934,6 +957,8 @@ private struct AllowListTableRow: View {
     }
 
     // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var rowBackground: some ShapeStyle {
         if isSelected {

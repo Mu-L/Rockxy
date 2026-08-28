@@ -12,9 +12,12 @@ struct RequestTimelineView: View {
     var body: some View {
         if coordinator.transactions.isEmpty {
             ContentUnavailableView(
-                String(localized: "No Timeline Data"),
+                String(localized: "No Timeline Data", bundle: RockxyLocalization.bundle),
                 systemImage: "chart.bar.xaxis",
-                description: Text(String(localized: "Capture traffic to see the request timeline"))
+                description: Text(String(
+                    localized: "Capture traffic to see the request timeline",
+                    bundle: RockxyLocalization.bundle
+                ))
             )
         } else {
             VStack(alignment: .leading, spacing: 0) {
@@ -32,6 +35,8 @@ struct RequestTimelineView: View {
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "RequestTimelineView")
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private let phaseColors: [(String, Color)] = [
         ("DNS", Theme.Timing.dns),
@@ -201,6 +206,4 @@ struct RequestTimelineView: View {
         }
         return String(format: "%.0fms", ms)
     }
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }

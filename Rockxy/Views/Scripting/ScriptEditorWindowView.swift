@@ -21,39 +21,41 @@ struct ScriptEditorWindowView: View {
                 consumePendingIntent()
             }
             .confirmationDialog(
-                String(localized: "Unsaved Changes"),
+                String(localized: "Unsaved Changes", bundle: RockxyLocalization.bundle),
                 isPresented: $viewModel.isShowingUnsavedSwitchPrompt,
                 titleVisibility: .visible
             ) {
-                Button(String(localized: "Save & Switch")) {
+                Button(String(localized: "Save & Switch", bundle: RockxyLocalization.bundle)) {
                     Task { await viewModel.resolveUnsavedSwitch(.saveAndSwitch) }
                 }
-                Button(String(localized: "Discard Changes"), role: .destructive) {
+                Button(String(localized: "Discard Changes", bundle: RockxyLocalization.bundle), role: .destructive) {
                     Task { await viewModel.resolveUnsavedSwitch(.discard) }
                 }
-                Button(String(localized: "Cancel"), role: .cancel) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                     Task { await viewModel.resolveUnsavedSwitch(.cancel) }
                 }
             } message: {
                 Text(
                     String(
-                        localized: "“\(viewModel.currentScriptDisplayName)” has unsaved changes. Save them before switching scripts?"
+                        localized: "“\(viewModel.currentScriptDisplayName)” has unsaved changes. Save them before switching scripts?",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             }
             .confirmationDialog(
-                String(localized: "Reset Shared State"),
+                String(localized: "Reset Shared State", bundle: RockxyLocalization.bundle),
                 isPresented: $isShowingResetConfirmation,
                 titleVisibility: .visible
             ) {
-                Button(String(localized: "Reset Shared State"), role: .destructive) {
+                Button(String(localized: "Reset Shared State", bundle: RockxyLocalization.bundle), role: .destructive) {
                     viewModel.resetSharedState()
                 }
-                Button(String(localized: "Cancel"), role: .cancel) {}
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
             } message: {
                 Text(
                     String(
-                        localized: "This removes every stored shared value for “\(viewModel.currentScriptDisplayName)”. This cannot be undone."
+                        localized: "This removes every stored shared value for “\(viewModel.currentScriptDisplayName)”. This cannot be undone.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             }
@@ -69,7 +71,7 @@ struct ScriptEditorWindowView: View {
 
     private var statusLineText: String {
         if viewModel.isDirty {
-            return String(localized: "Unsaved changes")
+            return String(localized: "Unsaved changes", bundle: RockxyLocalization.bundle)
         }
         return viewModel.statusMessage
     }
@@ -94,6 +96,18 @@ struct ScriptEditorWindowView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var methodMenuWidth: CGFloat {
+        max(90, toolMetrics.bodyFontSize * 5.2)
+    }
+
+    private var patternModeMenuWidth: CGFloat {
+        max(150, toolMetrics.bodyFontSize * 8.5)
+    }
+
+    private var footerLabelHeight: CGFloat {
+        max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
+    }
+
     // MARK: - Top-level content routing
 
     @ViewBuilder private var content: some View {
@@ -109,9 +123,12 @@ struct ScriptEditorWindowView: View {
 
     private var unavailableState: some View {
         ContentUnavailableView {
-            Label(String(localized: "No Script Loaded"), systemImage: "curlybraces")
+            Label(String(localized: "No Script Loaded", bundle: RockxyLocalization.bundle), systemImage: "curlybraces")
         } description: {
-            Text(String(localized: "Open a script from the Scripting window to edit it here."))
+            Text(String(
+                localized: "Open a script from the Scripting window to edit it here.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -119,7 +136,7 @@ struct ScriptEditorWindowView: View {
     private var loadingState: some View {
         VStack(spacing: toolMetrics.controlSpacing) {
             ProgressView()
-            Text(String(localized: "Loading script…"))
+            Text(String(localized: "Loading script…", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
@@ -151,15 +168,18 @@ struct ScriptEditorWindowView: View {
     private var matchingConfigurationSection: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                labeledField(String(localized: "Name")) {
-                    TextField(String(localized: "Untitled Script"), text: $viewModel.name)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .frame(minHeight: toolMetrics.formControlHeight)
-                        .accessibilityLabel(String(localized: "Script name"))
+                labeledField(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                    TextField(
+                        String(localized: "Untitled Script", bundle: RockxyLocalization.bundle),
+                        text: $viewModel.name
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .frame(minHeight: toolMetrics.formControlHeight)
+                    .accessibilityLabel(String(localized: "Script name", bundle: RockxyLocalization.bundle))
                 }
 
-                labeledField(String(localized: "URL Pattern")) {
+                labeledField(String(localized: "URL Pattern", bundle: RockxyLocalization.bundle)) {
                     ViewThatFits(in: .horizontal) {
                         patternControls(stacked: false)
                         patternControls(stacked: true)
@@ -173,7 +193,7 @@ struct ScriptEditorWindowView: View {
             }
             .padding(toolMetrics.controlSpacing)
         } label: {
-            Text(String(localized: "Matching Configuration"))
+            Text(String(localized: "Matching Configuration", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -183,7 +203,7 @@ struct ScriptEditorWindowView: View {
     }
 
     private var testMatchRow: some View {
-        labeledField(String(localized: "Test URL")) {
+        labeledField(String(localized: "Test URL", bundle: RockxyLocalization.bundle)) {
             ViewThatFits(in: .horizontal) {
                 testMatchControls(stacked: false)
                 testMatchControls(stacked: true)
@@ -269,7 +289,7 @@ struct ScriptEditorWindowView: View {
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "HTTP method"))
+        .accessibilityLabel(String(localized: "HTTP method", bundle: RockxyLocalization.bundle))
     }
 
     private var patternModeMenu: some View {
@@ -291,7 +311,7 @@ struct ScriptEditorWindowView: View {
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Pattern mode"))
+        .accessibilityLabel(String(localized: "Pattern mode", bundle: RockxyLocalization.bundle))
     }
 
     private var consoleFilterMenu: some View {
@@ -315,8 +335,8 @@ struct ScriptEditorWindowView: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .help(String(localized: "Filter console levels"))
-        .accessibilityLabel(String(localized: "Filter console levels"))
+        .help(String(localized: "Filter console levels", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "Filter console levels", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: - Action bar
@@ -352,7 +372,7 @@ struct ScriptEditorWindowView: View {
             Button {
                 viewModel.beautify()
             } label: {
-                footerActionLabel(String(localized: "Beautify"))
+                footerActionLabel(String(localized: "Beautify", bundle: RockxyLocalization.bundle))
             }
             .rockxyGlassButtonStyle()
             .fixedSize()
@@ -360,7 +380,7 @@ struct ScriptEditorWindowView: View {
             Button {
                 viewModel.insertHeaderExample()
             } label: {
-                footerActionLabel(String(localized: "Insert Header Example"))
+                footerActionLabel(String(localized: "Insert Header Example", bundle: RockxyLocalization.bundle))
             }
             .rockxyGlassButtonStyle()
             .fixedSize()
@@ -369,17 +389,17 @@ struct ScriptEditorWindowView: View {
 
     private var actionMenu: some View {
         Menu {
-            Button(String(localized: "Toggle Console")) {
+            Button(String(localized: "Toggle Console", bundle: RockxyLocalization.bundle)) {
                 viewModel.toggleConsolePanel()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             Divider()
-            Button(String(localized: "Reset Shared State…"), role: .destructive) {
+            Button(String(localized: "Reset Shared State…", bundle: RockxyLocalization.bundle), role: .destructive) {
                 isShowingResetConfirmation = true
             }
             .disabled(viewModel.pluginID == nil)
         } label: {
-            Label(String(localized: "Actions"), systemImage: "ellipsis.circle")
+            Label(String(localized: "Actions", bundle: RockxyLocalization.bundle), systemImage: "ellipsis.circle")
                 .font(toolMetrics.font())
                 .frame(minHeight: footerLabelHeight)
         }
@@ -401,8 +421,8 @@ struct ScriptEditorWindowView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .disabled(viewModel.consoleEntries.isEmpty)
-            .help(String(localized: "Clear console"))
-            .accessibilityLabel(String(localized: "Clear console"))
+            .help(String(localized: "Clear console", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Clear console", bundle: RockxyLocalization.bundle))
 
             Divider()
                 .frame(height: toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
@@ -415,7 +435,7 @@ struct ScriptEditorWindowView: View {
             Button {
                 viewModel.validateScript()
             } label: {
-                footerActionLabel(String(localized: "Validate"))
+                footerActionLabel(String(localized: "Validate", bundle: RockxyLocalization.bundle))
             }
             .rockxyGlassButtonStyle()
             .keyboardShortcut("r", modifiers: .command)
@@ -424,7 +444,10 @@ struct ScriptEditorWindowView: View {
             Button {
                 Task { await viewModel.saveAndActivate() }
             } label: {
-                footerActionLabel(String(localized: "Save & Activate"), weight: .semibold)
+                footerActionLabel(
+                    String(localized: "Save & Activate", bundle: RockxyLocalization.bundle),
+                    weight: .semibold
+                )
             }
             .rockxyGlassButtonStyle(prominent: true)
             .keyboardShortcut("s", modifiers: .command)
@@ -442,7 +465,7 @@ struct ScriptEditorWindowView: View {
                 minWidth: max(220, toolMetrics.bodyFontSize * 12),
                 minHeight: toolMetrics.formControlHeight
             )
-            .accessibilityLabel(String(localized: "URL pattern"))
+            .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
 
         let menus = HStack(spacing: toolMetrics.controlSpacing) {
             methodMenu
@@ -478,7 +501,7 @@ struct ScriptEditorWindowView: View {
                 minWidth: max(260, toolMetrics.bodyFontSize * 12),
                 minHeight: toolMetrics.formControlHeight
             )
-            .accessibilityLabel(String(localized: "Test URL"))
+            .accessibilityLabel(String(localized: "Test URL", bundle: RockxyLocalization.bundle))
 
         let button = Button {
             viewModel.runRuleTest()
@@ -541,18 +564,6 @@ struct ScriptEditorWindowView: View {
             }
             Text(title)
         }
-    }
-
-    private var methodMenuWidth: CGFloat {
-        max(90, toolMetrics.bodyFontSize * 5.2)
-    }
-
-    private var patternModeMenuWidth: CGFloat {
-        max(150, toolMetrics.bodyFontSize * 8.5)
-    }
-
-    private var footerLabelHeight: CGFloat {
-        max(16, toolMetrics.footerControlHeight - toolMetrics.controlSpacing)
     }
 
     private func footerActionLabel(_ title: String, weight: Font.Weight = .regular) -> some View {

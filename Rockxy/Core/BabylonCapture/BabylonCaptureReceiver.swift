@@ -31,6 +31,12 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     /// non-zero value does not imply any paired/authenticated Babylon client.
     private(set) var openConnectionCount = 0
 
+    static func validateRuntimePayloadSize(_ byteCount: Int) throws {
+        guard byteCount >= 0, byteCount <= maximumRuntimePayloadSize else {
+            throw BabylonCaptureProtocolError.frameTooLarge
+        }
+    }
+
     @MainActor
     func start(
         coordinator: MainContentCoordinator,
@@ -61,12 +67,6 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
     func retryListener() {
         queue.async { [weak self] in
             self?.restartListener()
-        }
-    }
-
-    static func validateRuntimePayloadSize(_ byteCount: Int) throws {
-        guard byteCount >= 0, byteCount <= maximumRuntimePayloadSize else {
-            throw BabylonCaptureProtocolError.frameTooLarge
         }
     }
 
@@ -259,7 +259,10 @@ final class BabylonCaptureReceiver: @unchecked Sendable {
             // The current listener was cancelled without our asking — surface a
             // retryable Unavailable state rather than a misleading Starting.
             self.listener = nil
-            publishListenerStatus(.failed(String(localized: "The Babylon listener stopped unexpectedly.")))
+            publishListenerStatus(.failed(String(
+                localized: "The Babylon listener stopped unexpectedly.",
+                bundle: RockxyLocalization.bundle
+            )))
         default:
             break
         }

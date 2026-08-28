@@ -37,7 +37,7 @@ struct DeveloperSetupSourceList: View {
         }
         .listStyle(.sidebar)
         .font(setupMetrics.font())
-        .accessibilityLabel(String(localized: "Developer setup targets"))
+        .accessibilityLabel(String(localized: "Developer setup targets", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -50,11 +50,14 @@ struct DeveloperSetupSourceList: View {
 
     private var emptySearchState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "No matching setups"))
+            Text(String(localized: "No matching setups", bundle: RockxyLocalization.bundle))
                 .font(setupMetrics.font(weight: .semibold))
-            Text(String(localized: "Try another runtime, browser, framework, environment, or category name."))
-                .font(setupMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
+            Text(String(
+                localized: "Try another runtime, browser, framework, environment, or category name.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(setupMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 6)
     }
@@ -108,17 +111,17 @@ struct DeveloperSetupSourceList: View {
 
     private func pinActionTitle(for target: SetupTarget) -> String {
         if isPinned(target) {
-            return String(localized: "Unpin")
+            return String(localized: "Unpin", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Pin")
+        return String(localized: "Pin", bundle: RockxyLocalization.bundle)
     }
 
     private func emptySectionTitle(for category: SetupTargetCategory) -> String {
         switch category {
         case .pinned:
-            String(localized: "No pinned setups yet")
+            String(localized: "No pinned setups yet", bundle: RockxyLocalization.bundle)
         default:
-            String(localized: "No setups in this section")
+            String(localized: "No setups in this section", bundle: RockxyLocalization.bundle)
         }
     }
 }

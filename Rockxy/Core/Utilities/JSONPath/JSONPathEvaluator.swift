@@ -3,13 +3,17 @@ import Foundation
 // MARK: - JSONPathEvaluator
 
 struct JSONPathEvaluator: Sendable {
-    let document: JSONPathDocument
-    let limits: JSONPathEvaluationLimits
+    // MARK: Lifecycle
 
     init(document: JSONPathDocument, limits: JSONPathEvaluationLimits = .default) {
         self.document = document
         self.limits = limits
     }
+
+    // MARK: Internal
+
+    let document: JSONPathDocument
+    let limits: JSONPathEvaluationLimits
 
     func evaluate(_ query: String) throws -> JSONPathQueryResult {
         var parser = try JSONPathParser(source: query, limits: limits)
@@ -52,20 +56,24 @@ struct JSONPathEvaluator: Sendable {
     func search(_ query: String, mode: JSONTreeFilterMode) throws -> JSONPathQueryResult {
         switch mode {
         case .jsonPath:
-            return try evaluate(query)
+            try evaluate(query)
         case .keyPath:
-            return try keyPath(query)
+            try keyPath(query)
         case .allKeys,
              .allValues:
-            return try textSearch(query, mode: mode)
+            try textSearch(query, mode: mode)
         }
     }
+
+    // MARK: Private
 
     private func apply(
         _ segment: JSONPathSegment,
         to nodes: [JSONPathNode],
         visited: inout Int
-    ) throws -> [JSONPathNode] {
+    )
+        throws -> [JSONPathNode]
+    {
         let isDescendant: Bool
         let selectors: [JSONPathSelector]
         switch segment {
@@ -83,7 +91,7 @@ struct JSONPathEvaluator: Sendable {
             for candidate in candidates {
                 for selector in selectors {
                     try Task.checkCancellation()
-                    results.append(contentsOf: try apply(selector, to: candidate))
+                    try results.append(contentsOf: apply(selector, to: candidate))
                     if results.count > limits.maxResultNodes {
                         return Array(results.prefix(limits.maxResultNodes + 1))
                     }
@@ -163,8 +171,18 @@ struct JSONPathEvaluator: Sendable {
         return result
     }
 
-    private func applyTailFunction(_ function: JSONPathFunctionCall, to nodes: [JSONPathNode]) throws -> [JSONPathNode] {
-        let value = try functionValue(name: function.name, nodes: nodes, current: document.root, arguments: function.arguments)
+    private func applyTailFunction(
+        _ function: JSONPathFunctionCall,
+        to nodes: [JSONPathNode]
+    )
+        throws -> [JSONPathNode]
+    {
+        let value = try functionValue(
+            name: function.name,
+            nodes: nodes,
+            current: document.root,
+            arguments: function.arguments
+        )
         return [JSONPathNode.synthetic(value: value, path: "$.\(function.name)()")]
     }
 
@@ -238,13 +256,13 @@ private extension JSONPathEvaluator {
         case let .literal(literal):
             literal.filterValue
         case let .path(path):
-            .nodes(try evaluate(path, current: current))
+            try .nodes(evaluate(path, current: current))
         case let .array(values):
-            .array(try values.map { try evaluateFilter($0, current: current) })
+            try .array(values.map { try evaluateFilter($0, current: current) })
         case let .function(function):
             try functionValue(name: function.name, nodes: [current], current: current, arguments: function.arguments)
         case let .unaryNot(expr):
-            .bool(!(try booleanValue(evaluateFilter(expr, current: current))))
+            try .bool(!booleanValue(evaluateFilter(expr, current: current)))
         case let .binary(lhs, op, rhs):
             try evaluateBinary(lhs: lhs, op: op, rhs: rhs, current: current)
         }
@@ -255,13 +273,15 @@ private extension JSONPathEvaluator {
         op: JSONPathBinaryOperator,
         rhs: JSONPathFilterExpression,
         current: JSONPathNode
-    ) throws -> JSONFilterValue {
+    )
+        throws -> JSONFilterValue
+    {
         if op == .and {
-            return .bool(try booleanValue(evaluateFilter(lhs, current: current))
+            return try .bool(booleanValue(evaluateFilter(lhs, current: current))
                 && booleanValue(evaluateFilter(rhs, current: current)))
         }
         if op == .or {
-            return .bool(try booleanValue(evaluateFilter(lhs, current: current))
+            return try .bool(booleanValue(evaluateFilter(lhs, current: current))
                 || booleanValue(evaluateFilter(rhs, current: current)))
         }
 
@@ -311,7 +331,9 @@ private extension JSONPathEvaluator {
         nodes: [JSONPathNode],
         current: JSONPathNode,
         arguments: [JSONPathFilterExpression]
-    ) throws -> JSONFilterValue {
+    )
+        throws -> JSONFilterValue
+    {
         let lower = name.lowercased()
         let argumentValue: (Int) throws -> JSONFilterValue = { index in
             guard arguments.indices.contains(index) else {
@@ -322,11 +344,11 @@ private extension JSONPathEvaluator {
 
         switch lower {
         case "length":
-            return .number(Double(collectionSize(try argumentValue(0))))
+            return try .number(Double(collectionSize(argumentValue(0))))
         case "count":
-            return .number(Double(arrayValues(try argumentValue(0)).count))
+            return try .number(Double(arrayValues(argumentValue(0)).count))
         case "keys":
-            let sourceNodes = nodesFrom(try argumentValue(0), fallback: nodes)
+            let sourceNodes = try nodesFrom(argumentValue(0), fallback: nodes)
             let keys = sourceNodes.flatMap { node -> [JSONFilterValue] in
                 if case let .object(pairs) = node.value {
                     return pairs.map { .string($0.key) }
@@ -339,14 +361,18 @@ private extension JSONPathEvaluator {
         case "max":
             return aggregate(nodes, using: Swift.max)
         case "avg":
-            let numbers = nodes.compactMap { $0.value.doubleValue }
-            guard !numbers.isEmpty else { return .null }
+            let numbers = nodes.compactMap(\.value.doubleValue)
+            guard !numbers.isEmpty else {
+                return .null
+            }
             return .number(numbers.reduce(0, +) / Double(numbers.count))
         case "sum":
-            return .number(nodes.compactMap { $0.value.doubleValue }.reduce(0, +))
+            return .number(nodes.compactMap(\.value.doubleValue).reduce(0, +))
         case "stddev":
-            let numbers = nodes.compactMap { $0.value.doubleValue }
-            guard !numbers.isEmpty else { return .null }
+            let numbers = nodes.compactMap(\.value.doubleValue)
+            guard !numbers.isEmpty else {
+                return .null
+            }
             let avg = numbers.reduce(0, +) / Double(numbers.count)
             let variance = numbers.map { pow($0 - avg, 2) }.reduce(0, +) / Double(numbers.count)
             return .number(sqrt(variance))
@@ -355,15 +381,15 @@ private extension JSONPathEvaluator {
         case "last":
             return nodes.last.map(JSONFilterValue.node) ?? .null
         case "index":
-            let index = Int(numberValue(try argumentValue(0)) ?? 0)
+            let index = try Int(numberValue(argumentValue(0)) ?? 0)
             let normalized = index < 0 ? nodes.count + index : index
             guard nodes.indices.contains(normalized) else {
                 return .null
             }
             return .node(nodes[normalized])
         case "match":
-            guard let text = stringValue(try argumentValue(0)),
-                  let pattern = stringValue(try argumentValue(1)),
+            guard let text = try stringValue(argumentValue(0)),
+                  let pattern = try stringValue(argumentValue(1)),
                   pattern.count <= limits.maxRegexPatternLength,
                   let regex = try? NSRegularExpression(pattern: pattern) else
             {
@@ -375,24 +401,28 @@ private extension JSONPathEvaluator {
             }
             return .bool(match.range.location == 0 && match.range.length == range.length)
         case "search":
-            guard let text = stringValue(try argumentValue(0)),
-                  let pattern = stringValue(try argumentValue(1)),
+            guard let text = try stringValue(argumentValue(0)),
+                  let pattern = try stringValue(argumentValue(1)),
                   pattern.count <= limits.maxRegexPatternLength,
                   let regex = try? NSRegularExpression(pattern: pattern) else
             {
                 return .bool(false)
             }
-            return .bool(regex.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil)
+            return .bool(regex
+                .firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil)
         case "value":
-            let sourceNodes = nodesFrom(try argumentValue(0), fallback: nodes)
+            let sourceNodes = try nodesFrom(argumentValue(0), fallback: nodes)
             return sourceNodes.count == 1 ? .node(sourceNodes[0]) : .null
         default:
-            throw JSONPathError.evaluationFailed(String(localized: "Unsupported function \(name)."))
+            throw JSONPathError.evaluationFailed(String(
+                localized: "Unsupported function \(name).",
+                bundle: RockxyLocalization.bundle
+            ))
         }
     }
 
     func aggregate(_ nodes: [JSONPathNode], using combine: (Double, Double) -> Double) -> JSONFilterValue {
-        let numbers = nodes.compactMap { $0.value.doubleValue }
+        let numbers = nodes.compactMap(\.value.doubleValue)
         guard let first = numbers.first else {
             return .null
         }
@@ -444,12 +474,16 @@ private extension JSONPathEvaluator {
         let right = scalar(rhs)
         switch (left, right) {
         case let (.number(lhs), .number(rhs)):
-            if lhs == rhs { return .orderedSame }
+            if lhs == rhs {
+                return .orderedSame
+            }
             return lhs < rhs ? .orderedAscending : .orderedDescending
         case let (.string(lhs), .string(rhs)):
             return lhs.compare(rhs)
         case let (.bool(lhs), .bool(rhs)):
-            if lhs == rhs { return .orderedSame }
+            if lhs == rhs {
+                return .orderedSame
+            }
             return lhs == false ? .orderedAscending : .orderedDescending
         case (.null, .null):
             return .orderedSame
@@ -462,14 +496,13 @@ private extension JSONPathEvaluator {
         guard let text = stringValue(lhs) else {
             return false
         }
-        let regex: NSRegularExpression?
-        switch rhs {
+        let regex: NSRegularExpression? = switch rhs {
         case let .regex(pattern, options):
-            regex = try? NSRegularExpression(pattern: pattern, options: options)
+            try? NSRegularExpression(pattern: pattern, options: options)
         case let .string(pattern):
-            regex = try? NSRegularExpression(pattern: pattern)
+            try? NSRegularExpression(pattern: pattern)
         default:
-            regex = nil
+            nil
         }
         guard let regex else {
             return false
@@ -649,7 +682,11 @@ enum JSONTreeFilterMode: String, CaseIterable, Identifiable, Sendable {
     case allKeys
     case allValues
 
-    var id: String { rawValue }
+    // MARK: Internal
+
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
@@ -673,14 +710,16 @@ enum JSONTreeFilterMode: String, CaseIterable, Identifiable, Sendable {
 // MARK: - JSONTreeTextMatcher
 
 private struct JSONTreeTextMatcher {
-    private let regex: NSRegularExpression?
-    private let query: String
+    // MARK: Lifecycle
 
     init(query: String, limits: JSONPathEvaluationLimits) throws {
         if query.hasPrefix("/"), query.last == "/", query.count > 2 {
             let pattern = String(query.dropFirst().dropLast())
             guard pattern.count <= limits.maxRegexPatternLength else {
-                throw JSONPathError.limitExceeded(String(localized: "Regex pattern is too long."))
+                throw JSONPathError.limitExceeded(String(
+                    localized: "Regex pattern is too long.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
             regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
             self.query = ""
@@ -690,10 +729,17 @@ private struct JSONTreeTextMatcher {
         }
     }
 
+    // MARK: Internal
+
     func matches(_ value: String) -> Bool {
         if let regex {
             return regex.firstMatch(in: value, range: NSRange(location: 0, length: (value as NSString).length)) != nil
         }
         return value.lowercased().contains(query)
     }
+
+    // MARK: Private
+
+    private let regex: NSRegularExpression?
+    private let query: String
 }

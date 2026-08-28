@@ -39,7 +39,7 @@ struct CustomCertificatesView: View {
             viewModel.reconcileSelection()
         }
         .alert(
-            String(localized: "Custom Certificate Failed"),
+            String(localized: "Custom Certificate Failed", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: {
@@ -49,7 +49,7 @@ struct CustomCertificatesView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK"), role: .cancel) {}
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
@@ -68,7 +68,7 @@ struct CustomCertificatesView: View {
             Button(request.confirmLabel, role: .destructive) {
                 confirmDeletion()
             }
-            Button(String(localized: "Cancel"), role: .cancel) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                 viewModel.pendingDeletion = nil
             }
         } message: { request in
@@ -137,10 +137,39 @@ struct CustomCertificatesView: View {
         }
     }
 
+    private var statusSymbol: String {
+        switch viewModel.statusTone {
+        case .neutral:
+            "info.circle"
+        case .success:
+            "checkmark.circle.fill"
+        case .warning:
+            "exclamationmark.triangle.fill"
+        case .error:
+            "xmark.circle.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch viewModel.statusTone {
+        case .neutral:
+            .secondary
+        case .success:
+            .green
+        case .warning:
+            .orange
+        case .error:
+            .red
+        }
+    }
+
     private var modePicker: some View {
         HStack {
             Spacer(minLength: 0)
-            Picker(String(localized: "Certificate Type"), selection: $viewModel.mode) {
+            Picker(
+                String(localized: "Certificate Type", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.mode
+            ) {
                 ForEach(CustomCertificatesViewModel.Mode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -190,7 +219,8 @@ struct CustomCertificatesView: View {
                     Label(
                         String(
                             localized:
-                            "Re-import this custom root and private key, or revert to Rockxy's default root certificate."
+                            "Re-import this custom root and private key, or revert to Rockxy's default root certificate.",
+                            bundle: RockxyLocalization.bundle
                         ),
                         systemImage: "exclamationmark.triangle"
                     )
@@ -202,11 +232,12 @@ struct CustomCertificatesView: View {
                         .foregroundStyle(.orange)
                 } else {
                     certificateEmptyState(
-                        title: String(localized: "No Root Certificate"),
+                        title: String(localized: "No Root Certificate", bundle: RockxyLocalization.bundle),
                         systemImage: "shield.slash",
                         description: String(
                             localized:
-                            "Create and trust Rockxy's root certificate from the Mac Setup Guide before intercepting HTTPS."
+                            "Create and trust Rockxy's root certificate from the Mac Setup Guide before intercepting HTTPS.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .frame(maxWidth: .infinity, minHeight: toolMetrics.tableRowHeight * 6)
@@ -251,7 +282,7 @@ struct CustomCertificatesView: View {
     private var loadingRow: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             ProgressView().controlSize(.small)
-            Text(String(localized: "Loading certificate details…"))
+            Text(String(localized: "Loading certificate details…", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
@@ -271,7 +302,11 @@ struct CustomCertificatesView: View {
 
             if viewModel.isBusy {
                 ProgressView().controlSize(.small)
-                Text(viewModel.isImporting ? String(localized: "Importing…") : String(localized: "Deleting…"))
+                Text(viewModel
+                    .isImporting ? String(localized: "Importing…", bundle: RockxyLocalization.bundle) : String(
+                        localized: "Deleting…",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             } else if let statusMessage = viewModel.statusMessage {
@@ -283,7 +318,7 @@ struct CustomCertificatesView: View {
 
             Spacer()
 
-            Button(String(localized: "Preview")) {
+            Button(String(localized: "Preview", bundle: RockxyLocalization.bundle)) {
                 presentPreview()
             }
             .rockxyGlassButtonStyle()
@@ -302,21 +337,21 @@ struct CustomCertificatesView: View {
         Menu {
             switch viewModel.mode {
             case .root:
-                Button(String(localized: "Import P12…")) {
+                Button(String(localized: "Import P12…", bundle: RockxyLocalization.bundle)) {
                     importPKCS12(kind: .root)
                 }
             case .server,
                  .client:
-                Button(String(localized: "Import PEM / DER…")) {
+                Button(String(localized: "Import PEM / DER…", bundle: RockxyLocalization.bundle)) {
                     importPEMOrDER(kind: viewModel.mode.kind)
                 }
                 Divider()
-                Button(String(localized: "Import P12…")) {
+                Button(String(localized: "Import P12…", bundle: RockxyLocalization.bundle)) {
                     importPKCS12(kind: viewModel.mode.kind)
                 }
             }
         } label: {
-            Text(String(localized: "Import"))
+            Text(String(localized: "Import", bundle: RockxyLocalization.bundle))
         }
         .menuStyle(.button)
         .fixedSize()
@@ -325,12 +360,22 @@ struct CustomCertificatesView: View {
 
     private func rootDetails(_ certificate: CertificatePreviewItem) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            detailRow(String(localized: "Common Name"), certificate.commonName)
-            detailRow(String(localized: "Not Valid Before"), certificate.notValidBefore.map(Self.format))
-            detailRow(String(localized: "Not Valid After"), certificate.notValidAfter.map(Self.format))
-            detailRow(String(localized: "SHA-256"), certificate.fingerprintSHA256, monospaced: true)
-            detailRow(String(localized: "Subject"), certificate.subjectSummary)
-            detailRow(String(localized: "Issuer"), certificate.issuerSummary)
+            detailRow(String(localized: "Common Name", bundle: RockxyLocalization.bundle), certificate.commonName)
+            detailRow(
+                String(localized: "Not Valid Before", bundle: RockxyLocalization.bundle),
+                certificate.notValidBefore.map(Self.format)
+            )
+            detailRow(
+                String(localized: "Not Valid After", bundle: RockxyLocalization.bundle),
+                certificate.notValidAfter.map(Self.format)
+            )
+            detailRow(
+                String(localized: "SHA-256", bundle: RockxyLocalization.bundle),
+                certificate.fingerprintSHA256,
+                monospaced: true
+            )
+            detailRow(String(localized: "Subject", bundle: RockxyLocalization.bundle), certificate.subjectSummary)
+            detailRow(String(localized: "Issuer", bundle: RockxyLocalization.bundle), certificate.issuerSummary)
         }
         .padding(.horizontal, 2)
     }
@@ -365,7 +410,7 @@ struct CustomCertificatesView: View {
         -> some View
     {
         Table(entries, selection: selection) {
-            TableColumn(String(localized: "Host")) { entry in
+            TableColumn(String(localized: "Host", bundle: RockxyLocalization.bundle)) { entry in
                 Text(entry.hostPattern ?? "—")
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -374,7 +419,7 @@ struct CustomCertificatesView: View {
             }
             .width(min: 150, ideal: 220)
 
-            TableColumn(String(localized: "Certificate")) { entry in
+            TableColumn(String(localized: "Certificate", bundle: RockxyLocalization.bundle)) { entry in
                 Text(entry.displayName)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -382,9 +427,12 @@ struct CustomCertificatesView: View {
             }
             .width(min: 150, ideal: 240)
 
-            TableColumn(String(localized: "Expires")) { entry in
-                Text(entry.notValidAfter.map(Self.format) ?? String(localized: "Unknown"))
-                    .foregroundStyle(.secondary)
+            TableColumn(String(localized: "Expires", bundle: RockxyLocalization.bundle)) { entry in
+                Text(entry.notValidAfter.map(Self.format) ?? String(
+                    localized: "Unknown",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .foregroundStyle(.secondary)
             }
             .width(min: 120, ideal: 170)
         }
@@ -409,7 +457,7 @@ struct CustomCertificatesView: View {
 
     @ViewBuilder
     private func listContextMenu(ids: Set<UUID>) -> some View {
-        Button(String(localized: "Preview")) {
+        Button(String(localized: "Preview", bundle: RockxyLocalization.bundle)) {
             if let id = ids.first {
                 viewModel.select(id: id)
                 presentPreview()
@@ -419,7 +467,7 @@ struct CustomCertificatesView: View {
 
         Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
+        Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
             if let id = ids.first {
                 viewModel.requestDeletion(certificateID: id)
             }
@@ -431,18 +479,20 @@ struct CustomCertificatesView: View {
         switch role {
         case .server:
             certificateEmptyState(
-                title: String(localized: "No Server Certificates"),
+                title: String(localized: "No Server Certificates", bundle: RockxyLocalization.bundle),
                 systemImage: "lock.doc",
                 description: String(
-                    localized: "Import a certificate and private key to present a pinned server identity for matching hosts."
+                    localized: "Import a certificate and private key to present a pinned server identity for matching hosts.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         default:
             certificateEmptyState(
-                title: String(localized: "No Client Certificates"),
+                title: String(localized: "No Client Certificates", bundle: RockxyLocalization.bundle),
                 systemImage: "lock.doc",
                 description: String(
-                    localized: "Import a certificate and private key to answer mutual-TLS challenges from matching hosts."
+                    localized: "Import a certificate and private key to answer mutual-TLS challenges from matching hosts.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -495,11 +545,11 @@ struct CustomCertificatesView: View {
 
     private func importPEMOrDER(kind: CustomCertificateKind) {
         guard let certificateURL = chooseFile(
-            title: String(localized: "Choose Certificate PEM or DER"),
+            title: String(localized: "Choose Certificate PEM or DER", bundle: RockxyLocalization.bundle),
             allowedContentTypes: CertificateImportFileType.certificateTypes
         ),
             let privateKeyURL = chooseFile(
-                title: String(localized: "Choose Private Key PEM or DER"),
+                title: String(localized: "Choose Private Key PEM or DER", bundle: RockxyLocalization.bundle),
                 allowedContentTypes: CertificateImportFileType.privateKeyTypes
             ) else
         {
@@ -522,7 +572,7 @@ struct CustomCertificatesView: View {
 
     private func importPKCS12(kind: CustomCertificateKind) {
         guard let pkcs12URL = chooseFile(
-            title: String(localized: "Choose P12 Certificate"),
+            title: String(localized: "Choose P12 Certificate", bundle: RockxyLocalization.bundle),
             allowedContentTypes: CertificateImportFileType.pkcs12Types
         ),
             let passphrase = promptPKCS12Passphrase() else
@@ -552,14 +602,18 @@ struct CustomCertificatesView: View {
             HostSelection(value: nil)
         case .server:
             promptHostPattern(
-                title: String(localized: "Server Certificate Host"),
-                message: String(localized: "Enter the host or wildcard pattern this server certificate should match.")
+                title: String(localized: "Server Certificate Host", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Enter the host or wildcard pattern this server certificate should match.",
+                    bundle: RockxyLocalization.bundle
+                )
             ).map { HostSelection(value: $0) }
         case .client:
             promptHostPattern(
-                title: String(localized: "Client Certificate Host"),
+                title: String(localized: "Client Certificate Host", bundle: RockxyLocalization.bundle),
                 message: String(
-                    localized: "Enter the upstream host or wildcard pattern that should receive this client identity."
+                    localized: "Enter the upstream host or wildcard pattern that should receive this client identity.",
+                    bundle: RockxyLocalization.bundle
                 )
             ).map { HostSelection(value: $0) }
         }
@@ -577,15 +631,18 @@ struct CustomCertificatesView: View {
 
     private func promptPKCS12Passphrase() -> String? {
         let alert = NSAlert()
-        alert.messageText = String(localized: "P12 Password")
+        alert.messageText = String(localized: "P12 Password", bundle: RockxyLocalization.bundle)
         alert
             .informativeText =
-            String(localized: "Enter the password for this P12 file. Leave it empty if the file has no password.")
-        alert.addButton(withTitle: String(localized: "Import"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+            String(
+                localized: "Enter the password for this P12 file. Leave it empty if the file has no password.",
+                bundle: RockxyLocalization.bundle
+            )
+        alert.addButton(withTitle: String(localized: "Import", bundle: RockxyLocalization.bundle))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
 
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.placeholderString = String(localized: "Password")
+        field.placeholderString = String(localized: "Password", bundle: RockxyLocalization.bundle)
         alert.accessoryView = field
 
         guard alert.runModal() == .alertFirstButtonReturn else {
@@ -601,8 +658,8 @@ struct CustomCertificatesView: View {
             alert.messageText = title
             alert.informativeText = validationMessage ?? message
             alert.alertStyle = validationMessage == nil ? .informational : .warning
-            alert.addButton(withTitle: String(localized: "Continue"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
+            alert.addButton(withTitle: String(localized: "Continue", bundle: RockxyLocalization.bundle))
+            alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
 
             let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
             field.placeholderString = "api.example.com or *.example.com"
@@ -613,7 +670,7 @@ struct CustomCertificatesView: View {
             }
             let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             if value.isEmpty {
-                validationMessage = String(localized: "Enter a host pattern.")
+                validationMessage = String(localized: "Enter a host pattern.", bundle: RockxyLocalization.bundle)
                 continue
             }
             if let message = viewModel.hostValidationMessage(for: value) {
@@ -621,32 +678,6 @@ struct CustomCertificatesView: View {
                 continue
             }
             return viewModel.normalizedHostPattern(value)
-        }
-    }
-
-    private var statusSymbol: String {
-        switch viewModel.statusTone {
-        case .neutral:
-            "info.circle"
-        case .success:
-            "checkmark.circle.fill"
-        case .warning:
-            "exclamationmark.triangle.fill"
-        case .error:
-            "xmark.circle.fill"
-        }
-    }
-
-    private var statusColor: Color {
-        switch viewModel.statusTone {
-        case .neutral:
-            .secondary
-        case .success:
-            .green
-        case .warning:
-            .orange
-        case .error:
-            .red
         }
     }
 }
@@ -687,7 +718,10 @@ struct CertificatePreviewItem {
     )
         throws
     {
-        self.displayName = displayName ?? Self.commonName(from: certificate.subject) ?? String(localized: "Certificate")
+        self.displayName = displayName ?? Self.commonName(from: certificate.subject) ?? String(
+            localized: "Certificate",
+            bundle: RockxyLocalization.bundle
+        )
         notValidBefore = certificate.notValidBefore
         notValidAfter = certificate.notValidAfter
         self.fingerprintSHA256 = fingerprintSHA256 ?? Self.fingerprint(certificate)
@@ -767,17 +801,17 @@ struct CertificatePreviewItem {
     private static func label(for oid: ASN1ObjectIdentifier) -> String {
         switch oid {
         case ASN1ObjectIdentifier.NameAttributes.commonName:
-            String(localized: "Common Name")
+            String(localized: "Common Name", bundle: RockxyLocalization.bundle)
         case ASN1ObjectIdentifier.NameAttributes.countryName:
-            String(localized: "Country or Region")
+            String(localized: "Country or Region", bundle: RockxyLocalization.bundle)
         case ASN1ObjectIdentifier.NameAttributes.localityName:
-            String(localized: "Locality")
+            String(localized: "Locality", bundle: RockxyLocalization.bundle)
         case ASN1ObjectIdentifier.NameAttributes.organizationName:
-            String(localized: "Organization")
+            String(localized: "Organization", bundle: RockxyLocalization.bundle)
         case ASN1ObjectIdentifier.NameAttributes.organizationalUnitName:
-            String(localized: "Organizational Unit")
+            String(localized: "Organizational Unit", bundle: RockxyLocalization.bundle)
         case ASN1ObjectIdentifier.NameAttributes.stateOrProvinceName:
-            String(localized: "State/Province")
+            String(localized: "State/Province", bundle: RockxyLocalization.bundle)
         default:
             String(describing: oid)
         }
@@ -805,7 +839,7 @@ private enum CustomCertificatePreviewError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidCertificate:
-            String(localized: "The certificate could not be converted for preview.")
+            String(localized: "The certificate could not be converted for preview.", bundle: RockxyLocalization.bundle)
         }
     }
 }

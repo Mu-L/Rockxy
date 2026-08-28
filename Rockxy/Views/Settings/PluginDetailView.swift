@@ -123,20 +123,23 @@ struct PluginDetailView: View {
             Button {
                 viewModel.revealInFinder(plugin: plugin)
             } label: {
-                Label(String(localized: "Reveal in Finder"), systemImage: "folder")
+                Label(String(localized: "Reveal in Finder", bundle: RockxyLocalization.bundle), systemImage: "folder")
             }
 
             Button {
                 Task { await viewModel.reloadPlugin(id: plugin.id) }
             } label: {
-                Label(String(localized: "Reload"), systemImage: "arrow.clockwise")
+                Label(String(localized: "Reload", bundle: RockxyLocalization.bundle), systemImage: "arrow.clockwise")
             }
 
             if !plugin.isBuiltIn {
                 Button {
                     Task { await viewModel.reinstallPlugin(id: plugin.id) }
                 } label: {
-                    Label(String(localized: "Reinstall"), systemImage: "arrow.triangle.2.circlepath")
+                    Label(
+                        String(localized: "Reinstall", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
                 }
                 .rockxyGlassButtonStyle()
             }
@@ -145,14 +148,14 @@ struct PluginDetailView: View {
                 Button(role: .destructive) {
                     showUninstallConfirmation = true
                 } label: {
-                    Label(String(localized: "Uninstall"), systemImage: "trash")
+                    Label(String(localized: "Uninstall", bundle: RockxyLocalization.bundle), systemImage: "trash")
                 }
                 .alert(
-                    String(localized: "Uninstall Plugin"),
+                    String(localized: "Uninstall Plugin", bundle: RockxyLocalization.bundle),
                     isPresented: $showUninstallConfirmation
                 ) {
-                    Button(String(localized: "Cancel"), role: .cancel) {}
-                    Button(String(localized: "Uninstall"), role: .destructive) {
+                    Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+                    Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle), role: .destructive) {
                         Task { await viewModel.uninstallPlugin(id: plugin.id) }
                     }
                 } message: {

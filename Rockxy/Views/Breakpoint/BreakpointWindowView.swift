@@ -8,6 +8,8 @@ private enum BreakpointQueueLayoutMode: String, CaseIterable {
     case horizontal
     case vertical
 
+    // MARK: Internal
+
     var next: BreakpointQueueLayoutMode {
         switch self {
         case .horizontal: .vertical
@@ -25,9 +27,9 @@ private enum BreakpointQueueLayoutMode: String, CaseIterable {
     var help: String {
         switch self {
         case .horizontal:
-            String(localized: "Switch to stacked layout")
+            String(localized: "Switch to stacked layout", bundle: RockxyLocalization.bundle)
         case .vertical:
-            String(localized: "Switch to side-by-side layout")
+            String(localized: "Switch to side-by-side layout", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -55,21 +57,22 @@ struct BreakpointWindowView: View {
             dismiss()
         }
         .confirmationDialog(
-            String(localized: "Abort all paused traffic?"),
+            String(localized: "Abort all paused traffic?", bundle: RockxyLocalization.bundle),
             isPresented: $isAbortAllConfirmationPresented,
             titleVisibility: .visible
         ) {
             Button(
-                String(localized: "Abort All with 503"),
+                String(localized: "Abort All with 503", bundle: RockxyLocalization.bundle),
                 role: .destructive
             ) {
                 manager.resolveAll(decision: .abort)
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
                 String(
-                    localized: "\(manager.pausedItems.count) paused items will receive a 503 Service Unavailable response."
+                    localized: "\(manager.pausedItems.count) paused items will receive a 503 Service Unavailable response.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -91,8 +94,64 @@ struct BreakpointWindowView: View {
         nonmutating set { layoutModeRaw = newValue.rawValue }
     }
 
-    @ViewBuilder
-    private var mainContent: some View {
+    private var queueSelection: Binding<UUID?> {
+        Binding(
+            get: { manager.selectedItemId },
+            set: { manager.selectedItemId = $0 }
+        )
+    }
+
+    private var queueSummary: String {
+        let count = manager.pausedItems.count
+        if count == 1 {
+            return String(localized: "1 item waiting", bundle: RockxyLocalization.bundle)
+        }
+        return String(localized: "\(count) items waiting", bundle: RockxyLocalization.bundle)
+    }
+
+    private var hasSelection: Bool {
+        guard let selectedItemId = manager.selectedItemId else {
+            return false
+        }
+        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
+    }
+
+    private var canApplySelection: Bool {
+        guard canApplySelectedChanges,
+              let selectedItemId = manager.selectedItemId else
+        {
+            return false
+        }
+        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
+    }
+
+    private var applyButtonHelp: String {
+        guard hasSelection else {
+            return String(localized: "Select paused traffic to apply changes", bundle: RockxyLocalization.bundle)
+        }
+        if let selectedItemId = manager.selectedItemId,
+           let item = manager.pausedItems.first(where: { $0.id == selectedItemId }),
+           !item.editableDraft.isBodyEditable
+        {
+            return String(
+                localized: "The body is protected. Request-line, status, and header changes can still be applied.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        if !canApplySelectedChanges {
+            return String(
+                localized: "Fix or discard the invalid Raw message before applying changes",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(localized: "Apply the edited message and continue (⌘↩)", bundle: RockxyLocalization.bundle)
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    @ViewBuilder private var mainContent: some View {
         switch layoutMode {
         case .horizontal:
             HSplitView {
@@ -119,11 +178,17 @@ struct BreakpointWindowView: View {
             ZStack {
                 if manager.pausedItems.isEmpty {
                     ContentUnavailableView {
-                        Label(String(localized: "No Paused Traffic"), systemImage: "pause.circle")
+                        Label(
+                            String(localized: "No Paused Traffic", bundle: RockxyLocalization.bundle),
+                            systemImage: "pause.circle"
+                        )
                     } description: {
-                        Text(String(localized: "Traffic matching an enabled breakpoint rule will appear here."))
+                        Text(String(
+                            localized: "Traffic matching an enabled breakpoint rule will appear here.",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     } actions: {
-                        Button(String(localized: "Manage Rules")) {
+                        Button(String(localized: "Manage Rules", bundle: RockxyLocalization.bundle)) {
                             openWindow(id: "breakpointRules")
                         }
                     }
@@ -149,7 +214,7 @@ struct BreakpointWindowView: View {
     private var queueHeader: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "Paused Traffic"))
+                Text(String(localized: "Paused Traffic", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .semibold))
                 Text(queueSummary)
                     .font(toolMetrics.secondaryFont())
@@ -161,8 +226,11 @@ struct BreakpointWindowView: View {
             Button {
                 layoutMode = layoutMode.next
             } label: {
-                Label(String(localized: "Switch Layout"), systemImage: layoutMode.systemImage)
-                    .labelStyle(.iconOnly)
+                Label(
+                    String(localized: "Switch Layout", bundle: RockxyLocalization.bundle),
+                    systemImage: layoutMode.systemImage
+                )
+                .labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
             .help(layoutMode.help)
@@ -176,26 +244,26 @@ struct BreakpointWindowView: View {
             Button {
                 manager.selectPreviousItem()
             } label: {
-                Label(String(localized: "Previous Item"), systemImage: "chevron.up")
+                Label(String(localized: "Previous Item", bundle: RockxyLocalization.bundle), systemImage: "chevron.up")
                     .labelStyle(.iconOnly)
             }
             .keyboardShortcut("[", modifiers: .command)
             .disabled(!manager.hasPausedItems)
-            .help(String(localized: "Previous Item (⌘[)"))
+            .help(String(localized: "Previous Item (⌘[)", bundle: RockxyLocalization.bundle))
 
             Button {
                 manager.selectNextItem()
             } label: {
-                Label(String(localized: "Next Item"), systemImage: "chevron.down")
+                Label(String(localized: "Next Item", bundle: RockxyLocalization.bundle), systemImage: "chevron.down")
                     .labelStyle(.iconOnly)
             }
             .keyboardShortcut("]", modifiers: .command)
             .disabled(!manager.hasPausedItems)
-            .help(String(localized: "Next Item (⌘])"))
+            .help(String(localized: "Next Item (⌘])", bundle: RockxyLocalization.bundle))
 
             Spacer()
 
-            Button(String(localized: "Manage Rules")) {
+            Button(String(localized: "Manage Rules", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointRules")
             }
             .keyboardShortcut("b", modifiers: [.command, .shift])
@@ -221,20 +289,32 @@ struct BreakpointWindowView: View {
             Button {
                 resolveSelected(.cancel)
             } label: {
-                Label(String(localized: "Continue Original"), systemImage: "play.fill")
-                    .frame(minWidth: 132)
+                Label(
+                    String(localized: "Continue Original", bundle: RockxyLocalization.bundle),
+                    systemImage: "play.fill"
+                )
+                .frame(minWidth: 132)
             }
-            .help(String(localized: "Discard edits and continue with the original message"))
+            .help(String(
+                localized: "Discard edits and continue with the original message",
+                bundle: RockxyLocalization.bundle
+            ))
             .disabled(!hasSelection)
 
             Button(role: .destructive) {
                 resolveSelected(.abort)
             } label: {
-                Label(String(localized: "Abort with 503"), systemImage: "xmark.octagon")
-                    .frame(minWidth: 132)
+                Label(
+                    String(localized: "Abort with 503", bundle: RockxyLocalization.bundle),
+                    systemImage: "xmark.octagon"
+                )
+                .frame(minWidth: 132)
             }
             .keyboardShortcut(".", modifiers: .command)
-            .help(String(localized: "Stop this transaction with a 503 Service Unavailable response"))
+            .help(String(
+                localized: "Stop this transaction with a 503 Service Unavailable response",
+                bundle: RockxyLocalization.bundle
+            ))
             .disabled(!hasSelection)
 
             Spacer()
@@ -242,8 +322,11 @@ struct BreakpointWindowView: View {
             Button {
                 resolveSelected(.execute)
             } label: {
-                Label(String(localized: "Apply Changes & Continue"), systemImage: "arrowshape.turn.up.right.fill")
-                    .frame(minWidth: 180)
+                Label(
+                    String(localized: "Apply Changes & Continue", bundle: RockxyLocalization.bundle),
+                    systemImage: "arrowshape.turn.up.right.fill"
+                )
+                .frame(minWidth: 180)
             }
             .keyboardShortcut(.return, modifiers: .command)
             .rockxyGlassButtonStyle(prominent: true)
@@ -258,12 +341,12 @@ struct BreakpointWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Continue All Original")) {
+            Button(String(localized: "Continue All Original", bundle: RockxyLocalization.bundle)) {
                 manager.resolveAll(decision: .cancel)
             }
             .disabled(!manager.hasPausedItems)
 
-            Button(String(localized: "Abort All with 503"), role: .destructive) {
+            Button(String(localized: "Abort All with 503", bundle: RockxyLocalization.bundle), role: .destructive) {
                 isAbortAllConfirmationPresented = true
             }
             .disabled(!manager.hasPausedItems)
@@ -274,67 +357,18 @@ struct BreakpointWindowView: View {
                 layoutMode = layoutMode.next
             }
 
-            Button(String(localized: "Templates…")) {
+            Button(String(localized: "Templates…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointTemplates")
             }
 
-            Button(String(localized: "Manage Rules…")) {
+            Button(String(localized: "Manage Rules…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointRules")
             }
         } label: {
-            Label(String(localized: "More"), systemImage: "ellipsis.circle")
+            Label(String(localized: "More", bundle: RockxyLocalization.bundle), systemImage: "ellipsis.circle")
         }
         .menuIndicator(.hidden)
         .fixedSize()
-    }
-
-    private var queueSelection: Binding<UUID?> {
-        Binding(
-            get: { manager.selectedItemId },
-            set: { manager.selectedItemId = $0 }
-        )
-    }
-
-    private var queueSummary: String {
-        let count = manager.pausedItems.count
-        if count == 1 {
-            return String(localized: "1 item waiting")
-        }
-        return String(localized: "\(count) items waiting")
-    }
-
-    private var hasSelection: Bool {
-        guard let selectedItemId = manager.selectedItemId else {
-            return false
-        }
-        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
-    }
-
-    private var canApplySelection: Bool {
-        guard canApplySelectedChanges,
-              let selectedItemId = manager.selectedItemId
-        else {
-            return false
-        }
-        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
-    }
-
-    private var applyButtonHelp: String {
-        guard hasSelection else {
-            return String(localized: "Select paused traffic to apply changes")
-        }
-        if let selectedItemId = manager.selectedItemId,
-           let item = manager.pausedItems.first(where: { $0.id == selectedItemId }),
-           !item.editableDraft.isBodyEditable
-        {
-            return String(
-                localized: "The body is protected. Request-line, status, and header changes can still be applied."
-            )
-        }
-        if !canApplySelectedChanges {
-            return String(localized: "Fix or discard the invalid Raw message before applying changes")
-        }
-        return String(localized: "Apply the edited message and continue (⌘↩)")
     }
 
     private func resolveSelected(_ decision: BreakpointDecision) {
@@ -349,15 +383,13 @@ struct BreakpointWindowView: View {
             layoutModeRaw = BreakpointQueueLayoutMode.horizontal.rawValue
         }
     }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
 }
 
 // MARK: - BreakpointQueueRow
 
 private struct BreakpointQueueRow: View {
+    // MARK: Internal
+
     let item: PausedBreakpointItem
 
     var body: some View {
@@ -399,20 +431,9 @@ private struct BreakpointQueueRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    // MARK: Private
 
-    private var phaseBadge: some View {
-        Text(item.phase == .request ? "REQ" : "RES")
-            .font(toolMetrics.metadataFont(weight: .semibold, monospaced: true))
-            .foregroundStyle(item.phase == .request ? Color.green : Color.blue)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                (item.phase == .request ? Color.green : Color.blue)
-                    .opacity(0.12),
-                in: RoundedRectangle(cornerRadius: 4)
-            )
-    }
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var primaryValue: String {
         if item.phase == .request {
@@ -443,7 +464,7 @@ private struct BreakpointQueueRow: View {
         if let port = displayComponents?.port {
             value += ":\(port)"
         }
-        return value.isEmpty ? String(localized: "Unknown Host") : value
+        return value.isEmpty ? String(localized: "Unknown Host", bundle: RockxyLocalization.bundle) : value
     }
 
     private var displayPath: String {
@@ -460,12 +481,27 @@ private struct BreakpointQueueRow: View {
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
+
+    private var phaseBadge: some View {
+        Text(item.phase == .request ? "REQ" : "RES")
+            .font(toolMetrics.metadataFont(weight: .semibold, monospaced: true))
+            .foregroundStyle(item.phase == .request ? Color.green : Color.blue)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                (item.phase == .request ? Color.green : Color.blue)
+                    .opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 4)
+            )
+    }
 }
 
 // MARK: - ElapsedTimeLabel
 
 /// Live-updating elapsed time shared by the queue and selected-item banner.
 struct ElapsedTimeLabel: View {
+    // MARK: Internal
+
     let since: Date
 
     var body: some View {
@@ -476,6 +512,8 @@ struct ElapsedTimeLabel: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

@@ -50,18 +50,31 @@ struct GistPublishPayloadBuilder {
         case payloadTooLarge(Int)
         case serializationFailed(String)
 
+        // MARK: Internal
+
         var errorDescription: String? {
             switch self {
             case .emptySelection:
-                String(localized: "Select at least one request before publishing to Gist.")
+                String(
+                    localized: "Select at least one request before publishing to Gist.",
+                    bundle: RockxyLocalization.bundle
+                )
             case let .fileTooLarge(name, size):
-                String(localized: "\(name) is \(Self.byteCount(size)), which is larger than the 10 MB per-file limit.")
+                String(
+                    localized: "\(name) is \(Self.byteCount(size)), which is larger than the 10 MB per-file limit.",
+                    bundle: RockxyLocalization.bundle
+                )
             case let .payloadTooLarge(size):
-                String(localized: "The Gist payload is \(Self.byteCount(size)), which is larger than the 25 MB limit.")
+                String(
+                    localized: "The Gist payload is \(Self.byteCount(size)), which is larger than the 25 MB limit.",
+                    bundle: RockxyLocalization.bundle
+                )
             case let .serializationFailed(message):
                 message
             }
         }
+
+        // MARK: Private
 
         private static func byteCount(_ count: Int) -> String {
             ByteCountFormatter.string(fromByteCount: Int64(count), countStyle: .file)
@@ -164,7 +177,10 @@ struct GistPublishPayloadBuilder {
 
     private func transactionText(_ transaction: HTTPTransaction) -> String {
         var lines: [String] = []
-        lines.append("\(transaction.request.method) \(transaction.request.url.absoluteString) \(transaction.request.httpVersion)")
+        lines
+            .append(
+                "\(transaction.request.method) \(transaction.request.url.absoluteString) \(transaction.request.httpVersion)"
+            )
         lines.append("")
         lines.append("Request Headers")
         lines.append(contentsOf: transaction.request.headers.map { "\($0.name): \($0.value)" })
@@ -195,7 +211,8 @@ struct GistPublishPayloadBuilder {
             return "(empty)"
         }
         if let text = String(data: body, encoding: .utf8),
-           contentType.map({ [.json, .xml, .html, .text, .form].contains($0) }) ?? true {
+           contentType.map({ [.json, .xml, .html, .text, .form].contains($0) }) ?? true
+        {
             return text
         }
         return "(binary body, base64)\n\(body.base64EncodedString())"

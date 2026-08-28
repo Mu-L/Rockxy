@@ -51,27 +51,33 @@ struct ContextDockEmptyStateCopy: Equatable {
     init(_ state: ContextDockEmptyState) {
         switch state {
         case .waitingForTraffic:
-            title = String(localized: "Waiting for Traffic")
+            title = String(localized: "Waiting for Traffic", bundle: RockxyLocalization.bundle)
             systemImage = "dot.radiowaves.left.and.right"
             description = String(
-                localized: "Captured requests will appear here. Select one to inspect its context."
+                localized: "Captured requests will appear here. Select one to inspect its context.",
+                bundle: RockxyLocalization.bundle
             )
         case .captureStopped:
-            title = String(localized: "Capture Stopped")
+            title = String(localized: "Capture Stopped", bundle: RockxyLocalization.bundle)
             systemImage = "stop.circle"
             description = String(
-                localized: "Start capture to record requests, then select one to inspect its context."
+                localized: "Start capture to record requests, then select one to inspect its context.",
+                bundle: RockxyLocalization.bundle
             )
         case .filteredNoResults:
-            title = String(localized: "No Matching Requests")
+            title = String(localized: "No Matching Requests", bundle: RockxyLocalization.bundle)
             systemImage = "line.3.horizontal.decrease.circle"
             description = String(
-                localized: "No captured requests match the current view. Adjust or clear its filters to see traffic here."
+                localized: "No captured requests match the current view. Adjust or clear its filters to see traffic here.",
+                bundle: RockxyLocalization.bundle
             )
         case .selectRequest:
-            title = String(localized: "No Selection")
+            title = String(localized: "No Selection", bundle: RockxyLocalization.bundle)
             systemImage = "doc.text.magnifyingglass"
-            description = String(localized: "Select a request to see diagnostics and related traffic.")
+            description = String(
+                localized: "Select a request to see diagnostics and related traffic.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 

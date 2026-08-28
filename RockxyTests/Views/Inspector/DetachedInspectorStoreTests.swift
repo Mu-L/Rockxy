@@ -79,8 +79,12 @@ struct DetachedInspectorWiringTests {
         #expect(urlBar.contains("var onOpenDetachedInspector: (() -> Void)?"))
         #expect(urlBar.contains("if let onOpenDetachedInspector {"))
         #expect(urlBar.contains("Image(systemName: \"macwindow.on.rectangle\")"))
-        #expect(urlBar.contains(".help(String(localized: \"Open Inspector in New Window\"))"))
-        #expect(urlBar.contains(".accessibilityLabel(String(localized: \"Open Inspector in New Window\"))"))
+        #expect(urlBar
+            .contains(".help(String(localized: \"Open Inspector in New Window\", bundle: RockxyLocalization.bundle))"))
+        #expect(urlBar
+            .contains(
+                ".accessibilityLabel(String(localized: \"Open Inspector in New Window\", bundle: RockxyLocalization.bundle))"
+            ))
     }
 
     @Test("The main panel opens the detached window only in its single-selection branch")

@@ -10,19 +10,19 @@ struct AssistantSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "1. Local Model Setup")) {
+            SettingsSection(String(localized: "1. Local Model Setup", bundle: RockxyLocalization.bundle)) {
                 globalModelSection
             }
 
-            SettingsSection(String(localized: "2. Provider & Model")) {
+            SettingsSection(String(localized: "2. Provider & Model", bundle: RockxyLocalization.bundle)) {
                 providerSection
             }
 
-            SettingsSection(String(localized: "3. Connection")) {
+            SettingsSection(String(localized: "3. Connection", bundle: RockxyLocalization.bundle)) {
                 connectionSection
             }
 
-            SettingsSection(String(localized: "Data Handling")) {
+            SettingsSection(String(localized: "Data Handling", bundle: RockxyLocalization.bundle)) {
                 privacySection
             }
         }
@@ -32,7 +32,7 @@ struct AssistantSettingsTab: View {
             viewModel.refreshModelLibrary()
         }
         .alert(
-            String(localized: "Remove Local Model?"),
+            String(localized: "Remove Local Model?", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { pendingModelRemoval != nil },
                 set: {
@@ -42,10 +42,10 @@ struct AssistantSettingsTab: View {
                 }
             )
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                 pendingModelRemoval = nil
             }
-            Button(String(localized: "Remove"), role: .destructive) {
+            Button(String(localized: "Remove", bundle: RockxyLocalization.bundle), role: .destructive) {
                 if let model = pendingModelRemoval {
                     viewModel.removeInstalledModel(model)
                 }
@@ -54,7 +54,8 @@ struct AssistantSettingsTab: View {
         } message: {
             Text(
                 String(
-                    localized: "This deletes \(pendingModelRemoval?.displayName ?? "the model") from Ollama. Rockxy cannot undo this action."
+                    localized: "This deletes \(pendingModelRemoval?.displayName ?? "the model") from Ollama. Rockxy cannot undo this action.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -77,7 +78,7 @@ struct AssistantSettingsTab: View {
     private var accessSection: some View {
         SettingsIndentedContent {
             VStack(alignment: .leading, spacing: 5) {
-                Toggle(String(localized: "Enable model access"), isOn: Binding(
+                Toggle(String(localized: "Enable model access", bundle: RockxyLocalization.bundle), isOn: Binding(
                     get: { viewModel.isEnabled },
                     set: viewModel.setEnabled
                 ))
@@ -86,7 +87,8 @@ struct AssistantSettingsTab: View {
 
                 Text(
                     String(
-                        localized: "Local investigation is always available. Sending a prompt to a configured model requires an explicit Review Data confirmation."
+                        localized: "Local investigation is always available. Sending a prompt to a configured model requires an explicit Review Data confirmation.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.secondaryFont())
@@ -95,7 +97,10 @@ struct AssistantSettingsTab: View {
 
                 if !viewModel.canEnable, !viewModel.isEnabled {
                     Label(
-                        String(localized: "Save a complete provider configuration to enable model access."),
+                        String(
+                            localized: "Save a complete provider configuration to enable model access.",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         systemImage: "info.circle"
                     )
                     .font(settingsMetrics.metadataFont())
@@ -109,8 +114,8 @@ struct AssistantSettingsTab: View {
         if let activeID = viewModel.savedConfiguration?.id,
            !viewModel.savedConfigurations.isEmpty
         {
-            SettingsFieldRow(String(localized: "Global Default")) {
-                Picker(String(localized: "Global Default"), selection: Binding(
+            SettingsFieldRow(String(localized: "Global Default", bundle: RockxyLocalization.bundle)) {
+                Picker(String(localized: "Global Default", bundle: RockxyLocalization.bundle), selection: Binding(
                     get: { activeID },
                     set: viewModel.selectSavedConfiguration
                 )) {
@@ -128,7 +133,8 @@ struct AssistantSettingsTab: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(
                     String(
-                        localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions."
+                        localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.secondaryFont())
@@ -139,12 +145,12 @@ struct AssistantSettingsTab: View {
                 ollamaRuntimeStatus
 
                 if viewModel.isOllamaReady {
-                    Text(String(localized: "Installed Models"))
+                    Text(String(localized: "Installed Models", bundle: RockxyLocalization.bundle))
                         .font(settingsMetrics.secondaryFont(weight: .medium))
 
                     if viewModel.installedOllamaModels.isEmpty {
                         Label(
-                            String(localized: "No local models installed yet."),
+                            String(localized: "No local models installed yet.", bundle: RockxyLocalization.bundle),
                             systemImage: "shippingbox"
                         )
                         .font(settingsMetrics.secondaryFont())
@@ -161,7 +167,7 @@ struct AssistantSettingsTab: View {
                         }
                     }
 
-                    Text(String(localized: "Curated Local Models"))
+                    Text(String(localized: "Curated Local Models", bundle: RockxyLocalization.bundle))
                         .font(settingsMetrics.secondaryFont(weight: .medium))
 
                     ForEach(AssistantDownloadableModel.recommended) { model in
@@ -175,13 +181,13 @@ struct AssistantSettingsTab: View {
                     if viewModel.isRefreshingModelLibrary {
                         ProgressView().controlSize(.small)
                     }
-                    Button(String(localized: "Check Again")) {
+                    Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                         viewModel.refreshModelLibrary()
                     }
                     .controlSize(.small)
                     .disabled(viewModel.isRefreshingModelLibrary || viewModel.modelInstallID != nil)
                     if viewModel.isOllamaReady {
-                        Button(String(localized: "Show Models Folder")) {
+                        Button(String(localized: "Show Models Folder", bundle: RockxyLocalization.bundle)) {
                             viewModel.revealOllamaModelsFolder()
                         }
                         .controlSize(.small)
@@ -190,7 +196,8 @@ struct AssistantSettingsTab: View {
 
                 Label(
                     String(
-                        localized: "Model files remain managed by Ollama. Downloads can require several GB of disk and memory; model license terms vary."
+                        localized: "Model files remain managed by Ollama. Downloads can require several GB of disk and memory; model license terms vary.",
+                        bundle: RockxyLocalization.bundle
                     ),
                     systemImage: "externaldrive"
                 )
@@ -220,12 +227,12 @@ struct AssistantSettingsTab: View {
 
             if !viewModel.isOllamaReady {
                 if viewModel.ollamaApplicationURL != nil {
-                    Button(String(localized: "Open Ollama")) {
+                    Button(String(localized: "Open Ollama", bundle: RockxyLocalization.bundle)) {
                         viewModel.openOllama()
                     }
                     .controlSize(.small)
                 } else {
-                    Button(String(localized: "Set Up Ollama…")) {
+                    Button(String(localized: "Set Up Ollama…", bundle: RockxyLocalization.bundle)) {
                         viewModel.prepareRuntimeSetup()
                         isRuntimeSetupPresented = true
                     }
@@ -254,20 +261,26 @@ struct AssistantSettingsTab: View {
 
     private var customModelDownload: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Download Another Ollama Model"))
+            Text(String(localized: "Download Another Ollama Model", bundle: RockxyLocalization.bundle))
                 .font(settingsMetrics.secondaryFont(weight: .medium))
             HStack(spacing: 8) {
-                TextField(String(localized: "Model ID, for example qwen3:8b"), text: $viewModel.customModelID)
-                    .textFieldStyle(.roundedBorder)
-                Button(String(localized: "Download & Use")) {
+                TextField(
+                    String(localized: "Model ID, for example qwen3:8b", bundle: RockxyLocalization.bundle),
+                    text: $viewModel.customModelID
+                )
+                .textFieldStyle(.roundedBorder)
+                Button(String(localized: "Download & Use", bundle: RockxyLocalization.bundle)) {
                     viewModel.installCustomModel()
                 }
                 .rockxyGlassButtonStyle()
                 .disabled(!viewModel.canInstallCustomModel)
             }
-            Text(String(localized: "Enter an exact model tag from the Ollama model library."))
-                .font(settingsMetrics.metadataFont())
-                .foregroundStyle(.secondary)
+            Text(String(
+                localized: "Enter an exact model tag from the Ollama model library.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(settingsMetrics.metadataFont())
+            .foregroundStyle(.secondary)
 
             if viewModel.modelInstallID == viewModel.customModelID.trimmingCharacters(in: .whitespacesAndNewlines) {
                 if let progress = viewModel.modelInstallProgress {
@@ -277,11 +290,14 @@ struct AssistantSettingsTab: View {
                         .controlSize(.small)
                 }
                 HStack(spacing: 8) {
-                    Text(viewModel.modelInstallStatus ?? String(localized: "Preparing download…"))
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
+                    Text(viewModel.modelInstallStatus ?? String(
+                        localized: "Preparing download…",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
                     Spacer()
-                    Button(String(localized: "Cancel")) {
+                    Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                         viewModel.cancelModelInstall()
                     }
                     .controlSize(.mini)
@@ -292,8 +308,8 @@ struct AssistantSettingsTab: View {
     }
 
     @ViewBuilder private var providerSection: some View {
-        SettingsFieldRow(String(localized: "Provider")) {
-            Picker(String(localized: "Provider"), selection: Binding(
+        SettingsFieldRow(String(localized: "Provider", bundle: RockxyLocalization.bundle)) {
+            Picker(String(localized: "Provider", bundle: RockxyLocalization.bundle), selection: Binding(
                 get: { viewModel.configuration.kind },
                 set: viewModel.selectProvider
             )) {
@@ -315,7 +331,8 @@ struct AssistantSettingsTab: View {
             SettingsIndentedContent {
                 Label(
                     String(
-                        localized: "This provider needs its native adapter. Select OpenAI, Anthropic, Gemini, an OpenAI-compatible endpoint, or Ollama."
+                        localized: "This provider needs its native adapter. Select OpenAI, Anthropic, Gemini, an OpenAI-compatible endpoint, or Ollama.",
+                        bundle: RockxyLocalization.bundle
                     ),
                     systemImage: "hammer"
                 )
@@ -324,32 +341,41 @@ struct AssistantSettingsTab: View {
             }
         }
 
-        SettingsFieldRow(String(localized: "API Surface")) {
+        SettingsFieldRow(String(localized: "API Surface", bundle: RockxyLocalization.bundle)) {
             Text(viewModel.configuration.kind.apiSurface)
                 .foregroundStyle(.secondary)
                 .frame(minHeight: settingsMetrics.controlHeight, alignment: .leading)
         }
 
-        SettingsFieldRow(String(localized: "Base URL")) {
-            TextField(String(localized: "Provider API base URL"), text: $viewModel.configuration.baseURL)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: settingsMetrics.fieldWidth(420))
-                .frame(minHeight: settingsMetrics.controlHeight)
-                .disabled(viewModel.configuration.kind.usesFixedEndpoint)
+        SettingsFieldRow(String(localized: "Base URL", bundle: RockxyLocalization.bundle)) {
+            TextField(
+                String(localized: "Provider API base URL", bundle: RockxyLocalization.bundle),
+                text: $viewModel.configuration.baseURL
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: settingsMetrics.fieldWidth(420))
+            .frame(minHeight: settingsMetrics.controlHeight)
+            .disabled(viewModel.configuration.kind.usesFixedEndpoint)
         }
 
         SettingsIndentedContent {
             endpointSecurityLabel
         }
 
-        SettingsFieldRow(String(localized: "Model")) {
+        SettingsFieldRow(String(localized: "Model", bundle: RockxyLocalization.bundle)) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     if viewModel.models.isEmpty {
-                        TextField(String(localized: "Exact model ID"), text: $viewModel.configuration.model)
-                            .textFieldStyle(.roundedBorder)
+                        TextField(
+                            String(localized: "Exact model ID", bundle: RockxyLocalization.bundle),
+                            text: $viewModel.configuration.model
+                        )
+                        .textFieldStyle(.roundedBorder)
                     } else {
-                        Picker(String(localized: "Available Models"), selection: $viewModel.configuration.model) {
+                        Picker(
+                            String(localized: "Available Models", bundle: RockxyLocalization.bundle),
+                            selection: $viewModel.configuration.model
+                        ) {
                             ForEach(viewModel.models) { model in
                                 Text(modelPickerTitle(model)).tag(model.id)
                             }
@@ -375,8 +401,11 @@ struct AssistantSettingsTab: View {
                             || !viewModel.configuration.kind.isImplemented
                             || !(viewModel.configuration.kind.capabilities?.modelDiscovery ?? false)
                     )
-                    .help(String(localized: "Refresh available models"))
-                    .accessibilityLabel(String(localized: "Refresh Available Models"))
+                    .help(String(localized: "Refresh available models", bundle: RockxyLocalization.bundle))
+                    .accessibilityLabel(String(
+                        localized: "Refresh Available Models",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
                 .frame(width: settingsMetrics.fieldWidth(420))
                 .frame(minHeight: settingsMetrics.controlHeight)
@@ -384,9 +413,12 @@ struct AssistantSettingsTab: View {
                 if viewModel.models.isEmpty,
                    viewModel.configuration.kind.capabilities?.modelDiscovery == true
                 {
-                    Text(String(localized: "Refresh to discover models available from this provider."))
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "Refresh to discover models available from this provider.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
                 } else if !viewModel.models.isEmpty {
                     Text(viewModel.availableModelsDetail)
                         .font(settingsMetrics.metadataFont())
@@ -399,22 +431,25 @@ struct AssistantSettingsTab: View {
             AssistantContextWindowSettingsField(configuration: $viewModel.configuration)
         }
 
-        SettingsFieldRow(String(localized: "Output Limit")) {
+        SettingsFieldRow(String(localized: "Output Limit", bundle: RockxyLocalization.bundle)) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     TextField(
-                        String(localized: "Maximum output tokens"),
+                        String(localized: "Maximum output tokens", bundle: RockxyLocalization.bundle),
                         value: $viewModel.configuration.maxOutputTokens,
                         format: .number
                     )
                     .textFieldStyle(.roundedBorder)
                     .frame(width: settingsMetrics.fieldWidth(120))
-                    Text(String(localized: "tokens per response"))
+                    Text(String(localized: "tokens per response", bundle: RockxyLocalization.bundle))
                         .foregroundStyle(.secondary)
                 }
-                Text(String(localized: "Rockxy safety range: 1–32,768. The selected model may allow less."))
-                    .font(settingsMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Rockxy safety range: 1–32,768. The selected model may allow less.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(settingsMetrics.metadataFont())
+                .foregroundStyle(.secondary)
             }
             .frame(minHeight: settingsMetrics.controlHeight)
         }
@@ -422,9 +457,9 @@ struct AssistantSettingsTab: View {
         if viewModel.configuration.kind == .openAICompatible
             || viewModel.configuration.kind.group == .china
         {
-            SettingsFieldRow(String(localized: "Platform / Region")) {
+            SettingsFieldRow(String(localized: "Platform / Region", bundle: RockxyLocalization.bundle)) {
                 TextField(
-                    String(localized: "Optional deployment or region label"),
+                    String(localized: "Optional deployment or region label", bundle: RockxyLocalization.bundle),
                     text: Binding(
                         get: { viewModel.configuration.region ?? "" },
                         set: { viewModel.configuration.region = $0.isEmpty ? nil : $0 }
@@ -437,12 +472,15 @@ struct AssistantSettingsTab: View {
         }
 
         if viewModel.configuration.kind != .ollama {
-            SettingsFieldRow(String(localized: "Credential")) {
+            SettingsFieldRow(String(localized: "Credential", bundle: RockxyLocalization.bundle)) {
                 VStack(alignment: .leading, spacing: 6) {
                     SecureField(
                         viewModel.hasStoredCredential
-                            ? String(localized: "Saved in Keychain. Enter a new key to replace it.")
-                            : String(localized: "API key"),
+                            ? String(
+                                localized: "Saved in Keychain. Enter a new key to replace it.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(localized: "API key", bundle: RockxyLocalization.bundle),
                         text: $viewModel.credentialInput
                     )
                     .textFieldStyle(.roundedBorder)
@@ -450,14 +488,23 @@ struct AssistantSettingsTab: View {
                     .frame(minHeight: settingsMetrics.controlHeight)
                     Label(
                         viewModel.hasStoredCredential
-                            ? String(localized: "Saved locally in macOS Keychain for this profile")
-                            : String(localized: "No credential saved in settings or Keychain"),
+                            ? String(
+                                localized: "Saved locally in macOS Keychain for this profile",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "No credential saved in settings or Keychain",
+                                bundle: RockxyLocalization.bundle
+                            ),
                         systemImage: viewModel.hasStoredCredential ? "key.fill" : "key"
                     )
                     .font(settingsMetrics.metadataFont())
                     .foregroundStyle(.secondary)
                     if viewModel.hasStoredCredential {
-                        Button(String(localized: "Remove Credential"), role: .destructive) {
+                        Button(
+                            String(localized: "Remove Credential", bundle: RockxyLocalization.bundle),
+                            role: .destructive
+                        ) {
                             viewModel.removeCredential()
                         }
                         .controlSize(.small)
@@ -474,19 +521,32 @@ struct AssistantSettingsTab: View {
     @ViewBuilder private var capabilitySummary: some View {
         if let capabilities = viewModel.configuration.kind.capabilities {
             VStack(alignment: .leading, spacing: 7) {
-                Text(String(localized: "Adapter Capabilities"))
+                Text(String(localized: "Adapter Capabilities", bundle: RockxyLocalization.bundle))
                     .font(settingsMetrics.secondaryFont(weight: .medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 14) {
-                    capabilityLabel(String(localized: "Streaming"), supported: capabilities.streaming)
-                    capabilityLabel(String(localized: "Discovery"), supported: capabilities.modelDiscovery)
-                    capabilityLabel(String(localized: "Tools"), supported: capabilities.toolCalling)
-                    capabilityLabel(String(localized: "Usage"), supported: capabilities.usageReporting)
+                    capabilityLabel(
+                        String(localized: "Streaming", bundle: RockxyLocalization.bundle),
+                        supported: capabilities.streaming
+                    )
+                    capabilityLabel(
+                        String(localized: "Discovery", bundle: RockxyLocalization.bundle),
+                        supported: capabilities.modelDiscovery
+                    )
+                    capabilityLabel(
+                        String(localized: "Tools", bundle: RockxyLocalization.bundle),
+                        supported: capabilities.toolCalling
+                    )
+                    capabilityLabel(
+                        String(localized: "Usage", bundle: RockxyLocalization.bundle),
+                        supported: capabilities.usageReporting
+                    )
                 }
                 .frame(maxWidth: settingsMetrics.fieldWidth(520), alignment: .leading)
                 Text(
                     String(
-                        localized: "These badges reflect Rockxy's current adapter path. Vision, reasoning, and model-level tool support are not inferred from the provider name."
+                        localized: "These badges reflect Rockxy's current adapter path. Vision, reasoning, and model-level tool support are not inferred from the provider name.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.metadataFont())
@@ -499,20 +559,20 @@ struct AssistantSettingsTab: View {
     @ViewBuilder private var connectionSection: some View {
         SettingsIndentedContent {
             HStack(spacing: 10) {
-                Button(String(localized: "Save Configuration")) {
+                Button(String(localized: "Save Configuration", bundle: RockxyLocalization.bundle)) {
                     viewModel.save()
                 }
                 .rockxyGlassButtonStyle(prominent: true)
                 .disabled(viewModel.isBusy || !viewModel.configuration.kind.isImplemented)
 
-                Button(String(localized: "Test Connection")) {
+                Button(String(localized: "Test Connection", bundle: RockxyLocalization.bundle)) {
                     viewModel.testConnection()
                 }
                 .disabled(viewModel.isBusy || !viewModel.configuration.isComplete)
 
                 if viewModel.isBusy {
                     ProgressView().controlSize(.small)
-                    Button(String(localized: "Cancel")) {
+                    Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                         viewModel.cancelConnection()
                     }
                     .controlSize(.small)
@@ -535,7 +595,7 @@ struct AssistantSettingsTab: View {
         accessSection
 
         SettingsIndentedContent {
-            Button(String(localized: "Remove Provider"), role: .destructive) {
+            Button(String(localized: "Remove Provider", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeProvider()
             }
             .disabled(viewModel.savedConfiguration == nil || viewModel.isBusy)
@@ -546,7 +606,8 @@ struct AssistantSettingsTab: View {
         SettingsIndentedContent {
             Label(
                 String(
-                    localized: "Sensitive headers, query values, and body fields are redacted before Review Data."
+                    localized: "Sensitive headers, query values, and body fields are redacted before Review Data.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 systemImage: "checkmark.shield.fill"
             )
@@ -557,17 +618,20 @@ struct AssistantSettingsTab: View {
             SettingsIndentedContent {
                 VStack(alignment: .leading, spacing: 5) {
                     Toggle(
-                        String(localized: "Allow provider response storage"),
+                        String(localized: "Allow provider response storage", bundle: RockxyLocalization.bundle),
                         isOn: $viewModel.configuration.storeResponses
                     )
                     .toggleStyle(.checkbox)
-                    Text(String(localized: "When off, Rockxy sends store=false with every Responses API request."))
-                        .font(settingsMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "When off, Rockxy sends store=false with every Responses API request.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
                 }
             }
         }
-        SettingsFieldRow(String(localized: "Destination")) {
+        SettingsFieldRow(String(localized: "Destination", bundle: RockxyLocalization.bundle)) {
             Text(viewModel.configuration.endpointHost)
                 .textSelection(.enabled)
                 .foregroundStyle(.secondary)
@@ -575,7 +639,10 @@ struct AssistantSettingsTab: View {
         }
         if let documentationURL = viewModel.configuration.kind.documentationURL {
             SettingsIndentedContent {
-                Link(String(localized: "Provider data and API documentation"), destination: documentationURL)
+                Link(
+                    String(localized: "Provider data and API documentation", bundle: RockxyLocalization.bundle),
+                    destination: documentationURL
+                )
             }
         }
     }
@@ -583,20 +650,29 @@ struct AssistantSettingsTab: View {
     @ViewBuilder private var endpointSecurityLabel: some View {
         switch viewModel.configuration.endpointSecurity {
         case .encrypted:
-            Label(String(localized: "Encrypted HTTPS connection"), systemImage: "lock.fill")
-                .foregroundStyle(.green)
+            Label(
+                String(localized: "Encrypted HTTPS connection", bundle: RockxyLocalization.bundle),
+                systemImage: "lock.fill"
+            )
+            .foregroundStyle(.green)
         case .localLoopback:
-            Label(String(localized: "Local-only connection on this Mac"), systemImage: "desktopcomputer")
-                .foregroundStyle(.green)
+            Label(
+                String(localized: "Local-only connection on this Mac", bundle: RockxyLocalization.bundle),
+                systemImage: "desktopcomputer"
+            )
+            .foregroundStyle(.green)
         case .insecureRemote:
             Label(
-                String(localized: "Blocked: remote endpoints must use HTTPS"),
+                String(localized: "Blocked: remote endpoints must use HTTPS", bundle: RockxyLocalization.bundle),
                 systemImage: "exclamationmark.shield.fill"
             )
             .foregroundStyle(.red)
         case .invalid:
-            Label(String(localized: "Enter a valid HTTP or HTTPS base URL"), systemImage: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
+            Label(
+                String(localized: "Enter a valid HTTP or HTTPS base URL", bundle: RockxyLocalization.bundle),
+                systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -631,11 +707,14 @@ struct AssistantSettingsTab: View {
                         .controlSize(.small)
                 }
                 HStack(spacing: 8) {
-                    Text(viewModel.modelInstallStatus ?? String(localized: "Preparing download…"))
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
+                    Text(viewModel.modelInstallStatus ?? String(
+                        localized: "Preparing download…",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
                     Spacer()
-                    Button(String(localized: "Cancel")) {
+                    Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                         viewModel.cancelModelInstall()
                     }
                     .controlSize(.mini)
@@ -662,11 +741,14 @@ struct AssistantSettingsTab: View {
             Spacer(minLength: 12)
             HStack(spacing: 8) {
                 if viewModel.isGlobalModel(model.id) {
-                    Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
-                        .font(settingsMetrics.metadataFont(weight: .medium))
-                        .foregroundStyle(.green)
+                    Label(
+                        String(localized: "In Use", bundle: RockxyLocalization.bundle),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(settingsMetrics.metadataFont(weight: .medium))
+                    .foregroundStyle(.green)
                 } else {
-                    Button(String(localized: "Use Globally")) {
+                    Button(String(localized: "Use Globally", bundle: RockxyLocalization.bundle)) {
                         viewModel.useGlobally(model)
                     }
                     .controlSize(.small)
@@ -676,7 +758,7 @@ struct AssistantSettingsTab: View {
                 } label: {
                     Image(systemName: "trash")
                 }
-                .help(String(localized: "Remove model from Ollama"))
+                .help(String(localized: "Remove model from Ollama", bundle: RockxyLocalization.bundle))
                 .disabled(viewModel.modelRemovalID != nil || viewModel.modelInstallID != nil)
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -688,17 +770,17 @@ struct AssistantSettingsTab: View {
     @ViewBuilder
     private func modelAction(_ model: AssistantDownloadableModel) -> some View {
         if viewModel.isGlobalModel(model.id) {
-            Label(String(localized: "In Use"), systemImage: "checkmark.circle.fill")
+            Label(String(localized: "In Use", bundle: RockxyLocalization.bundle), systemImage: "checkmark.circle.fill")
                 .font(settingsMetrics.metadataFont(weight: .medium))
                 .foregroundStyle(.green)
         } else if viewModel.installedOllamaModelIDs.contains(model.id) {
-            Button(String(localized: "Use Globally")) {
+            Button(String(localized: "Use Globally", bundle: RockxyLocalization.bundle)) {
                 viewModel.useGlobally(model)
             }
             .controlSize(.small)
             .disabled(viewModel.modelInstallID != nil)
         } else {
-            Button(String(localized: "Download & Use")) {
+            Button(String(localized: "Download & Use", bundle: RockxyLocalization.bundle)) {
                 viewModel.installAndUse(model)
             }
             .controlSize(.small)
@@ -719,16 +801,16 @@ struct AssistantSettingsTab: View {
         guard !provider.isImplemented else {
             return provider.title
         }
-        return String(localized: "Adapter pending for \(provider.title)")
+        return String(localized: "Adapter pending for \(provider.title)", bundle: RockxyLocalization.bundle)
     }
 
     private func modelPickerTitle(_ model: AssistantModel) -> String {
         var details: [String] = []
         if let limit = model.inputTokenLimit {
-            details.append(String(localized: "\(limit.formatted()) input"))
+            details.append(String(localized: "\(limit.formatted()) input", bundle: RockxyLocalization.bundle))
         }
         if let limit = model.outputTokenLimit {
-            details.append(String(localized: "\(limit.formatted()) output"))
+            details.append(String(localized: "\(limit.formatted()) output", bundle: RockxyLocalization.bundle))
         }
         return details.isEmpty ? model.displayName : "\(model.displayName) · \(details.joined(separator: " / "))"
     }
@@ -838,24 +920,36 @@ final class AssistantSettingsViewModel {
     var availableModelsDetail: String {
         if configuration.kind != .ollama {
             if models.count == 1 {
-                return String(localized: "1 model available from \(configuration.kind.title).")
+                return String(
+                    localized: "1 model available from \(configuration.kind.title).",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "\(models.count) models available from \(configuration.kind.title).")
+            return String(
+                localized: "\(models.count) models available from \(configuration.kind.title).",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if models.count == 1 {
-            return String(localized: "1 model available. The list refreshes after local downloads.")
+            return String(
+                localized: "1 model available. The list refreshes after local downloads.",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "\(models.count) models available. The list refreshes after local downloads.")
+        return String(
+            localized: "\(models.count) models available. The list refreshes after local downloads.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     var ollamaRuntimeTitle: String {
         switch ollamaRuntimeState {
         case .checking:
-            String(localized: "Checking Ollama Runtime…")
+            String(localized: "Checking Ollama Runtime…", bundle: RockxyLocalization.bundle)
         case let .ready(version):
-            String(localized: "Ollama \(version) Ready")
+            String(localized: "Ollama \(version) Ready", bundle: RockxyLocalization.bundle)
         case .unavailable:
-            String(localized: "Ollama Runtime Unavailable")
+            String(localized: "Ollama Runtime Unavailable", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -863,10 +957,14 @@ final class AssistantSettingsViewModel {
         switch ollamaRuntimeState {
         case .checking:
             String(
-                localized: "Connecting to the local service at \(ollamaBaseURL.host() ?? "127.0.0.1")."
+                localized: "Connecting to the local service at \(ollamaBaseURL.host() ?? "127.0.0.1").",
+                bundle: RockxyLocalization.bundle
             )
         case .ready:
-            String(localized: "Models and reviewed traffic stay on this Mac through this local endpoint.")
+            String(
+                localized: "Models and reviewed traffic stay on this Mac through this local endpoint.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .unavailable(message):
             message
         }
@@ -948,7 +1046,10 @@ final class AssistantSettingsViewModel {
     func save() {
         do {
             try persistDraft()
-            setSuccess(String(localized: "AI Assistant configuration saved as the global default."))
+            setSuccess(String(
+                localized: "AI Assistant configuration saved as the global default.",
+                bundle: RockxyLocalization.bundle
+            ))
         } catch {
             setError(error)
         }
@@ -999,7 +1100,7 @@ final class AssistantSettingsViewModel {
             if !self.configuration.model.isEmpty {
                 try self.persistDraft()
             }
-            self.setSuccess(String(localized: "Found \(values.count) models."))
+            self.setSuccess(String(localized: "Found \(values.count) models.", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -1064,7 +1165,8 @@ final class AssistantSettingsViewModel {
                 }
                 self.ollamaRuntimeState = .unavailable(
                     message: String(
-                        localized: "Start Ollama on this Mac, then check again. (\(error.localizedDescription))"
+                        localized: "Start Ollama on this Mac, then check again. (\(error.localizedDescription))",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             }
@@ -1090,9 +1192,12 @@ final class AssistantSettingsViewModel {
             return
         }
         let panel = NSOpenPanel()
-        panel.title = String(localized: "Choose Ollama Install Location")
-        panel.prompt = String(localized: "Choose")
-        panel.message = String(localized: "Rockxy will install Ollama.app inside the selected folder.")
+        panel.title = String(localized: "Choose Ollama Install Location", bundle: RockxyLocalization.bundle)
+        panel.prompt = String(localized: "Choose", bundle: RockxyLocalization.bundle)
+        panel.message = String(
+            localized: "Rockxy will install Ollama.app inside the selected folder.",
+            bundle: RockxyLocalization.bundle
+        )
         panel.directoryURL = runtimeInstallDestination
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -1199,7 +1304,7 @@ final class AssistantSettingsViewModel {
         installAndUse(AssistantDownloadableModel(
             id: modelID,
             name: modelID,
-            detail: String(localized: "Custom model from the Ollama library")
+            detail: String(localized: "Custom model from the Ollama library", bundle: RockxyLocalization.bundle)
         ))
     }
 
@@ -1211,7 +1316,7 @@ final class AssistantSettingsViewModel {
         let baseURL = ollamaBaseURL
         modelInstallID = model.id
         modelInstallProgress = nil
-        modelInstallStatus = String(localized: "Connecting to Ollama…")
+        modelInstallStatus = String(localized: "Connecting to Ollama…", bundle: RockxyLocalization.bundle)
         hasError = false
         modelInstallTask = Task { [weak self] in
             guard let self else {
@@ -1226,7 +1331,10 @@ final class AssistantSettingsViewModel {
                     case let .status(value):
                         self.modelInstallStatus = value
                     case let .progress(completed, total):
-                        self.modelInstallStatus = String(localized: "Downloading \(model.name)…")
+                        self.modelInstallStatus = String(
+                            localized: "Downloading \(model.name)…",
+                            bundle: RockxyLocalization.bundle
+                        )
                         if let total, total > 0 {
                             self.modelInstallProgress = min(1, Double(completed) / Double(total))
                         }
@@ -1258,9 +1366,9 @@ final class AssistantSettingsViewModel {
                     }
                 }
             } catch is CancellationError {
-                self.modelInstallStatus = String(localized: "Download cancelled.")
+                self.modelInstallStatus = String(localized: "Download cancelled.", bundle: RockxyLocalization.bundle)
             } catch AssistantProviderError.cancelled {
-                self.modelInstallStatus = String(localized: "Download cancelled.")
+                self.modelInstallStatus = String(localized: "Download cancelled.", bundle: RockxyLocalization.bundle)
             } catch {
                 self.setError(error)
                 self.modelInstallStatus = error.localizedDescription
@@ -1276,7 +1384,7 @@ final class AssistantSettingsViewModel {
         modelInstallTask = nil
         modelInstallID = nil
         modelInstallProgress = nil
-        modelInstallStatus = String(localized: "Download cancelled.")
+        modelInstallStatus = String(localized: "Download cancelled.", bundle: RockxyLocalization.bundle)
     }
 
     func useGlobally(_ model: AssistantDownloadableModel) {
@@ -1321,7 +1429,10 @@ final class AssistantSettingsViewModel {
                     self.isEnabled = false
                     self.manager.updateAssistantConfiguration(self.savedConfiguration, enabled: false)
                 }
-                self.setSuccess(String(localized: "Removed \(model.displayName) from Ollama."))
+                self.setSuccess(String(
+                    localized: "Removed \(model.displayName) from Ollama.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } catch {
                 self.setError(error)
             }
@@ -1335,7 +1446,10 @@ final class AssistantSettingsViewModel {
                 return
             }
             self.setSuccess(
-                String(localized: "Connected to \(result.provider) at \(result.endpointHost) with \(result.model).")
+                String(
+                    localized: "Connected to \(result.provider) at \(result.endpointHost) with \(result.model).",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -1343,7 +1457,7 @@ final class AssistantSettingsViewModel {
     func cancelConnection() {
         invalidateConnectionAction()
         hasError = false
-        statusMessage = String(localized: "Connection check cancelled.")
+        statusMessage = String(localized: "Connection check cancelled.", bundle: RockxyLocalization.bundle)
     }
 
     func removeCredential() {
@@ -1355,7 +1469,7 @@ final class AssistantSettingsViewModel {
                 isEnabled = false
                 manager.updateAssistantConfiguration(savedConfiguration, enabled: false)
             }
-            setSuccess(String(localized: "Saved credential removed."))
+            setSuccess(String(localized: "Saved credential removed.", bundle: RockxyLocalization.bundle))
         } catch {
             setError(error)
         }
@@ -1376,7 +1490,10 @@ final class AssistantSettingsViewModel {
             models = []
             isEnabled = manager.settings.debugAssistantModelAccessEnabled
             refreshCredentialState()
-            setSuccess(String(localized: "Provider profile and its saved credential removed."))
+            setSuccess(String(
+                localized: "Provider profile and its saved credential removed.",
+                bundle: RockxyLocalization.bundle
+            ))
         } catch {
             setError(error)
         }
@@ -1437,7 +1554,7 @@ final class AssistantSettingsViewModel {
 
     private func waitForOllamaReadiness() async throws -> OllamaRuntimeInfo {
         var latestError: Error = AssistantProviderError.network(
-            String(localized: "Ollama did not start its local service.")
+            String(localized: "Ollama did not start its local service.", bundle: RockxyLocalization.bundle)
         )
         for attempt in 0 ..< 30 {
             try Task.checkCancellation()
@@ -1523,7 +1640,7 @@ final class AssistantSettingsViewModel {
             }
         }
         refreshSavedConfigurations()
-        setSuccess(String(localized: "\(name) is ready and selected globally."))
+        setSuccess(String(localized: "\(name) is ready and selected globally.", bundle: RockxyLocalization.bundle))
     }
 
     private func applyDiscoveredContextWindow(

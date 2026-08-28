@@ -62,34 +62,34 @@ struct FocusSetSidebarRow: View {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
-                        .accessibilityLabel(String(localized: "Active"))
+                        .accessibilityLabel(String(localized: "Active", bundle: RockxyLocalization.bundle))
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(isActive
-            ? String(localized: "This Focus Set is active. Click to reapply it.")
-            : String(localized: "Apply this Focus Set."))
+            ? String(localized: "This Focus Set is active. Click to reapply it.", bundle: RockxyLocalization.bundle)
+            : String(localized: "Apply this Focus Set.", bundle: RockxyLocalization.bundle))
         .accessibilityValue(
             focusSet.ruleCount == 1
-                ? String(localized: "1 condition")
-                : String(localized: "\(focusSet.ruleCount) conditions")
+                ? String(localized: "1 condition", bundle: RockxyLocalization.bundle)
+                : String(localized: "\(focusSet.ruleCount) conditions", bundle: RockxyLocalization.bundle)
         )
     }
 
-    @ViewBuilder private var ruleDetails: some View {
+    private var ruleDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !focusSet.sidebarIncludedRules.isEmpty {
                 ruleGroup(
-                    title: String(localized: "Show when all match"),
+                    title: String(localized: "Show when all match", bundle: RockxyLocalization.bundle),
                     systemImage: "checkmark.circle",
                     rules: focusSet.sidebarIncludedRules
                 )
             }
             if !focusSet.sidebarExcludedRules.isEmpty {
                 ruleGroup(
-                    title: String(localized: "Hide when any match"),
+                    title: String(localized: "Hide when any match", bundle: RockxyLocalization.bundle),
                     systemImage: "eye.slash",
                     rules: focusSet.sidebarExcludedRules
                 )
@@ -130,11 +130,11 @@ struct FocusSetSidebarRow: View {
     private func ruleLabel(_ kind: FocusSetRuleDescriptor.Kind) -> String {
         switch kind {
         case .application:
-            String(localized: "Application")
+            String(localized: "Application", bundle: RockxyLocalization.bundle)
         case .domain:
-            String(localized: "Domain")
+            String(localized: "Domain", bundle: RockxyLocalization.bundle)
         case .pathPrefix:
-            String(localized: "Path")
+            String(localized: "Path", bundle: RockxyLocalization.bundle)
         }
     }
 }

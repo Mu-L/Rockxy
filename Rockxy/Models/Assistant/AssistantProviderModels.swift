@@ -11,14 +11,14 @@ enum AssistantProviderGroup: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .global: String(localized: "Global Models")
-        case .china: String(localized: "China Models")
-        case .customAndLocal: String(localized: "Custom & Local")
+        case .global: String(localized: "Global Models", bundle: RockxyLocalization.bundle)
+        case .china: String(localized: "China Models", bundle: RockxyLocalization.bundle)
+        case .customAndLocal: String(localized: "Custom & Local", bundle: RockxyLocalization.bundle)
         }
     }
 }
 
-// MARK: - Assistant Provider Architecture
+// MARK: - AssistantExecutionLocation
 
 /// Where inference executes. This is deliberately independent from the model family:
 /// Qwen, DeepSeek, Llama, and other weights can run locally or behind a cloud API.
@@ -28,14 +28,20 @@ enum AssistantExecutionLocation: String, Equatable, Sendable {
     case remoteServer
     case cloudService
 
+    // MARK: Internal
+
     var isLocal: Bool {
         self == .onDevice || self == .localServer
     }
 }
 
+// MARK: - AssistantExecutionLocationPolicy
+
 enum AssistantExecutionLocationPolicy: Equatable, Sendable {
     case fixed(AssistantExecutionLocation)
     case endpointDerived
+
+    // MARK: Internal
 
     func resolve(endpointSecurity: AssistantEndpointSecurity) -> AssistantExecutionLocation {
         switch self {
@@ -47,6 +53,8 @@ enum AssistantExecutionLocationPolicy: Equatable, Sendable {
     }
 }
 
+// MARK: - AssistantAPIDialect
+
 /// The wire protocol used by an inference endpoint. Multiple vendors can share one dialect.
 enum AssistantAPIDialect: String, Equatable, Sendable {
     case openAIResponses
@@ -57,22 +65,30 @@ enum AssistantAPIDialect: String, Equatable, Sendable {
     case appleFoundationModels
 }
 
+// MARK: - AssistantCredentialMode
+
 enum AssistantCredentialMode: Equatable, Sendable {
     case none
     case bearerToken
     case header(name: String)
     case queryItem(name: String)
 
+    // MARK: Internal
+
     var isRequired: Bool {
         self != .none
     }
 }
+
+// MARK: - AssistantEndpointPolicy
 
 enum AssistantEndpointPolicy: Equatable, Sendable {
     case fixedHTTPS(host: String, path: String)
     case trustedHTTPS(hosts: [String], hostSuffixes: [String])
     case secureRemote
     case localOrSecureRemote
+
+    // MARK: Internal
 
     func permits(_ url: URL, security: AssistantEndpointSecurity) -> Bool {
         switch self {
@@ -99,17 +115,23 @@ enum AssistantEndpointPolicy: Equatable, Sendable {
     }
 }
 
+// MARK: - AssistantModelCatalogStrategy
+
 enum AssistantModelCatalogStrategy: Equatable, Sendable {
     case remoteDiscovery
     case remoteDiscoveryWithManualFallback
     case manualEntry
 }
 
+// MARK: - AssistantCostModel
+
 enum AssistantCostModel: Equatable, Sendable {
     case localCompute
     case providerBilled
     case endpointDefined
 }
+
+// MARK: - AssistantProviderDescriptor
 
 struct AssistantProviderDescriptor: Equatable, Sendable {
     let group: AssistantProviderGroup
@@ -158,7 +180,7 @@ enum AssistantProviderKind: String, CaseIterable, Codable, Identifiable {
         case .kimi: "Kimi / Moonshot"
         case .doubao: "Doubao / Volcengine Ark"
         case .glm: "GLM / Zhipu"
-        case .openAICompatible: String(localized: "OpenAI-compatible Endpoint")
+        case .openAICompatible: String(localized: "OpenAI-compatible Endpoint", bundle: RockxyLocalization.bundle)
         case .ollama: "Ollama"
         }
     }
@@ -221,7 +243,9 @@ enum AssistantProviderKind: String, CaseIterable, Codable, Identifiable {
                 defaultBaseURL: "https://api.openai.com/v1",
                 apiSurface: "Responses API",
                 capabilities: .openAI,
-                documentationURL: URL(string: "https://developers.openai.com/api/docs/guides/responses-vs-chat-completions"),
+                documentationURL: URL(
+                    string: "https://developers.openai.com/api/docs/guides/responses-vs-chat-completions"
+                ),
                 isImplemented: true
             )
         case .anthropic:
@@ -323,12 +347,16 @@ enum AssistantProviderKind: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    // MARK: Private
+
     private func compatibleCloudDescriptor(
         defaultBaseURL: String,
         documentationURL: String,
         catalogStrategy: AssistantModelCatalogStrategy = .remoteDiscoveryWithManualFallback,
         endpointPolicy: AssistantEndpointPolicy
-    ) -> AssistantProviderDescriptor {
+    )
+        -> AssistantProviderDescriptor
+    {
         let capabilities = catalogStrategy == .manualEntry
             ? AssistantProviderCapabilities.compatibleManualCatalog
             : .compatible
@@ -379,7 +407,34 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
         self.redactSensitiveData = redactSensitiveData
     }
 
+    // MARK: Codable
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        kind = try container.decode(AssistantProviderKind.self, forKey: .kind)
+        baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? kind.defaultBaseURL
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? kind.defaultModel
+        region = try container.decodeIfPresent(String.self, forKey: .region)
+        contextWindowTokens = try Self.normalizedContextWindowTokens(
+            container.decodeIfPresent(Int.self, forKey: .contextWindowTokens),
+            for: kind
+        )
+        maxOutputTokens = try Self.validMaxOutputTokens(
+            container.decodeIfPresent(Int.self, forKey: .maxOutputTokens) ?? Self.defaultMaxOutputTokens
+        )
+        storeResponses = try container.decodeIfPresent(Bool.self, forKey: .storeResponses) ?? false
+        redactSensitiveData = try container.decodeIfPresent(Bool.self, forKey: .redactSensitiveData) ?? true
+    }
+
     // MARK: Internal
+
+    static let defaultMaxOutputTokens = 2_048
+    static let maxAllowedOutputTokens = 32_768
+    static let defaultLocalContextWindowTokens = 8_192
+    static let maxLocalContextWindowTokens = 32_768
+    static let minContextWindowTokens = 1_024
+    static let maxContextWindowTokens = 1_048_576
 
     var id: UUID
     var kind: AssistantProviderKind
@@ -406,7 +461,7 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
     }
 
     var endpointHost: String {
-        endpointURL?.host ?? String(localized: "Invalid endpoint")
+        endpointURL?.host ?? String(localized: "Invalid endpoint", bundle: RockxyLocalization.bundle)
     }
 
     var endpointSecurity: AssistantEndpointSecurity {
@@ -432,13 +487,6 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
             && endpointSecurity.permitsCapturedData
             && !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-
-    static let defaultMaxOutputTokens = 2_048
-    static let maxAllowedOutputTokens = 32_768
-    static let defaultLocalContextWindowTokens = 8_192
-    static let maxLocalContextWindowTokens = 32_768
-    static let minContextWindowTokens = 1_024
-    static let maxContextWindowTokens = 1_048_576
 
     var effectiveContextWindowTokens: Int? {
         if let contextWindowTokens {
@@ -482,25 +530,7 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
         )
     }
 
-    // MARK: Codable
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        kind = try container.decode(AssistantProviderKind.self, forKey: .kind)
-        baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? kind.defaultBaseURL
-        model = try container.decodeIfPresent(String.self, forKey: .model) ?? kind.defaultModel
-        region = try container.decodeIfPresent(String.self, forKey: .region)
-        contextWindowTokens = Self.normalizedContextWindowTokens(
-            try container.decodeIfPresent(Int.self, forKey: .contextWindowTokens),
-            for: kind
-        )
-        maxOutputTokens = Self.validMaxOutputTokens(
-            try container.decodeIfPresent(Int.self, forKey: .maxOutputTokens) ?? Self.defaultMaxOutputTokens
-        )
-        storeResponses = try container.decodeIfPresent(Bool.self, forKey: .storeResponses) ?? false
-        redactSensitiveData = try container.decodeIfPresent(Bool.self, forKey: .redactSensitiveData) ?? true
-    }
+    // MARK: Private
 
     private static func isLoopbackHost(_ host: String?) -> Bool {
         guard var host = host?.lowercased() else {
@@ -522,6 +552,8 @@ enum AssistantEndpointSecurity: Equatable {
     case localLoopback
     case insecureRemote
     case invalid
+
+    // MARK: Internal
 
     var permitsCapturedData: Bool {
         self == .encrypted || self == .localLoopback
@@ -586,7 +618,7 @@ struct AssistantProviderCapabilities: Equatable {
     let responseStorageControl: Bool
 }
 
-// MARK: - AssistantModel
+// MARK: - AssistantModelCapability
 
 enum AssistantModelCapability: String, Hashable, Sendable {
     case completion
@@ -596,7 +628,11 @@ enum AssistantModelCapability: String, Hashable, Sendable {
     case vision
 }
 
+// MARK: - AssistantModel
+
 struct AssistantModel: Identifiable, Equatable, Sendable {
+    // MARK: Lifecycle
+
     init(
         id: String,
         displayName: String,
@@ -619,6 +655,8 @@ struct AssistantModel: Identifiable, Equatable, Sendable {
         self.capabilities = capabilities
     }
 
+    // MARK: Internal
+
     let id: String
     let displayName: String
     let inputTokenLimit: Int?
@@ -633,6 +671,8 @@ struct AssistantModel: Identifiable, Equatable, Sendable {
 // MARK: - AssistantCompletionRequest
 
 struct AssistantCompletionRequest: Equatable {
+    // MARK: Lifecycle
+
     init(
         instructions: String,
         input: String,
@@ -648,6 +688,8 @@ struct AssistantCompletionRequest: Equatable {
         self.storeResponse = storeResponse
         self.contextWindowTokens = contextWindowTokens
     }
+
+    // MARK: Internal
 
     let instructions: String
     let input: String

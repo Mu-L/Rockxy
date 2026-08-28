@@ -56,6 +56,15 @@ enum MapLocalMatchType: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - MapLocalRuleTestResult
+
+enum MapLocalRuleTestResult: Equatable {
+    case matched
+    case notMatched
+    case invalidURL
+    case invalidPattern(String)
+}
+
 // MARK: - MapLocalTargetMode
 
 enum MapLocalTargetMode: String, CaseIterable, Identifiable {

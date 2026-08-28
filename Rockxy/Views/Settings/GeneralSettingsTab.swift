@@ -12,11 +12,11 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "Proxy")) {
+            SettingsSection(String(localized: "Proxy", bundle: RockxyLocalization.bundle)) {
                 generalControlsSection
             }
 
-            SettingsSection(String(localized: "Root CA Certificate")) {
+            SettingsSection(String(localized: "Root CA Certificate", bundle: RockxyLocalization.bundle)) {
                 certificateSection
 
                 if case let .success(message) = certificateStatus {
@@ -33,17 +33,18 @@ struct GeneralSettingsTab: View {
             AppSettingsManager.shared.updateRecordOnLaunch(newValue)
         }
         .alert(
-            String(localized: "Reset Certificates"),
+            String(localized: "Reset Certificates", bundle: RockxyLocalization.bundle),
             isPresented: $showResetConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Reset"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Reset", bundle: RockxyLocalization.bundle), role: .destructive) {
                 resetCertificates()
             }
         } message: {
             Text(
                 String(
-                    localized: "This will delete the root CA and all generated host certificates. You will need to generate and install a new root CA."
+                    localized: "This will delete the root CA and all generated host certificates. You will need to generate and install a new root CA.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -106,7 +107,7 @@ struct GeneralSettingsTab: View {
 
     private var generalControlsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SettingsFieldRow(String(localized: "Port Number:")) {
+            SettingsFieldRow(String(localized: "Port Number:", bundle: RockxyLocalization.bundle)) {
                 TextField("", value: $proxyPort, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .font(settingsMetrics.font(monospaced: true))
@@ -117,12 +118,15 @@ struct GeneralSettingsTab: View {
             SettingsIndentedContent {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle(
-                        String(localized: "Auto Start Recording Traffic at Launch"),
+                        String(localized: "Auto Start Recording Traffic at Launch", bundle: RockxyLocalization.bundle),
                         isOn: $recordOnLaunch
                     )
                     .toggleStyle(.checkbox)
                     Text(
-                        String(localized: "Start capturing network traffic as soon as the app launches.")
+                        String(
+                            localized: "Start capturing network traffic as soon as the app launches.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                     .font(settingsMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
@@ -131,7 +135,7 @@ struct GeneralSettingsTab: View {
             }
 
             SettingsIndentedContent {
-                Button(String(localized: "Advanced Proxy Setting…")) {
+                Button(String(localized: "Advanced Proxy Setting…", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "advancedProxySettings")
                 }
             }
@@ -161,18 +165,27 @@ struct GeneralSettingsTab: View {
                 switch action {
                 case .generate:
                     try await CertificateManager.shared.ensureRootCA()
-                    certificateStatus = .success(String(localized: "Root CA generated successfully."))
+                    certificateStatus = .success(String(
+                        localized: "Root CA generated successfully.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     Self.logger.info("Root CA generated")
 
                 case .installAndTrust:
                     try await CertificateManager.shared.installAndTrust()
-                    certificateStatus = .success(String(localized: "Root CA installed and trusted."))
+                    certificateStatus = .success(String(
+                        localized: "Root CA installed and trusted.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     Self.logger.info("Root CA installed and trusted")
 
                 case .export:
                     guard let pem = try await CertificateManager.shared.getRootCAPEM() else {
                         certificateStatus = .error(
-                            String(localized: "No Root CA certificate to export. Generate one first.")
+                            String(
+                                localized: "No Root CA certificate to export. Generate one first.",
+                                bundle: RockxyLocalization.bundle
+                            )
                         )
                         return
                     }
@@ -185,13 +198,19 @@ struct GeneralSettingsTab: View {
                         await MainActor.run {
                             AppSettingsManager.shared.updateLastExportedRootCAPath(url.path)
                         }
-                        certificateStatus = .success(String(localized: "Root CA exported successfully."))
+                        certificateStatus = .success(String(
+                            localized: "Root CA exported successfully.",
+                            bundle: RockxyLocalization.bundle
+                        ))
                         Self.logger.info("Root CA exported to \(url.path)")
                     }
 
                 case .share:
                     let session = try await caShareController.startSharing()
-                    certificateStatus = .success(String(localized: "Root CA sharing link started."))
+                    certificateStatus = .success(String(
+                        localized: "Root CA sharing link started.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     Self.logger.info("Root CA sharing started on \(session.host):\(session.port)")
 
                 case .reset:
@@ -222,12 +241,18 @@ struct GeneralSettingsTab: View {
                 await MainActor.run {
                     AppSettingsManager.shared.updateLastExportedRootCAPath(nil)
                 }
-                certificateStatus = .success(String(localized: "All certificates have been reset."))
+                certificateStatus = .success(String(
+                    localized: "All certificates have been reset.",
+                    bundle: RockxyLocalization.bundle
+                ))
                 await checkCAStatus()
                 Self.logger.info("Certificates reset")
             } catch {
                 certificateStatus = .error(
-                    String(localized: "Failed to reset certificates: \(error.localizedDescription)")
+                    String(
+                        localized: "Failed to reset certificates: \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 Self.logger.error("Certificate reset failed: \(error)")
             }
@@ -237,7 +262,10 @@ struct GeneralSettingsTab: View {
     private func copyShareURL(_ url: URL) {
         do {
             try caShareController.copyShareURL(sessionURL: url)
-            certificateStatus = .success(String(localized: "Root CA sharing URL copied."))
+            certificateStatus = .success(String(
+                localized: "Root CA sharing URL copied.",
+                bundle: RockxyLocalization.bundle
+            ))
         } catch {
             certificateStatus = .error(CAShareController.userFacingMessage(for: error))
         }

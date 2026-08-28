@@ -173,6 +173,10 @@ final class RulePolicyGate: @unchecked Sendable {
         await RuleSyncService.reorderModifyHeaderRules(orderedIDs: orderedIDs)
     }
 
+    func reorderMapLocalRules(orderedIDs: [UUID]) async {
+        await RuleSyncService.reorderMapLocalRules(orderedIDs: orderedIDs)
+    }
+
     func setBreakpointToolEnabled(_ enabled: Bool) async {
         await RuleSyncService.setBreakpointToolEnabled(enabled)
     }

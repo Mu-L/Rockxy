@@ -4,6 +4,8 @@ import Testing
 
 @Suite("Keyboard shortcuts")
 struct KeyboardShortcutTests {
+    // MARK: Internal
+
     @Test("KS convention row is documented", arguments: KeyboardShortcutCatalog.allShortcuts)
     func conventionRowIsDocumented(shortcut: KeyboardShortcutReference) throws {
         let reference = try Self.documentation(named: "keyboard-shortcuts.md")
@@ -75,9 +77,9 @@ struct KeyboardShortcutTests {
         let footer = try Self.projectFile(named: "Rockxy/Views/RequestList/StatusBarView.swift")
         let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
 
-        #expect(!footer.contains(#"title: String(localized: "Clear")"#))
+        #expect(!footer.contains(#"title: String(localized: "Clear", bundle: RockxyLocalization.bundle)"#))
         #expect(!footer.contains("var onClear:"))
-        #expect(app.contains(#"Button(String(localized: "Clear Session"))"#))
+        #expect(app.contains(#"Button(String(localized: "Clear Session", bundle: RockxyLocalization.bundle))"#))
         #expect(app.contains(#".keyboardShortcut("k", modifiers: [.command])"#))
         #expect(KeyboardShortcutCatalog.allShortcuts.contains {
             $0.action == "Clear session" && $0.shortcut == "⌘K"
@@ -115,14 +117,19 @@ struct KeyboardShortcutTests {
         let requestTable = try Self.projectFile(named: "Rockxy/Views/RequestList/RequestTableView.swift")
 
         // File owns Save Session; Flow owns Clear Session. Neither gets a misleading alias.
-        #expect(Self.occurrences(of: #"Button(String(localized: "Save Session…"))"#, in: app) == 1)
-        #expect(!app.contains(#"Button(String(localized: "Save Requests"))"#))
-        #expect(!app.contains(#"Button(String(localized: "Delete All"))"#))
+        #expect(Self.occurrences(
+            of: #"Button(String(localized: "Save Session…", bundle: RockxyLocalization.bundle))"#,
+            in: app
+        ) == 1)
+        #expect(!app.contains(#"Button(String(localized: "Save Requests", bundle: RockxyLocalization.bundle))"#))
+        #expect(!app.contains(#"Button(String(localized: "Delete All", bundle: RockxyLocalization.bundle))"#))
         #expect(!actions.contains("func deleteAll()"))
 
         // Context menus reuse actions but never display or register keyboard shortcuts.
         #expect(!requestTable.contains("keyEquivalentModifierMask"))
     }
+
+    // MARK: Private
 
     private static func documentation(named name: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)

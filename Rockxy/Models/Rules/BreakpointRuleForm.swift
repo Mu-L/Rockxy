@@ -1,6 +1,8 @@
 import Foundation
 
 enum BreakpointRuleForm {
+    // MARK: Internal
+
     struct Decoded: Equatable {
         let displayPattern: String
         let matchType: RuleMatchType
@@ -56,7 +58,9 @@ enum BreakpointRuleForm {
         phaseRequest: Bool,
         phaseResponse: Bool,
         includeSubpaths: Bool
-    ) -> ProxyRule {
+    )
+        -> ProxyRule
+    {
         let trimmedPattern = rawPattern.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedIncludeSubpaths = matchType == .wildcard && includeSubpaths
         let originalDecoded = original.map(decode)
@@ -67,11 +71,10 @@ enum BreakpointRuleForm {
                 && $0.includeSubpaths == normalizedIncludeSubpaths
         } ?? false
 
-        let condition: RuleMatchCondition
-        if scopeIsUnchanged, let originalCondition = original?.matchCondition {
-            condition = originalCondition
+        let condition: RuleMatchCondition = if scopeIsUnchanged, let originalCondition = original?.matchCondition {
+            originalCondition
         } else {
-            condition = RuleMatchCondition(
+            RuleMatchCondition(
                 urlPattern: RulePatternBuilder.regexSource(
                     rawPattern: trimmedPattern,
                     matchType: matchType,
@@ -101,10 +104,12 @@ enum BreakpointRuleForm {
         rawPattern: String,
         matchType: RuleMatchType,
         includeSubpaths: Bool
-    ) -> String? {
+    )
+        -> String?
+    {
         let trimmedPattern = rawPattern.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPattern.isEmpty else {
-            return String(localized: "Enter a URL pattern.")
+            return String(localized: "Enter a URL pattern.", bundle: RockxyLocalization.bundle)
         }
         let runtimePattern = RulePatternBuilder.regexSource(
             rawPattern: trimmedPattern,
@@ -121,8 +126,10 @@ enum BreakpointRuleForm {
         guard !request, !response else {
             return nil
         }
-        return String(localized: "Select Request, Response, or both.")
+        return String(localized: "Select Request, Response, or both.", bundle: RockxyLocalization.bundle)
     }
+
+    // MARK: Private
 
     private static func phase(request: Bool, response: Bool) -> BreakpointRulePhase {
         switch (request, response) {
@@ -139,7 +146,9 @@ enum BreakpointRuleForm {
 
     private static func decodeLegacyPattern(
         _ pattern: String
-    ) -> (displayPattern: String, matchType: RuleMatchType, includeSubpaths: Bool) {
+    )
+        -> (displayPattern: String, matchType: RuleMatchType, includeSubpaths: Bool)
+    {
         var working = pattern
         var includeSubpaths = true
 

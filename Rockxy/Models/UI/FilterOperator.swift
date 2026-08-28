@@ -15,13 +15,27 @@ enum FilterOperator: String, CaseIterable, Codable, Hashable {
 
     var displayName: String {
         switch self {
-        case .contains: String(localized: "Contains")
-        case .is: String(localized: "Is")
-        case .startsWith: String(localized: "Starts With")
-        case .endsWith: String(localized: "Ends With")
-        case .doesNotContain: String(localized: "Does Not Contain")
-        case .notEqual: String(localized: "Is Not")
-        case .regex: String(localized: "Regex")
+        case .contains: String(localized: "Contains", bundle: RockxyLocalization.bundle)
+        case .is: String(localized: "Is", bundle: RockxyLocalization.bundle)
+        case .startsWith: String(localized: "Starts With", bundle: RockxyLocalization.bundle)
+        case .endsWith: String(localized: "Ends With", bundle: RockxyLocalization.bundle)
+        case .doesNotContain: String(localized: "Does Not Contain", bundle: RockxyLocalization.bundle)
+        case .notEqual: String(localized: "Is Not", bundle: RockxyLocalization.bundle)
+        case .regex: String(localized: "Regex", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    var contributesHighlight: Bool {
+        switch self {
+        case .doesNotContain,
+             .notEqual:
+            false
+        case .contains,
+             .is,
+             .startsWith,
+             .endsWith,
+             .regex:
+            true
         }
     }
 
@@ -44,20 +58,6 @@ enum FilterOperator: String, CaseIterable, Codable, Hashable {
             }
             let range = NSRange(fieldValue.startIndex..., in: fieldValue)
             return pattern.firstMatch(in: fieldValue, range: range) != nil
-        }
-    }
-
-    var contributesHighlight: Bool {
-        switch self {
-        case .doesNotContain,
-             .notEqual:
-            false
-        case .contains,
-             .is,
-             .startsWith,
-             .endsWith,
-             .regex:
-            true
         }
     }
 }

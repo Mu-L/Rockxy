@@ -40,7 +40,7 @@ struct InvestigationUnknownsView: View {
     var body: some View {
         if !unknowns.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Unknowns"))
+                Text(String(localized: "Unknowns", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
                     .foregroundStyle(.primary)
                 ForEach(unknowns) { evidence in
@@ -89,8 +89,11 @@ struct InvestigationEvidenceRow: View {
         .disabled(evidence.sourceTransactionID == nil)
         .help(evidence.sourceTransactionID == nil
             ? evidence.detail
-            : String(localized: "Reveal the request behind this finding"))
-        .accessibilityLabel(String(localized: "\(evidence.kind.title) finding: \(evidence.title)"))
+            : String(localized: "Reveal the request behind this finding", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(
+            localized: "\(evidence.kind.title) finding: \(evidence.title)",
+            bundle: RockxyLocalization.bundle
+        ))
     }
 
     // MARK: Private
@@ -204,7 +207,7 @@ struct InvestigationReportView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel(String(localized: "Investigation answer"))
+            .accessibilityLabel(String(localized: "Investigation answer", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -217,14 +220,14 @@ struct InvestigationReportView: View {
         HStack(spacing: 8) {
             ProgressView()
                 .controlSize(.small)
-            Text(String(localized: "Preparing redacted preview…"))
+            Text(String(localized: "Preparing redacted preview…", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(.secondary)
         }
     }
 
     private func answer(_ result: InvestigationResult) -> some View {
-        InvestigationSectionFrame(title: String(localized: "Summary")) {
+        InvestigationSectionFrame(title: String(localized: "Summary", bundle: RockxyLocalization.bundle)) {
             if usesModelAnswer(result) {
                 AssistantMarkdownText(source: message.text)
             } else {
@@ -233,7 +236,10 @@ struct InvestigationReportView: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel(String(localized: "Answer: \(result.summary)"))
+                    .accessibilityLabel(String(
+                        localized: "Answer: \(result.summary)",
+                        bundle: RockxyLocalization.bundle
+                    ))
             }
         }
     }
@@ -241,7 +247,7 @@ struct InvestigationReportView: View {
     @ViewBuilder
     private func nextStep(_ result: InvestigationResult) -> some View {
         if !result.nextStep.isEmpty {
-            InvestigationSectionFrame(title: String(localized: "Next step")) {
+            InvestigationSectionFrame(title: String(localized: "Next step", bundle: RockxyLocalization.bundle)) {
                 Text(result.nextStep)
                     .font(.system(size: metrics.primaryFontSize))
                     .textSelection(.enabled)
@@ -277,7 +283,7 @@ struct InvestigationReportView: View {
             .padding(.top, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         } label: {
-            Text(String(localized: "Details"))
+            Text(String(localized: "Details", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
                 .foregroundStyle(.primary)
         }
@@ -285,25 +291,31 @@ struct InvestigationReportView: View {
     }
 
     private func scopeSection(_ result: InvestigationResult) -> some View {
-        InvestigationReportSection(title: String(localized: "Scope")) {
+        InvestigationReportSection(title: String(localized: "Scope", bundle: RockxyLocalization.bundle)) {
             Text(result.scopeSummary)
                 .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(String(localized: "Investigation scope: \(result.scopeSummary)"))
+                .accessibilityLabel(String(
+                    localized: "Investigation scope: \(result.scopeSummary)",
+                    bundle: RockxyLocalization.bundle
+                ))
         }
     }
 
     @ViewBuilder
     private func findingsSection(_ result: InvestigationResult) -> some View {
         let findingGroups = InvestigationResultPresentation.findingGroups(for: result.evidence)
-        InvestigationReportSection(title: String(localized: "Findings")) {
+        InvestigationReportSection(title: String(localized: "Findings", bundle: RockxyLocalization.bundle)) {
             if findingGroups.isEmpty {
-                Text(String(localized: "No concrete findings from the captured traffic."))
-                    .font(.system(size: metrics.metadataFontSize))
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "No concrete findings from the captured traffic.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(findingGroups.enumerated()), id: \.element.id) { index, group in
@@ -322,7 +334,10 @@ struct InvestigationReportView: View {
         if let modelResult = message.modelResult {
             modelAttributionLabel(modelResult, requestCount: result.scopeTransactionIDs.count)
         } else {
-            let text = String(localized: "Local analysis · \(result.scopeTransactionIDs.count) requests")
+            let text = String(
+                localized: "Local analysis · \(result.scopeTransactionIDs.count) requests",
+                bundle: RockxyLocalization.bundle
+            )
             Text(text)
                 .font(.system(size: metrics.metadataFontSize))
                 .foregroundStyle(.secondary)
@@ -341,14 +356,18 @@ struct InvestigationReportView: View {
         -> some View
     {
         let summary = String(
-            localized: "\(modelResult.provider.title) · \(modelResult.model) · \(requestCount) requests"
+            localized: "\(modelResult.provider.title) · \(modelResult.model) · \(requestCount) requests",
+            bundle: RockxyLocalization.bundle
         )
         return Menu {
             Button(modelResult.endpointHost) {}
                 .disabled(true)
             if let usage = modelResult.usage {
                 Divider()
-                Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens")) {}
+                Button(String(
+                    localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens",
+                    bundle: RockxyLocalization.bundle
+                )) {}
                     .disabled(true)
             }
         } label: {
@@ -387,7 +406,10 @@ struct InvestigationReportView: View {
             Button {
                 onContinueWithModel()
             } label: {
-                Label(String(localized: "Ask Configured Model"), systemImage: "lock.shield")
+                Label(
+                    String(localized: "Ask Configured Model", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
             }
         }
         ForEach(handoffs) { handoff in

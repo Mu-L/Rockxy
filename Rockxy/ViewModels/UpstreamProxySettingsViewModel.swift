@@ -52,6 +52,11 @@ final class UpstreamProxySettingsViewModel {
 
     // MARK: Internal
 
+    private(set) var validationIssues: [UpstreamProxySettingsValidationIssue] = []
+    private(set) var status: UpstreamProxySettingsStatus?
+    private(set) var isTesting = false
+    private(set) var hasExternalConflict = false
+
     var draft: ExternalProxySettingsDraft {
         didSet {
             guard !isLoadingDraft else {
@@ -62,11 +67,6 @@ final class UpstreamProxySettingsViewModel {
             refreshValidation()
         }
     }
-
-    private(set) var validationIssues: [UpstreamProxySettingsValidationIssue] = []
-    private(set) var status: UpstreamProxySettingsStatus?
-    private(set) var isTesting = false
-    private(set) var hasExternalConflict = false
 
     var isDirty: Bool {
         draft != baselineDraft
@@ -121,7 +121,7 @@ final class UpstreamProxySettingsViewModel {
             let configuration = try draft.configuration()
             try store.saveConfiguration(configuration, credentials: draft.credentials())
             loadFromStore()
-            status = .success(String(localized: "Upstream Proxy settings saved."))
+            status = .success(String(localized: "Upstream Proxy settings saved.", bundle: RockxyLocalization.bundle))
         } catch {
             status = .failure(error.localizedDescription)
             throw error
@@ -224,26 +224,37 @@ final class UpstreamProxySettingsViewModel {
 
     private func validationIssuesForCurrentDraft(
         testing: Bool
-    ) -> [UpstreamProxySettingsValidationIssue] {
+    )
+        -> [UpstreamProxySettingsValidationIssue]
+    {
         var issues: [UpstreamProxySettingsValidationIssue] = []
 
         if draft.selectedProtocol == .socks5, !canSelectSOCKS5 {
             issues.append(.init(
                 field: .protocolSelection,
-                message: String(localized: "SOCKS5 upstream proxy is unavailable in this build.")
+                message: String(
+                    localized: "SOCKS5 upstream proxy is unavailable in this build.",
+                    bundle: RockxyLocalization.bundle
+                )
             ))
         }
         if draft.usesAuthentication, !canEnableAuthentication {
             issues.append(.init(
                 field: .authentication,
-                message: String(localized: "Upstream proxy authentication is unavailable in this build.")
+                message: String(
+                    localized: "Upstream proxy authentication is unavailable in this build.",
+                    bundle: RockxyLocalization.bundle
+                )
             ))
         } else if draft.needsReplacementPassword {
             issues.append(.init(
                 field: .password,
                 message: draft.hasStoredCredentials
-                    ? String(localized: "Enter the password again when changing the saved username.")
-                    : String(localized: "Enter the upstream proxy password.")
+                    ? String(
+                        localized: "Enter the password again when changing the saved username.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(localized: "Enter the upstream proxy password.", bundle: RockxyLocalization.bundle)
             ))
         }
 
@@ -266,7 +277,9 @@ final class UpstreamProxySettingsViewModel {
 
     private func field(
         for error: UpstreamProxyConfigurationError
-    ) -> UpstreamProxySettingsField {
+    )
+        -> UpstreamProxySettingsField
+    {
         switch error {
         case .hostInvalid:
             .host
@@ -293,12 +306,17 @@ enum UpstreamProxySettingsViewModelError: LocalizedError {
     case validationFailed
     case unresolvedConflict
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .validationFailed:
-            String(localized: "Review the highlighted Upstream Proxy settings.")
+            String(localized: "Review the highlighted Upstream Proxy settings.", bundle: RockxyLocalization.bundle)
         case .unresolvedConflict:
-            String(localized: "Resolve the externally changed Upstream Proxy settings before applying.")
+            String(
+                localized: "Resolve the externally changed Upstream Proxy settings before applying.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
@@ -309,9 +327,10 @@ private extension UpstreamProxyTestResult {
             + duration.components.attoseconds / 1_000_000_000_000_000
         let typeName = resolvedPACRoute?.displayName
             ?? negotiatedType?.displayName
-            ?? String(localized: "Direct")
+            ?? String(localized: "Direct", bundle: RockxyLocalization.bundle)
         return String(
-            localized: "Connected to \(targetHost):\(targetPort) through \(typeName) in \(milliseconds) ms."
+            localized: "Connected to \(targetHost):\(targetPort) through \(typeName) in \(milliseconds) ms.",
+            bundle: RockxyLocalization.bundle
         )
     }
 }
