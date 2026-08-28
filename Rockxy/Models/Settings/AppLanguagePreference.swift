@@ -42,6 +42,7 @@ enum AppLanguagePreference {
     // MARK: Internal
 
     static let defaultsKey = RockxyIdentity.current.defaultsKey("appLanguage")
+    static let appleLanguagesDefaultsKey = "AppleLanguages"
 
     static func availableOptions(
         localizations: [String] = Bundle.main.localizations,
@@ -95,6 +96,19 @@ enum AppLanguagePreference {
         ).first
     }
 
+    /// Returns the Mac's global language order instead of the process-effective
+    /// order, which may still contain a per-app `AppleLanguages` override from
+    /// an earlier language choice.
+    static func systemPreferredLanguages(defaults: UserDefaults = .standard) -> [String] {
+        if let languages = defaults.persistentDomain(forName: UserDefaults.globalDomain)?[appleLanguagesDefaultsKey]
+            as? [String],
+            !languages.isEmpty
+        {
+            return languages
+        }
+        return Locale.preferredLanguages
+    }
+
     @discardableResult
     static func apply(
         optionID: String,
@@ -106,6 +120,10 @@ enum AppLanguagePreference {
     {
         if optionID == AppLanguageOption.systemID {
             defaults.removeObject(forKey: defaultsKey)
+            // Selecting System Default is an explicit request to stop using an
+            // app-specific language. Remove any legacy/per-app override so the
+            // next launch agrees with the live runtime selection as well.
+            defaults.removeObject(forKey: appleLanguagesDefaultsKey)
             return true
         }
 
@@ -120,13 +138,15 @@ enum AppLanguagePreference {
 
     fileprivate static func runtimeState(
         optionID: String,
-        bundle: Bundle
+        bundle: Bundle,
+        systemPreferredLanguages: [String]
     )
         -> AppLanguageRuntimeState
     {
         let identifier = resolvedLocalizationID(
             optionID: optionID,
-            availableLocalizations: bundle.localizations
+            availableLocalizations: bundle.localizations,
+            preferredLanguages: systemPreferredLanguages
         ) ?? bundle.developmentLocalization ?? "en"
         let localizedBundle = bundle.path(forResource: identifier, ofType: "lproj")
             .flatMap(Bundle.init(path:)) ?? bundle
@@ -162,18 +182,25 @@ final class AppLanguageController: @unchecked Sendable {
     init(
         defaults: UserDefaults = .standard,
         bundle: Bundle = .main,
-        defaultsKey: String = AppLanguagePreference.defaultsKey
+        defaultsKey: String = AppLanguagePreference.defaultsKey,
+        systemPreferredLanguages: [String]? = nil
     ) {
         self.defaults = defaults
         self.mainBundle = bundle
         self.defaultsKey = defaultsKey
+        systemPreferredLanguagesOverride = systemPreferredLanguages
         let optionID = AppLanguagePreference.selectedOptionID(
             defaults: defaults,
             defaultsKey: defaultsKey,
             availableLocalizations: bundle.localizations
         )
         selectedOptionID = optionID
-        runtimeState = AppLanguagePreference.runtimeState(optionID: optionID, bundle: bundle)
+        runtimeState = AppLanguagePreference.runtimeState(
+            optionID: optionID,
+            bundle: bundle,
+            systemPreferredLanguages: systemPreferredLanguages
+                ?? AppLanguagePreference.systemPreferredLanguages(defaults: defaults)
+        )
     }
 
     // MARK: Internal
@@ -211,7 +238,12 @@ final class AppLanguageController: @unchecked Sendable {
             return true
         }
 
-        let newState = AppLanguagePreference.runtimeState(optionID: optionID, bundle: mainBundle)
+        let newState = AppLanguagePreference.runtimeState(
+            optionID: optionID,
+            bundle: mainBundle,
+            systemPreferredLanguages: systemPreferredLanguagesOverride
+                ?? AppLanguagePreference.systemPreferredLanguages(defaults: defaults)
+        )
         runtimeStateLock.lock()
         runtimeState = newState
         runtimeStateLock.unlock()
@@ -224,6 +256,7 @@ final class AppLanguageController: @unchecked Sendable {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let mainBundle: Bundle
     @ObservationIgnored private let defaultsKey: String
+    @ObservationIgnored private let systemPreferredLanguagesOverride: [String]?
     @ObservationIgnored private let runtimeStateLock = NSLock()
     @ObservationIgnored private var runtimeState: AppLanguageRuntimeState
 

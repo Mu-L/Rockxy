@@ -62,6 +62,25 @@ struct AppLanguagePreferenceTests {
         #expect(defaults.object(forKey: defaultsKey) == nil)
     }
 
+    @Test("System Default removes a stale app-specific AppleLanguages override")
+    func systemDefaultRemovesAppLanguageOverride() throws {
+        let suiteName = "AppLanguagePreferenceTests.\(UUID().uuidString)"
+        let defaultsKey = "selectedLanguage"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(["zh-Hans"], forKey: AppLanguagePreference.appleLanguagesDefaultsKey)
+
+        #expect(AppLanguagePreference.apply(
+            optionID: AppLanguageOption.systemID,
+            defaults: defaults,
+            defaultsKey: defaultsKey,
+            availableLocalizations: ["en", "zh-Hans"]
+        ))
+        #expect(
+            defaults.persistentDomain(forName: suiteName)?[AppLanguagePreference.appleLanguagesDefaultsKey] == nil
+        )
+    }
+
     @Test("Unsupported language identifiers are rejected without replacing the current choice")
     func unsupportedLanguageIsRejected() throws {
         let suiteName = "AppLanguagePreferenceTests.\(UUID().uuidString)"
@@ -118,6 +137,29 @@ struct AppLanguagePreferenceTests {
         #expect(controller.locale == Locale(identifier: "en"))
 
         #expect(controller.select(optionID: AppLanguageOption.systemID))
+        #expect(controller.locale == Locale.current)
+    }
+
+    @MainActor
+    @Test("System Default ignores a stale Chinese process preference and follows the Mac")
+    func systemDefaultUsesGlobalMacLanguageOrder() throws {
+        let suiteName = "AppLanguagePreferenceTests.\(UUID().uuidString)"
+        let defaultsKey = "selectedLanguage"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("zh-Hans", forKey: defaultsKey)
+        defaults.set(["zh-Hans"], forKey: AppLanguagePreference.appleLanguagesDefaultsKey)
+        let controller = AppLanguageController(
+            defaults: defaults,
+            bundle: .main,
+            defaultsKey: defaultsKey,
+            systemPreferredLanguages: ["en-VN", "zh-Hans-VN"]
+        )
+
+        #expect(String(localized: "General", bundle: controller.localizedBundle) == "通用")
+
+        #expect(controller.select(optionID: AppLanguageOption.systemID))
+        #expect(String(localized: "General", bundle: controller.localizedBundle) == "General")
         #expect(controller.locale == Locale.current)
     }
 }
