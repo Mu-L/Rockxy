@@ -134,11 +134,11 @@ enum ImportReviewCopy {
     }
 
     static func requests(_ count: Int) -> String {
-        String(localized: "\(count) request\(count == 1 ? "" : "s")")
+        String(AttributedString(localized: "^[\(count) request](inflect: true)").characters)
     }
 
     static func logEntries(_ count: Int) -> String {
-        String(localized: "\(count) log entr\(count == 1 ? "y" : "ies")")
+        String(AttributedString(localized: "^[\(count) log entry](inflect: true)").characters)
     }
 }
 

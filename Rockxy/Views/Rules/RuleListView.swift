@@ -400,7 +400,8 @@ private struct RuleGridRow: View {
         case let .modifyHeader(operations):
             let count = operations.count
             let phaseLabel = operations.phaseSummaryLabel
-            let label = "\(count) \(count == 1 ? "op" : "ops") \u{00B7} \(phaseLabel)"
+            let opsLabel = String(AttributedString(localized: "^[\(count) op](inflect: true)").characters)
+            let label = "\(opsLabel) \u{00B7} \(phaseLabel)"
             return (label, .green)
         case let .networkCondition(preset, _):
             return ("Network \u{00B7} \(preset.displayName)", .cyan)

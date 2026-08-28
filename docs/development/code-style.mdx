@@ -121,6 +121,18 @@ SwiftUI view literals auto-localize — `Text("Start Proxy")` and `Button("Clear
 
 Do **not** localize technical terms (HTTP, TLS, WebSocket, GraphQL, etc.).
 
+Two rules keep string extraction clean and translations grammatically safe:
+
+- **No dynamic keys.** Never build a localization key from a runtime value
+  (`String(localized: String.LocalizationValue(name))`). Pass a
+  `LocalizedStringResource` literal into helpers so the compiler can extract it.
+- **Pluralize with grammar agreement**, never a hand-rolled suffix:
+  `String(localized: "^[\(count) request](inflect: true)")` instead of
+  `"\(count) request\(count == 1 ? "" : "s")"`.
+
+See [Localization](/development/localization) for the full contributor workflow,
+catalog hygiene, placeholder rules, and the `validate_xcstrings.py` validation gate.
+
 ## Naming Conventions
 
 | Element | Convention | Example |

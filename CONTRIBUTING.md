@@ -73,8 +73,25 @@ Before opening, check:
 - [ ] `CHANGELOG.md` updated under `[Unreleased]` (skip for unreleased-only fixes)
 - [ ] Docs updated in `docs/` if the change affects user-facing behavior
 - [ ] User-facing strings localized
+- [ ] If string catalogs changed, `python3 .github/tools/validate_xcstrings.py` passes
 - [ ] No SwiftLint/SwiftFormat violations
 - [ ] If the change touches helper packaging, release scripts, or platform compatibility claims, Intel + Apple Silicon validation was updated or re-run
+
+## Translations
+
+Rockxy ships native Xcode String Catalogs (`Rockxy/Localizable.xcstrings` and
+`Rockxy/InfoPlist.xcstrings`); the Git-tracked catalogs are canonical and there is
+no in-app language picker (macOS drives the language). To add or improve a language,
+edit the catalogs in Xcode, preserve every placeholder and plural/format token, then
+validate before pushing:
+
+```bash
+python3 .github/tools/validate_xcstrings.py
+```
+
+A maintainer reviews every `.xcstrings` change; this gates review, not authorship.
+See [`docs/development/localization.mdx`](docs/development/localization.mdx) for the
+full workflow, catalog hygiene, and placeholder rules.
 
 ## Project Layout
 

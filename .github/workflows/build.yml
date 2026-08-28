@@ -1,11 +1,14 @@
 name: Build & Validate
 
-# Automatic full CI is reserved for the same-repository develop -> main PR.
-# Feature and fix PRs targeting develop do not trigger this workflow.
+# Automatic full CI (lint / test / build) is reserved for the same-repository
+# develop -> main PR; those jobs self-gate with an `if:` and skip otherwise.
+# The lightweight `localization` job runs on every PR (including forks) because
+# it needs no secrets and no privileged access.
 on:
   pull_request:
     branches:
       - main
+      - develop
   workflow_dispatch:
     inputs:
       channel:
@@ -26,6 +29,18 @@ defaults:
     shell: bash
 
 jobs:
+  localization:
+    name: Localization Catalogs
+    # No secrets and no privileged access, so this is safe to run on fork PRs.
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
+      - name: Validate string catalogs (JSON, zh-Hans coverage, placeholder parity, compile)
+        run: python3 .github/tools/validate_xcstrings.py
+
   lint:
     name: SwiftLint
     if: >-

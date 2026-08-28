@@ -449,24 +449,29 @@ struct DeveloperSetupViewModelTests {
     func iosSimulatorGuideContent() {
         let guide = DeveloperSetupGuideCatalog.content(for: .iosSimulator)
 
-        #expect(guide?.setupTips.contains(where: { $0.message.contains("loopback") }) == true)
+        #expect(guide?.setupTips.contains(where: { String(localized: $0.message).contains("loopback") }) == true)
         #expect(guide?.setupTips
-            .contains(where: { $0.message.contains("Trust") || $0.message.contains("trust") }) == true)
+            .contains(where: {
+                let message = String(localized: $0.message)
+                return message.contains("Trust") || message.contains("trust")
+            }) == true)
     }
 
     @Test("Android Emulator guide calls out 10.0.2.2 and network-security-config")
     func androidEmulatorGuideContent() {
         let guide = DeveloperSetupGuideCatalog.content(for: .androidEmulator)
 
-        #expect(guide?.setupTips.contains(where: { $0.message.contains("10.0.2.2") }) == true)
-        #expect(guide?.setupTips.contains(where: { $0.message.contains("network-security-config") }) == true)
+        #expect(guide?.setupTips.contains(where: { String(localized: $0.message).contains("10.0.2.2") }) == true)
+        #expect(guide?.setupTips.contains(where: {
+            String(localized: $0.message).contains("network-security-config")
+        }) == true)
     }
 
     @Test("Vision Pro guide treats the headset as an iOS-class device")
     func visionProGuideContent() {
         let guide = DeveloperSetupGuideCatalog.content(for: .visionPro)
 
-        #expect(guide?.setupTips.contains(where: { $0.message.contains("iOS") }) == true)
+        #expect(guide?.setupTips.contains(where: { String(localized: $0.message).contains("iOS") }) == true)
         #expect(guide?.troubleshootingTips.isEmpty == false)
     }
 

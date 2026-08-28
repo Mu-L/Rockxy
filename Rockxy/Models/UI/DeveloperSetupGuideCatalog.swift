@@ -4,8 +4,8 @@ import Foundation
 
 struct SetupGuideTip: Identifiable, Equatable {
     let id: String
-    let title: String
-    let message: String
+    let title: LocalizedStringResource
+    let message: LocalizedStringResource
 }
 
 // MARK: - SetupGuideContent
@@ -471,15 +471,15 @@ enum DeveloperSetupGuideCatalog {
 
     private static func tip(
         _ id: String,
-        _ title: String.LocalizationValue,
-        _ message: String.LocalizationValue
+        _ title: LocalizedStringResource,
+        _ message: LocalizedStringResource
     )
         -> SetupGuideTip
     {
         SetupGuideTip(
             id: id,
-            title: String(localized: title),
-            message: String(localized: message)
+            title: title,
+            message: message
         )
     }
 }

@@ -579,13 +579,13 @@ struct BreakpointEditorView: View {
         draftFor(itemId)?.headers.first(where: { $0.id == headerId })
     }
 
-    private func columnHeaders(name: String, value: String) -> some View {
+    private func columnHeaders(name: LocalizedStringResource, value: LocalizedStringResource) -> some View {
         HStack {
-            Text(String(localized: String.LocalizationValue(name)))
+            Text(name)
                 .font(toolMetrics.secondaryFont(weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(String(localized: String.LocalizationValue(value)))
+            Text(value)
                 .font(toolMetrics.secondaryFont(weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)

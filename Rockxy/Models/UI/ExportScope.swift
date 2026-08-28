@@ -285,7 +285,7 @@ struct ExportScopeContext: Identifiable {
     func countSummary(for scope: ExportScope) -> String {
         let snapshot = snapshot(for: scope)
         if !format.isOpenAPI {
-            return String(localized: "\(snapshot.total) transaction\(snapshot.total == 1 ? "" : "s")")
+            return String(AttributedString(localized: "^[\(snapshot.total) transaction](inflect: true)").characters)
         }
         return String(localized: "\(snapshot.eligibleCount) included · \(snapshot.skippedCount) skipped")
     }
@@ -296,7 +296,11 @@ struct ExportScopeContext: Identifiable {
         guard format.isOpenAPI, skipped > 0 else {
             return nil
         }
-        return String(localized: "\(skipped) request\(skipped == 1 ? "" : "s") can't be inferred and will be skipped")
+        return String(
+            AttributedString(
+                localized: "^[\(skipped) request](inflect: true) can't be inferred and will be skipped"
+            ).characters
+        )
     }
 
     /// Truthful reason a scope is unavailable, or `nil` when it is selectable.

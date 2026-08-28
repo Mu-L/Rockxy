@@ -852,7 +852,7 @@ extension RequestTableView {
                     // Unified display: WS rows show frame count, Web3 rows show RPC method, GraphQL rows show operation name.
                     if rowData.isWebSocket {
                         let count = rowData.webSocketFrameCount
-                        text = "\(count) \(count == 1 ? "frame" : "frames")"
+                        text = String(AttributedString(localized: "^[\(count) frame](inflect: true)").characters)
                     } else if rowData.isWeb3RPC {
                         text = rowData.web3RPCMethod ?? ""
                     } else {
@@ -2579,7 +2579,9 @@ extension RequestTableView {
             case "queryName":
                 if rowData.isWebSocket {
                     let count = rowData.webSocketFrameCount
-                    cell.stringValue = "\(count) \(count == 1 ? "frame" : "frames")"
+                    cell.stringValue = String(
+                        AttributedString(localized: "^[\(count) frame](inflect: true)").characters
+                    )
                     cell.textColor = .tertiaryLabelColor
                     cell.toolTip = nil
                 } else if rowData.isWeb3RPC {

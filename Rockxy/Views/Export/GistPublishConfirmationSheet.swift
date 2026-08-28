@@ -41,7 +41,7 @@ struct GistPublishReviewSummary: Equatable {
     }
 
     var requestSummary: String {
-        String(localized: "\(requestCount) request\(requestCount == 1 ? "" : "s") selected")
+        String(AttributedString(localized: "^[\(requestCount) request](inflect: true) selected").characters)
     }
 
     /// Compact host line: names for one or two hosts, then a "+N more" overflow.
@@ -60,12 +60,12 @@ struct GistPublishReviewSummary: Equatable {
     }
 
     var hostCountLabel: String {
-        String(localized: "\(uniqueHostCount) host\(uniqueHostCount == 1 ? "" : "s")")
+        String(AttributedString(localized: "^[\(uniqueHostCount) host](inflect: true)").characters)
     }
 
     var fileSummary: String {
         var parts = [String(localized: "README"), String(localized: "HAR")]
-        parts.append(String(localized: "\(requestCount) transaction file\(requestCount == 1 ? "" : "s")"))
+        parts.append(String(AttributedString(localized: "^[\(requestCount) transaction file](inflect: true)").characters))
         if hasWebSocketFrames {
             parts.append(String(localized: "WebSocket frames"))
         }
@@ -73,7 +73,7 @@ struct GistPublishReviewSummary: Equatable {
     }
 
     var fileCountLabel: String {
-        String(localized: "\(fileCount) file\(fileCount == 1 ? "" : "s")")
+        String(AttributedString(localized: "^[\(fileCount) file](inflect: true)").characters)
     }
 }
 

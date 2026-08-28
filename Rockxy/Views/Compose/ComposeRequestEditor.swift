@@ -228,14 +228,14 @@ struct ComposeRequestEditor: View {
 
     // MARK: - Shared Helpers
 
-    private func columnHeaders(name: String, value: String) -> some View {
+    private func columnHeaders(name: LocalizedStringResource, value: LocalizedStringResource) -> some View {
         HStack {
             Color.clear.frame(width: 24)
-            Text(String(localized: String.LocalizationValue(name)))
+            Text(name)
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(String(localized: String.LocalizationValue(value)))
+            Text(value)
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
