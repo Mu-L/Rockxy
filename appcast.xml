@@ -6,35 +6,38 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.35.0 (build 52)</title>
-      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-08-19T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.36.0 (build 53)</title>
+      <pubDate>Mon, 24 Aug 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-08-24T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.35.0/Rockxy-0.35.0-52.dmg"
-        sparkle:version="52"
-        sparkle:shortVersionString="0.35.0"
-        sparkle:edSignature="j6mVzEXb0ttqCyLlj8Oq97nersUFz0I+cVKY3XZQmm9tIHkG9CbxCLe4zCRaKA+9nAOysTMSXG4vp3uoZbqIBQ=="
-        length="34293044"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.36.0/Rockxy-0.36.0-53.dmg"
+        sparkle:version="53"
+        sparkle:shortVersionString="0.36.0"
+        sparkle:edSignature="ZeGd0gLT6UpscReuO7TJ02Osd72tK91SGBlgvf6V+aarqohsQgsXzGTKYAAcb/g9VQCSEnnQM7svYp5ERBS0BQ=="
+        length="35551815"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.35.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.36.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
-  <li>Follow Live keeps each workspace on the newest request that matches its active filters until you navigate traffic manually.</li>
-  <li>Focus actions are now explicit sidebar buttons, making focused traffic views easier to discover and control.</li>
+  <li>Added local Projects with project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only Project file import and export.</li>
+  <li>Added optional iCloud synchronization for Pro Projects, with conflict-safe merging and local recovery.</li>
+  <li>Added detachable transaction inspectors, letting you continue capturing traffic while reviewing a request in its own window.</li>
+  <li>Added a dedicated traffic command bar for recording controls, Follow Live, Clear Session, and faster traffic navigation.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
-  <li>Stabilized live request-table refresh and selection while high-volume captures and app metadata updates arrive.</li>
-  <li>Kept HTTPS decryption controls accessible with clearer host and app scope, retry guidance after TLS rejection, and safer encrypted passthrough recovery.</li>
-  <li>Preserved helper reset and reinstall recovery across development rebuilds, and now prompts for a clean reopen after app replacement.</li>
-  <li>Rebalanced sidebar, Context Dock, and inspector sizing while preserving each workspace&#x27;s active context and manual divider choices.</li>
+  <li>Prevented Developer Hub from appearing blank after traffic capture starts.</li>
+  <li>Hardened Project lifecycle, reopening, retention, and recovery behavior.</li>
+  <li>Preserved recovery options for oversized Project catalogs before size validation blocks normal loading.</li>
+  <li>Improved Settings and recovery presentation during invalid or damaged state handling.</li>
 </ul>
 <h3>Changed</h3>
 <ul>
-  <li>Workspace feedback now appears in the relevant pane without obscuring capture controls or unrelated workspaces.</li>
-  <li>Official builds now include clearer binary licensing, public-source boundaries, third-party notices, and release provenance.</li>
+  <li>Refreshed the workspace, Settings, and tool windows with native Liquid Glass styling that respects themes and accessibility preferences.</li>
+  <li>Improved transaction selection and per-workspace navigation so reveal and follow actions remain attached to the correct workspace.</li>
+  <li>Strengthened bounded traffic capture and Project retention to keep long-running sessions predictable.</li>
 </ul>
       ]]></description>
     </item>

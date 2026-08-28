@@ -63,24 +63,27 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.35.0** — 2026-08-19
+**v0.36.0** — 2026-08-24
 
 ### Added
 
-- Follow Live keeps each workspace on the newest request that matches its active filters until you navigate traffic manually.
-- Focus actions are now explicit sidebar buttons, making focused traffic views easier to discover and control.
+- Added local Projects with project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only Project file import and export.
+- Added optional iCloud synchronization for Pro Projects, with conflict-safe merging and local recovery.
+- Added detachable transaction inspectors, letting you continue capturing traffic while reviewing a request in its own window.
+- Added a dedicated traffic command bar for recording controls, Follow Live, Clear Session, and faster traffic navigation.
 
 ### Fixed
 
-- Stabilized live request-table refresh and selection while high-volume captures and app metadata updates arrive.
-- Kept HTTPS decryption controls accessible with clearer host and app scope, retry guidance after TLS rejection, and safer encrypted passthrough recovery.
-- Preserved helper reset and reinstall recovery across development rebuilds, and now prompts for a clean reopen after app replacement.
-- Rebalanced sidebar, Context Dock, and inspector sizing while preserving each workspace's active context and manual divider choices.
+- Prevented Developer Hub from appearing blank after traffic capture starts.
+- Hardened Project lifecycle, reopening, retention, and recovery behavior.
+- Preserved recovery options for oversized Project catalogs before size validation blocks normal loading.
+- Improved Settings and recovery presentation during invalid or damaged state handling.
 
 ### Changed
 
-- Workspace feedback now appears in the relevant pane without obscuring capture controls or unrelated workspaces.
-- Official builds now include clearer binary licensing, public-source boundaries, third-party notices, and release provenance.
+- Refreshed the workspace, Settings, and tool windows with native Liquid Glass styling that respects themes and accessibility preferences.
+- Improved transaction selection and per-workspace navigation so reveal and follow actions remain attached to the correct workspace.
+- Strengthened bounded traffic capture and Project retention to keep long-running sessions predictable.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
