@@ -10,10 +10,12 @@ struct NativeWorkspaceToolbarConfiguration {
     init(
         coordinator: MainContentCoordinator,
         onOpenDeveloperHub: @escaping () -> Void,
+        onOpenToolWindow: @escaping (String) -> Void = { _ in },
         onToggleProxy: (() -> Void)? = nil
     ) {
         self.coordinator = coordinator
         self.onOpenDeveloperHub = onOpenDeveloperHub
+        self.onOpenToolWindow = onOpenToolWindow
         self.onToggleProxy = onToggleProxy ?? {
             if coordinator.isProxyRunning {
                 coordinator.stopProxy()
@@ -27,6 +29,7 @@ struct NativeWorkspaceToolbarConfiguration {
 
     let coordinator: MainContentCoordinator
     let onOpenDeveloperHub: () -> Void
+    let onOpenToolWindow: (String) -> Void
     let onToggleProxy: () -> Void
 }
 
@@ -71,6 +74,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         self.splitViewController = splitViewController
         coordinator = configuration.coordinator
         onOpenDeveloperHub = configuration.onOpenDeveloperHub
+        onOpenToolWindow = configuration.onOpenToolWindow
         onToggleProxy = configuration.onToggleProxy
         managedToolbar = NSToolbar(identifier: toolbarIdentifier ?? Self.toolbarIdentifier)
         super.init()
@@ -111,6 +115,154 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     static let contextDockIdentifier = NSToolbarItem.Identifier(
         "\(RockxyIdentity.current.logSubsystem).toolbar.contextDock"
     )
+    static let recordingIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.toggleRecording"
+    )
+    static let composeIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.compose"
+    )
+    static let clearSessionIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.clearSession"
+    )
+    static let detachedInspectorIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.detachedInspector"
+    )
+    static let blockListIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.blockList"
+    )
+    static let allowListIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.allowList"
+    )
+    static let mapLocalIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.mapLocal"
+    )
+    static let mapRemoteIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.mapRemote"
+    )
+    static let scriptingIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.scripting"
+    )
+    static let breakpointRulesIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.breakpointRules"
+    )
+    static let networkConditionsIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.networkConditions"
+    )
+    static let sslProxyingIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.sslProxying"
+    )
+    static let bypassProxyIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.bypassProxy"
+    )
+    static let externalProxyIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.externalProxy"
+    )
+    static let modifyHeadersIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.modifyHeaders"
+    )
+    static let diffIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.diff"
+    )
+    static let customColumnsIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.customColumns"
+    )
+    static let previewTabsIdentifier = NSToolbarItem.Identifier(
+        "\(RockxyIdentity.current.logSubsystem).toolbar.previewTabs"
+    )
+
+    struct ToolWindowItemDescriptor {
+        let identifier: NSToolbarItem.Identifier
+        let label: String
+        let systemImage: String
+        let windowID: String
+    }
+
+    static let toolWindowItemDescriptors: [ToolWindowItemDescriptor] = [
+        .init(
+            identifier: blockListIdentifier,
+            label: String(localized: "Block List"),
+            systemImage: "hand.raised.slash",
+            windowID: "blockList"
+        ),
+        .init(
+            identifier: allowListIdentifier,
+            label: String(localized: "Allow List"),
+            systemImage: "checkmark.shield",
+            windowID: "allowList"
+        ),
+        .init(
+            identifier: mapLocalIdentifier,
+            label: String(localized: "Map Local"),
+            systemImage: "folder.badge.gearshape",
+            windowID: "mapLocal"
+        ),
+        .init(
+            identifier: mapRemoteIdentifier,
+            label: String(localized: "Map Remote"),
+            systemImage: "arrow.triangle.branch",
+            windowID: "mapRemote"
+        ),
+        .init(
+            identifier: scriptingIdentifier,
+            label: String(localized: "Scripting"),
+            systemImage: "curlybraces",
+            windowID: "scriptingList"
+        ),
+        .init(
+            identifier: breakpointRulesIdentifier,
+            label: String(localized: "Breakpoint Rules"),
+            systemImage: "pause.circle",
+            windowID: "breakpointRules"
+        ),
+        .init(
+            identifier: networkConditionsIdentifier,
+            label: String(localized: "Network Conditions"),
+            systemImage: "speedometer",
+            windowID: "networkConditions"
+        ),
+        .init(
+            identifier: sslProxyingIdentifier,
+            label: String(localized: "HTTPS Decryption"),
+            systemImage: "lock.open",
+            windowID: "sslProxyingList"
+        ),
+        .init(
+            identifier: bypassProxyIdentifier,
+            label: String(localized: "Proxy Bypass"),
+            systemImage: "arrow.uturn.left.circle",
+            windowID: "bypassProxyList"
+        ),
+        .init(
+            identifier: externalProxyIdentifier,
+            label: String(localized: "External Proxy"),
+            systemImage: "globe",
+            windowID: "externalProxySettings"
+        ),
+        .init(
+            identifier: modifyHeadersIdentifier,
+            label: String(localized: "Modify Headers"),
+            systemImage: "slider.horizontal.3",
+            windowID: "modifyHeaders"
+        ),
+        .init(
+            identifier: diffIdentifier,
+            label: String(localized: "Diff"),
+            systemImage: "doc.text.magnifyingglass",
+            windowID: "diff"
+        ),
+        .init(
+            identifier: customColumnsIdentifier,
+            label: String(localized: "Header Columns"),
+            systemImage: "rectangle.split.3x1",
+            windowID: "customColumns"
+        ),
+        .init(
+            identifier: previewTabsIdentifier,
+            label: String(localized: "Inspector Preview Tabs"),
+            systemImage: "rectangle.stack",
+            windowID: "bodyPreviewerTabs"
+        ),
+    ]
 
     static let defaultItemIdentifiers: [NSToolbarItem.Identifier] = [
         .flexibleSpace,
@@ -135,6 +287,11 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         developerHubIdentifier,
         bottomInspectorIdentifier,
         contextDockIdentifier,
+        recordingIdentifier,
+        composeIdentifier,
+        clearSessionIdentifier,
+        detachedInspectorIdentifier,
+    ] + toolWindowItemDescriptors.map(\.identifier) + [
         .space,
         .flexibleSpace,
     ]
@@ -147,7 +304,11 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         developerHubIdentifier,
         bottomInspectorIdentifier,
         contextDockIdentifier,
-    ]
+        recordingIdentifier,
+        composeIdentifier,
+        clearSessionIdentifier,
+        detachedInspectorIdentifier,
+    ] + toolWindowItemDescriptors.map(\.identifier)
 
     let managedToolbar: NSToolbar
 
@@ -268,8 +429,21 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             return makeBottomInspectorItem()
         case Self.contextDockIdentifier:
             return makeContextDockItem()
+        case Self.recordingIdentifier:
+            return makeRecordingItem()
+        case Self.composeIdentifier:
+            return makeComposeItem()
+        case Self.clearSessionIdentifier:
+            return makeClearSessionItem()
+        case Self.detachedInspectorIdentifier:
+            return makeDetachedInspectorItem()
         default:
-            return nil
+            guard let descriptor = Self.toolWindowItemDescriptors.first(where: {
+                $0.identifier == itemIdentifier
+            }) else {
+                return nil
+            }
+            return makeToolWindowItem(descriptor)
         }
     }
 
@@ -278,6 +452,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private weak var splitViewController: NativeWorkspaceSplitViewController?
     private let coordinator: MainContentCoordinator
     private let onOpenDeveloperHub: () -> Void
+    private let onOpenToolWindow: (String) -> Void
     private let onToggleProxy: () -> Void
     private var isObservingState = false
 
@@ -302,6 +477,28 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             : String(localized: "Show Context Dock")
     }
 
+    private var recordingToolTip: String {
+        guard coordinator.isProxyRunning else {
+            return String(localized: "Start the proxy before changing recording")
+        }
+        return coordinator.isRecording
+            ? String(localized: "Pause Recording")
+            : String(localized: "Resume Recording")
+    }
+
+    private var canClearSession: Bool {
+        TrafficCommandAvailability.canClearSession(
+            transactionCount: coordinator.transactions.count,
+            logCount: coordinator.logEntries.count,
+            hasSessionProvenance: coordinator.sessionProvenance != nil,
+            isClearingSession: coordinator.isClearingSession
+        )
+    }
+
+    private var canDetachInspector: Bool {
+        coordinator.selectedTransaction != nil && coordinator.selectedTransactionIDs.count <= 1
+    }
+
     /// Arms a single-shot observation of the coordinator's toolbar-relevant state and re-arms
     /// after each change. `withObservationTracking` fires `onChange` exactly once, so the handler
     /// re-registers itself. Both the handler and its follow-up task capture `self` weakly, so a
@@ -312,6 +509,13 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             _ = coordinator.hasPayloadInspectorSelection
             _ = coordinator.isBottomInspectorEffectivelyPresented
             _ = coordinator.isContextDockVisible
+            _ = coordinator.isRecording
+            _ = coordinator.transactions.count
+            _ = coordinator.logEntries.count
+            _ = coordinator.sessionProvenance
+            _ = coordinator.isClearingSession
+            _ = coordinator.selectedTransaction
+            _ = coordinator.selectedTransactionIDs
         } onChange: { [weak self] in
             // `onChange` runs inside the mutating turn. Hop to a fresh main-actor turn and yield
             // before touching AppKit-owned toolbar items: mutating NSToolbarItem geometry while
@@ -388,6 +592,70 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         return item
     }
 
+    private func makeRecordingItem() -> NSToolbarItem {
+        let item = imageItem(
+            identifier: Self.recordingIdentifier,
+            label: coordinator.isRecording
+                ? String(localized: "Pause Recording")
+                : String(localized: "Resume Recording"),
+            paletteLabel: String(localized: "Toggle Recording"),
+            systemImage: coordinator.isRecording ? "pause.circle" : "record.circle",
+            action: #selector(toggleRecording(_:))
+        )
+        item.possibleLabels = [
+            String(localized: "Pause Recording"),
+            String(localized: "Resume Recording"),
+        ]
+        item.isEnabled = coordinator.isProxyRunning
+        item.toolTip = recordingToolTip
+        return item
+    }
+
+    private func makeComposeItem() -> NSToolbarItem {
+        imageItem(
+            identifier: Self.composeIdentifier,
+            label: String(localized: "Compose"),
+            systemImage: "square.and.pencil",
+            action: #selector(composeRequest(_:))
+        )
+    }
+
+    private func makeClearSessionItem() -> NSToolbarItem {
+        let item = imageItem(
+            identifier: Self.clearSessionIdentifier,
+            label: String(localized: "Clear"),
+            paletteLabel: String(localized: "Clear Session"),
+            systemImage: "trash",
+            action: #selector(clearSession(_:))
+        )
+        item.isEnabled = canClearSession
+        item.toolTip = String(localized: "Clear the current traffic session")
+        return item
+    }
+
+    private func makeDetachedInspectorItem() -> NSToolbarItem {
+        let item = imageItem(
+            identifier: Self.detachedInspectorIdentifier,
+            label: String(localized: "Detach Inspector"),
+            systemImage: "rectangle.on.rectangle.angled",
+            action: #selector(detachInspector(_:))
+        )
+        item.isEnabled = canDetachInspector
+        item.toolTip = canDetachInspector
+            ? String(localized: "Open the selected request in a separate Inspector window")
+            : String(localized: "Select one request to detach its Inspector")
+        return item
+    }
+
+    private func makeToolWindowItem(_ descriptor: ToolWindowItemDescriptor) -> NSToolbarItem {
+        imageItem(
+            identifier: descriptor.identifier,
+            label: descriptor.label,
+            systemImage: descriptor.systemImage,
+            action: #selector(openToolWindow(_:))
+        )
+    }
+
     private func imageItem(
         identifier: NSToolbarItem.Identifier,
         label: String,
@@ -449,6 +717,26 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         bottomInspectorItem?.toolTip = bottomInspectorToolTip
 
         toolbarItem(identifier: Self.contextDockIdentifier)?.toolTip = contextDockToolTip
+
+        let recordingItem = toolbarItem(identifier: Self.recordingIdentifier)
+        let recordingLabel = coordinator.isRecording
+            ? String(localized: "Pause Recording")
+            : String(localized: "Resume Recording")
+        recordingItem?.label = recordingLabel
+        recordingItem?.isEnabled = coordinator.isProxyRunning
+        recordingItem?.toolTip = recordingToolTip
+        recordingItem?.image = NSImage(
+            systemSymbolName: coordinator.isRecording ? "pause.circle" : "record.circle",
+            accessibilityDescription: recordingLabel
+        )
+
+        toolbarItem(identifier: Self.clearSessionIdentifier)?.isEnabled = canClearSession
+
+        let detachedInspectorItem = toolbarItem(identifier: Self.detachedInspectorIdentifier)
+        detachedInspectorItem?.isEnabled = canDetachInspector
+        detachedInspectorItem?.toolTip = canDetachInspector
+            ? String(localized: "Open the selected request in a separate Inspector window")
+            : String(localized: "Select one request to detach its Inspector")
     }
 
     private func toolbarItem(identifier: NSToolbarItem.Identifier) -> NSToolbarItem? {
@@ -497,6 +785,66 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     @objc
     private func toggleContextDock(_ sender: Any?) {
         coordinator.toggleInspectorRight()
+    }
+
+    @objc
+    private func toggleRecording(_ sender: Any?) {
+        coordinator.toggleRecording()
+    }
+
+    @objc
+    private func composeRequest(_ sender: Any?) {
+        ComposeStore.shared.requestBlankDraft()
+        openToolWindow(id: "compose")
+    }
+
+    @objc
+    private func clearSession(_ sender: Any?) {
+        guard canClearSession else {
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            await self.coordinator.clearSession()
+        }
+    }
+
+    @objc
+    private func detachInspector(_ sender: Any?) {
+        guard canDetachInspector,
+              let transaction = coordinator.selectedTransaction else
+        {
+            return
+        }
+        DetachedInspectorStore.shared.present(
+            transaction: transaction,
+            highlightContext: coordinator.activeInspectorHighlightContext()
+        )
+        openToolWindow(id: "detachedInspector")
+    }
+
+    @objc
+    private func openToolWindow(_ sender: Any?) {
+        guard let item = sender as? NSToolbarItem,
+              let descriptor = Self.toolWindowItemDescriptors.first(where: {
+                  $0.identifier == item.itemIdentifier
+              }) else
+        {
+            return
+        }
+        openToolWindow(id: descriptor.windowID)
+    }
+
+    private func openToolWindow(id: String) {
+        // Opening a SwiftUI scene inline from an AppKit toolbar target can re-enter
+        // the unified toolbar's hosted views. Leave the action turn first, matching
+        // the existing Developer Hub safety boundary.
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.onOpenToolWindow(id)
+        }
     }
 }
 

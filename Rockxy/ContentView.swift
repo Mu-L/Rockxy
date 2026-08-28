@@ -51,7 +51,8 @@ struct ContentView: View {
             inspectorIdealWidth: MainWindowLayoutMetrics.contextDockIdealWidth,
             toolbarConfiguration: NativeWorkspaceToolbarConfiguration(
                 coordinator: coordinator,
-                onOpenDeveloperHub: { openWindow(id: "developerSetupHub") }
+                onOpenDeveloperHub: { openWindow(id: "developerSetupHub") },
+                onOpenToolWindow: { id in openWindow(id: id) }
             )
         ) {
             SidebarView(coordinator: coordinator)

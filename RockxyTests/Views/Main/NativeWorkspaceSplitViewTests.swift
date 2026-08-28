@@ -266,6 +266,8 @@ struct NativeWorkspaceSplitViewTests {
         #expect(allowed.contains(.space))
         #expect(allowed.contains(.flexibleSpace))
         #expect(Set(NativeWorkspaceToolbar.userCustomizableItemIdentifiers).isSubset(of: Set(allowed)))
+        #expect(NativeWorkspaceToolbar.userCustomizableItemIdentifiers.count == 25)
+        #expect(NativeWorkspaceToolbar.toolWindowItemDescriptors.count == 14)
         #expect(immovable == [NativeWorkspaceToolbar.sidebarTrackingSeparatorIdentifier])
 
         let preferredWindow = window
@@ -310,6 +312,25 @@ struct NativeWorkspaceSplitViewTests {
             #expect(!item.paletteLabel.isEmpty)
             #expect(item.image != nil || item.view != nil)
         }
+
+        let toolWindowIDs = NativeWorkspaceToolbar.toolWindowItemDescriptors.map(\.windowID)
+        #expect(Set(toolWindowIDs).count == toolWindowIDs.count)
+        #expect(Set(toolWindowIDs) == [
+            "allowList",
+            "blockList",
+            "bodyPreviewerTabs",
+            "breakpointRules",
+            "bypassProxyList",
+            "customColumns",
+            "diff",
+            "externalProxySettings",
+            "mapLocal",
+            "mapRemote",
+            "modifyHeaders",
+            "networkConditions",
+            "scriptingList",
+            "sslProxyingList",
+        ])
     }
 
     @Test("Tracking separator uses a compact default-set palette label")
@@ -351,9 +372,15 @@ struct NativeWorkspaceSplitViewTests {
         window.toolbar = toolbar.managedToolbar
 
         for identifier in NativeWorkspaceToolbar.userCustomizableItemIdentifiers {
-            let index = try #require(toolbar.managedToolbar.items.firstIndex {
-                $0.itemIdentifier == identifier
-            })
+            if !toolbar.managedToolbar.items.contains(where: { $0.itemIdentifier == identifier }) {
+                toolbar.managedToolbar.insertItem(
+                    withItemIdentifier: identifier,
+                    at: toolbar.managedToolbar.items.count
+                )
+            }
+            let index = try #require(
+                toolbar.managedToolbar.items.firstIndex { $0.itemIdentifier == identifier }
+            )
             toolbar.managedToolbar.removeItem(at: index)
             #expect(!toolbar.managedToolbar.items.contains { $0.itemIdentifier == identifier })
 
@@ -541,6 +568,46 @@ struct NativeWorkspaceSplitViewTests {
         #expect(openCount == 1)
     }
 
+    @Test("Custom tool-window items dispatch their canonical SwiftUI scene after the AppKit action")
+    func customToolWindowDispatchIsDeferred() async throws {
+        let controller = makeController(sidebarPresented: true, inspectorPresented: true)
+        var actionDispatchReturned = false
+        var openedWindowID: String?
+        let toolbar = NativeWorkspaceToolbar(
+            splitViewController: controller,
+            configuration: NativeWorkspaceToolbarConfiguration(
+                coordinator: MainContentCoordinator(),
+                onOpenDeveloperHub: {},
+                onOpenToolWindow: { id in
+                    #expect(actionDispatchReturned)
+                    openedWindowID = id
+                }
+            ),
+            toolbarIdentifier: uniqueToolbarIdentifier(),
+            autosavesConfiguration: false
+        )
+        let window = NSWindow(contentViewController: controller)
+        window.toolbar = toolbar.managedToolbar
+        toolbar.managedToolbar.insertItem(
+            withItemIdentifier: NativeWorkspaceToolbar.mapRemoteIdentifier,
+            at: toolbar.managedToolbar.items.count
+        )
+
+        let item = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.mapRemoteIdentifier
+        })
+        let action = try #require(item.action)
+
+        NSApp.sendAction(action, to: item.target, from: item)
+        #expect(openedWindowID == nil)
+        actionDispatchReturned = true
+
+        for _ in 0 ..< 4 where openedWindowID == nil {
+            await Task.yield()
+        }
+        #expect(openedWindowID == "mapRemote")
+    }
+
     @Test("Capture start leaves the AppKit toolbar action turn before mutating SwiftUI state")
     func proxyToggleIsDeferredFromNativeToolbarAction() async throws {
         let controller = makeController(sidebarPresented: true, inspectorPresented: true)
@@ -661,6 +728,38 @@ struct NativeWorkspaceSplitViewTests {
         }
         #expect(coordinator.isContextDockVisible != initialContextVisibility)
         #expect(contextItem.toolTip == expectedContextToolTip)
+
+        toolbar.managedToolbar.insertItem(
+            withItemIdentifier: NativeWorkspaceToolbar.recordingIdentifier,
+            at: toolbar.managedToolbar.items.count
+        )
+        let recordingItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.recordingIdentifier
+        })
+        #expect(!recordingItem.isEnabled)
+
+        coordinator.isProxyRunning = true
+        for _ in 0 ..< 6 where !recordingItem.isEnabled {
+            await Task.yield()
+        }
+        #expect(recordingItem.isEnabled)
+        #expect(recordingItem.label == String(localized: "Pause Recording"))
+
+        coordinator.isRecording = false
+        for _ in 0 ..< 6 where recordingItem.label != String(localized: "Resume Recording") {
+            await Task.yield()
+        }
+        #expect(recordingItem.label == String(localized: "Resume Recording"))
+        #expect(recordingItem.paletteLabel == String(localized: "Toggle Recording"))
+
+        toolbar.managedToolbar.insertItem(
+            withItemIdentifier: NativeWorkspaceToolbar.detachedInspectorIdentifier,
+            at: toolbar.managedToolbar.items.count
+        )
+        let detachedInspectorItem = try #require(toolbar.managedToolbar.items.first {
+            $0.itemIdentifier == NativeWorkspaceToolbar.detachedInspectorIdentifier
+        })
+        #expect(detachedInspectorItem.isEnabled)
     }
 
     // MARK: - Project selector sizing metrics
