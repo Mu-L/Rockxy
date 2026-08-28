@@ -39,6 +39,11 @@ enum RuleSyncService {
         await syncAll()
     }
 
+    static func reorderMapLocalRules(orderedIDs: [UUID]) async {
+        await RuleEngine.shared.reorderMapLocalRules(orderedIDs: orderedIDs)
+        await syncAll()
+    }
+
     static func setRuleEnabled(id: UUID, enabled: Bool) async {
         await RuleEngine.shared.setEnabled(id: id, enabled: enabled)
         await syncAll()

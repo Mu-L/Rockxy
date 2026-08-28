@@ -15,7 +15,8 @@ struct MapLocalDraft {
         responseBody: Data? = nil,
         responseContentType: String? = nil,
         inferredExtension: String? = nil,
-        responseStatusCode: Int? = nil
+        responseStatusCode: Int? = nil,
+        responseHeaders: [HTTPHeader] = []
     ) {
         self.origin = origin
         self.suggestedName = suggestedName
@@ -27,6 +28,7 @@ struct MapLocalDraft {
         self.responseContentType = responseContentType
         self.inferredExtension = inferredExtension
         self.responseStatusCode = responseStatusCode
+        self.responseHeaders = responseHeaders
     }
 
     // MARK: Internal
@@ -46,6 +48,12 @@ struct MapLocalDraft {
     let responseContentType: String?
     let inferredExtension: String?
     let responseStatusCode: Int?
+
+    /// Captured response headers, in wire order, with repeats (e.g. multiple `Set-Cookie`)
+    /// preserved. Carried verbatim as handoff data only — framing/hop-by-hop sanitization
+    /// and `Content-Length` recomputation stay the responsibility of `MapLocalResponseBuilder`
+    /// at serve time. Empty for domain quick-create and legacy drafts.
+    let responseHeaders: [HTTPHeader]
 
     var hasResponseBody: Bool {
         guard let body = responseBody else {

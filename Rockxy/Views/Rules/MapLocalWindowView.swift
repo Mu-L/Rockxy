@@ -53,6 +53,11 @@ final class MapLocalViewModel {
         mapLocalRules.filter(\.isEnabled).count
     }
 
+    var isReorderable: Bool {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && selectedRuleIDs.count == 1
+    }
+
     var selectedRule: ProxyRule? {
         guard let id = selectedRuleIDs.first else {
             return nil
@@ -77,6 +82,28 @@ final class MapLocalViewModel {
                 await RulePolicyGate.shared.replaceAllRules(updated)
                 allRules = await RuleEngine.shared.allRules
             }
+        }
+    }
+
+    static func applyingMapLocalOrder(_ orderedSubset: [ProxyRule], to allRules: [ProxyRule]) -> [ProxyRule] {
+        let currentIDs = allRules.compactMap { rule -> UUID? in
+            if case .mapLocal = rule.action {
+                return rule.id
+            }
+            return nil
+        }
+        guard orderedSubset.count == currentIDs.count,
+              Set(orderedSubset.map(\.id)) == Set(currentIDs) else
+        {
+            return allRules
+        }
+
+        var iterator = orderedSubset.makeIterator()
+        return allRules.map { rule in
+            if case .mapLocal = rule.action {
+                return iterator.next() ?? rule
+            }
+            return rule
         }
     }
 
@@ -161,8 +188,30 @@ final class MapLocalViewModel {
         addRule(rule)
     }
 
+    func moveSelectedRule(by offset: Int) {
+        guard isReorderable, let selectedID = selectedRuleIDs.first,
+              let sourceIndex = mapLocalRules.firstIndex(where: { $0.id == selectedID }) else
+        {
+            return
+        }
+        let destinationIndex = sourceIndex + offset
+        guard mapLocalRules.indices.contains(destinationIndex) else {
+            return
+        }
+
+        var reordered = mapLocalRules
+        let moved = reordered.remove(at: sourceIndex)
+        reordered.insert(moved, at: destinationIndex)
+        let orderedIDs = reordered.map(\.id)
+        allRules = Self.applyingMapLocalOrder(reordered, to: allRules)
+        Task {
+            await RulePolicyGate.shared.reorderMapLocalRules(orderedIDs: orderedIDs)
+            allRules = await RuleEngine.shared.allRules
+        }
+    }
+
     func filePath(for rule: ProxyRule) -> String {
-        if case let .mapLocal(path, _, _, _) = rule.action {
+        if case let .mapLocal(path, _, _, _, _) = rule.action {
             return path
         }
         return ""
@@ -195,14 +244,14 @@ final class MapLocalViewModel {
     }
 
     func isDirectory(for rule: ProxyRule) -> Bool {
-        if case let .mapLocal(_, _, isDirectory, _) = rule.action {
+        if case let .mapLocal(_, _, isDirectory, _, _) = rule.action {
             return isDirectory
         }
         return false
     }
 
     func delayLabel(for rule: ProxyRule) -> String {
-        if case let .mapLocal(_, _, _, delayMs) = rule.action, delayMs != 0 {
+        if case let .mapLocal(_, _, _, delayMs, _) = rule.action, delayMs != 0 {
             return MapLocalDelayPreset.from(delayMs: delayMs).displayName
         }
         return ""
@@ -338,7 +387,7 @@ struct MapLocalWindowView: View {
             Text(
                 String(
                     localized:
-                    "Map Local participates in Rockxy's global first-match rule order. A match returns the selected local response without contacting the remote server."
+                    "Map Local participates in Rockxy's global first-match rule order. Reorder rules from the More menu; unavailable local targets safely fall back to the origin."
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -529,6 +578,11 @@ struct MapLocalWindowView: View {
             .keyboardShortcut(.space, modifiers: [])
             .disabled(viewModel.selectedRule == nil)
             Divider()
+            Button(String(localized: "Move Up")) { viewModel.moveSelectedRule(by: -1) }
+                .disabled(!canMoveSelectedRule(by: -1))
+            Button(String(localized: "Move Down")) { viewModel.moveSelectedRule(by: 1) }
+                .disabled(!canMoveSelectedRule(by: 1))
+            Divider()
             Button(String(localized: "Delete"), role: .destructive) {
                 viewModel.removeSelectedRules()
             }
@@ -559,6 +613,17 @@ struct MapLocalWindowView: View {
                 viewModel.duplicateSelectedRule()
             }
             Divider()
+            Button(String(localized: "Move Up")) {
+                viewModel.selectedRuleIDs = [id]
+                viewModel.moveSelectedRule(by: -1)
+            }
+            .disabled(!canMoveRule(id: id, by: -1))
+            Button(String(localized: "Move Down")) {
+                viewModel.selectedRuleIDs = [id]
+                viewModel.moveSelectedRule(by: 1)
+            }
+            .disabled(!canMoveRule(id: id, by: 1))
+            Divider()
             Button(String(localized: "Delete Rule"), role: .destructive) {
                 viewModel.removeRule(id: id)
             }
@@ -580,6 +645,22 @@ struct MapLocalWindowView: View {
             return
         }
         openNewEditor(draft: draft)
+    }
+
+    private func canMoveSelectedRule(by offset: Int) -> Bool {
+        guard let id = viewModel.selectedRuleIDs.first else {
+            return false
+        }
+        return canMoveRule(id: id, by: offset)
+    }
+
+    private func canMoveRule(id: UUID, by offset: Int) -> Bool {
+        guard viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let index = viewModel.mapLocalRules.firstIndex(where: { $0.id == id }) else
+        {
+            return false
+        }
+        return viewModel.mapLocalRules.indices.contains(index + offset)
     }
 }
 
@@ -676,6 +757,9 @@ struct MapLocalEditorWindowView: View {
             return String(localized: "Captured binary response will be written when the rule is saved.")
         }
         if viewModel.isExternalReference {
+            if viewModel.isExternalFullHTTPMessage {
+                return String(localized: "Full HTTP response file detected — previewing file-owned status, headers, and body.")
+            }
             return viewModel.isSelectedFileAvailable
                 ? String(localized: "External file available")
                 : String(localized: "External file is currently unavailable")
@@ -687,6 +771,32 @@ struct MapLocalEditorWindowView: View {
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var localFileResponseDescription: String {
+        if viewModel.isInlineResponseEditable {
+            return String(
+                localized: "Edit the status line, response headers, and body. Rockxy always recalculates Content-Length."
+            )
+        }
+        if viewModel.isCapturedBinary {
+            return String(
+                localized: "Edit status and headers here. Captured binary body bytes stay preserved and text after the blank line is ignored."
+            )
+        }
+        if viewModel.isExternalFullHTTPMessage {
+            if viewModel.externalFullMessageHasBinaryBody {
+                return String(
+                    localized: "Read-only preview. This file controls the status and headers; its binary body is preserved but not shown."
+                )
+            }
+            return String(
+                localized: "Read-only preview. This file controls the status, ordered headers, and body at request time."
+            )
+        }
+        return String(
+            localized: "Edit status and headers here. The body comes from the user-owned file and text after the blank line is ignored."
+        )
     }
 
     private var ruleDetailsSection: some View {
@@ -718,6 +828,12 @@ struct MapLocalEditorWindowView: View {
                         .foregroundStyle(.red)
                 }
 
+                MapLocalHTTPSPrerequisiteNotice(
+                    isHTTPSPattern: viewModel.isHTTPSPattern,
+                    targetHost: viewModel.httpsTargetHost,
+                    toolMetrics: toolMetrics
+                )
+
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
                     inlineField(String(localized: "Method")) {
                         methodMenu
@@ -741,6 +857,14 @@ struct MapLocalEditorWindowView: View {
                     )
                     .toggleStyle(.checkbox)
                 }
+
+                if let validationMessage = viewModel.directoryRegexValidationMessage {
+                    Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(toolMetrics.secondaryFont())
+                        .foregroundStyle(.red)
+                }
+
+                MapLocalRuleTesterSection(viewModel: viewModel, toolMetrics: toolMetrics)
 
                 Divider()
 
@@ -845,58 +969,22 @@ struct MapLocalEditorWindowView: View {
                 Text(viewModel.responseContentType)
                     .font(toolMetrics.metadataFont(monospaced: true))
                     .foregroundStyle(.secondary)
-                    .help(String(localized: "Content-Type is inferred from the file extension."))
+                    .help(String(localized: "Configured Content-Type, or the file-extension fallback."))
             }
 
-            if viewModel.isInlineResponseEditable {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Response body"))
-                        .foregroundStyle(.secondary)
-                    MapLocalHTTPMessageEditor(
-                        text: Binding(
-                            get: { viewModel.responseBodyText },
-                            set: { viewModel.responseBodyText = $0 }
-                        ),
-                        editorSettings: toolMetrics.codeEditorSettings
-                    )
-                    .frame(minHeight: 230)
-                    .clipped()
-                    .overlay {
-                        Rectangle()
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                    }
-                    Text(
-                        String(
-                            localized:
-                            "Rockxy saves the status code and body. Content-Type is inferred from the file extension."
-                        )
-                    )
+            if let validationMessage = viewModel.externalFileValidationMessage {
+                Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                }
-            } else {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: viewModel.isCapturedBinary ? "doc.zipper" : "link")
-                        .foregroundStyle(.secondary)
-                    Text(
-                        viewModel.isCapturedBinary
-                            ? String(
-                                localized:
-                                "Captured binary data is preserved byte-for-byte and cannot be edited inline."
-                            )
-                            : String(
-                                localized:
-                                "This rule references a user-owned file. Rockxy will never rewrite its contents."
-                            )
-                    )
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(10)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .foregroundStyle(.orange)
             }
+
+            MapLocalHTTPResponseSection(
+                text: $viewModel.httpMessageText,
+                bodyIsEditable: viewModel.isInlineResponseEditable,
+                bodyDescription: localFileResponseDescription,
+                toolMetrics: toolMetrics,
+                messageIsEditable: !viewModel.isExternalFullHTTPMessage
+            )
         }
     }
 
@@ -915,7 +1003,10 @@ struct MapLocalEditorWindowView: View {
             .textFieldStyle(.roundedBorder)
             .frame(width: 84, height: toolMetrics.formControlHeight)
             .accessibilityLabel(String(localized: "HTTP response status code"))
-            Text(String(localized: "Applied to every response from this rule. Valid range: 100–599."))
+            .disabled(viewModel.isExternalFullHTTPMessage)
+            Text(viewModel.isExternalFullHTTPMessage
+                ? String(localized: "The selected full HTTP response file controls this status code.")
+                : String(localized: "Applied to every response from this rule. Valid range: 100–599."))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
             Spacer()
@@ -949,10 +1040,9 @@ struct MapLocalEditorWindowView: View {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
                 Text(
-                    String(
-                        localized:
-                        "Request subpaths resolve inside this directory. Root requests use index.html when it exists."
-                    )
+                    String(localized: "Request subpaths resolve to files inside this directory. Root requests and missing files continue to the origin.")
+                        + " "
+                        + String(localized: "Regex directory rules use the first capture group as the relative file path.")
                 )
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
@@ -961,6 +1051,16 @@ struct MapLocalEditorWindowView: View {
             .padding(10)
             .background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 5))
+
+            MapLocalHTTPResponseSection(
+                text: $viewModel.httpMessageText,
+                bodyIsEditable: false,
+                bodyDescription: String(
+                    localized:
+                    "Edit status and headers here. Response bodies come from the matched file in this directory; text after the blank line is ignored."
+                ),
+                toolMetrics: toolMetrics
+            )
         }
     }
 

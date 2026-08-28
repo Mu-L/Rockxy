@@ -355,6 +355,28 @@ struct RuleQuotaTests {
         await RuleTestLock.shared.release()
     }
 
+    // MARK: - Reorder Pass-Through
+
+    @Test("Gate reorderMapLocalRules delegates to RuleSyncService and reorders the shared engine")
+    func gateReordersMapLocalRules() async {
+        await RuleTestLock.shared.acquire()
+        let snapshot = await RuleEngine.shared.allRules
+
+        let block = makeNamedRule(name: "Block", action: .block(statusCode: 403), enabled: true)
+        let mapA = makeNamedRule(name: "A", action: .mapLocal(filePath: "/tmp/a.json"), enabled: true)
+        let mapB = makeNamedRule(name: "B", action: .mapLocal(filePath: "/tmp/b.json"), enabled: true)
+        let mapC = makeNamedRule(name: "C", action: .mapLocal(filePath: "/tmp/c.json"), enabled: true)
+        await RuleEngine.shared.replaceAll([block, mapA, mapB, mapC])
+
+        await RulePolicyGate().reorderMapLocalRules(orderedIDs: [mapC.id, mapA.id, mapB.id])
+
+        let reordered = await RuleEngine.shared.allRules
+        #expect(reordered.map(\.id) == [block.id, mapC.id, mapA.id, mapB.id])
+
+        await RuleEngine.shared.replaceAll(snapshot)
+        await RuleTestLock.shared.release()
+    }
+
     // MARK: Private
 
     private func activeCount(for category: String) async -> Int {

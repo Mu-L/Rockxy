@@ -78,7 +78,7 @@ actor RuleEngine {
 
     func addRule(_ rule: ProxyRule) {
         rules.append(rule)
-        if let pattern = rule.matchCondition.urlPattern {
+        if let pattern = rule.matchCondition.runtimeURLPattern {
             if case let .success(regex) = RegexValidator.compile(pattern) {
                 compiledPatterns[rule.id] = regex
             }
@@ -101,7 +101,7 @@ actor RuleEngine {
         if let index = rules.firstIndex(where: { $0.id == rule.id }) {
             rules[index] = rule
             compiledPatterns.removeValue(forKey: rule.id)
-            if let pattern = rule.matchCondition.urlPattern,
+            if let pattern = rule.matchCondition.runtimeURLPattern,
                case let .success(regex) = RegexValidator.compile(pattern)
             {
                 compiledPatterns[rule.id] = regex
@@ -141,6 +141,33 @@ actor RuleEngine {
         }
     }
 
+    /// Reorders only Map Local rules within their existing global slots.
+    /// Missing IDs are ignored and newly-added Map Local rules retain their
+    /// current relative order after the explicitly ordered rules.
+    func reorderMapLocalRules(orderedIDs: [UUID]) {
+        let mapLocalRules = rules.filter { rule in
+            if case .mapLocal = rule.action {
+                return true
+            }
+            return false
+        }
+        let byID = Dictionary(uniqueKeysWithValues: mapLocalRules.map { ($0.id, $0) })
+        let orderedIDSet = Set(orderedIDs)
+        let reordered = orderedIDs.compactMap { byID[$0] }
+            + mapLocalRules.filter { !orderedIDSet.contains($0.id) }
+        guard reordered.count == mapLocalRules.count else {
+            return
+        }
+
+        var iterator = reordered.makeIterator()
+        rules = rules.map { rule in
+            if case .mapLocal = rule.action {
+                return iterator.next() ?? rule
+            }
+            return rule
+        }
+    }
+
     func setEnabled(id: UUID, enabled: Bool) {
         if let index = rules.firstIndex(where: { $0.id == id }) {
             rules[index].isEnabled = enabled
@@ -173,10 +200,11 @@ actor RuleEngine {
 
     func addNetworkConditionExclusive(_ rule: ProxyRule) {
         precondition(
-            { if case .networkCondition = rule.action {
-                return true
-            }
-            return false
+            {
+                if case .networkCondition = rule.action {
+                    return true
+                }
+                return false
             }(),
             "addNetworkConditionExclusive requires a .networkCondition rule"
         )
@@ -302,7 +330,7 @@ actor RuleEngine {
     private func compilePatterns() {
         compiledPatterns.removeAll()
         for i in rules.indices {
-            guard let pattern = rules[i].matchCondition.urlPattern else {
+            guard let pattern = rules[i].matchCondition.runtimeURLPattern else {
                 continue
             }
             switch RegexValidator.compile(pattern) {
