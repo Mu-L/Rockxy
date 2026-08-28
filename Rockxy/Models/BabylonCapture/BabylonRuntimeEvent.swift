@@ -30,11 +30,13 @@ enum BabylonRuntimeTruncatedField: Hashable, Sendable {
     case error
     case metadata
 
+    // MARK: Internal
+
     var title: String {
         switch self {
-        case .name: String(localized: "Name")
-        case .error: String(localized: "Error")
-        case .metadata: String(localized: "Metadata")
+        case .name: String(localized: "Name", bundle: RockxyLocalization.bundle)
+        case .error: String(localized: "Error", bundle: RockxyLocalization.bundle)
+        case .metadata: String(localized: "Metadata", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -48,19 +50,15 @@ enum BabylonRuntimeTruncatedField: Hashable, Sendable {
 /// or sessions stay independently selectable, while an exact composite duplicate
 /// can be ignored. The producer's own package ID is preserved separately.
 struct BabylonRuntimeEvent: Identifiable, Equatable, Sendable {
-    struct Identity: Hashable, Sendable {
-        let clientID: String
-        let transportSessionID: String
-        let packageID: String
-    }
-
     // MARK: Lifecycle
 
     init(
         validating package: BabylonRuntimePackageDTO,
         source: BabylonCaptureIdentity,
         receivedAt: Date = Date()
-    ) throws {
+    )
+        throws
+    {
         let packageID = package.id
         guard Self.isValidIdentifier(packageID) else {
             throw BabylonRuntimeValidationError.invalidPackageIdentifier
@@ -133,6 +131,12 @@ struct BabylonRuntimeEvent: Identifiable, Equatable, Sendable {
     }
 
     // MARK: Internal
+
+    struct Identity: Hashable, Sendable {
+        let clientID: String
+        let transportSessionID: String
+        let packageID: String
+    }
 
     static let maximumIdentifierByteCount = 256
     static let maximumNameByteCount = 512
@@ -231,7 +235,9 @@ struct BabylonRuntimeEvent: Identifiable, Equatable, Sendable {
 
     private static func boundedMetadata(
         _ metadata: [String: String]
-    ) -> (values: [String: String], wasTruncated: Bool) {
+    )
+        -> (values: [String: String], wasTruncated: Bool)
+    {
         // Deterministic key ordering makes the retained subset stable and testable
         // when a producer sends more than the retained-pair budget.
         let retainedPairs = metadata.sorted { $0.key < $1.key }.prefix(maximumMetadataPairs)
@@ -291,10 +297,10 @@ enum BabylonRuntimeOutcome: Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .finished: String(localized: "Finished")
-        case .failed: String(localized: "Error")
-        case .started: String(localized: "Started")
-        case .informational: String(localized: "Info")
+        case .finished: String(localized: "Finished", bundle: RockxyLocalization.bundle)
+        case .failed: String(localized: "Error", bundle: RockxyLocalization.bundle)
+        case .started: String(localized: "Started", bundle: RockxyLocalization.bundle)
+        case .informational: String(localized: "Info", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -368,15 +374,15 @@ extension BabylonRuntimePackageDTO.Kind {
 
     var displayTitle: String {
         switch self {
-        case .sessionStarted: String(localized: "Session Started")
-        case .sessionFinished: String(localized: "Session Finished")
-        case .traceStarted: String(localized: "Trace Started")
-        case .traceFinished: String(localized: "Trace Finished")
-        case .stepStarted: String(localized: "Step Started")
-        case .stepFinished: String(localized: "Step Finished")
-        case .mark: String(localized: "Mark")
-        case .event: String(localized: "Event")
-        case .error: String(localized: "Error")
+        case .sessionStarted: String(localized: "Session Started", bundle: RockxyLocalization.bundle)
+        case .sessionFinished: String(localized: "Session Finished", bundle: RockxyLocalization.bundle)
+        case .traceStarted: String(localized: "Trace Started", bundle: RockxyLocalization.bundle)
+        case .traceFinished: String(localized: "Trace Finished", bundle: RockxyLocalization.bundle)
+        case .stepStarted: String(localized: "Step Started", bundle: RockxyLocalization.bundle)
+        case .stepFinished: String(localized: "Step Finished", bundle: RockxyLocalization.bundle)
+        case .mark: String(localized: "Mark", bundle: RockxyLocalization.bundle)
+        case .event: String(localized: "Event", bundle: RockxyLocalization.bundle)
+        case .error: String(localized: "Error", bundle: RockxyLocalization.bundle)
         }
     }
 

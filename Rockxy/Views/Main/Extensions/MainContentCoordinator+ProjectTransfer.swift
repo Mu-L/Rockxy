@@ -35,7 +35,8 @@ extension MainContentCoordinator {
         panel
             .message =
             String(
-                localized: "Exports tabs, filters, and layout only. Captured traffic is excluded. Filter text may be sensitive; review it before sharing."
+                localized: "Exports tabs, filters, and layout only. Captured traffic is excluded. Filter text may be sensitive; review it before sharing.",
+                bundle: RockxyLocalization.bundle
             )
         guard panel.runModal() == .OK, let url = panel.url else {
             return false
@@ -51,12 +52,12 @@ extension MainContentCoordinator {
             try PortableProjectDocument.write(currentProject, to: url)
             activeToast = ToastMessage(
                 style: .success,
-                text: String(localized: "Exported Project configuration")
+                text: String(localized: "Exported Project configuration", bundle: RockxyLocalization.bundle)
             )
             return true
         } catch {
             presentProjectTransferError(
-                title: String(localized: "Project Export Failed"),
+                title: String(localized: "Project Export Failed", bundle: RockxyLocalization.bundle),
                 error: error
             )
             return false
@@ -78,7 +79,10 @@ extension MainContentCoordinator {
         panel.allowedContentTypes = [.rockxyProject, .json]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.message = String(localized: "Choose a configuration-only .rockxyproject file")
+        panel.message = String(
+            localized: "Choose a configuration-only .rockxyproject file",
+            bundle: RockxyLocalization.bundle
+        )
         guard panel.runModal() == .OK, let url = panel.url else {
             return false
         }
@@ -101,15 +105,21 @@ extension MainContentCoordinator {
             lastProjectOperationError = nil
             activeToast = ToastMessage(
                 style: .success,
-                text: String(localized: "Imported \(portable.name) as a new Project")
+                text: String(localized: "Imported \(portable.name) as a new Project", bundle: RockxyLocalization.bundle)
             )
             return true
         } catch let error as ProjectMutationError {
             lastProjectOperationError = error
-            presentProjectTransferError(title: String(localized: "Project Import Failed"), error: error)
+            presentProjectTransferError(
+                title: String(localized: "Project Import Failed", bundle: RockxyLocalization.bundle),
+                error: error
+            )
             return false
         } catch {
-            presentProjectTransferError(title: String(localized: "Project Import Failed"), error: error)
+            presentProjectTransferError(
+                title: String(localized: "Project Import Failed", bundle: RockxyLocalization.bundle),
+                error: error
+            )
             return false
         }
     }
@@ -118,13 +128,17 @@ extension MainContentCoordinator {
 
     private func confirmPortableProjectImport(_ portable: PortableProject, fileName: String) -> Bool {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Import \(portable.name) as a New Project?")
+        alert.messageText = String(
+            localized: "Import \(portable.name) as a New Project?",
+            bundle: RockxyLocalization.bundle
+        )
         alert.informativeText = String(
-            localized: "\(fileName) contains \(portable.tabs.count) traffic tab(s), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced."
+            localized: "\(fileName) contains \(portable.tabs.count) traffic tab(s), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced.",
+            bundle: RockxyLocalization.bundle
         )
         alert.alertStyle = .informational
-        alert.addButton(withTitle: String(localized: "Import"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.addButton(withTitle: String(localized: "Import", bundle: RockxyLocalization.bundle))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
         return alert.runModal() == .alertFirstButtonReturn
     }
 
@@ -140,10 +154,11 @@ extension MainContentCoordinator {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = String(
-            localized: "The Project configuration could not be processed safely. Verify the file and try again."
+            localized: "The Project configuration could not be processed safely. Verify the file and try again.",
+            bundle: RockxyLocalization.bundle
         )
         alert.alertStyle = .warning
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 }

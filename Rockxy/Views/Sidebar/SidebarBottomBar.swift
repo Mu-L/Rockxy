@@ -23,8 +23,8 @@ struct SidebarBottomBar: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(String(localized: "Add favorite app or domain"))
-            .help(String(localized: "Add favorite app or domain"))
+            .accessibilityLabel(String(localized: "Add favorite app or domain", bundle: RockxyLocalization.bundle))
+            .help(String(localized: "Add favorite app or domain", bundle: RockxyLocalization.bundle))
 
             NativeSidebarSearchField(
                 text: $filterText,
@@ -46,7 +46,30 @@ struct SidebarBottomBar: View {
 private struct NativeSidebarSearchField: NSViewRepresentable {
     // MARK: Internal
 
+    // MARK: - Coordinator
+
+    @MainActor
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        // MARK: Lifecycle
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        // MARK: Internal
+
+        var text: Binding<String>
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let searchField = notification.object as? NSSearchField else {
+                return
+            }
+            text.wrappedValue = searchField.stringValue
+        }
+    }
+
     @Binding var text: String
+
     let fontSize: CGFloat
 
     func makeCoordinator() -> Coordinator {
@@ -55,8 +78,8 @@ private struct NativeSidebarSearchField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let searchField = NSSearchField()
-        searchField.placeholderString = String(localized: "Filter")
-        searchField.toolTip = String(localized: "Filter sidebar items")
+        searchField.placeholderString = String(localized: "Filter", bundle: RockxyLocalization.bundle)
+        searchField.toolTip = String(localized: "Filter sidebar items", bundle: RockxyLocalization.bundle)
         searchField.controlSize = .regular
         searchField.focusRingType = .exterior
         searchField.sendsWholeSearchString = false
@@ -64,7 +87,7 @@ private struct NativeSidebarSearchField: NSViewRepresentable {
         searchField.delegate = context.coordinator
         searchField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        searchField.setAccessibilityLabel(String(localized: "Filter sidebar"))
+        searchField.setAccessibilityLabel(String(localized: "Filter sidebar", bundle: RockxyLocalization.bundle))
         configure(searchField)
         return searchField
     }
@@ -81,26 +104,12 @@ private struct NativeSidebarSearchField: NSViewRepresentable {
 
     private func configure(_ searchField: NSSearchField) {
         searchField.font = .systemFont(ofSize: fontSize)
-        guard let searchCell = searchField.cell as? NSSearchFieldCell else { return }
+        guard let searchCell = searchField.cell as? NSSearchFieldCell else {
+            return
+        }
         searchCell.searchButtonCell?.image = NSImage(
             systemSymbolName: "line.3.horizontal.decrease.circle",
-            accessibilityDescription: String(localized: "Filter")
+            accessibilityDescription: String(localized: "Filter", bundle: RockxyLocalization.bundle)
         )
-    }
-
-    // MARK: - Coordinator
-
-    @MainActor
-    final class Coordinator: NSObject, NSSearchFieldDelegate {
-        var text: Binding<String>
-
-        init(text: Binding<String>) {
-            self.text = text
-        }
-
-        func controlTextDidChange(_ notification: Notification) {
-            guard let searchField = notification.object as? NSSearchField else { return }
-            text.wrappedValue = searchField.stringValue
-        }
     }
 }

@@ -23,6 +23,8 @@ final class RockxyWorkspaceWindowManager: NSObject {
     static let mainWindowIdentifier = NSUserInterfaceItemIdentifier("main")
     static let tabbingIdentifier = "\(RockxyIdentity.current.logSubsystem).mainWorkspace"
 
+    private(set) weak var primaryWindow: NSWindow?
+
     var canCreateWorkspaceTab: Bool {
         coordinator?.workspaceStore.canCreateWorkspace == true
     }
@@ -70,7 +72,8 @@ final class RockxyWorkspaceWindowManager: NSObject {
 
     func openNewWorkspaceTabFromNativeControl() {
         guard let coordinator,
-              coordinator.workspaceStore.canCreateWorkspace else {
+              coordinator.workspaceStore.canCreateWorkspace else
+        {
             return
         }
         let workspace = coordinator.workspaceStore.createWorkspace()
@@ -158,6 +161,69 @@ final class RockxyWorkspaceWindowManager: NSObject {
         }
     }
 
+    // MARK: Fileprivate
+
+    fileprivate func selectWorkspace(_ workspaceID: UUID) {
+        guard let coordinator,
+              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }) else
+        {
+            return
+        }
+        coordinator.workspaceStore.selectWorkspace(id: workspaceID)
+        updateTabAccessory()
+        enforceToolbarOnlyProjectPresentation()
+    }
+
+    fileprivate func closeWorkspace(_ workspaceID: UUID) {
+        guard let coordinator,
+              let workspace = coordinator.workspaceStore.workspaces.first(where: { $0.id == workspaceID }),
+              workspace.isClosable else
+        {
+            return
+        }
+        coordinator.closeWorkspace(id: workspaceID)
+        updateTabAccessory()
+        enforceToolbarOnlyProjectPresentation()
+    }
+
+    fileprivate func createWorkspace() {
+        openNewWorkspaceTabFromNativeControl()
+    }
+
+    fileprivate func renameWorkspace(_ workspaceID: UUID, to title: String) {
+        guard let coordinator,
+              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }),
+              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(title) else
+        {
+            return
+        }
+        coordinator.workspaceStore.renameWorkspace(id: workspaceID, to: normalizedTitle)
+        updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
+        enforceToolbarOnlyProjectPresentation()
+    }
+
+    @discardableResult
+    fileprivate func moveWorkspace(_ workspaceID: UUID, toInsertionIndex insertionIndex: Int) -> Bool {
+        guard let coordinator,
+              let sourceIndex = coordinator.workspaceStore.workspaces.firstIndex(where: { $0.id == workspaceID }) else
+        {
+            return false
+        }
+
+        var destinationIndex = insertionIndex
+        if destinationIndex > sourceIndex {
+            destinationIndex -= 1
+        }
+        destinationIndex = min(max(destinationIndex, 0), coordinator.workspaceStore.workspaces.count - 1)
+        guard destinationIndex != sourceIndex else {
+            return false
+        }
+        coordinator.workspaceStore.moveWorkspace(from: sourceIndex, to: destinationIndex)
+        updateTabAccessory()
+        enforceToolbarOnlyProjectPresentation()
+        return true
+    }
+
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "WorkspaceTabs")
@@ -166,7 +232,6 @@ final class RockxyWorkspaceWindowManager: NSObject {
     /// Survives primary-window closure so AppDelegate can still force the final
     /// debounced Project snapshot to disk while the app remains running.
     private weak var terminationCoordinator: MainContentCoordinator?
-    private(set) weak var primaryWindow: NSWindow?
     private var accessoryControllers: [ObjectIdentifier: WorkspaceTabBarAccessoryController] = [:]
     private var observersByWindow: [ObjectIdentifier: [NSObjectProtocol]] = [:]
     private var titleObservationsByWindow: [ObjectIdentifier: [NSKeyValueObservation]] = [:]
@@ -176,7 +241,8 @@ final class RockxyWorkspaceWindowManager: NSObject {
     /// semantics, but never let a Project name become a second visible title.
     private func enforceToolbarOnlyProjectPresentation(on window: NSWindow? = nil) {
         guard let window = window ?? primaryWindow,
-              window === primaryWindow else {
+              window === primaryWindow else
+        {
             return
         }
         if window.title != RockxyIdentity.current.displayName {
@@ -256,7 +322,8 @@ final class RockxyWorkspaceWindowManager: NSObject {
 
     private func updateTabAccessory(forceVisible: Bool = false) {
         guard let window = primaryWindow,
-              let coordinator else {
+              let coordinator else
+        {
             return
         }
 
@@ -296,7 +363,8 @@ final class RockxyWorkspaceWindowManager: NSObject {
     private func beginInlineRename(workspaceID: UUID) {
         guard let window = primaryWindow,
               let coordinator,
-              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }) else {
+              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }) else
+        {
             return
         }
 
@@ -304,63 +372,6 @@ final class RockxyWorkspaceWindowManager: NSObject {
         let controller = accessoryController(for: window)
         controller.update(coordinator: coordinator)
         controller.beginRename(workspaceID: workspaceID)
-    }
-
-    fileprivate func selectWorkspace(_ workspaceID: UUID) {
-        guard let coordinator,
-              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }) else {
-            return
-        }
-        coordinator.workspaceStore.selectWorkspace(id: workspaceID)
-        updateTabAccessory()
-        enforceToolbarOnlyProjectPresentation()
-    }
-
-    fileprivate func closeWorkspace(_ workspaceID: UUID) {
-        guard let coordinator,
-              let workspace = coordinator.workspaceStore.workspaces.first(where: { $0.id == workspaceID }),
-              workspace.isClosable else {
-            return
-        }
-        coordinator.closeWorkspace(id: workspaceID)
-        updateTabAccessory()
-        enforceToolbarOnlyProjectPresentation()
-    }
-
-    fileprivate func createWorkspace() {
-        openNewWorkspaceTabFromNativeControl()
-    }
-
-    fileprivate func renameWorkspace(_ workspaceID: UUID, to title: String) {
-        guard let coordinator,
-              coordinator.workspaceStore.workspaces.contains(where: { $0.id == workspaceID }),
-              let normalizedTitle = try? ProjectNormalization.normalizedDisplayName(title) else {
-            return
-        }
-        coordinator.workspaceStore.renameWorkspace(id: workspaceID, to: normalizedTitle)
-        updateTabAccessory(forceVisible: coordinator.workspaceStore.workspaces.count > 1)
-        enforceToolbarOnlyProjectPresentation()
-    }
-
-    @discardableResult
-    fileprivate func moveWorkspace(_ workspaceID: UUID, toInsertionIndex insertionIndex: Int) -> Bool {
-        guard let coordinator,
-              let sourceIndex = coordinator.workspaceStore.workspaces.firstIndex(where: { $0.id == workspaceID }) else {
-            return false
-        }
-
-        var destinationIndex = insertionIndex
-        if destinationIndex > sourceIndex {
-            destinationIndex -= 1
-        }
-        destinationIndex = min(max(destinationIndex, 0), coordinator.workspaceStore.workspaces.count - 1)
-        guard destinationIndex != sourceIndex else {
-            return false
-        }
-        coordinator.workspaceStore.moveWorkspace(from: sourceIndex, to: destinationIndex)
-        updateTabAccessory()
-        enforceToolbarOnlyProjectPresentation()
-        return true
     }
 }
 
@@ -483,7 +494,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         recalculateFrames()
         if let editingWorkspaceID,
            let field = editField,
-           let frame = tabFrames[editingWorkspaceID] {
+           let frame = tabFrames[editingWorkspaceID]
+        {
             field.frame = editorFrame(in: frame)
         }
     }
@@ -546,13 +558,15 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
     override func mouseDragged(with event: NSEvent) {
         guard editField == nil,
               let mouseDownWorkspaceID,
-              let mouseDownPoint else {
+              let mouseDownPoint else
+        {
             return
         }
 
         let point = convert(event.locationInWindow, from: nil)
         if draggingWorkspaceID == nil,
-           distance(from: mouseDownPoint, to: point) >= WorkspaceTabBarMetrics.dragThreshold {
+           distance(from: mouseDownPoint, to: point) >= WorkspaceTabBarMetrics.dragThreshold
+        {
             draggingWorkspaceID = mouseDownWorkspaceID
             dragGrabOffsetX = dragGrabOffset(for: mouseDownWorkspaceID, at: mouseDownPoint)
         }
@@ -588,7 +602,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         }
         guard event.clickCount == 2,
               let workspaceID = workspaceID(at: point),
-              workspaceID == mouseDownWorkspaceID else {
+              workspaceID == mouseDownWorkspaceID else
+        {
             return
         }
         beginRename(workspaceID: workspaceID)
@@ -600,13 +615,14 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
             return
         }
         guard let workspaceID = workspaceID(at: point),
-              let coordinator else {
+              let coordinator else
+        {
             return
         }
 
         let menu = NSMenu()
         let renameItem = NSMenuItem(
-            title: String(localized: "Rename Tab"),
+            title: String(localized: "Rename Tab", bundle: RockxyLocalization.bundle),
             action: #selector(renameTabFromMenu(_:)),
             keyEquivalent: ""
         )
@@ -616,7 +632,7 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
         if coordinator.workspaceStore.workspaces.first(where: { $0.id == workspaceID })?.isClosable == true {
             let closeItem = NSMenuItem(
-                title: String(localized: "Close Tab"),
+                title: String(localized: "Close Tab", bundle: RockxyLocalization.bundle),
                 action: #selector(closeTabFromMenu(_:)),
                 keyEquivalent: ""
             )
@@ -628,7 +644,7 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         if coordinator.workspaceStore.canCreateWorkspace {
             menu.addItem(.separator())
             let newItem = NSMenuItem(
-                title: String(localized: "New Tab"),
+                title: String(localized: "New Tab", bundle: RockxyLocalization.bundle),
                 action: #selector(newTabFromMenu(_:)),
                 keyEquivalent: ""
             )
@@ -649,7 +665,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     func beginRename(workspaceID: UUID) {
         guard let coordinator,
-              let workspace = coordinator.workspaceStore.workspaces.first(where: { $0.id == workspaceID }) else {
+              let workspace = coordinator.workspaceStore.workspaces.first(where: { $0.id == workspaceID }) else
+        {
             return
         }
 
@@ -684,7 +701,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
     @discardableResult
     func endEditing(commit: Bool) -> Bool {
         guard let editingWorkspaceID,
-              let field = editField else {
+              let field = editField else
+        {
             return true
         }
 
@@ -700,7 +718,7 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
                 return false
             } catch {
                 field.textColor = .systemRed
-                field.toolTip = String(localized: "Enter a valid Traffic Tab name.")
+                field.toolTip = String(localized: "Enter a valid Traffic Tab name.", bundle: RockxyLocalization.bundle)
                 NSSound.beep()
                 window?.makeFirstResponder(field)
                 return false
@@ -727,7 +745,9 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         _ control: NSControl,
         textView: NSTextView,
         doCommandBy commandSelector: Selector
-    ) -> Bool {
+    )
+        -> Bool
+    {
         switch commandSelector {
         case #selector(NSResponder.insertNewline(_:)):
             endEditing(commit: true)
@@ -770,6 +790,63 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private var displayMetrics: AppUIDisplayMetrics {
         AppUIDisplayMetrics(settings: AppSettingsManager.shared.appUI)
+    }
+
+    private var isDarkAppearance: Bool {
+        effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+
+    // swiftlint:disable object_literal
+    private var tabBarFillColor: NSColor {
+        if isDarkAppearance {
+            return NSColor.windowBackgroundColor.withAlphaComponent(0.24)
+        }
+        return NSColor.windowBackgroundColor.withAlphaComponent(0.34)
+    }
+
+    private var tabBarStrokeColor: NSColor {
+        if isDarkAppearance {
+            return NSColor.white.withAlphaComponent(0.06)
+        }
+        return NSColor(white: 0.82, alpha: 0.50)
+    }
+
+    private var selectedTabFillColor: NSColor {
+        if isDarkAppearance {
+            return NSColor.controlBackgroundColor.withAlphaComponent(0.84)
+        }
+        return NSColor(white: 0.985, alpha: 0.96)
+    }
+
+    private var selectedTabStrokeColor: NSColor {
+        if isDarkAppearance {
+            return NSColor.white.withAlphaComponent(0.14)
+        }
+        return NSColor(white: 0.76, alpha: 0.70)
+    }
+
+    private var hoverTabFillColor: NSColor {
+        isDarkAppearance
+            ? NSColor.labelColor.withAlphaComponent(0.08)
+            : NSColor.labelColor.withAlphaComponent(0.035)
+    }
+
+    private var activeTitleColor: NSColor {
+        isDarkAppearance
+            ? NSColor.labelColor.withAlphaComponent(0.90)
+            : NSColor.labelColor.withAlphaComponent(0.76)
+    }
+
+    private var inactiveTitleColor: NSColor {
+        isDarkAppearance
+            ? NSColor.secondaryLabelColor.withAlphaComponent(0.90)
+            : NSColor.secondaryLabelColor.withAlphaComponent(0.88)
+    }
+
+    private var dividerColor: NSColor {
+        isDarkAppearance
+            ? NSColor(displayP3Red: 0.271, green: 0.292, blue: 0.301, alpha: 1.0)
+            : NSColor(white: 0.72, alpha: 0.78)
     }
 
     private func workspaceTabFont(weight: NSFont.Weight) -> NSFont {
@@ -878,7 +955,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         if let draggingWorkspaceID,
            let draggingPoint,
            let workspace = workspaces.first(where: { $0.id == draggingWorkspaceID }),
-           let sourceFrame = tabFrames[draggingWorkspaceID] {
+           let sourceFrame = tabFrames[draggingWorkspaceID]
+        {
             drawDragGhost(workspace.title, sourceFrame: sourceFrame, at: draggingPoint)
         }
 
@@ -906,7 +984,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         }
         if workspace.isClosable,
            isActive || workspace.id == hoveredWorkspaceID,
-           workspace.id != draggingWorkspaceID {
+           workspace.id != draggingWorkspaceID
+        {
             let closeFrame = closeFrame(in: frame)
             drawCloseGlyph(in: closeFrame, isActive: isActive, isHovered: workspace.id == hoveredWorkspaceID)
         }
@@ -915,8 +994,15 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private func drawTabBackground(in frame: NSRect, isActive: Bool, isHovered: Bool) {
         let leadingOverlap: CGFloat = frame.minX <= WorkspaceTabBarMetrics.leftInset + 0.5 ? 8 : 0
-        let trailingOverlap: CGFloat = { let gap = addButtonFrame.minX - 4 - frame.maxX; return gap > 0 && gap <= 2.5 ? gap : 0 }()
-        let rect = NSRect(x: frame.minX - leadingOverlap, y: frame.minY, width: frame.width + leadingOverlap + trailingOverlap, height: frame.height).insetBy(dx: 0.5, dy: 0)
+        let trailingOverlap: CGFloat = { let gap = addButtonFrame.minX - 4 - frame.maxX
+            return gap > 0 && gap <= 2.5 ? gap : 0
+        }()
+        let rect = NSRect(
+            x: frame.minX - leadingOverlap,
+            y: frame.minY,
+            width: frame.width + leadingOverlap + trailingOverlap,
+            height: frame.height
+        ).insetBy(dx: 0.5, dy: 0)
         let path = NSBezierPath(roundedRect: rect, xRadius: 14, yRadius: 14)
         if isActive {
             NSGraphicsContext.saveGraphicsState()
@@ -964,14 +1050,16 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
               workspace.id != hoveredWorkspaceID,
               workspace.id != draggingWorkspaceID,
               let index = coordinator.workspaceStore.workspaces.firstIndex(where: { $0.id == workspace.id }),
-              index < coordinator.workspaceStore.workspaces.count - 1 else {
+              index < coordinator.workspaceStore.workspaces.count - 1 else
+        {
             return
         }
 
         let nextWorkspace = coordinator.workspaceStore.workspaces[index + 1]
         guard nextWorkspace.id != coordinator.workspaceStore.activeWorkspaceID,
               nextWorkspace.id != hoveredWorkspaceID,
-              nextWorkspace.id != draggingWorkspaceID else {
+              nextWorkspace.id != draggingWorkspaceID else
+        {
             return
         }
 
@@ -1062,69 +1150,13 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         path.fill()
     }
 
-    private var isDarkAppearance: Bool {
-        effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-    }
-
-    // swiftlint:disable object_literal
-    private var tabBarFillColor: NSColor {
-        if isDarkAppearance {
-            return NSColor.windowBackgroundColor.withAlphaComponent(0.24)
-        }
-        return NSColor.windowBackgroundColor.withAlphaComponent(0.34)
-    }
-
-    private var tabBarStrokeColor: NSColor {
-        if isDarkAppearance {
-            return NSColor.white.withAlphaComponent(0.06)
-        }
-        return NSColor(white: 0.82, alpha: 0.50)
-    }
-
-    private var selectedTabFillColor: NSColor {
-        if isDarkAppearance {
-            return NSColor.controlBackgroundColor.withAlphaComponent(0.84)
-        }
-        return NSColor(white: 0.985, alpha: 0.96)
-    }
-
-    private var selectedTabStrokeColor: NSColor {
-        if isDarkAppearance {
-            return NSColor.white.withAlphaComponent(0.14)
-        }
-        return NSColor(white: 0.76, alpha: 0.70)
-    }
-
-    private var hoverTabFillColor: NSColor {
-        isDarkAppearance
-            ? NSColor.labelColor.withAlphaComponent(0.08)
-            : NSColor.labelColor.withAlphaComponent(0.035)
-    }
-
-    private var activeTitleColor: NSColor {
-        isDarkAppearance
-            ? NSColor.labelColor.withAlphaComponent(0.90)
-            : NSColor.labelColor.withAlphaComponent(0.76)
-    }
-
-    private var inactiveTitleColor: NSColor {
-        isDarkAppearance
-            ? NSColor.secondaryLabelColor.withAlphaComponent(0.90)
-            : NSColor.secondaryLabelColor.withAlphaComponent(0.88)
-    }
-
-    private var dividerColor: NSColor {
-        isDarkAppearance
-            ? NSColor(displayP3Red: 0.271, green: 0.292, blue: 0.301, alpha: 1.0)
-            : NSColor(white: 0.72, alpha: 0.78)
-    }
-
     private func addButtonStrokeColor(canCreate: Bool) -> NSColor {
         guard canCreate else {
             return isDarkAppearance ? NSColor.white.withAlphaComponent(0.08) : NSColor(white: 0.72, alpha: 0.36)
         }
         return isDarkAppearance ? NSColor.white.withAlphaComponent(0.18) : NSColor(white: 0.72, alpha: 0.62)
     }
+
     // swiftlint:enable object_literal
 
     private func titleFrame(for frame: NSRect, workspace: WorkspaceState) -> NSRect {
@@ -1201,19 +1233,22 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private func insertionMarkerX(for insertionIndex: Int) -> CGFloat? {
         guard let coordinator,
-              !coordinator.workspaceStore.workspaces.isEmpty else {
+              !coordinator.workspaceStore.workspaces.isEmpty else
+        {
             return nil
         }
 
         if insertionIndex <= 0,
            let first = coordinator.workspaceStore.workspaces.first,
-           let frame = tabFrames[first.id] {
+           let frame = tabFrames[first.id]
+        {
             return frame.minX + 2
         }
 
         if insertionIndex >= coordinator.workspaceStore.workspaces.count,
            let last = coordinator.workspaceStore.workspaces.last,
-           let frame = tabFrames[last.id] {
+           let frame = tabFrames[last.id]
+        {
             return frame.maxX - 2
         }
 
@@ -1233,7 +1268,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private func dragPreviewFrames(for workspaceID: UUID, insertionIndex: Int) -> [UUID: NSRect] {
         guard let coordinator,
-              let sourceIndex = coordinator.workspaceStore.workspaces.firstIndex(where: { $0.id == workspaceID }) else {
+              let sourceIndex = coordinator.workspaceStore.workspaces.firstIndex(where: { $0.id == workspaceID }) else
+        {
             return tabFrames
         }
 
@@ -1286,7 +1322,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private func animateTabFrameChanges(from previousFrames: [UUID: NSRect], to targetFrames: [UUID: NSRect]) {
         guard !previousFrames.isEmpty,
-              !targetFrames.isEmpty else {
+              !targetFrames.isEmpty else
+        {
             stopTabFrameAnimation(snapToTarget: true)
             return
         }
@@ -1294,7 +1331,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         let commonIDs = Set(previousFrames.keys).intersection(targetFrames.keys)
         let shouldAnimate = commonIDs.contains { workspaceID in
             guard let previous = previousFrames[workspaceID],
-                  let target = targetFrames[workspaceID] else {
+                  let target = targetFrames[workspaceID] else
+            {
                 return false
             }
             return abs(previous.minX - target.minX) > 0.5 || abs(previous.width - target.width) > 0.5
@@ -1324,7 +1362,8 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
         RunLoop.main.add(timer, forMode: .eventTracking)
     }
 
-    @objc private func advanceTabFrameAnimation(_ timer: Timer) {
+    @objc
+    private func advanceTabFrameAnimation(_ timer: Timer) {
         let elapsed = Date().timeIntervalSince(tabAnimationStartDate)
         let progress = min(1, elapsed / WorkspaceTabBarMetrics.reorderAnimationDuration)
         let easedProgress = easeOutCubic(progress)
@@ -1405,7 +1444,10 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
 
     private func installEditingMonitor() {
         removeEditingMonitor()
-        editMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] nsEvent in
+        editMonitor = NSEvent.addLocalMonitorForEvents(matching: [
+            .leftMouseDown,
+            .rightMouseDown
+        ]) { [weak self] nsEvent in
             guard let self else {
                 return nsEvent
             }
@@ -1441,33 +1483,40 @@ private final class WorkspaceTabBarView: NSView, NSTextFieldDelegate {
     private func inlineRenameErrorMessage(for error: ProjectNameNormalizationError) -> String {
         switch error {
         case .empty:
-            String(localized: "Enter a Traffic Tab name.")
+            String(localized: "Enter a Traffic Tab name.", bundle: RockxyLocalization.bundle)
         case .containsControlCharacters:
-            String(localized: "Traffic Tab names cannot contain control characters.")
+            String(localized: "Traffic Tab names cannot contain control characters.", bundle: RockxyLocalization.bundle)
         case let .tooLong(count):
             String(
-                localized: "Traffic Tab names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count))."
+                localized: "Traffic Tab names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count)).",
+                bundle: RockxyLocalization.bundle
             )
         case .notCanonical:
-            String(localized: "The Traffic Tab name is not in canonical Unicode form.")
+            String(
+                localized: "The Traffic Tab name is not in canonical Unicode form.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
-    @objc private func renameTabFromMenu(_ sender: NSMenuItem) {
+    @objc
+    private func renameTabFromMenu(_ sender: NSMenuItem) {
         guard let workspaceID = sender.representedObject as? UUID else {
             return
         }
         beginRename(workspaceID: workspaceID)
     }
 
-    @objc private func closeTabFromMenu(_ sender: NSMenuItem) {
+    @objc
+    private func closeTabFromMenu(_ sender: NSMenuItem) {
         guard let workspaceID = sender.representedObject as? UUID else {
             return
         }
         manager.closeWorkspace(workspaceID)
     }
 
-    @objc private func newTabFromMenu(_ sender: NSMenuItem) {
+    @objc
+    private func newTabFromMenu(_ sender: NSMenuItem) {
         manager.createWorkspace()
     }
 }
@@ -1503,7 +1552,8 @@ private final class WorkspaceInlineTabTextField: NSTextField {
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 36, 76:
+        case 36,
+             76:
             onCommit?()
         case 53:
             onCancel?()

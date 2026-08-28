@@ -38,8 +38,10 @@ struct HistoryRetentionTests {
         coordinator.appendObservedDomainsByApp(from: [transaction])
         coordinator.updateAllWorkspaces(with: [transaction])
 
-        #expect(coordinator.appNodes.map(\.name) == [String(localized: "Unknown")])
-        #expect(coordinator.observedDomainsByApp[String(localized: "Unknown")] == ["api.example.com"])
+        #expect(coordinator.appNodes.map(\.name) == [String(localized: "Unknown", bundle: RockxyLocalization.bundle)])
+        #expect(coordinator
+            .observedDomainsByApp[String(localized: "Unknown", bundle: RockxyLocalization.bundle)] ==
+            ["api.example.com"])
         #expect(coordinator.filteredRows.first?.clientApp == nil)
 
         transaction.clientApp = "Safari"
@@ -50,7 +52,8 @@ struct HistoryRetentionTests {
         #expect(app.name == "Safari")
         #expect(app.requestCount == 1)
         #expect(app.domains == ["api.example.com"])
-        #expect(coordinator.observedDomainsByApp[String(localized: "Unknown")] == nil)
+        #expect(coordinator
+            .observedDomainsByApp[String(localized: "Unknown", bundle: RockxyLocalization.bundle)] == nil)
         #expect(coordinator.observedDomainsByApp["Safari"] == ["api.example.com"])
         #expect(coordinator.filteredRows.first?.clientApp == "Safari")
     }
@@ -70,7 +73,8 @@ struct HistoryRetentionTests {
         #expect(coordinator.filteredRows.count == 1_000)
         #expect(coordinator.activeWorkspace.lastDeriveWasAppendOnly)
         #expect(coordinator.appNodes.first?.requestCount == 1_000)
-        #expect(coordinator.observedDomainsByApp[String(localized: "Unknown")]?.count == 20)
+        #expect(coordinator.observedDomainsByApp[String(localized: "Unknown", bundle: RockxyLocalization.bundle)]?
+            .count == 20)
     }
 
     @Test("Saturated capture evicts with headroom instead of rebuilding every batch")

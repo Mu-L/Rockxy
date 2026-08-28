@@ -550,7 +550,7 @@ struct DeveloperSetupViewModelTests {
 
         let guideOnlyTarget = SetupTarget(
             id: .androidDevice,
-            title: String(localized: "Android Device"),
+            title: String(localized: "Android Device", bundle: RockxyLocalization.bundle),
             category: .device,
             iconName: "iphone.gen2.radiowaves.left.and.right",
             manualSupport: .guideOnly,

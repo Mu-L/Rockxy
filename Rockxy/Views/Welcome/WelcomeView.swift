@@ -52,11 +52,11 @@ struct WelcomeView: View {
             viewModel.syncFromCoordinator()
         }
         .alert(
-            String(localized: "Repair Helper Tool?"),
+            String(localized: "Repair Helper Tool?", bundle: RockxyLocalization.bundle),
             isPresented: $showingHelperRepairConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Repair & Reinstall"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Repair & Reinstall", bundle: RockxyLocalization.bundle), role: .destructive) {
                 Task {
                     await viewModel.repairAndReinstallHelper()
                 }
@@ -68,7 +68,7 @@ struct WelcomeView: View {
                     Rockxy will stop capture, request administrator approval, remove stale helper files and registration state, then reinstall the helper from this app.
 
                     Use this when Install, Retry, Update, or Reinstall cannot recover the helper.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -101,10 +101,16 @@ struct WelcomeView: View {
         [
             WelcomeStepItem(
                 id: 1,
-                title: String(localized: "Generate Root Certificate"),
-                detail: String(localized: "Create Rockxy's local certificate authority for HTTPS inspection."),
+                title: String(localized: "Generate Root Certificate", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Create Rockxy's local certificate authority for HTTPS inspection.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 symbol: "lock.badge.plus",
-                actionLabel: viewModel.certInstalled ? nil : String(localized: "Install"),
+                actionLabel: viewModel.certInstalled ? nil : String(
+                    localized: "Install",
+                    bundle: RockxyLocalization.bundle
+                ),
                 isCompleted: viewModel.certInstalled,
                 isDisabled: false,
                 activeAction: .certificate,
@@ -113,10 +119,16 @@ struct WelcomeView: View {
             ),
             WelcomeStepItem(
                 id: 2,
-                title: String(localized: "Trust Root Certificate"),
-                detail: String(localized: "Trust the certificate so intercepted HTTPS connections are accepted."),
+                title: String(localized: "Trust Root Certificate", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Trust the certificate so intercepted HTTPS connections are accepted.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 symbol: "checkmark.shield",
-                actionLabel: viewModel.certTrusted ? nil : String(localized: "Trust"),
+                actionLabel: viewModel.certTrusted ? nil : String(
+                    localized: "Trust",
+                    bundle: RockxyLocalization.bundle
+                ),
                 isCompleted: viewModel.certTrusted,
                 isDisabled: !viewModel.certInstalled,
                 activeAction: .certificate,
@@ -125,9 +137,10 @@ struct WelcomeView: View {
             ),
             WelcomeStepItem(
                 id: 3,
-                title: String(localized: "Install Helper Tool"),
+                title: String(localized: "Install Helper Tool", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "Install the privileged service used for reliable proxy changes and recovery."
+                    localized: "Install the privileged service used for reliable proxy changes and recovery.",
+                    bundle: RockxyLocalization.bundle
                 ),
                 symbol: "wrench.and.screwdriver",
                 actionLabel: viewModel.helperActionLabel,
@@ -139,10 +152,16 @@ struct WelcomeView: View {
             ),
             WelcomeStepItem(
                 id: 4,
-                title: String(localized: "Enable System Proxy"),
-                detail: String(localized: "Route macOS network traffic through Rockxy for capture."),
+                title: String(localized: "Enable System Proxy", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Route macOS network traffic through Rockxy for capture.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 symbol: "network",
-                actionLabel: viewModel.systemProxyEnabled ? nil : String(localized: "Enable"),
+                actionLabel: viewModel.systemProxyEnabled ? nil : String(
+                    localized: "Enable",
+                    bundle: RockxyLocalization.bundle
+                ),
                 isCompleted: viewModel.systemProxyEnabled,
                 isDisabled: false,
                 activeAction: .systemProxy,
@@ -168,7 +187,7 @@ struct WelcomeView: View {
                     .frame(width: 56, height: 56)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(String(localized: "Welcome to Rockxy"))
+                    Text(String(localized: "Welcome to Rockxy", bundle: RockxyLocalization.bundle))
                         .font(
                             toolMetrics.appMetrics.swiftUIFont(
                                 size: max(20, toolMetrics.bodyFontSize + 7),
@@ -177,8 +196,14 @@ struct WelcomeView: View {
                         )
                     Text(
                         isFirstLaunch
-                            ? String(localized: "Complete these four steps to prepare network debugging.")
-                            : String(localized: "Review the four setup steps before continuing.")
+                            ? String(
+                                localized: "Complete these four steps to prepare network debugging.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Review the four setup steps before continuing.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
@@ -199,18 +224,24 @@ struct WelcomeView: View {
                     HStack(spacing: 6) {
                         ProgressView()
                             .controlSize(.small)
-                        Text(String(localized: "Checking system…"))
+                        Text(String(localized: "Checking system…", bundle: RockxyLocalization.bundle))
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel(String(localized: "Checking system readiness"))
+                    .accessibilityLabel(String(
+                        localized: "Checking system readiness",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     .font(toolMetrics.metadataFont(weight: .medium))
                     .foregroundStyle(.secondary)
                     .fixedSize()
                 } else {
-                    Text(String(localized: "\(viewModel.completedSteps) of \(viewModel.totalSteps) complete"))
-                        .font(toolMetrics.metadataFont(weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .fixedSize()
+                    Text(String(
+                        localized: "\(viewModel.completedSteps) of \(viewModel.totalSteps) complete",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.metadataFont(weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
                 }
             }
         }
@@ -253,7 +284,7 @@ struct WelcomeView: View {
                 showingHelperRepairConfirmation = true
             } label: {
                 Label(
-                    String(localized: "Repair & Reinstall…"),
+                    String(localized: "Repair & Reinstall…", bundle: RockxyLocalization.bundle),
                     systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
                 )
                 .font(toolMetrics.metadataFont(weight: .medium))
@@ -267,7 +298,7 @@ struct WelcomeView: View {
                 openWindow(id: "advancedProxySettings")
             } label: {
                 Label(
-                    String(localized: "View Advanced Diagnostics"),
+                    String(localized: "View Advanced Diagnostics", bundle: RockxyLocalization.bundle),
                     systemImage: "wrench.and.screwdriver"
                 )
                 .font(toolMetrics.metadataFont(weight: .medium))
@@ -305,7 +336,7 @@ struct WelcomeView: View {
 
     private var startupToggle: some View {
         Toggle(isOn: $showWelcomeOnLaunch) {
-            Text(String(localized: "Show on startup"))
+            Text(String(localized: "Show on startup", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
         }
         .toggleStyle(.checkbox)
@@ -314,14 +345,14 @@ struct WelcomeView: View {
     private var footerButtons: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             if viewModel.canGetStarted {
-                Button(String(localized: "Debug My App…")) {
+                Button(String(localized: "Debug My App…", bundle: RockxyLocalization.bundle)) {
                     finish(openDeveloperSetup: true)
                 }
                 .rockxyGlassButtonStyle()
                 .controlSize(.large)
             }
 
-            Button(String(localized: "Get Started")) {
+            Button(String(localized: "Get Started", bundle: RockxyLocalization.bundle)) {
                 finish(openDeveloperSetup: false)
             }
             .rockxyGlassButtonStyle(prominent: true)
@@ -383,8 +414,8 @@ struct WelcomeView: View {
         .frame(width: 28, height: 28)
         .accessibilityLabel(
             step.isCompleted
-                ? String(localized: "Completed")
-                : String(localized: "Step \(step.id)")
+                ? String(localized: "Completed", bundle: RockxyLocalization.bundle)
+                : String(localized: "Step \(step.id)", bundle: RockxyLocalization.bundle)
         )
     }
 

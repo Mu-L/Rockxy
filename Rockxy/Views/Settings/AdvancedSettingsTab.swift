@@ -15,8 +15,8 @@ struct AdvancedSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "System Proxy")) {
-                settingsRow(label: String(localized: "Proxy Helper Tool:")) {
+            SettingsSection(String(localized: "System Proxy", bundle: RockxyLocalization.bundle)) {
+                settingsRow(label: String(localized: "Proxy Helper Tool:", bundle: RockxyLocalization.bundle)) {
                     VStack(alignment: .leading, spacing: 10) {
                         // Zone A: Summary
                         HStack(spacing: 8) {
@@ -36,7 +36,7 @@ struct AdvancedSettingsTab: View {
                         // Zone B: Diagnostics
                         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
                             GridRow {
-                                Text(String(localized: "Bundled:"))
+                                Text(String(localized: "Bundled:", bundle: RockxyLocalization.bundle))
                                     .font(settingsMetrics.secondaryFont())
                                     .foregroundStyle(.secondary)
                                     .gridColumnAlignment(.trailing)
@@ -44,7 +44,7 @@ struct AdvancedSettingsTab: View {
                                     .font(settingsMetrics.secondaryFont(monospaced: true))
                             }
                             GridRow {
-                                Text(String(localized: "Installed:"))
+                                Text(String(localized: "Installed:", bundle: RockxyLocalization.bundle))
                                     .font(settingsMetrics.secondaryFont())
                                     .foregroundStyle(.secondary)
                                 Text(helperManager.installedInfo?.binaryVersion ?? "\u{2014}")
@@ -52,7 +52,7 @@ struct AdvancedSettingsTab: View {
                                     .foregroundStyle(installedVersionColor)
                             }
                             GridRow {
-                                Text(String(localized: "Registration:"))
+                                Text(String(localized: "Registration:", bundle: RockxyLocalization.bundle))
                                     .font(settingsMetrics.secondaryFont())
                                     .foregroundStyle(.secondary)
                                 Text(helperManager.registrationStatus)
@@ -60,15 +60,15 @@ struct AdvancedSettingsTab: View {
                                     .foregroundStyle(registrationColor)
                             }
                             GridRow {
-                                Text(String(localized: "XPC:"))
+                                Text(String(localized: "XPC:", bundle: RockxyLocalization.bundle))
                                     .font(settingsMetrics.secondaryFont())
                                     .foregroundStyle(.secondary)
                                 Text(
                                     helperManager.status == .notInstalled
                                         ? "\u{2014}"
                                         : (helperManager.isReachable
-                                            ? String(localized: "Reachable")
-                                            : String(localized: "Unreachable"))
+                                            ? String(localized: "Reachable", bundle: RockxyLocalization.bundle)
+                                            : String(localized: "Unreachable", bundle: RockxyLocalization.bundle))
                                 )
                                 .font(settingsMetrics.secondaryFont())
                                 .foregroundStyle(xpcColor)
@@ -95,67 +95,67 @@ struct AdvancedSettingsTab: View {
 
                             switch helperManager.status {
                             case .notInstalled:
-                                Button(String(localized: "Install Helper")) {
+                                Button(String(localized: "Install Helper", bundle: RockxyLocalization.bundle)) {
                                     installHelper()
                                 }
                                 .disabled(helperManager.isBusy)
                             case .requiresApproval:
-                                Button(String(localized: "Open System Settings")) {
+                                Button(String(localized: "Open System Settings", bundle: RockxyLocalization.bundle)) {
                                     SMAppService.openSystemSettingsLoginItems()
                                 }
                                 .disabled(helperManager.isBusy)
-                                Button(String(localized: "Check Again")) {
+                                Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                                     Task { await helperManager.checkStatus() }
                                 }
                                 .disabled(helperManager.isBusy)
                             case .installedCompatible:
-                                Button(String(localized: "Check Again")) {
+                                Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                                     Task { await helperManager.checkStatus() }
                                 }
                                 .disabled(helperManager.isBusy)
-                                Button(String(localized: "Uninstall")) {
+                                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                                     showUninstallConfirmation = true
                                 }
                                 .disabled(helperManager.isBusy)
                             case .installedOutdated,
                                  .installedIncompatible:
-                                Button(String(localized: "Update Helper")) {
+                                Button(String(localized: "Update Helper", bundle: RockxyLocalization.bundle)) {
                                     updateHelper()
                                 }
                                 .disabled(helperManager.isBusy)
-                                Button(String(localized: "Uninstall")) {
+                                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                                     showUninstallConfirmation = true
                                 }
                                 .disabled(helperManager.isBusy)
                             case .unreachable:
-                                Button(String(localized: "Retry Connection")) {
+                                Button(String(localized: "Retry Connection", bundle: RockxyLocalization.bundle)) {
                                     Task { await helperManager.retryConnection() }
                                 }
                                 .disabled(helperManager.isBusy)
-                                Button(String(localized: "Reinstall")) {
+                                Button(String(localized: "Reinstall", bundle: RockxyLocalization.bundle)) {
                                     reinstallHelper()
                                 }
                                 .disabled(helperManager.isBusy)
-                                Button(String(localized: "Uninstall")) {
+                                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                                     showUninstallConfirmation = true
                                 }
                                 .disabled(helperManager.isBusy)
                             case .signingMismatch:
                                 if case .applicationMustReopen = helperManager.signingIssue {
-                                    Button(String(localized: "Quit Rockxy")) {
+                                    Button(String(localized: "Quit Rockxy", bundle: RockxyLocalization.bundle)) {
                                         HelperRecoveryPresenter.requestRequiredReopen()
                                     }
                                 } else if case .identityMismatch = helperManager.signingIssue {
-                                    Button(String(localized: "Reinstall Helper")) {
+                                    Button(String(localized: "Reinstall Helper", bundle: RockxyLocalization.bundle)) {
                                         reinstallHelper()
                                     }
                                     .disabled(helperManager.isBusy)
-                                    Button(String(localized: "Uninstall")) {
+                                    Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                                         showUninstallConfirmation = true
                                     }
                                     .disabled(helperManager.isBusy)
                                 } else {
-                                    Button(String(localized: "Check Again")) {
+                                    Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                                         Task { await helperManager.checkStatus() }
                                     }
                                     .disabled(helperManager.isBusy)
@@ -166,7 +166,7 @@ struct AdvancedSettingsTab: View {
                                 Button(role: .destructive) {
                                     HelperRecoveryPresenter.presentForceReset()
                                 } label: {
-                                    Text(String(localized: "Force Reset…"))
+                                    Text(String(localized: "Force Reset…", bundle: RockxyLocalization.bundle))
                                 }
                                 .disabled(helperManager.isBusy)
                             }
@@ -175,13 +175,13 @@ struct AdvancedSettingsTab: View {
                 }
             }
 
-            SettingsSection(String(localized: "Software Update")) {
+            SettingsSection(String(localized: "Software Update", bundle: RockxyLocalization.bundle)) {
                 updatesSection
             }
 
-            SettingsSection(String(localized: "Behavior")) {
+            SettingsSection(String(localized: "Behavior", bundle: RockxyLocalization.bundle)) {
                 checkboxRow(
-                    title: String(localized: "Show alert when quitting Rockxy"),
+                    title: String(localized: "Show alert when quitting Rockxy", bundle: RockxyLocalization.bundle),
                     isOn: $showAlertOnQuit
                 )
             }
@@ -190,17 +190,18 @@ struct AdvancedSettingsTab: View {
             await helperManager.checkStatus()
         }
         .alert(
-            String(localized: "Uninstall Helper Tool?"),
+            String(localized: "Uninstall Helper Tool?", bundle: RockxyLocalization.bundle),
             isPresented: $showUninstallConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Uninstall"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle), role: .destructive) {
                 uninstallHelper()
             }
         } message: {
             Text(
                 String(
-                    localized: "The proxy helper tool will be removed. You may be prompted for your password when changing proxy settings."
+                    localized: "The proxy helper tool will be removed. You may be prompted for your password when changing proxy settings.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -276,23 +277,23 @@ struct AdvancedSettingsTab: View {
     private var helperStatusText: String {
         switch helperManager.status {
         case .notInstalled:
-            String(localized: "Not Installed")
+            String(localized: "Not Installed", bundle: RockxyLocalization.bundle)
         case .requiresApproval:
-            String(localized: "Requires Approval")
+            String(localized: "Requires Approval", bundle: RockxyLocalization.bundle)
         case .installedCompatible:
-            String(localized: "Installed")
+            String(localized: "Installed", bundle: RockxyLocalization.bundle)
         case .installedOutdated,
              .installedIncompatible:
-            String(localized: "Update Available")
+            String(localized: "Update Available", bundle: RockxyLocalization.bundle)
         case .unreachable:
-            String(localized: "Unreachable")
+            String(localized: "Unreachable", bundle: RockxyLocalization.bundle)
         case .signingMismatch:
             if case .applicationMustReopen = helperManager.signingIssue {
-                String(localized: "Reopen Required")
+                String(localized: "Reopen Required", bundle: RockxyLocalization.bundle)
             } else if case .appSignatureInvalid = helperManager.signingIssue {
-                String(localized: "Invalid App Signature")
+                String(localized: "Invalid App Signature", bundle: RockxyLocalization.bundle)
             } else {
-                String(localized: "Signing Mismatch")
+                String(localized: "Signing Mismatch", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -322,20 +323,41 @@ struct AdvancedSettingsTab: View {
     private var helperStatusSubtitle: String {
         switch helperManager.status {
         case .notInstalled:
-            String(localized: "Rockxy will use networksetup and may ask for your password.")
+            String(
+                localized: "Rockxy will use networksetup and may ask for your password.",
+                bundle: RockxyLocalization.bundle
+            )
         case .requiresApproval:
-            String(localized: "Approve Rockxy Helper in System Settings \u{2192} General \u{2192} Login Items.")
+            String(
+                localized: "Approve Rockxy Helper in System Settings \u{2192} General \u{2192} Login Items.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedCompatible:
-            String(localized: "Helper is responding and matches the bundled version.")
+            String(
+                localized: "Helper is responding and matches the bundled version.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedOutdated:
-            String(localized: "Installed helper version is outdated and should be updated.")
+            String(
+                localized: "Installed helper version is outdated and should be updated.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedIncompatible:
-            String(localized: "Installed helper version is incompatible with this app.")
+            String(
+                localized: "Installed helper version is incompatible with this app.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unreachable:
-            String(localized: "Rockxy could not communicate with the helper over XPC.")
+            String(
+                localized: "Rockxy could not communicate with the helper over XPC.",
+                bundle: RockxyLocalization.bundle
+            )
         case .signingMismatch:
             helperManager.lastErrorMessage
-                ?? String(localized: "The app and helper have mismatched signing certificates.")
+                ?? String(
+                    localized: "The app and helper have mismatched signing certificates.",
+                    bundle: RockxyLocalization.bundle
+                )
         }
     }
 
@@ -349,7 +371,7 @@ struct AdvancedSettingsTab: View {
                         .frame(width: 20)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(String(localized: "Update Controls"))
+                        Text(String(localized: "Update Controls", bundle: RockxyLocalization.bundle))
                             .font(settingsMetrics.font(weight: .medium))
                         Text(updater.updateAvailabilitySummary)
                             .font(settingsMetrics.secondaryFont())
@@ -360,14 +382,14 @@ struct AdvancedSettingsTab: View {
 
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
                     GridRow {
-                        Text(String(localized: "Current:"))
+                        Text(String(localized: "Current:", bundle: RockxyLocalization.bundle))
                             .font(settingsMetrics.secondaryFont())
                             .foregroundStyle(.secondary)
                         Text(updater.currentVersionSummary)
                             .font(settingsMetrics.secondaryFont(monospaced: true))
                     }
                     GridRow {
-                        Text(String(localized: "Last Checked:"))
+                        Text(String(localized: "Last Checked:", bundle: RockxyLocalization.bundle))
                             .font(settingsMetrics.secondaryFont())
                             .foregroundStyle(.secondary)
                         Text(updater.lastCheckedDescription)
@@ -377,12 +399,12 @@ struct AdvancedSettingsTab: View {
             }
 
             HStack(spacing: 10) {
-                Button(String(localized: "Check for Updates…")) {
+                Button(String(localized: "Check for Updates…", bundle: RockxyLocalization.bundle)) {
                     updater.checkForUpdates()
                 }
                 .disabled(!updater.canInitiateUpdateCheck)
 
-                Button(String(localized: "Change Logs…")) {
+                Button(String(localized: "Change Logs…", bundle: RockxyLocalization.bundle)) {
                     updater.openFullChangelog()
                 }
 
@@ -393,7 +415,7 @@ struct AdvancedSettingsTab: View {
             }
 
             Toggle(
-                String(localized: "Automatically check for updates"),
+                String(localized: "Automatically check for updates", bundle: RockxyLocalization.bundle),
                 isOn: Binding(
                     get: { updater.automaticallyChecksForUpdates },
                     set: { updater.setAutomaticallyChecksForUpdates($0) }
@@ -404,7 +426,10 @@ struct AdvancedSettingsTab: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle(
-                    String(localized: "Automatically download updates in the background"),
+                    String(
+                        localized: "Automatically download updates in the background",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     isOn: Binding(
                         get: { updater.automaticallyDownloadsUpdates },
                         set: { updater.setAutomaticallyDownloadsUpdates($0) }
@@ -419,7 +444,8 @@ struct AdvancedSettingsTab: View {
 
                 Text(
                     String(
-                        localized: "When enabled, Rockxy downloads signed updates ahead of time so install prompts are faster."
+                        localized: "When enabled, Rockxy downloads signed updates ahead of time so install prompts are faster.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.secondaryFont())
@@ -427,9 +453,9 @@ struct AdvancedSettingsTab: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingsFieldRow(String(localized: "Check Frequency")) {
+            SettingsFieldRow(String(localized: "Check Frequency", bundle: RockxyLocalization.bundle)) {
                 Picker(
-                    String(localized: "Check Frequency"),
+                    String(localized: "Check Frequency", bundle: RockxyLocalization.bundle),
                     selection: Binding(
                         get: { UpdateCheckIntervalOption.closest(to: updater.updateCheckInterval) },
                         set: { updater.setUpdateCheckInterval($0.rawValue) }
@@ -447,7 +473,7 @@ struct AdvancedSettingsTab: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Toggle(
-                    String(localized: "Send anonymous compatibility profile"),
+                    String(localized: "Send anonymous compatibility profile", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { updater.sendsSystemProfile },
                         set: { updater.setSendsSystemProfile($0) }
@@ -460,7 +486,7 @@ struct AdvancedSettingsTab: View {
                     String(
                         localized: """
                         This shares basic macOS and hardware compatibility details with Sparkle so Rockxy can match the right update. It does not include captured traffic.
-                        """
+                        """, bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.secondaryFont())

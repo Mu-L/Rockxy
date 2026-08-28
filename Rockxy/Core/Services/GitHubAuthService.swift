@@ -6,6 +6,8 @@ protocol GitHubHTTPDataLoading: Sendable {
     func data(for request: URLRequest) async throws -> (Data, URLResponse)
 }
 
+// MARK: - URLSession + GitHubHTTPDataLoading
+
 extension URLSession: GitHubHTTPDataLoading {}
 
 // MARK: - GitHubAuthService
@@ -20,12 +22,6 @@ struct GitHubAuthService: Sendable {
     // MARK: Internal
 
     struct DeviceCode: Decodable, Equatable {
-        let deviceCode: String
-        let userCode: String
-        let verificationURI: String
-        let expiresIn: Int
-        let interval: Int
-
         enum CodingKeys: String, CodingKey {
             case deviceCode = "device_code"
             case userCode = "user_code"
@@ -33,6 +29,12 @@ struct GitHubAuthService: Sendable {
             case expiresIn = "expires_in"
             case interval
         }
+
+        let deviceCode: String
+        let userCode: String
+        let verificationURI: String
+        let expiresIn: Int
+        let interval: Int
     }
 
     enum AuthError: LocalizedError, Equatable {
@@ -45,22 +47,24 @@ struct GitHubAuthService: Sendable {
         case invalidResponse
         case githubError(String)
 
+        // MARK: Internal
+
         var errorDescription: String? {
             switch self {
             case .clientIDMissing:
-                String(localized: "GitHub OAuth is not configured for this build.")
+                String(localized: "GitHub OAuth is not configured for this build.", bundle: RockxyLocalization.bundle)
             case .accessDenied:
-                String(localized: "GitHub authorization was denied.")
+                String(localized: "GitHub authorization was denied.", bundle: RockxyLocalization.bundle)
             case .expired:
-                String(localized: "The GitHub authorization code expired.")
+                String(localized: "The GitHub authorization code expired.", bundle: RockxyLocalization.bundle)
             case .authorizationPending:
-                String(localized: "GitHub authorization is still pending.")
+                String(localized: "GitHub authorization is still pending.", bundle: RockxyLocalization.bundle)
             case .missingGistScope:
-                String(localized: "The token is missing the required gist scope.")
+                String(localized: "The token is missing the required gist scope.", bundle: RockxyLocalization.bundle)
             case let .unexpectedStatus(status):
-                String(localized: "GitHub returned HTTP \(status).")
+                String(localized: "GitHub returned HTTP \(status).", bundle: RockxyLocalization.bundle)
             case .invalidResponse:
-                String(localized: "GitHub returned an unexpected response.")
+                String(localized: "GitHub returned an unexpected response.", bundle: RockxyLocalization.bundle)
             case let .githubError(message):
                 message
             }
@@ -136,13 +140,13 @@ struct GitHubAuthService: Sendable {
     // MARK: Private
 
     private struct DeviceTokenResponse: Decodable {
-        let accessToken: String
-        let scope: String
-
         enum CodingKeys: String, CodingKey {
             case accessToken = "access_token"
             case scope
         }
+
+        let accessToken: String
+        let scope: String
     }
 
     private struct DevicePollError: Decodable {
@@ -179,7 +183,8 @@ struct GitHubAuthService: Sendable {
 
     private func mappedPollError(_ error: String) -> AuthError {
         switch error {
-        case "authorization_pending", "slow_down":
+        case "authorization_pending",
+             "slow_down":
             .authorizationPending
         case "expired_token":
             .expired

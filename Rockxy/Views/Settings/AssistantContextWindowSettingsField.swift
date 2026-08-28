@@ -2,26 +2,28 @@ import SwiftUI
 
 /// Model-aware context control kept separate from the provider form's general connection fields.
 struct AssistantContextWindowSettingsField: View {
+    // MARK: Internal
+
     @Binding var configuration: AssistantProviderConfiguration
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     var body: some View {
-        SettingsFieldRow(String(localized: "Context Window")) {
+        SettingsFieldRow(String(localized: "Context Window", bundle: RockxyLocalization.bundle)) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     TextField(
-                        String(localized: "Context window tokens"),
+                        String(localized: "Context window tokens", bundle: RockxyLocalization.bundle),
                         value: contextWindow,
                         format: .number
                     )
                     .textFieldStyle(.roundedBorder)
                     .frame(width: settingsMetrics.fieldWidth(120))
-                    Text(String(localized: "tokens"))
+                    Text(String(localized: "tokens", bundle: RockxyLocalization.bundle))
                         .foregroundStyle(.secondary)
                 }
                 Text(
                     String(
-                        localized: "Rockxy uses 8,192 tokens by default and limits local inference to 32,768 tokens to avoid excessive memory pressure."
+                        localized: "Rockxy uses 8,192 tokens by default and limits local inference to 32,768 tokens to avoid excessive memory pressure.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(settingsMetrics.metadataFont())
@@ -30,6 +32,10 @@ struct AssistantContextWindowSettingsField: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var contextWindow: Binding<Int> {
         Binding(

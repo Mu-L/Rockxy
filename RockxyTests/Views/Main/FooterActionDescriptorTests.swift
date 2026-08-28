@@ -5,6 +5,8 @@ import Testing
 // MARK: - FooterActionDescriptorTests
 
 struct FooterActionDescriptorTests {
+    // MARK: Internal
+
     @Test("Footer tooling action order is stable")
     func toolingActionOrder() {
         let actions = FooterActionDescriptor.toolingActions(isAllowListActive: false)
@@ -46,9 +48,12 @@ struct FooterActionDescriptorTests {
         )
         let action = try #require(actions.first { $0.id == .proxyOverride })
 
-        #expect(action.title == "Proxy Overridden")
+        #expect(action.title == String(localized: "Proxy Overridden", bundle: RockxyLocalization.bundle))
         #expect(action.systemImage == "checkmark.circle.fill")
-        #expect(action.help == "Show system proxy override details. Toggle by: ⌥⌘O")
+        #expect(action.help == String(
+            localized: "Show system proxy override details. Toggle by: ⌥⌘O",
+            bundle: RockxyLocalization.bundle
+        ))
         #expect(action.isActive)
         #expect(action.isEnabled)
     }
@@ -117,15 +122,24 @@ struct FooterActionDescriptorTests {
 
         #expect(source.contains("Label(descriptor.title, systemImage: descriptor.systemImage)"))
         #expect(source.contains(".rockxyGlassButtonStyle(prominent: descriptor.isActive)"))
-        #expect(source.contains("Label(String(localized: \"Quick Tools\"), systemImage: \"hammer\")"))
+        #expect(source
+            .contains(
+                "Label(String(localized: \"Quick Tools\", bundle: RockxyLocalization.bundle), systemImage: \"hammer\")"
+            ))
         #expect(source.contains("Image(systemName: \"ellipsis\")"))
-        #expect(!source.contains("Label(String(localized: \"Customize\"), systemImage: \"ellipsis\")"))
+        #expect(!source
+            .contains(
+                "Label(String(localized: \"Customize\", bundle: RockxyLocalization.bundle), systemImage: \"ellipsis\")"
+            ))
         #expect(!source.contains("showsCustomizeTitle"))
         #expect(source.contains("quickTools\n                    .layoutPriority(0)"))
         #expect(source.contains("centerStatus\n                    .layoutPriority(3)"))
         #expect(source.contains("rightStats\n                    .layoutPriority(3)"))
         #expect(source.contains("ViewThatFits(in: .horizontal)"))
-        #expect(source.contains(".accessibilityLabel(String(localized: \"Customize Quick Tools\"))"))
+        #expect(source
+            .contains(
+                ".accessibilityLabel(String(localized: \"Customize Quick Tools\", bundle: RockxyLocalization.bundle))"
+            ))
         #expect(!source.contains("struct FooterToolIconLabel"))
         #expect(!source.contains("struct FooterToolingChrome"))
         #expect(!source.contains("FooterToolingChrome("))

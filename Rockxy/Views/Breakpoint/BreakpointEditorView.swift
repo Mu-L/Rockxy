@@ -69,13 +69,92 @@ struct BreakpointEditorView: View {
     @State private var pendingTemplateRawMessage = ""
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(String(localized: "Select Paused Traffic"), systemImage: "cursorarrow.click.2")
+            Label(
+                String(localized: "Select Paused Traffic", bundle: RockxyLocalization.bundle),
+                systemImage: "cursorarrow.click.2"
+            )
         } description: {
-            Text(String(localized: "Choose an item from the queue to inspect and edit its message."))
+            Text(String(
+                localized: "Choose an item from the queue to inspect and edit its message.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var binaryBodyNotice: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Original payload protected", bundle: RockxyLocalization.bundle))
+                    .font(toolMetrics.secondaryFont(weight: .semibold))
+                Text(
+                    String(
+                        localized: "This body is not UTF-8 text, so body edits are disabled. Applying request-line, status, or header changes preserves every body byte.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
+    }
+
+    private var protectedBodyState: some View {
+        ContentUnavailableView {
+            Label(String(localized: "Binary Body", bundle: RockxyLocalization.bundle), systemImage: "doc.badge.lock")
+        } description: {
+            Text(
+                String(
+                    localized: "Body editing is unavailable. Applying metadata changes or continuing original preserves every body byte.",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var saveTemplateSheet: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(String(localized: "Save Template", bundle: RockxyLocalization.bundle))
+                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .semibold))
+
+            TextField(String(localized: "Template name", bundle: RockxyLocalization.bundle), text: $saveTemplateName)
+                .textFieldStyle(.roundedBorder)
+
+            let validation = BreakpointRawMessage.validation(for: pendingTemplateRawMessage, kind: pendingTemplateKind)
+            Label(validation.message, systemImage: "circle.fill")
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(validation.isValid ? Color.green : Color.red)
+
+            HStack {
+                Spacer()
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
+                    isSaveTemplateSheetPresented = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(String(localized: "Save", bundle: RockxyLocalization.bundle)) {
+                    savePendingTemplate()
+                }
+                .keyboardShortcut(.defaultAction)
+                .rockxyGlassButtonStyle(prominent: true)
+                .disabled(!validation.isValid)
+            }
+        }
+        .padding(20)
+        .frame(width: 380)
     }
 
     @ViewBuilder
@@ -104,8 +183,8 @@ struct BreakpointEditorView: View {
             Image(systemName: "pause.circle.fill")
                 .foregroundStyle(.orange)
             Text(item.phase == .request
-                ? String(localized: "Request paused for review")
-                : String(localized: "Response paused for review"))
+                ? String(localized: "Request paused for review", bundle: RockxyLocalization.bundle)
+                : String(localized: "Response paused for review", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
                 .foregroundStyle(.primary)
             Spacer()
@@ -119,28 +198,6 @@ struct BreakpointEditorView: View {
         }
         .padding(12)
         .background(Color.orange.opacity(0.12))
-    }
-
-    private var binaryBodyNotice: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "lock.shield.fill")
-                .foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "Original payload protected"))
-                    .font(toolMetrics.secondaryFont(weight: .semibold))
-                Text(
-                    String(
-                        localized: "This body is not UTF-8 text, so body edits are disabled. Applying request-line, status, or header changes preserves every body byte."
-                    )
-                )
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.orange.opacity(0.08))
     }
 
     private func requestLine(itemId: UUID) -> some View {
@@ -188,9 +245,12 @@ struct BreakpointEditorView: View {
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .help(String(localized: "The HTTPS authority is fixed for this connection"))
+                .help(String(
+                    localized: "The HTTPS authority is fixed for this connection",
+                    bundle: RockxyLocalization.bundle
+                ))
 
-            TextField(String(localized: "Path and query"), text: Binding(
+            TextField(String(localized: "Path and query", bundle: RockxyLocalization.bundle), text: Binding(
                 get: { httpsPathAndQuery(itemId: itemId) },
                 set: { updateHTTPSPathAndQuery($0, itemId: itemId) }
             ))
@@ -203,7 +263,7 @@ struct BreakpointEditorView: View {
     }
 
     private func editableURLField(itemId: UUID) -> some View {
-        TextField(String(localized: "URL"), text: Binding(
+        TextField(String(localized: "URL", bundle: RockxyLocalization.bundle), text: Binding(
             get: { draftFor(itemId)?.url ?? "" },
             set: { newValue in manager.updateDraft(id: itemId) { $0.url = newValue } }
         ))
@@ -214,7 +274,7 @@ struct BreakpointEditorView: View {
 
     private func readOnlyURL(itemId: UUID) -> some View {
         HStack(spacing: 8) {
-            Text(String(localized: "URL"))
+            Text(String(localized: "URL", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont(weight: .semibold))
                 .foregroundStyle(.secondary)
             Text(draftFor(itemId)?.url ?? "")
@@ -293,7 +353,7 @@ struct BreakpointEditorView: View {
                 let headers = draftFor(itemId)?.headers ?? []
                 ForEach(headers) { header in
                     HStack(spacing: 8) {
-                        TextField(String(localized: "Header name"), text: Binding(
+                        TextField(String(localized: "Header name", bundle: RockxyLocalization.bundle), text: Binding(
                             get: { headerValue(itemId: itemId, headerId: header.id)?.name ?? "" },
                             set: { newName in
                                 manager.updateDraft(id: itemId) { draft in
@@ -307,7 +367,7 @@ struct BreakpointEditorView: View {
                         .font(toolMetrics.secondaryFont(monospaced: true))
                         .frame(minHeight: toolMetrics.formControlHeight)
 
-                        TextField(String(localized: "Header value"), text: Binding(
+                        TextField(String(localized: "Header value", bundle: RockxyLocalization.bundle), text: Binding(
                             get: { headerValue(itemId: itemId, headerId: header.id)?.value ?? "" },
                             set: { newValue in
                                 manager.updateDraft(id: itemId) { draft in
@@ -333,7 +393,7 @@ struct BreakpointEditorView: View {
                     }
                 }
 
-                addButton(String(localized: "Add Header")) {
+                addButton(String(localized: "Add Header", bundle: RockxyLocalization.bundle)) {
                     manager.updateDraft(id: itemId) { draft in
                         draft.headers.append(EditableHeader(name: "", value: ""))
                     }
@@ -344,39 +404,25 @@ struct BreakpointEditorView: View {
         }
     }
 
+    @ViewBuilder
     private func bodyEditor(itemId: UUID) -> some View {
-        Group {
-            if draftFor(itemId)?.isBodyEditable == false {
-                protectedBodyState
-            } else {
-                TextEditor(text: Binding(
-                    get: { draftFor(itemId)?.body ?? "" },
-                    set: { newValue in manager.updateDraft(id: itemId) { $0.body = newValue } }
-                ))
-                .font(toolMetrics.font(monospaced: true))
-                .padding(8)
-                .background(Color(nsColor: .textBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                }
-                .padding(12)
+        if draftFor(itemId)?.isBodyEditable == false {
+            protectedBodyState
+        } else {
+            TextEditor(text: Binding(
+                get: { draftFor(itemId)?.body ?? "" },
+                set: { newValue in manager.updateDraft(id: itemId) { $0.body = newValue } }
+            ))
+            .font(toolMetrics.font(monospaced: true))
+            .padding(8)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
+            .padding(12)
         }
-    }
-
-    private var protectedBodyState: some View {
-        ContentUnavailableView {
-            Label(String(localized: "Binary Body"), systemImage: "doc.badge.lock")
-        } description: {
-            Text(
-                String(
-                    localized: "Body editing is unavailable. Applying metadata changes or continuing original preserves every body byte."
-                )
-            )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -393,7 +439,10 @@ struct BreakpointEditorView: View {
                         .foregroundStyle(validation.isValid ? Color.green : Color.red)
                     Spacer()
                     Menu {
-                        Button(String(localized: "Save current message as new template...")) {
+                        Button(String(
+                            localized: "Save current message as new template...",
+                            bundle: RockxyLocalization.bundle
+                        )) {
                             pendingTemplateKind = kind
                             pendingTemplateRawMessage = rawMessage
                             saveTemplateName = defaultTemplateName(for: kind)
@@ -406,7 +455,10 @@ struct BreakpointEditorView: View {
                                 applyTemplate(template, to: itemId)
                             } label: {
                                 Label(
-                                    template.name.isEmpty ? String(localized: "Untitled") : template.name,
+                                    template.name.isEmpty ? String(
+                                        localized: "Untitled",
+                                        bundle: RockxyLocalization.bundle
+                                    ) : template.name,
                                     systemImage: validation.isValid ? "doc.text" : "exclamationmark.triangle"
                                 )
                             }
@@ -414,7 +466,7 @@ struct BreakpointEditorView: View {
                             .help(validation.message)
                         }
                     } label: {
-                        Label(String(localized: "Template"), systemImage: "doc.text")
+                        Label(String(localized: "Template", bundle: RockxyLocalization.bundle), systemImage: "doc.text")
                     }
                 }
                 .padding(.horizontal, 12)
@@ -424,9 +476,9 @@ struct BreakpointEditorView: View {
                     get: { rawMessage },
                     set: { updateRawMessage($0, itemId: itemId) }
                 ), editorSettings: toolMetrics.codeEditorSettings)
-                .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35)))
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                    .overlay(Rectangle().stroke(Color(nsColor: .separatorColor).opacity(0.35)))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
             }
             .onAppear { syncRawMessageFromDraft(itemId: itemId, force: true) }
             .onChange(of: manager.selectedItemId) { _, _ in
@@ -445,7 +497,7 @@ struct BreakpointEditorView: View {
 
                 ForEach(queryItems) { item in
                     HStack(spacing: 8) {
-                        TextField(String(localized: "Parameter name"), text: Binding(
+                        TextField(String(localized: "Parameter name", bundle: RockxyLocalization.bundle), text: Binding(
                             get: { queryItems.first(where: { $0.id == item.id })?.name ?? "" },
                             set: { newName in
                                 if let idx = queryItems.firstIndex(where: { $0.id == item.id }) {
@@ -458,15 +510,18 @@ struct BreakpointEditorView: View {
                         .font(toolMetrics.secondaryFont(monospaced: true))
                         .frame(minHeight: toolMetrics.formControlHeight)
 
-                        TextField(String(localized: "Parameter value"), text: Binding(
-                            get: { queryItems.first(where: { $0.id == item.id })?.value ?? "" },
-                            set: { newValue in
-                                if let idx = queryItems.firstIndex(where: { $0.id == item.id }) {
-                                    queryItems[idx].value = newValue
-                                    rebuildURLFromQuery(itemId: itemId)
+                        TextField(
+                            String(localized: "Parameter value", bundle: RockxyLocalization.bundle),
+                            text: Binding(
+                                get: { queryItems.first(where: { $0.id == item.id })?.value ?? "" },
+                                set: { newValue in
+                                    if let idx = queryItems.firstIndex(where: { $0.id == item.id }) {
+                                        queryItems[idx].value = newValue
+                                        rebuildURLFromQuery(itemId: itemId)
+                                    }
                                 }
-                            }
-                        ))
+                            )
+                        )
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.secondaryFont(monospaced: true))
                         .frame(minHeight: toolMetrics.formControlHeight)
@@ -482,7 +537,7 @@ struct BreakpointEditorView: View {
                     }
                 }
 
-                addButton(String(localized: "Add Parameter")) {
+                addButton(String(localized: "Add Parameter", bundle: RockxyLocalization.bundle)) {
                     queryItems.append(EditableQueryItem(name: "", value: ""))
                     rebuildURLFromQuery(itemId: itemId)
                 }
@@ -492,6 +547,33 @@ struct BreakpointEditorView: View {
         }
         .onAppear { syncQueryItemsFromURL(itemId: itemId) }
         .onChange(of: draftFor(itemId)?.url) { _, _ in syncQueryItemsFromURL(itemId: itemId) }
+    }
+
+    private func columnHeaders(name: LocalizedStringResource, value: LocalizedStringResource) -> some View {
+        HStack {
+            Text(name)
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(value)
+                .font(toolMetrics.secondaryFont(weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Color.clear.frame(width: 24)
+        }
+        .padding(.bottom, 4)
+    }
+
+    private func addButton(_ title: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Button(action: action) {
+                Label(title, systemImage: "plus.circle")
+                    .font(toolMetrics.secondaryFont())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+        }
+        .padding(.top, 2)
     }
 
     private func itemPhase(itemId: UUID) -> BreakpointPhase? {
@@ -540,9 +622,9 @@ struct BreakpointEditorView: View {
         guard let url = draftFor(itemId)?.url,
               let components = URLComponents(string: url),
               let scheme = components.scheme,
-              let host = components.host
-        else {
-            return String(localized: "HTTPS connection")
+              let host = components.host else
+        {
+            return String(localized: "HTTPS connection", bundle: RockxyLocalization.bundle)
         }
 
         var authority = "\(scheme)://\(host)"
@@ -554,8 +636,8 @@ struct BreakpointEditorView: View {
 
     private func httpsPathAndQuery(itemId: UUID) -> String {
         guard let url = draftFor(itemId)?.url,
-              let components = URLComponents(string: url)
-        else {
+              let components = URLComponents(string: url) else
+        {
             return "/"
         }
 
@@ -568,8 +650,8 @@ struct BreakpointEditorView: View {
 
     private func updateHTTPSPathAndQuery(_ value: String, itemId: UUID) {
         guard let currentURL = draftFor(itemId)?.url,
-              let updatedURL = BreakpointRequestData.applyingOriginForm(value, to: currentURL)
-        else {
+              let updatedURL = BreakpointRequestData.applyingOriginForm(value, to: currentURL) else
+        {
             return
         }
         manager.updateDraft(id: itemId) { $0.url = updatedURL }
@@ -579,41 +661,14 @@ struct BreakpointEditorView: View {
         draftFor(itemId)?.headers.first(where: { $0.id == headerId })
     }
 
-    private func columnHeaders(name: LocalizedStringResource, value: LocalizedStringResource) -> some View {
-        HStack {
-            Text(name)
-                .font(toolMetrics.secondaryFont(weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(value)
-                .font(toolMetrics.secondaryFont(weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Color.clear.frame(width: 24)
-        }
-        .padding(.bottom, 4)
-    }
-
-    private func addButton(_ title: String, action: @escaping () -> Void) -> some View {
-        HStack {
-            Button(action: action) {
-                Label(title, systemImage: "plus.circle")
-                    .font(toolMetrics.secondaryFont())
-            }
-            .buttonStyle(.plain)
-            Spacer()
-        }
-        .padding(.top, 2)
-    }
-
     private func rawKind(for itemId: UUID) -> BreakpointTemplateKind {
         itemPhase(itemId: itemId) == .response ? .response : .request
     }
 
     private func refreshApplyAvailability() {
         guard let selectedItemId = manager.selectedItemId,
-              let draft = draftFor(selectedItemId)
-        else {
+              let draft = draftFor(selectedItemId) else
+        {
             canApplySelectedChanges = false
             return
         }
@@ -622,8 +677,8 @@ struct BreakpointEditorView: View {
 
     private func syncRawMessageFromDraft(itemId: UUID, force: Bool = false) {
         guard force || rawMessageItemID != itemId,
-              let draft = draftFor(itemId)
-        else {
+              let draft = draftFor(itemId) else
+        {
             return
         }
         rawMessageItemID = itemId
@@ -650,8 +705,8 @@ struct BreakpointEditorView: View {
     private func applyTemplate(_ template: BreakpointTemplate, to itemId: UUID) {
         guard let application = template.applicationPayload,
               application.kind == rawKind(for: itemId),
-              draftFor(itemId) != nil
-        else {
+              draftFor(itemId) != nil else
+        {
             return
         }
         manager.updateDraft(id: itemId) { draft in
@@ -662,44 +717,12 @@ struct BreakpointEditorView: View {
         canApplySelectedChanges = true
     }
 
-    private var saveTemplateSheet: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(String(localized: "Save Template"))
-                .font(.system(size: max(17, toolMetrics.bodyFontSize + 4), weight: .semibold))
-
-            TextField(String(localized: "Template name"), text: $saveTemplateName)
-                .textFieldStyle(.roundedBorder)
-
-            let validation = BreakpointRawMessage.validation(for: pendingTemplateRawMessage, kind: pendingTemplateKind)
-            Label(validation.message, systemImage: "circle.fill")
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(validation.isValid ? Color.green : Color.red)
-
-            HStack {
-                Spacer()
-                Button(String(localized: "Cancel")) {
-                    isSaveTemplateSheetPresented = false
-                }
-                .keyboardShortcut(.cancelAction)
-
-                Button(String(localized: "Save")) {
-                    savePendingTemplate()
-                }
-                .keyboardShortcut(.defaultAction)
-                .rockxyGlassButtonStyle(prominent: true)
-                .disabled(!validation.isValid)
-            }
-        }
-        .padding(20)
-        .frame(width: 380)
-    }
-
     private func defaultTemplateName(for kind: BreakpointTemplateKind) -> String {
         switch kind {
         case .request:
-            String(localized: "Saved Request")
+            String(localized: "Saved Request", bundle: RockxyLocalization.bundle)
         case .response:
-            String(localized: "Saved Response")
+            String(localized: "Saved Response", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -711,10 +734,6 @@ struct BreakpointEditorView: View {
             rawMessage: pendingTemplateRawMessage
         )
         isSaveTemplateSheetPresented = false
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }
 
@@ -734,10 +753,10 @@ private enum BreakpointEditorTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .headers: String(localized: "Headers")
-        case .body: String(localized: "Body")
-        case .raw: String(localized: "Raw")
-        case .query: String(localized: "Query")
+        case .headers: String(localized: "Headers", bundle: RockxyLocalization.bundle)
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
+        case .query: String(localized: "Query", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -746,6 +765,8 @@ private enum BreakpointEditorTab: String, CaseIterable, Identifiable {
 
 /// Live-updating elapsed time badge for the editor banner.
 private struct ElapsedTimeBadge: View {
+    // MARK: Internal
+
     let since: Date
 
     var body: some View {
@@ -756,6 +777,8 @@ private struct ElapsedTimeBadge: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

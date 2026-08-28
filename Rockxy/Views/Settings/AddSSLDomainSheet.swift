@@ -37,16 +37,16 @@ struct AddSSLDomainSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                fieldRow(String(localized: "Host Pattern")) {
+                fieldRow(String(localized: "Host Pattern", bundle: RockxyLocalization.bundle)) {
                     TextField("", text: $domain, prompt: Text("api.example.com"))
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
                         .frame(height: toolMetrics.formControlHeight)
                         .focused($isHostFocused)
-                        .accessibilityLabel(String(localized: "Host pattern"))
+                        .accessibilityLabel(String(localized: "Host pattern", bundle: RockxyLocalization.bundle))
                 }
 
-                fieldRow(String(localized: "Behavior")) {
+                fieldRow(String(localized: "Behavior", bundle: RockxyLocalization.bundle)) {
                     Picker("", selection: $listType) {
                         Text(SSLProxyingListViewModel.behaviorLabel(for: .include))
                             .tag(SSLProxyingListType.include)
@@ -56,11 +56,14 @@ struct AddSSLDomainSheet: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(height: toolMetrics.formControlHeight)
-                    .accessibilityLabel(String(localized: "Rule behavior"))
+                    .accessibilityLabel(String(localized: "Rule behavior", bundle: RockxyLocalization.bundle))
                 }
 
                 Text(
-                    String(localized: "Enter a host: * for all, an exact host or IPv4, or *.domain.com for subdomains.")
+                    String(
+                        localized: "Enter a host: * for all, an exact host or IPv4, or *.domain.com for subdomains.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.tertiary)
@@ -75,7 +78,8 @@ struct AddSSLDomainSheet: View {
                     Label(
                         String(
                             localized:
-                            "This host also has the opposite behavior. Tunnel Without Decryption takes priority; row order does not affect matching."
+                            "This host also has the opposite behavior. Tunnel Without Decryption takes priority; row order does not affect matching.",
+                            bundle: RockxyLocalization.bundle
                         ),
                         systemImage: "exclamationmark.triangle"
                     )
@@ -96,7 +100,7 @@ struct AddSSLDomainSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -107,7 +111,10 @@ struct AddSSLDomainSheet: View {
                     }
                 } label: {
                     footerButtonLabel(
-                        editingRule != nil ? String(localized: "Save") : String(localized: "Add")
+                        editingRule != nil ? String(localized: "Save", bundle: RockxyLocalization.bundle) : String(
+                            localized: "Add",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 }
                 .keyboardShortcut(.defaultAction)
@@ -136,16 +143,22 @@ struct AddSSLDomainSheet: View {
 
     private var title: String {
         editingRule != nil
-            ? String(localized: "Edit HTTPS Rule")
-            : String(localized: "Add HTTPS Rule")
+            ? String(localized: "Edit HTTPS Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Add HTTPS Rule", bundle: RockxyLocalization.bundle)
     }
 
     private var explanation: String {
         switch listType {
         case .include:
-            String(localized: "Rockxy decrypts HTTPS for hosts matching this pattern.")
+            String(
+                localized: "Rockxy decrypts HTTPS for hosts matching this pattern.",
+                bundle: RockxyLocalization.bundle
+            )
         case .exclude:
-            String(localized: "Rockxy tunnels matching HTTPS without decrypting, overriding any Decrypt rule.")
+            String(
+                localized: "Rockxy tunnels matching HTTPS without decrypting, overriding any Decrypt rule.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -170,7 +183,10 @@ struct AddSSLDomainSheet: View {
             return message
         }
         return hasSameBehaviorDuplicate
-            ? String(localized: "A rule with this host pattern and behavior already exists.")
+            ? String(
+                localized: "A rule with this host pattern and behavior already exists.",
+                bundle: RockxyLocalization.bundle
+            )
             : nil
     }
 

@@ -32,7 +32,7 @@ struct AssistantProductHelpPromptBuilder {
                 workspaceSummary: workspaceSummary
             ),
             input: normalizedQuestion.isEmpty
-                ? String(localized: "The user asked a Rockxy product question.")
+                ? String(localized: "The user asked a Rockxy product question.", bundle: RockxyLocalization.bundle)
                 : normalizedQuestion,
             model: configuration.model,
             maxOutputTokens: plan.maxOutputTokens,

@@ -45,7 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
         false
     }
 
-    @objc func newWindowForTab(_ sender: Any?) {
+    @objc
+    func newWindowForTab(_ sender: Any?) {
         RockxyWorkspaceWindowManager.shared.openNewWorkspaceTabFromNativeControl()
     }
 
@@ -63,22 +64,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
             && UserDefaults.standard.bool(forKey: Self.identity.defaultsKey("showAlertOnQuit"))
         if showAlert {
             let alert = NSAlert()
-            alert.messageText = String(localized: "Quit Rockxy?")
+            alert.messageText = String(localized: "Quit Rockxy?", bundle: RockxyLocalization.bundle)
             if SystemProxyManager.shared.systemProxyEnabled {
                 alert.informativeText = String(
-                    localized: "Your current recording Request/Response data will be lost. Rockxy will stop capturing and restore macOS proxy settings before quitting."
+                    localized: "Your current recording Request/Response data will be lost. Rockxy will stop capturing and restore macOS proxy settings before quitting.",
+                    bundle: RockxyLocalization.bundle
                 )
             } else {
                 alert.informativeText = String(
-                    localized: "Your current recording Request/Response data will be lost."
+                    localized: "Your current recording Request/Response data will be lost.",
+                    bundle: RockxyLocalization.bundle
                 )
             }
-            alert.addButton(withTitle: String(localized: "Quit"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
+            alert.addButton(withTitle: String(localized: "Quit", bundle: RockxyLocalization.bundle))
+            alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
             alert.alertStyle = .warning
             alert.icon = AppIconProvider.appIcon
             alert.showsSuppressionButton = true
-            alert.suppressionButton?.title = String(localized: "Don’t ask again")
+            alert.suppressionButton?.title = String(localized: "Don’t ask again", bundle: RockxyLocalization.bundle)
 
             guard alert.runModal() == .alertFirstButtonReturn else {
                 return .terminateCancel
@@ -125,11 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
 
     // MARK: Private
 
-    private var skipNextQuitConfirmation = false
-
     private static let identity = RockxyIdentity.current
 
     private static let logger = Logger(subsystem: identity.logSubsystem, category: "AppDelegate")
+
+    private var skipNextQuitConfirmation = false
 
     private var terminationSignalMonitor: TerminationSignalMonitor?
 }

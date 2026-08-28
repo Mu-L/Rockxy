@@ -27,16 +27,20 @@ private enum BlockListImportSource {
 
 @MainActor @Observable
 final class BlockListViewModel {
+    // MARK: Lifecycle
+
+    init() {
+        isBlockListActive = UserDefaults.standard.object(forKey: "blockListToolEnabled") as? Bool ?? true
+    }
+
+    // MARK: Internal
+
     var selectedRuleID: UUID?
     var editorSession: BlockListEditorSession?
     var isBlockListActive: Bool
     var searchText = ""
     var mutationError: String?
     private(set) var allRules: [ProxyRule] = []
-
-    init() {
-        isBlockListActive = UserDefaults.standard.object(forKey: "blockListToolEnabled") as? Bool ?? true
-    }
 
     var blockRules: [ProxyRule] {
         allRules.filter(\.isBlockRule)
@@ -120,9 +124,7 @@ final class BlockListViewModel {
             if !accepted {
                 allRules = await RuleEngine.shared.allRules
                 reconcileSelectionAfterRulesChange()
-                mutationError = String(
-                    localized: "The active Block List rule limit was reached. Disable another rule and try again."
-                )
+                mutationError = String(localized: "The active Block List rule limit was reached. Disable another rule and try again.", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -178,7 +180,7 @@ final class BlockListViewModel {
         }
         var copy = original
         copy = ProxyRule(
-            name: String(localized: "Copy of \(original.name)"),
+            name: String(localized: "Copy of \(original.name)", bundle: RockxyLocalization.bundle),
             isEnabled: original.isEnabled,
             matchCondition: original.matchCondition,
             action: original.action,
@@ -205,9 +207,7 @@ final class BlockListViewModel {
             if !accepted {
                 allRules = await RuleEngine.shared.allRules
                 reconcileSelectionAfterRulesChange()
-                mutationError = String(
-                    localized: "The active Block List rule limit was reached. Disable another rule and try again."
-                )
+                mutationError = String(localized: "The active Block List rule limit was reached. Disable another rule and try again.", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -276,6 +276,8 @@ final class BlockListViewModel {
 // MARK: - BlockListWindowView
 
 struct BlockListWindowView: View {
+    // MARK: Internal
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -348,7 +350,7 @@ struct BlockListWindowView: View {
             handleImport(result)
         }
         .alert(
-            String(localized: "Block List"),
+            String(localized: "Block List", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { displayedErrorMessage != nil },
                 set: {
@@ -359,7 +361,7 @@ struct BlockListWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) {
                 importError = nil
                 viewModel.mutationError = nil
             }
@@ -390,11 +392,29 @@ struct BlockListWindowView: View {
         importError ?? viewModel.mutationError
     }
 
+    private var footerHint: String {
+        let countText = viewModel.searchText.isEmpty
+            ? "\(viewModel.ruleCount) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
+            : String(localized: "\(viewModel.filteredBlockRules.count) of \(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var enableDisableLabel: String {
+        guard let id = viewModel.selectedRuleID else {
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
+        }
+        return enableDisableLabel(for: id)
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Toggle(
-                    String(localized: "Enable Block List"),
+                    String(localized: "Enable Block List", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { viewModel.isBlockListActive },
                         set: { viewModel.setBlockListActive($0) }
@@ -403,24 +423,22 @@ struct BlockListWindowView: View {
                 .toggleStyle(.checkbox)
                 .font(toolMetrics.font(weight: .medium))
                 .help(
-                    String(
-                        localized: "When off, Block List rules are skipped. Other intervention rules remain active."
-                    )
+                    String(localized: "When off, Block List rules are skipped. Other intervention rules remain active.", bundle: RockxyLocalization.bundle)
                 )
 
-                Text(String(localized: "Return 403 Forbidden or drop matching client connections."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(localized: "Return 403 Forbidden or drop matching client connections.", bundle: RockxyLocalization.bundle))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Block List rules"))
+                .accessibilityLabel(String(localized: "Search Block List rules", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -434,7 +452,8 @@ struct BlockListWindowView: View {
             Text(
                 String(
                     localized:
-                    "Block List is a network intervention. Enabled rules participate in Rockxy's global first-match runtime order."
+                    "Block List is a network intervention. Enabled rules participate in Rockxy's global first-match runtime order.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -467,8 +486,8 @@ struct BlockListWindowView: View {
 
             Text(
                 viewModel.isBlockListActive
-                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
-                    : String(localized: "BLOCK LIST OFF")
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE", bundle: RockxyLocalization.bundle))"
+                    : String(localized: "BLOCK LIST OFF", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
             .padding(.horizontal, 12)
@@ -478,13 +497,6 @@ struct BlockListWindowView: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
         .rockxyFunctionalBar()
-    }
-
-    private var footerHint: String {
-        let countText = viewModel.searchText.isEmpty
-            ? "\(viewModel.ruleCount) \(String(localized: "rules"))"
-            : String(localized: "\(viewModel.filteredBlockRules.count) of \(viewModel.ruleCount) rules")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
     }
 
     private var addRemoveControl: some View {
@@ -500,7 +512,7 @@ struct BlockListWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -517,7 +529,7 @@ struct BlockListWindowView: View {
             }
             .buttonStyle(.plain)
             .disabled(viewModel.selectedRuleID == nil)
-            .help(String(localized: "Delete Rule"))
+            .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
         }
         .frame(width: max(43, toolMetrics.compactButtonSize * 2 + 1), height: toolMetrics.footerControlHeight)
         .background(Color(nsColor: .controlBackgroundColor))
@@ -529,20 +541,20 @@ struct BlockListWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New…")) {
+            Button(String(localized: "New…", bundle: RockxyLocalization.bundle)) {
                 viewModel.presentNewRuleEditor()
             }
             .keyboardShortcut("n", modifiers: .command)
 
             Divider()
 
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 openEditorForSelection()
             }
             .keyboardShortcut("e", modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.duplicateSelected()
             }
             .keyboardShortcut("d", modifiers: .command)
@@ -566,18 +578,18 @@ struct BlockListWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Export Settings…")) {
+            Button(String(localized: "Export Settings…", bundle: RockxyLocalization.bundle)) {
                 prepareExport()
             }
             .disabled(viewModel.blockRules.isEmpty)
 
-            Menu(String(localized: "Import Settings")) {
-                Button(String(localized: "From Proxyman…")) {
+            Menu(String(localized: "Import Settings", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "From Proxyman…", bundle: RockxyLocalization.bundle)) {
                     importSource = .proxyman
                     showImporter = true
                 }
 
-                Button(String(localized: "From Charles Proxy…")) {
+                Button(String(localized: "From Charles Proxy…", bundle: RockxyLocalization.bundle)) {
                     importSource = .charlesProxy
                     showImporter = true
                 }
@@ -585,14 +597,14 @@ struct BlockListWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -602,18 +614,14 @@ struct BlockListWindowView: View {
         .fixedSize()
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     @ViewBuilder
     private func contextMenuItems(for id: UUID) -> some View {
-        Button(String(localized: "Edit…")) {
+        Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
             openEditorForRule(id)
         }
         .keyboardShortcut("e", modifiers: .command)
 
-        Button(String(localized: "Duplicate")) {
+        Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
             viewModel.selectedRuleID = id
             viewModel.duplicateSelected()
         }
@@ -631,24 +639,17 @@ struct BlockListWindowView: View {
 
         Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
+        Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
             viewModel.removeRule(id: id)
         }
         .keyboardShortcut(.delete, modifiers: .command)
     }
 
-    private var enableDisableLabel: String {
-        guard let id = viewModel.selectedRuleID else {
-            return String(localized: "Enable Rule")
-        }
-        return enableDisableLabel(for: id)
-    }
-
     private func enableDisableLabel(for id: UUID) -> String {
         guard let rule = viewModel.blockRules.first(where: { $0.id == id }) else {
-            return String(localized: "Enable Rule")
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
-        return rule.isEnabled ? String(localized: "Disable Rule") : String(localized: "Enable Rule")
+        return rule.isEnabled ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle) : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
     }
 
     private func openEditorForSelection() {
@@ -675,7 +676,7 @@ struct BlockListWindowView: View {
 
     private func prepareExport() {
         do {
-            exportDocument = BlockListSettingsDocument(data: try viewModel.exportBlockRules())
+            exportDocument = try BlockListSettingsDocument(data: viewModel.exportBlockRules())
             showExporter = true
         } catch {
             importError = error.localizedDescription
@@ -698,16 +699,15 @@ struct BlockListWindowView: View {
             do {
                 let resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
                 if let fileSize = resourceValues.fileSize, fileSize > Self.maxImportFileBytes {
-                    importError = String(localized: "File is too large to import (max 1 MB).")
+                    importError = String(localized: "File is too large to import (max 1 MB).", bundle: RockxyLocalization.bundle)
                     return
                 }
                 let data = try Data(contentsOf: url)
-                let rules: [ProxyRule]
-                switch importSource {
+                let rules: [ProxyRule] = switch importSource {
                 case .proxyman:
-                    rules = try BlockListSettingsCodec.importFromProxyman(data)
+                    try BlockListSettingsCodec.importFromProxyman(data)
                 case .charlesProxy:
-                    rules = try BlockListSettingsCodec.importFromCharlesProxy(data)
+                    try BlockListSettingsCodec.importFromCharlesProxy(data)
                 }
                 viewModel.importBlockRules(rules)
             } catch {
@@ -723,8 +723,11 @@ struct BlockListWindowView: View {
 // MARK: - BlockListTableView
 
 private struct BlockListTableView<ContextMenuContent: View>: View {
+    // MARK: Internal
+
     let rules: [ProxyRule]
     @Binding var selectedRuleID: UUID?
+
     let onToggle: (UUID) -> Void
     let onEdit: (UUID) -> Void
     let onDelete: (UUID) -> Void
@@ -737,7 +740,7 @@ private struct BlockListTableView<ContextMenuContent: View>: View {
                 zebraRows
 
                 if rules.isEmpty {
-                    Text(String(localized: "Click \"+\" or ⌘N to add new entry"))
+                    Text(String(localized: "Click \"+\" or ⌘N to add new entry", bundle: RockxyLocalization.bundle))
                         .font(.system(size: toolMetrics.emptyStateFontSize))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -776,21 +779,29 @@ private struct BlockListTableView<ContextMenuContent: View>: View {
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
     }
 
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private var columnHeader: some View {
         HStack(spacing: 0) {
-            Text(String(localized: "Enabled"))
+            Text(String(localized: "Enabled", bundle: RockxyLocalization.bundle))
                 .frame(width: 66, alignment: .leading)
             tableDivider
-            Text(String(localized: "Name"))
+            Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                 .frame(width: 300, alignment: .leading)
             tableDivider
-            Text(String(localized: "Block Action"))
+            Text(String(localized: "Block Action", bundle: RockxyLocalization.bundle))
                 .frame(width: 150, alignment: .leading)
             tableDivider
-            Text(String(localized: "Method"))
+            Text(String(localized: "Method", bundle: RockxyLocalization.bundle))
                 .frame(width: 90, alignment: .leading)
             tableDivider
-            Text(String(localized: "Matching Rule"))
+            Text(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(toolMetrics.tableHeaderFont())
@@ -816,7 +827,8 @@ private struct BlockListTableView<ContextMenuContent: View>: View {
             VStack(spacing: 0) {
                 ForEach(0 ..< rowCount, id: \.self) { index in
                     Rectangle()
-                        .fill(index.isMultiple(of: 2) ? Color(nsColor: .textBackgroundColor) : Color.secondary.opacity(0.08))
+                        .fill(index.isMultiple(of: 2) ? Color(nsColor: .textBackgroundColor) : Color.secondary
+                            .opacity(0.08))
                         .frame(height: toolMetrics.tableRowHeight)
                 }
                 Spacer(minLength: 0)
@@ -825,18 +837,12 @@ private struct BlockListTableView<ContextMenuContent: View>: View {
         }
         .allowsHitTesting(false)
     }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 }
 
 // MARK: - BlockRuleTableRow
 
 private struct BlockRuleTableRow: View {
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
+    // MARK: Internal
 
     let rule: ProxyRule
     let isSelected: Bool
@@ -886,27 +892,38 @@ private struct BlockRuleTableRow: View {
         .opacity(rule.isEnabled ? 1.0 : 0.5)
     }
 
-    @ViewBuilder private var actionLabel: some View {
-        if case let .block(statusCode) = rule.action {
-            Text(statusCode == 0 ? String(localized: "Drop Connection") : String(localized: "Return 403 Forbidden"))
-        }
-    }
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var rowBackground: some ShapeStyle {
         if isSelected {
             return AnyShapeStyle(Color.accentColor.opacity(0.22))
         }
-        return AnyShapeStyle(rowIndex.isMultiple(of: 2) ? Color(nsColor: .textBackgroundColor) : Color.secondary.opacity(0.08))
+        return AnyShapeStyle(rowIndex.isMultiple(of: 2) ? Color(nsColor: .textBackgroundColor) : Color.secondary
+            .opacity(0.08))
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    @ViewBuilder private var actionLabel: some View {
+        if case let .block(statusCode) = rule.action {
+            Text(
+                statusCode == 0
+                    ? String(localized: "Drop Connection", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Return 403 Forbidden", bundle: RockxyLocalization.bundle)
+            )
+        }
     }
 }
 
 // MARK: - AddBlockRuleSheet
 
 private struct AddBlockRuleSheet: View {
+    // MARK: Lifecycle
+
     init(
         session: BlockListEditorSession,
         onSave: @escaping (String, String, HTTPMethodFilter, BlockMatchType, BlockActionType, Bool) -> Void
@@ -946,19 +963,21 @@ private struct AddBlockRuleSheet: View {
         }
     }
 
+    // MARK: Internal
+
     let session: BlockListEditorSession
     let onSave: (String, String, HTTPMethodFilter, BlockMatchType, BlockActionType, Bool) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                Text(isEditing ? String(localized: "Edit Block Rule") : String(localized: "New Block Rule"))
-                    .font(
-                        .system(
-                            size: max(15, toolMetrics.bodyFontSize + 2),
-                            weight: .semibold
-                        )
+                Text(isEditing ? String(localized: "Edit Block Rule", bundle: RockxyLocalization.bundle) : String(localized: "New Block Rule", bundle: RockxyLocalization.bundle))
+                .font(
+                    .system(
+                        size: max(15, toolMetrics.bodyFontSize + 2),
+                        weight: .semibold
                     )
+                )
 
                 provenanceBanner
 
@@ -976,7 +995,7 @@ private struct AddBlockRuleSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -1005,6 +1024,8 @@ private struct AddBlockRuleSheet: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    // MARK: Private
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @State private var ruleName: String
@@ -1022,7 +1043,7 @@ private struct AddBlockRuleSheet: View {
     }
 
     private var primaryButtonTitle: String {
-        isEditing ? String(localized: "Save") : String(localized: "Add")
+        isEditing ? String(localized: "Save", bundle: RockxyLocalization.bundle) : String(localized: "Add", bundle: RockxyLocalization.bundle)
     }
 
     private var trimmedName: String {
@@ -1031,6 +1052,19 @@ private struct AddBlockRuleSheet: View {
 
     private var trimmedPattern: String {
         urlPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var actionDescription: String {
+        switch blockAction {
+        case .returnForbidden:
+            String(localized: "Send an HTTP 403 response to the client.", bundle: RockxyLocalization.bundle)
+        case .dropConnection:
+            String(localized: "Close the matching client connection without a response.", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     @ViewBuilder private var provenanceBanner: some View {
@@ -1043,12 +1077,12 @@ private struct AddBlockRuleSheet: View {
                     switch context.origin {
                     case .selectedTransaction:
                         if let method = context.sourceMethod {
-                            Text(String(localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")"))
+                            Text(String(localized: "Created from: \(method) \(context.sourceHost)\(context.sourcePath ?? "")", bundle: RockxyLocalization.bundle))
                         } else {
-                            Text(String(localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")"))
+                            Text(String(localized: "Created from: \(context.sourceHost)\(context.sourcePath ?? "")", bundle: RockxyLocalization.bundle))
                         }
                     case .domainQuickCreate:
-                        Text(String(localized: "Created from domain: \(context.sourceHost)"))
+                        Text(String(localized: "Created from domain: \(context.sourceHost)", bundle: RockxyLocalization.bundle))
                     }
                 }
                 .font(toolMetrics.secondaryFont())
@@ -1064,7 +1098,7 @@ private struct AddBlockRuleSheet: View {
 
     private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
@@ -1085,18 +1119,18 @@ private struct AddBlockRuleSheet: View {
 
     private var identityFields: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-            fieldGroup(String(localized: "Name")) {
-                TextField(String(localized: "Untitled"), text: $ruleName)
+            fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                TextField(String(localized: "Untitled", bundle: RockxyLocalization.bundle), text: $ruleName)
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(String(localized: "Rule name"))
+                    .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
             }
             .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-            fieldGroup(String(localized: "URL pattern")) {
+            fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                 TextField("https://example.com/api/*", text: $urlPattern)
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
-                    .accessibilityLabel(String(localized: "URL pattern"))
+                    .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
             }
             .frame(maxWidth: .infinity)
         }
@@ -1104,7 +1138,7 @@ private struct AddBlockRuleSheet: View {
 
     private var methodAndMatchRow: some View {
         HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-            inlineField(String(localized: "Method")) {
+            inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
                         Button {
@@ -1118,11 +1152,11 @@ private struct AddBlockRuleSheet: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "HTTP Method"))
+                .accessibilityLabel(String(localized: "HTTP Method", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(90))
             }
 
-            inlineField(String(localized: "Match type")) {
+            inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(BlockMatchType.allCases, id: \.self) { type in
                         Button {
@@ -1136,12 +1170,12 @@ private struct AddBlockRuleSheet: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Match Type"))
+                .accessibilityLabel(String(localized: "Match Type", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(175))
             }
 
             if matchType == .wildcard {
-                Text(String(localized: "Support wildcard * and ?."))
+                Text(String(localized: "Support wildcard * and ?.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1153,19 +1187,22 @@ private struct AddBlockRuleSheet: View {
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                .toggleStyle(.checkbox)
-                .font(toolMetrics.font())
+            Toggle(
+                String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
+                isOn: $includeSubpaths
+            )
+            .toggleStyle(.checkbox)
+            .font(toolMetrics.font())
         }
     }
 
     private var decisionSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Decision"))
+            Text(String(localized: "Decision", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                inlineField(String(localized: "When matched")) {
+                inlineField(String(localized: "When matched", bundle: RockxyLocalization.bundle)) {
                     Menu {
                         ForEach(BlockActionType.allCases, id: \.self) { action in
                             Button {
@@ -1179,7 +1216,7 @@ private struct AddBlockRuleSheet: View {
                     }
                     .menuIndicator(.hidden)
                     .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: "Block action"))
+                    .accessibilityLabel(String(localized: "Block action", bundle: RockxyLocalization.bundle))
                     .frame(width: toolMetrics.menuWidth(220))
                 }
 
@@ -1197,15 +1234,6 @@ private struct AddBlockRuleSheet: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
-        }
-    }
-
-    private var actionDescription: String {
-        switch blockAction {
-        case .returnForbidden:
-            String(localized: "Send an HTTP 403 response to the client.")
-        case .dropConnection:
-            String(localized: "Close the matching client connection without a response.")
         }
     }
 
@@ -1274,10 +1302,6 @@ private struct AddBlockRuleSheet: View {
         }
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     private func footerButtonLabel(_ title: String) -> some View {
         Text(title)
             .frame(
@@ -1290,6 +1314,8 @@ private struct AddBlockRuleSheet: View {
 // MARK: - BlockListSettingsDocument
 
 struct BlockListSettingsDocument: FileDocument {
+    // MARK: Lifecycle
+
     init(data: Data) {
         self.data = data
     }
@@ -1297,6 +1323,8 @@ struct BlockListSettingsDocument: FileDocument {
     init(configuration: ReadConfiguration) throws {
         data = configuration.file.regularFileContents ?? Data()
     }
+
+    // MARK: Internal
 
     static var readableContentTypes: [UTType] {
         [.json]

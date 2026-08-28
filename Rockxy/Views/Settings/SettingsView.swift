@@ -27,15 +27,15 @@ enum RockxySettingsTab: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .general: String(localized: "General")
-        case .appearance: String(localized: "Appearance")
-        case .privacy: String(localized: "Privacy")
-        case .assistant: String(localized: "AI Assistant")
-        case .tools: String(localized: "Tools")
-        case .github: String(localized: "GitHub")
-        case .plugins: String(localized: "Plugins")
-        case .mcp: String(localized: "MCP")
-        case .advanced: String(localized: "Advanced")
+        case .general: String(localized: "General", bundle: RockxyLocalization.bundle)
+        case .appearance: String(localized: "Appearance", bundle: RockxyLocalization.bundle)
+        case .privacy: String(localized: "Privacy", bundle: RockxyLocalization.bundle)
+        case .assistant: String(localized: "AI Assistant", bundle: RockxyLocalization.bundle)
+        case .tools: String(localized: "Tools", bundle: RockxyLocalization.bundle)
+        case .github: String(localized: "GitHub", bundle: RockxyLocalization.bundle)
+        case .plugins: String(localized: "Plugins", bundle: RockxyLocalization.bundle)
+        case .mcp: String(localized: "MCP", bundle: RockxyLocalization.bundle)
+        case .advanced: String(localized: "Advanced", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -56,23 +56,35 @@ enum RockxySettingsTab: String, CaseIterable, Identifiable, Hashable {
     var paneDescription: String {
         switch self {
         case .general:
-            String(localized: "Proxy port, launch behavior, and the root CA certificate.")
+            String(
+                localized: "Proxy port, launch behavior, and the root CA certificate.",
+                bundle: RockxyLocalization.bundle
+            )
         case .appearance:
-            String(localized: "Theme, font, and layout density for the debugging workspace.")
+            String(
+                localized: "Language, theme, font, and layout density for the debugging workspace.",
+                bundle: RockxyLocalization.bundle
+            )
         case .privacy:
-            String(localized: "Local storage, exports, and data-handling details.")
+            String(localized: "Local storage, exports, and data-handling details.", bundle: RockxyLocalization.bundle)
         case .assistant:
-            String(localized: "Model providers and data handling for the AI Assistant.")
+            String(
+                localized: "Model providers and data handling for the AI Assistant.",
+                bundle: RockxyLocalization.bundle
+            )
         case .tools:
-            String(localized: "Defaults for built-in debugging tools.")
+            String(localized: "Defaults for built-in debugging tools.", bundle: RockxyLocalization.bundle)
         case .github:
-            String(localized: "Connect a GitHub account for Gist publishing.")
+            String(localized: "Connect a GitHub account for Gist publishing.", bundle: RockxyLocalization.bundle)
         case .plugins:
-            String(localized: "Manage installed plugins and available extensions.")
+            String(localized: "Manage installed plugins and available extensions.", bundle: RockxyLocalization.bundle)
         case .mcp:
-            String(localized: "Connect compatible local clients to Rockxy over MCP.")
+            String(localized: "Connect compatible local clients to Rockxy over MCP.", bundle: RockxyLocalization.bundle)
         case .advanced:
-            String(localized: "Diagnostics, updates, and lower-level proxy controls.")
+            String(
+                localized: "Diagnostics, updates, and lower-level proxy controls.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -105,9 +117,9 @@ private enum RockxySettingsSidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .application: String(localized: "Application")
-        case .integrations: String(localized: "Integrations")
-        case .system: String(localized: "System")
+        case .application: String(localized: "Application", bundle: RockxyLocalization.bundle)
+        case .integrations: String(localized: "Integrations", bundle: RockxyLocalization.bundle)
+        case .system: String(localized: "System", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -208,7 +220,7 @@ struct SettingsView: View {
             ideal: settingsMetrics.sidebarIdealWidth,
             max: settingsMetrics.sidebarMaxWidth
         )
-        .accessibilityLabel(String(localized: "Settings categories"))
+        .accessibilityLabel(String(localized: "Settings categories", bundle: RockxyLocalization.bundle))
 
         #if compiler(>=6.2)
         if #available(macOS 26.0, *) {

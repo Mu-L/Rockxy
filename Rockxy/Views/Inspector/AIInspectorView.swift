@@ -33,9 +33,12 @@ struct AIInspectorView: View {
                 }
             } else {
                 InspectorEmptyStateView(
-                    String(localized: "No AI Metadata"),
+                    String(localized: "No AI Metadata", bundle: RockxyLocalization.bundle),
                     systemImage: "sparkles",
-                    description: String(localized: "This response does not look like captured AI model traffic.")
+                    description: String(
+                        localized: "This response does not look like captured AI model traffic.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }
@@ -64,20 +67,29 @@ struct AIInspectorView: View {
         return inspection.events.first
     }
 
-    private func loadInspection() async {
-        isLoading = true
-        let snapshot = AITrafficSnapshot(transaction: transaction)
-        let transactionID = transaction.id
-        let detected = await Task.detached(priority: .userInitiated) {
-            AITrafficDetector.detect(snapshot: snapshot)
-        }.value
-
-        guard transaction.id == transactionID else {
-            return
+    private var sessionTransportLabel: String {
+        if transaction.webSocketConnection != nil || transaction.request.url.scheme?.lowercased() == "wss" {
+            return String(localized: "WebSocket / TLS", bundle: RockxyLocalization.bundle)
         }
-        inspection = detected
-        selectedEventID = detected?.events.first?.id
-        isLoading = false
+        if transaction.request.method.caseInsensitiveCompare("CONNECT") == .orderedSame {
+            return String(localized: "CONNECT / TLS", bundle: RockxyLocalization.bundle)
+        }
+        return String(localized: "HTTPS / TLS", bundle: RockxyLocalization.bundle)
+    }
+
+    @ViewBuilder private var selectedEventSection: some View {
+        if let selectedEvent {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionHeader(String(localized: "Selected Event", bundle: RockxyLocalization.bundle))
+                Text(selectedEvent.detail)
+                    .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+            }
+        }
     }
 
     private func summaryStrip(_ inspection: AIInspection) -> some View {
@@ -85,21 +97,33 @@ struct AIInspectorView: View {
             HStack(spacing: 8) {
                 badge(inspection.kind.displayName, color: inspection.kind == .session ? .teal : .accentColor)
                 if inspection.kind == .session {
-                    badge(String(localized: "TLS only"), color: .orange)
+                    badge(String(localized: "TLS only", bundle: RockxyLocalization.bundle), color: .orange)
                 } else if inspection.isStreaming {
-                    badge(String(localized: "Stream"), color: .blue)
+                    badge(String(localized: "Stream", bundle: RockxyLocalization.bundle), color: .blue)
                 }
                 if !inspection.toolCalls.isEmpty {
-                    badge(String(localized: "Tool"), color: .orange)
+                    badge(String(localized: "Tool", bundle: RockxyLocalization.bundle), color: .orange)
                 }
                 Spacer(minLength: 0)
             }
 
             HStack(spacing: 18) {
-                summaryItem(String(localized: "Provider"), value: inspection.provider.displayName)
-                summaryItem(String(localized: "Model"), value: inspection.model ?? String(localized: "Unavailable"))
-                summaryItem(String(localized: "Finish"), value: finishLabel(for: inspection))
-                summaryItem(String(localized: "Evidence"), value: evidenceLabel(for: inspection))
+                summaryItem(
+                    String(localized: "Provider", bundle: RockxyLocalization.bundle),
+                    value: inspection.provider.displayName
+                )
+                summaryItem(
+                    String(localized: "Model", bundle: RockxyLocalization.bundle),
+                    value: inspection.model ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+                )
+                summaryItem(
+                    String(localized: "Finish", bundle: RockxyLocalization.bundle),
+                    value: finishLabel(for: inspection)
+                )
+                summaryItem(
+                    String(localized: "Evidence", bundle: RockxyLocalization.bundle),
+                    value: evidenceLabel(for: inspection)
+                )
             }
 
             Text(unavailableSummary(for: inspection))
@@ -119,27 +143,45 @@ struct AIInspectorView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionCard {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(String(localized: "Captured app session"))
+                        Text(String(localized: "Captured app session", bundle: RockxyLocalization.bundle))
                             .font(.system(size: metrics.primaryFontSize, weight: .semibold))
-                        metadataPair(String(localized: "App"), value: transaction.clientApp ?? String(localized: "Unknown"))
-                        metadataPair(String(localized: "Host"), value: transaction.request.host)
-                        metadataPair(String(localized: "Transport"), value: sessionTransportLabel)
+                        metadataPair(
+                            String(localized: "App", bundle: RockxyLocalization.bundle),
+                            value: transaction.clientApp ?? String(
+                                localized: "Unknown",
+                                bundle: RockxyLocalization.bundle
+                            )
+                        )
+                        metadataPair(
+                            String(localized: "Host", bundle: RockxyLocalization.bundle),
+                            value: transaction.request.host
+                        )
+                        metadataPair(
+                            String(localized: "Transport", bundle: RockxyLocalization.bundle),
+                            value: sessionTransportLabel
+                        )
                     }
                 }
 
                 warningCard(
-                    title: String(localized: "Body unavailable"),
-                    message: String(localized: "Rockxy can identify this AI app session, but model, tokens, and tools need decrypted API evidence."),
+                    title: String(localized: "Body unavailable", bundle: RockxyLocalization.bundle),
+                    message: String(
+                        localized: "Rockxy can identify this AI app session, but model, tokens, and tools need decrypted API evidence.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     color: .orange
                 )
 
                 sectionCard {
                     VStack(alignment: .leading, spacing: 8) {
-                        sectionHeader(String(localized: "Suggested Check"))
-                        Text(String(localized: "Open SSL Proxying for this host or capture SDK traffic with HTTPS_PROXY when debugging local apps."))
-                            .font(.system(size: metrics.metadataFontSize))
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        sectionHeader(String(localized: "Suggested Check", bundle: RockxyLocalization.bundle))
+                        Text(String(
+                            localized: "Open SSL Proxying for this host or capture SDK traffic with HTTPS_PROXY when debugging local apps.",
+                            bundle: RockxyLocalization.bundle
+                        ))
+                        .font(.system(size: metrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -164,9 +206,9 @@ struct AIInspectorView: View {
     private func eventList(_ inspection: AIInspection) -> some View {
         VStack(spacing: 0) {
             Picker(selection: $filter) {
-                Text(String(localized: "All")).tag(AIInspectorEventFilter.all)
-                Text(String(localized: "Stream")).tag(AIInspectorEventFilter.stream)
-                Text(String(localized: "Tools")).tag(AIInspectorEventFilter.tools)
+                Text(String(localized: "All", bundle: RockxyLocalization.bundle)).tag(AIInspectorEventFilter.all)
+                Text(String(localized: "Stream", bundle: RockxyLocalization.bundle)).tag(AIInspectorEventFilter.stream)
+                Text(String(localized: "Tools", bundle: RockxyLocalization.bundle)).tag(AIInspectorEventFilter.tools)
             } label: {
                 EmptyView()
             }
@@ -180,9 +222,12 @@ struct AIInspectorView: View {
             let events = filteredEvents(inspection.events)
             if events.isEmpty {
                 InspectorEmptyStateView(
-                    String(localized: "No Events"),
+                    String(localized: "No Events", bundle: RockxyLocalization.bundle),
                     systemImage: "list.bullet",
-                    description: String(localized: "No captured events match this filter.")
+                    description: String(
+                        localized: "No captured events match this filter.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             } else {
                 List(events, selection: $selectedEventID) { event in
@@ -235,28 +280,50 @@ struct AIInspectorView: View {
         sectionCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    sectionHeader(String(localized: "Debug Focus"))
+                    sectionHeader(String(localized: "Debug Focus", bundle: RockxyLocalization.bundle))
                     badge(aiDebugFocusLabel(inspection), color: aiDebugFocusColor(inspection))
                     Spacer(minLength: 0)
                 }
-                metadataPair(String(localized: "Outcome"), value: aiDebugOutcome(inspection))
-                metadataPair(String(localized: "Next Check"), value: aiDebugNextCheck(inspection))
+                metadataPair(
+                    String(localized: "Outcome", bundle: RockxyLocalization.bundle),
+                    value: aiDebugOutcome(inspection)
+                )
+                metadataPair(
+                    String(localized: "Next Check", bundle: RockxyLocalization.bundle),
+                    value: aiDebugNextCheck(inspection)
+                )
             }
         }
     }
 
     private func timingSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Timing and Stream"))
+            sectionHeader(String(localized: "Timing and Stream", bundle: RockxyLocalization.bundle))
             HStack(spacing: 14) {
-                metadataPair(String(localized: "Duration"), value: durationLabel(inspection.duration))
-                metadataPair(String(localized: "Streaming"), value: inspection.isStreaming ? String(localized: "Yes") : String(localized: "No"))
-                metadataPair(String(localized: "Events"), value: "\(inspection.events.count)")
+                metadataPair(
+                    String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                    value: durationLabel(inspection.duration)
+                )
+                metadataPair(
+                    String(localized: "Streaming", bundle: RockxyLocalization.bundle),
+                    value: inspection
+                        .isStreaming ? String(localized: "Yes", bundle: RockxyLocalization.bundle) : String(
+                            localized: "No",
+                            bundle: RockxyLocalization.bundle
+                        )
+                )
+                metadataPair(
+                    String(localized: "Events", bundle: RockxyLocalization.bundle),
+                    value: "\(inspection.events.count)"
+                )
             }
             streamBars(inspection.events)
-            Text(String(localized: "SSE cadence is shown from captured events. Token boundaries stay unavailable unless the provider exposes them."))
-                .font(.system(size: metrics.metadataFontSize))
-                .foregroundStyle(.secondary)
+            Text(String(
+                localized: "SSE cadence is shown from captured events. Token boundaries stay unavailable unless the provider exposes them.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(.system(size: metrics.metadataFontSize))
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -276,19 +343,34 @@ struct AIInspectorView: View {
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
     }
 
-    @ViewBuilder private func usageSection(_ inspection: AIInspection) -> some View {
+    private func usageSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Usage"))
+            sectionHeader(String(localized: "Usage", bundle: RockxyLocalization.bundle))
             if let usage = inspection.usage {
                 HStack(spacing: 16) {
-                    metadataPair(String(localized: "Input"), value: tokenLabel(usage.inputTokens))
-                    metadataPair(String(localized: "Cached"), value: tokenLabel(usage.cachedTokens))
-                    metadataPair(String(localized: "Output"), value: tokenLabel(usage.outputTokens))
-                    metadataPair(String(localized: "Total"), value: "\(usage.totalTokens)")
+                    metadataPair(
+                        String(localized: "Input", bundle: RockxyLocalization.bundle),
+                        value: tokenLabel(usage.inputTokens)
+                    )
+                    metadataPair(
+                        String(localized: "Cached", bundle: RockxyLocalization.bundle),
+                        value: tokenLabel(usage.cachedTokens)
+                    )
+                    metadataPair(
+                        String(localized: "Output", bundle: RockxyLocalization.bundle),
+                        value: tokenLabel(usage.outputTokens)
+                    )
+                    metadataPair(
+                        String(localized: "Total", bundle: RockxyLocalization.bundle),
+                        value: "\(usage.totalTokens)"
+                    )
                 }
                 tokenBar(usage)
             } else {
-                unavailableText(String(localized: "Usage fields were not present in the captured provider response."))
+                unavailableText(String(
+                    localized: "Usage fields were not present in the captured provider response.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
         }
     }
@@ -321,9 +403,12 @@ struct AIInspectorView: View {
 
     private func toolChainSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Tool Chain"))
+            sectionHeader(String(localized: "Tool Chain", bundle: RockxyLocalization.bundle))
             if inspection.toolCalls.isEmpty {
-                unavailableText(String(localized: "No tool-call payloads were visible in the captured traffic."))
+                unavailableText(String(
+                    localized: "No tool-call payloads were visible in the captured traffic.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } else {
                 ForEach(Array(inspection.toolCalls.enumerated()), id: \.offset) { index, tool in
                     HStack(spacing: 10) {
@@ -346,9 +431,12 @@ struct AIInspectorView: View {
 
     private func retrievalSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Retrieval"))
+            sectionHeader(String(localized: "Retrieval", bundle: RockxyLocalization.bundle))
             if inspection.retrieval.isEmpty {
-                unavailableText(String(localized: "No retrieval or embedding result was visible for this selected transaction."))
+                unavailableText(String(
+                    localized: "No retrieval or embedding result was visible for this selected transaction.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } else {
                 ForEach(Array(inspection.retrieval.enumerated()), id: \.offset) { _, match in
                     HStack {
@@ -369,14 +457,20 @@ struct AIInspectorView: View {
 
     private func warningSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Warnings"))
+            sectionHeader(String(localized: "Warnings", bundle: RockxyLocalization.bundle))
             if inspection.warnings.isEmpty {
-                unavailableText(String(localized: "No AI-specific warning was detected from visible traffic fields."))
+                unavailableText(String(
+                    localized: "No AI-specific warning was detected from visible traffic fields.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } else {
                 ForEach(Array(inspection.warnings.enumerated()), id: \.offset) { _, warning in
-                    Label(warning.message, systemImage: warning.severity == .error ? "exclamationmark.triangle" : "lock.shield")
-                        .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                        .foregroundStyle(warning.severity == .error ? .red : .orange)
+                    Label(
+                        warning.message,
+                        systemImage: warning.severity == .error ? "exclamationmark.triangle" : "lock.shield"
+                    )
+                    .font(.system(size: metrics.metadataFontSize, weight: .medium))
+                    .foregroundStyle(warning.severity == .error ? .red : .orange)
                 }
             }
         }
@@ -400,7 +494,7 @@ struct AIInspectorView: View {
         }
     }
 
-    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func sectionCard(@ViewBuilder content: () -> some View) -> some View {
         content()
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -409,21 +503,6 @@ struct AIInspectorView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
             }
-    }
-
-    @ViewBuilder private var selectedEventSection: some View {
-        if let selectedEvent {
-            VStack(alignment: .leading, spacing: 8) {
-                sectionHeader(String(localized: "Selected Event"))
-                Text(selectedEvent.detail)
-                    .font(.system(size: metrics.metadataFontSize, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
-            }
-        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -463,6 +542,22 @@ struct AIInspectorView: View {
             .foregroundStyle(.secondary)
     }
 
+    private func loadInspection() async {
+        isLoading = true
+        let snapshot = AITrafficSnapshot(transaction: transaction)
+        let transactionID = transaction.id
+        let detected = await Task.detached(priority: .userInitiated) {
+            AITrafficDetector.detect(snapshot: snapshot)
+        }.value
+
+        guard transaction.id == transactionID else {
+            return
+        }
+        inspection = detected
+        selectedEventID = detected?.events.first?.id
+        isLoading = false
+    }
+
     private func filteredEvents(_ events: [AIEventSummary]) -> [AIEventSummary] {
         switch filter {
         case .all:
@@ -476,24 +571,24 @@ struct AIInspectorView: View {
 
     private func aiDebugFocusLabel(_ inspection: AIInspection) -> String {
         if inspection.warnings.contains(where: { $0.severity == .error }) {
-            return String(localized: "Provider Error")
+            return String(localized: "Provider Error", bundle: RockxyLocalization.bundle)
         }
         if inspection.isStreaming, !inspection.toolCalls.isEmpty {
-            return String(localized: "Streaming Tool")
+            return String(localized: "Streaming Tool", bundle: RockxyLocalization.bundle)
         }
         if inspection.isStreaming {
-            return String(localized: "Streaming")
+            return String(localized: "Streaming", bundle: RockxyLocalization.bundle)
         }
         if !inspection.toolCalls.isEmpty {
-            return String(localized: "Tool Call")
+            return String(localized: "Tool Call", bundle: RockxyLocalization.bundle)
         }
         if !inspection.retrieval.isEmpty {
-            return String(localized: "Retrieval")
+            return String(localized: "Retrieval", bundle: RockxyLocalization.bundle)
         }
         if inspection.usage == nil {
-            return String(localized: "Metadata Sparse")
+            return String(localized: "Metadata Sparse", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Completion")
+        return String(localized: "Completion", bundle: RockxyLocalization.bundle)
     }
 
     private func aiDebugFocusColor(_ inspection: AIInspection) -> Color {
@@ -519,65 +614,92 @@ struct AIInspectorView: View {
         if let statusCode = transaction.response?.statusCode,
            statusCode >= 400
         {
-            return String(localized: "HTTP \(statusCode) from provider")
+            return String(localized: "HTTP \(statusCode) from provider", bundle: RockxyLocalization.bundle)
         }
         if inspection.isStreaming {
-            return String(localized: "\(inspection.events.count) captured stream events, finish \(finishLabel(for: inspection))")
+            return String(
+                localized: "\(inspection.events.count) captured stream events, finish \(finishLabel(for: inspection))",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Finish \(finishLabel(for: inspection))")
+        return String(localized: "Finish \(finishLabel(for: inspection))", bundle: RockxyLocalization.bundle)
     }
 
     private func aiDebugNextCheck(_ inspection: AIInspection) -> String {
         if inspection.warnings.contains(where: { $0.severity == .error }) {
-            return String(localized: "Check provider error body, request id, auth, rate-limit headers, and retry timing.")
+            return String(
+                localized: "Check provider error body, request id, auth, rate-limit headers, and retry timing.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if inspection.isStreaming, !inspection.toolCalls.isEmpty {
-            return String(localized: "Filter Tools and verify partial arguments, final tool call state, and stream completion.")
+            return String(
+                localized: "Filter Tools and verify partial arguments, final tool call state, and stream completion.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if inspection.isStreaming {
-            return String(localized: "Check event count, final event, interruption signs, and first-token/overall duration.")
+            return String(
+                localized: "Check event count, final event, interruption signs, and first-token/overall duration.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if !inspection.toolCalls.isEmpty {
-            return String(localized: "Verify declared tool name, arguments, completion state, and app-side tool result follow-up.")
+            return String(
+                localized: "Verify declared tool name, arguments, completion state, and app-side tool result follow-up.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if !inspection.retrieval.isEmpty {
-            return String(localized: "Review retrieved sources, score, and sensitive-data risk before sharing traces.")
+            return String(
+                localized: "Review retrieved sources, score, and sensitive-data risk before sharing traces.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if inspection.usage == nil {
-            return String(localized: "Confirm provider adapter, response body visibility, and whether usage is omitted by this endpoint.")
+            return String(
+                localized: "Confirm provider adapter, response body visibility, and whether usage is omitted by this endpoint.",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Compare model, tokens, finish reason, and latency against adjacent retries.")
+        return String(
+            localized: "Compare model, tokens, finish reason, and latency against adjacent retries.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func durationLabel(_ duration: TimeInterval?) -> String {
-        duration.map { DurationFormatter.format(seconds: $0) } ?? String(localized: "Unavailable")
+        duration.map { DurationFormatter.format(seconds: $0) } ?? String(
+            localized: "Unavailable",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func tokenLabel(_ value: Int?) -> String {
-        value.map(String.init) ?? String(localized: "Unavailable")
+        value.map(String.init) ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
     }
 
     private func scoreLabel(_ score: Double?) -> String {
         guard let score else {
-            return String(localized: "Unavailable")
+            return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
         }
         return String(format: "%.2f", score)
     }
 
     private func finishLabel(for inspection: AIInspection) -> String {
         if inspection.events.contains(where: { $0.title.lowercased().contains("completed") }) {
-            return String(localized: "completed")
+            return String(localized: "completed", bundle: RockxyLocalization.bundle)
         }
         if let status = inspection.httpStatusCode, status >= 400 {
             return "HTTP \(status)"
         }
-        return String(localized: "Unavailable")
+        return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
     }
 
     private func confidenceLabel(for inspection: AIInspection) -> String {
         inspection.events.contains(where: { $0.category == .stream || $0.category == .tool })
-            ? String(localized: "observed + derived")
-            : String(localized: "observed")
+            ? String(localized: "observed + derived", bundle: RockxyLocalization.bundle)
+            : String(localized: "observed", bundle: RockxyLocalization.bundle)
     }
 
     private func evidenceLabel(for inspection: AIInspection) -> String {
@@ -587,21 +709,17 @@ struct AIInspectorView: View {
         return inspection.evidence.joined(separator: ", ")
     }
 
-    private var sessionTransportLabel: String {
-        if transaction.webSocketConnection != nil || transaction.request.url.scheme?.lowercased() == "wss" {
-            return String(localized: "WebSocket / TLS")
-        }
-        if transaction.request.method.caseInsensitiveCompare("CONNECT") == .orderedSame {
-            return String(localized: "CONNECT / TLS")
-        }
-        return String(localized: "HTTPS / TLS")
-    }
-
     private func unavailableSummary(for inspection: AIInspection) -> String {
         if inspection.unavailableFields.isEmpty {
-            return String(localized: "All displayed values come from visible captured traffic.")
+            return String(
+                localized: "All displayed values come from visible captured traffic.",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Unavailable: \(inspection.unavailableFields.joined(separator: ", ")). Missing fields are not inferred.")
+        return String(
+            localized: "Unavailable: \(inspection.unavailableFields.joined(separator: ", ")). Missing fields are not inferred.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 }
 
@@ -617,13 +735,13 @@ private extension AITrafficSignalKind {
     var displayName: String {
         switch self {
         case .api:
-            String(localized: "AI API")
+            String(localized: "AI API", bundle: RockxyLocalization.bundle)
         case .session:
-            String(localized: "AI Session")
+            String(localized: "AI Session", bundle: RockxyLocalization.bundle)
         case .heuristic:
-            String(localized: "Likely AI")
+            String(localized: "Likely AI", bundle: RockxyLocalization.bundle)
         case .none:
-            String(localized: "AI")
+            String(localized: "AI", bundle: RockxyLocalization.bundle)
         }
     }
 }

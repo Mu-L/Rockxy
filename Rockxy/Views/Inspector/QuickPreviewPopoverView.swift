@@ -4,6 +4,8 @@ import SwiftUI
 // MARK: - QuickPreviewPopoverView
 
 struct QuickPreviewPopoverView: View {
+    // MARK: Internal
+
     let result: QuickPreviewResult
 
     var body: some View {
@@ -18,6 +20,8 @@ struct QuickPreviewPopoverView: View {
         .frame(minWidth: 420, minHeight: 260)
     }
 
+    // MARK: Private
+
     @State private var copied = false
     @Environment(\.appUIDisplayMetrics) private var metrics
 
@@ -28,7 +32,7 @@ struct QuickPreviewPopoverView: View {
              let .keyValue(title, _):
             title
         case .jwt:
-            String(localized: "JWT")
+            String(localized: "JWT", bundle: RockxyLocalization.bundle)
         case let .error(title, _):
             title
         }
@@ -44,7 +48,13 @@ struct QuickPreviewPopoverView: View {
                 NSPasteboard.general.setString(result.copyText, forType: .string)
                 copied = true
             } label: {
-                Label(copied ? String(localized: "Copied") : String(localized: "Copy"), systemImage: copied ? "checkmark" : "doc.on.doc")
+                Label(
+                    copied ? String(localized: "Copied", bundle: RockxyLocalization.bundle) : String(
+                        localized: "Copy",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                    systemImage: copied ? "checkmark" : "doc.on.doc"
+                )
             }
             .buttonStyle(.borderless)
             .font(.system(size: metrics.controlFontSize))
@@ -54,7 +64,7 @@ struct QuickPreviewPopoverView: View {
     @ViewBuilder private var content: some View {
         switch result {
         case let .json(_, text),
-            let .text(_, text):
+             let .text(_, text):
             InspectorBodyTextEditor(text: text, editorSettings: metrics.inspectorTextEditorSettings)
                 .frame(minWidth: 0)
                 .clipped()
@@ -82,7 +92,10 @@ struct QuickPreviewPopoverView: View {
             jwtContent(preview)
         case let .error(_, message):
             ContentUnavailableView {
-                Label(String(localized: "Unable to Preview"), systemImage: "exclamationmark.triangle")
+                Label(
+                    String(localized: "Unable to Preview", bundle: RockxyLocalization.bundle),
+                    systemImage: "exclamationmark.triangle"
+                )
             } description: {
                 Text(message)
             }
@@ -90,14 +103,27 @@ struct QuickPreviewPopoverView: View {
         }
     }
 
+    private var footer: some View {
+        Text(String(
+            localized: "Preview is local. JWT signatures are decoded, not verified.",
+            bundle: RockxyLocalization.bundle
+        ))
+        .font(.system(size: metrics.secondaryFontSize))
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func jwtContent(_ preview: JWTPreview) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if !preview.warnings.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(preview.warnings.enumerated()), id: \.offset) { _, warning in
-                        Label(warning.message, systemImage: warning.severity == .warning ? "exclamationmark.triangle" : "info.circle")
-                            .font(.system(size: metrics.secondaryFontSize))
-                            .foregroundStyle(warning.severity == .warning ? .orange : .secondary)
+                        Label(
+                            warning.message,
+                            systemImage: warning.severity == .warning ? "exclamationmark.triangle" : "info.circle"
+                        )
+                        .font(.system(size: metrics.secondaryFontSize))
+                        .foregroundStyle(warning.severity == .warning ? .orange : .secondary)
                     }
                 }
             }
@@ -121,27 +147,20 @@ struct QuickPreviewPopoverView: View {
                 InspectorBodyTextEditor(text: preview.headerText, editorSettings: metrics.inspectorTextEditorSettings)
                     .frame(minWidth: 0)
                     .clipped()
-                    .tabItem { Text(String(localized: "Header")) }
+                    .tabItem { Text(String(localized: "Header", bundle: RockxyLocalization.bundle)) }
                 InspectorBodyTextEditor(text: preview.payloadText, editorSettings: metrics.inspectorTextEditorSettings)
                     .frame(minWidth: 0)
                     .clipped()
-                    .tabItem { Text(String(localized: "Payload")) }
+                    .tabItem { Text(String(localized: "Payload", bundle: RockxyLocalization.bundle)) }
                 InspectorBodyTextEditor(
                     text: preview.signaturePreview,
                     editorSettings: metrics.inspectorTextEditorSettings
                 )
-                    .frame(minWidth: 0)
-                    .clipped()
-                    .tabItem { Text(String(localized: "Signature")) }
+                .frame(minWidth: 0)
+                .clipped()
+                .tabItem { Text(String(localized: "Signature", bundle: RockxyLocalization.bundle)) }
             }
             .frame(minHeight: 210)
         }
-    }
-
-    private var footer: some View {
-        Text(String(localized: "Preview is local. JWT signatures are decoded, not verified."))
-            .font(.system(size: metrics.secondaryFontSize))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

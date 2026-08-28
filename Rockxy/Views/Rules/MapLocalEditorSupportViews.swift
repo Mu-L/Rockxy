@@ -3,18 +3,23 @@ import SwiftUI
 // MARK: - MapLocalRuleTesterSection
 
 struct MapLocalRuleTesterSection: View {
+    // MARK: Internal
+
     @Bindable var viewModel: MapLocalEditorViewModel
 
     let toolMetrics: ToolWindowDisplayMetrics
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(String(localized: "Test this rule"))
+            Text(String(localized: "Test this rule", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont(weight: .medium))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: toolMetrics.controlSpacing) {
-                Picker(String(localized: "Test method"), selection: $viewModel.testMethod) {
+                Picker(
+                    String(localized: "Test method", bundle: RockxyLocalization.bundle),
+                    selection: $viewModel.testMethod
+                ) {
                     ForEach(MapLocalHTTPMethod.allCases.filter { $0 != .any }) { method in
                         Text(method.rawValue).tag(method)
                     }
@@ -25,11 +30,11 @@ struct MapLocalRuleTesterSection: View {
                 TextField("https://example.com/api/users", text: $viewModel.testURLText)
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
-                    .accessibilityLabel(String(localized: "Test request URL"))
+                    .accessibilityLabel(String(localized: "Test request URL", bundle: RockxyLocalization.bundle))
 
-                Button(String(localized: "Test")) { viewModel.testRule() }
+                Button(String(localized: "Test", bundle: RockxyLocalization.bundle)) { viewModel.testRule() }
                     .disabled(viewModel.testURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .accessibilityLabel(String(localized: "Test Map Local rule"))
+                    .accessibilityLabel(String(localized: "Test Map Local rule", bundle: RockxyLocalization.bundle))
             }
 
             if let result = viewModel.visibleTestResult {
@@ -41,24 +46,32 @@ struct MapLocalRuleTesterSection: View {
         .clipShape(RoundedRectangle(cornerRadius: 5))
     }
 
+    // MARK: Private
+
     @ViewBuilder
     private func resultLabel(_ result: MapLocalRuleTestResult) -> some View {
         switch result {
         case .matched:
             Label(
-                String(localized: "Matched — this request will use the local response."),
+                String(
+                    localized: "Matched — this request will use the local response.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "checkmark.circle.fill"
             )
             .foregroundStyle(.green)
         case .notMatched:
             Label(
-                String(localized: "Not matched — this request will continue to the origin."),
+                String(
+                    localized: "Not matched — this request will continue to the origin.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "xmark.circle.fill"
             )
             .foregroundStyle(.secondary)
         case .invalidURL:
             Label(
-                String(localized: "Enter a complete HTTP or HTTPS URL."),
+                String(localized: "Enter a complete HTTP or HTTPS URL.", bundle: RockxyLocalization.bundle),
                 systemImage: "exclamationmark.triangle.fill"
             )
             .foregroundStyle(.red)
@@ -102,13 +115,14 @@ struct MapLocalHTTPSPrerequisiteNotice: View {
             Text(
                 String(
                     localized:
-                    "HTTPS regex or wildcard-host rules require a matching host in HTTPS Decryption. Rockxy cannot safely infer one from this pattern."
+                    "HTTPS regex or wildcard-host rules require a matching host in HTTPS Decryption. Rockxy cannot safely infer one from this pattern.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
             Spacer()
-            Button(String(localized: "Open HTTPS Decryption")) {
+            Button(String(localized: "Open HTTPS Decryption", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "sslProxyingList")
             }
         }
@@ -124,21 +138,22 @@ struct MapLocalHTTPSPrerequisiteNotice: View {
                 .foregroundStyle(ready ? Color.green : Color.orange)
             Text(
                 ready
-                    ? String(localized: "HTTPS interception is ready for \(host).")
+                    ? String(localized: "HTTPS interception is ready for \(host).", bundle: RockxyLocalization.bundle)
                     :
                     String(
-                        localized: "HTTPS Map Local needs SSL Proxying for \(host) before this rule can see the request."
+                        localized: "HTTPS Map Local needs SSL Proxying for \(host) before this rule can see the request.",
+                        bundle: RockxyLocalization.bundle
                     )
             )
             .font(toolMetrics.secondaryFont())
             .foregroundStyle(.secondary)
             Spacer()
             if !ready {
-                Button(String(localized: "Enable for Host")) {
+                Button(String(localized: "Enable for Host", bundle: RockxyLocalization.bundle)) {
                     enableSSLProxying(for: host)
                 }
             }
-            Button(String(localized: "Open HTTPS Decryption")) {
+            Button(String(localized: "Open HTTPS Decryption", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "sslProxyingList")
             }
         }
@@ -173,8 +188,11 @@ struct MapLocalHTTPResponseSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(bodyIsEditable ? String(localized: "HTTP response") : String(localized: "Response status and headers"))
-                .foregroundStyle(.secondary)
+            Text(bodyIsEditable ? String(localized: "HTTP response", bundle: RockxyLocalization.bundle) : String(
+                localized: "Response status and headers",
+                bundle: RockxyLocalization.bundle
+            ))
+            .foregroundStyle(.secondary)
             MapLocalHTTPMessageEditor(
                 text: $text,
                 editorSettings: toolMetrics.codeEditorSettings,

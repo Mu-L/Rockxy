@@ -127,14 +127,18 @@ final class CustomHeaderColumnsViewModel {
     /// Live inline validation message for the Add field (nil when the token is valid).
     static func validationMessage(for value: String) -> String? {
         if value.isEmpty {
-            return String(localized: "Enter a header name.")
+            return String(localized: "Enter a header name.", bundle: RockxyLocalization.bundle)
         }
         if value.count > maxHeaderNameLength {
-            return String(localized: "Header names are limited to \(maxHeaderNameLength) characters.")
+            return String(
+                localized: "Header names are limited to \(maxHeaderNameLength) characters.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         for character in value where !isTokenCharacter(character) {
             return String(
-                localized: "Use letters, digits, or ! # $ % & ' * + - . ^ _ ` | ~ — no spaces or colons."
+                localized: "Use letters, digits, or ! # $ % & ' * + - . ^ _ ` | ~ — no spaces or colons.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return nil
@@ -373,31 +377,34 @@ struct CustomHeaderColumnsView: View {
 
     private var infoBannerText: String {
         let discovered = String(
-            localized: "Discovered names are cached suggestions from captured traffic."
+            localized: "Discovered names are cached suggestions from captured traffic.",
+            bundle: RockxyLocalization.bundle
         )
         let removal = String(
             localized:
-            "Removing a saved column only removes its table configuration — it never deletes captured traffic or history."
+            "Removing a saved column only removes its table configuration — it never deletes captured traffic or history.",
+            bundle: RockxyLocalization.bundle
         )
         return "\(discovered) \(removal)"
     }
 
     private var countsText: String {
-        let saved = String(localized: "\(model.savedCount) saved")
-        let shown = String(localized: "\(model.enabledCount) shown")
-        let suggested = String(localized: "\(model.discoveredOnlyCount) suggested")
+        let saved = String(localized: "\(model.savedCount) saved", bundle: RockxyLocalization.bundle)
+        let shown = String(localized: "\(model.enabledCount) shown", bundle: RockxyLocalization.bundle)
+        let suggested = String(localized: "\(model.discoveredOnlyCount) suggested", bundle: RockxyLocalization.bundle)
         return "\(saved) · \(shown) · \(suggested)"
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Custom Header Columns"))
+                Text(String(localized: "Custom Header Columns", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
                 Text(
                     String(
-                        localized: "Show a request or response header value as a column. Changes appear in the traffic table right away."
+                        localized: "Show a request or response header value as a column. Changes appear in the traffic table right away.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -407,12 +414,15 @@ struct CustomHeaderColumnsView: View {
 
             Spacer()
 
-            TextField(String(localized: "Search header names"), text: $model.searchText)
-                .textFieldStyle(.roundedBorder)
-                .font(toolMetrics.font())
-                .frame(width: toolMetrics.fieldWidth(230), height: toolMetrics.formControlHeight)
-                .focused($isSearchFocused)
-                .accessibilityLabel(String(localized: "Search header names"))
+            TextField(
+                String(localized: "Search header names", bundle: RockxyLocalization.bundle),
+                text: $model.searchText
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font())
+            .frame(width: toolMetrics.fieldWidth(230), height: toolMetrics.formControlHeight)
+            .focused($isSearchFocused)
+            .accessibilityLabel(String(localized: "Search header names", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.headerTopPadding)
@@ -439,20 +449,22 @@ struct CustomHeaderColumnsView: View {
 
     private var sourcePicker: some View {
         Picker("", selection: $model.source) {
-            Text(String(localized: "Request Headers")).tag(HeaderColumnSource.request)
-            Text(String(localized: "Response Headers")).tag(HeaderColumnSource.response)
+            Text(String(localized: "Request Headers", bundle: RockxyLocalization.bundle))
+                .tag(HeaderColumnSource.request)
+            Text(String(localized: "Response Headers", bundle: RockxyLocalization.bundle))
+                .tag(HeaderColumnSource.response)
         }
         .labelsHidden()
         .pickerStyle(.segmented)
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.top, toolMetrics.controlSpacing)
         .padding(.bottom, toolMetrics.controlSpacing)
-        .accessibilityLabel(String(localized: "Header source"))
+        .accessibilityLabel(String(localized: "Header source", bundle: RockxyLocalization.bundle))
     }
 
     private var tableContent: some View {
         Table(model.visibleRows, selection: $model.selection) {
-            TableColumn(String(localized: "Shown")) { row in
+            TableColumn(String(localized: "Shown", bundle: RockxyLocalization.bundle)) { row in
                 Toggle("", isOn: Binding(
                     get: { row.isEnabled },
                     set: { _ in model.toggle(rowID: row.id) }
@@ -462,13 +474,13 @@ struct CustomHeaderColumnsView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityLabel(
                     row.isEnabled
-                        ? String(localized: "Hide \(row.displayName) column")
-                        : String(localized: "Show \(row.displayName) column")
+                        ? String(localized: "Hide \(row.displayName) column", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Show \(row.displayName) column", bundle: RockxyLocalization.bundle)
                 )
             }
             .width(60)
 
-            TableColumn(String(localized: "Header Name")) { row in
+            TableColumn(String(localized: "Header Name", bundle: RockxyLocalization.bundle)) { row in
                 Text(row.displayName)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -479,7 +491,7 @@ struct CustomHeaderColumnsView: View {
             }
             .width(min: 220, ideal: 440)
 
-            TableColumn(String(localized: "State")) { row in
+            TableColumn(String(localized: "State", bundle: RockxyLocalization.bundle)) { row in
                 stateLabel(for: row)
             }
             .width(min: 120, ideal: 150)
@@ -505,17 +517,23 @@ struct CustomHeaderColumnsView: View {
         if model.visibleRows.isEmpty {
             if query.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "No Header Columns"),
+                    String(localized: "No Header Columns", bundle: RockxyLocalization.bundle),
                     systemImage: "tablecells.badge.ellipsis",
                     description: Text(
-                        String(localized: "Add a header name, or capture some traffic to see suggested headers here.")
+                        String(
+                            localized: "Add a header name, or capture some traffic to see suggested headers here.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 )
             } else {
                 ContentUnavailableView(
-                    String(localized: "No Matching Headers"),
+                    String(localized: "No Matching Headers", bundle: RockxyLocalization.bundle),
                     systemImage: "magnifyingglass",
-                    description: Text(String(localized: "Try a different header name."))
+                    description: Text(String(
+                        localized: "Try a different header name.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 )
             }
         }
@@ -531,11 +549,14 @@ struct CustomHeaderColumnsView: View {
 
             Spacer()
 
-            Text(String(localized: "Drag column headers in the traffic table to reorder or resize."))
-                .font(toolMetrics.metadataFont())
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            Text(String(
+                localized: "Drag column headers in the traffic table to reorder or resize.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.metadataFont())
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.tail)
 
             moreMenu
         }
@@ -557,8 +578,8 @@ struct CustomHeaderColumnsView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "Add Header Column"))
-            .accessibilityLabel(String(localized: "Add Header Column"))
+            .help(String(localized: "Add Header Column", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Add Header Column", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -575,8 +596,8 @@ struct CustomHeaderColumnsView: View {
             }
             .buttonStyle(.plain)
             .disabled(!model.hasRemovableSelection)
-            .help(String(localized: "Remove Selected Columns"))
-            .accessibilityLabel(String(localized: "Remove Selected Columns"))
+            .help(String(localized: "Remove Selected Columns", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Remove Selected Columns", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -588,30 +609,30 @@ struct CustomHeaderColumnsView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Find…")) {
+            Button(String(localized: "Find…", bundle: RockxyLocalization.bundle)) {
                 isSearchFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
 
-            Button(String(localized: "Add Header Column…")) {
+            Button(String(localized: "Add Header Column…", bundle: RockxyLocalization.bundle)) {
                 showingAdd = true
             }
 
             Divider()
 
-            Button(String(localized: "Toggle Shown")) {
+            Button(String(localized: "Toggle Shown", bundle: RockxyLocalization.bundle)) {
                 toggleSelection()
             }
             .disabled(model.selection.count != 1)
 
-            Button(String(localized: "Remove Selected"), role: .destructive) {
+            Button(String(localized: "Remove Selected", bundle: RockxyLocalization.bundle), role: .destructive) {
                 model.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(!model.hasRemovableSelection)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -627,11 +648,11 @@ struct CustomHeaderColumnsView: View {
         case .savedEnabled,
              .savedDisabled:
             text = row.isAlsoDiscovered
-                ? String(localized: "Saved · Captured")
-                : String(localized: "Saved")
+                ? String(localized: "Saved · Captured", bundle: RockxyLocalization.bundle)
+                : String(localized: "Saved", bundle: RockxyLocalization.bundle)
             color = .secondary
         case .discovered:
-            text = String(localized: "Discovered")
+            text = String(localized: "Discovered", bundle: RockxyLocalization.bundle)
             color = Color(nsColor: .tertiaryLabelColor)
         }
         return Text(text)
@@ -651,7 +672,7 @@ struct CustomHeaderColumnsView: View {
             Divider()
         }
 
-        Button(String(localized: "Remove"), role: .destructive) {
+        Button(String(localized: "Remove", bundle: RockxyLocalization.bundle), role: .destructive) {
             model.selection = ids
             model.removeSelected()
         }
@@ -661,11 +682,11 @@ struct CustomHeaderColumnsView: View {
     private func toggleLabel(for row: HeaderColumnRow) -> String {
         switch row.state {
         case .savedEnabled:
-            String(localized: "Hide From Table")
+            String(localized: "Hide From Table", bundle: RockxyLocalization.bundle)
         case .savedDisabled:
-            String(localized: "Show In Table")
+            String(localized: "Show In Table", bundle: RockxyLocalization.bundle)
         case .discovered:
-            String(localized: "Add As Column")
+            String(localized: "Add As Column", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -681,7 +702,10 @@ struct CustomHeaderColumnsView: View {
              .enabledExisting:
             .success
         case .alreadyEnabled:
-            .failure(String(localized: "This header column is already added and shown."))
+            .failure(String(
+                localized: "This header column is already added and shown.",
+                bundle: RockxyLocalization.bundle
+            ))
         case let .invalid(message):
             .failure(message)
         }
@@ -710,7 +734,7 @@ private struct AddHeaderColumnSheet: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing + 2) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(String(localized: "Add Header Column"))
+                    Text(String(localized: "Add Header Column", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .semibold))
                     Text(sourceExplanation)
                         .font(toolMetrics.secondaryFont())
@@ -718,13 +742,13 @@ private struct AddHeaderColumnSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                fieldRow(String(localized: "Source")) {
+                fieldRow(String(localized: "Source", bundle: RockxyLocalization.bundle)) {
                     Text(sourceLabel)
                         .font(toolMetrics.font())
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                fieldRow(String(localized: "Header Name")) {
+                fieldRow(String(localized: "Header Name", bundle: RockxyLocalization.bundle)) {
                     TextField("", text: $name, prompt: Text(verbatim: "X-Request-Id"))
                         .textFieldStyle(.roundedBorder)
                         .font(toolMetrics.font(monospaced: true))
@@ -734,7 +758,7 @@ private struct AddHeaderColumnSheet: View {
                             feedback = nil
                         }
                         .onSubmit(attemptCommit)
-                        .accessibilityLabel(String(localized: "Header name"))
+                        .accessibilityLabel(String(localized: "Header name", bundle: RockxyLocalization.bundle))
                 }
 
                 if let message = inlineMessage {
@@ -743,10 +767,13 @@ private struct AddHeaderColumnSheet: View {
                         .foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text(String(localized: "Matching is case-insensitive. Request and Response are kept separate."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Matching is case-insensitive. Request and Response are kept separate.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 24)
@@ -761,14 +788,14 @@ private struct AddHeaderColumnSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 
                 Button {
                     attemptCommit()
                 } label: {
-                    footerButtonLabel(String(localized: "Add"))
+                    footerButtonLabel(String(localized: "Add", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.defaultAction)
                 .rockxyGlassButtonStyle(prominent: true)
@@ -812,14 +839,20 @@ private struct AddHeaderColumnSheet: View {
 
     private var sourceLabel: String {
         source == .request
-            ? String(localized: "Request Headers")
-            : String(localized: "Response Headers")
+            ? String(localized: "Request Headers", bundle: RockxyLocalization.bundle)
+            : String(localized: "Response Headers", bundle: RockxyLocalization.bundle)
     }
 
     private var sourceExplanation: String {
         source == .request
-            ? String(localized: "Show this request header's value as a column in the traffic table.")
-            : String(localized: "Show this response header's value as a column in the traffic table.")
+            ? String(
+                localized: "Show this request header's value as a column in the traffic table.",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(
+                localized: "Show this response header's value as a column in the traffic table.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     private func fieldRow(_ label: String, @ViewBuilder content: () -> some View) -> some View {

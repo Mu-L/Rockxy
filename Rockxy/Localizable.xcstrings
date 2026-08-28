@@ -3608,6 +3608,16 @@
         }
       }
     },
+    "App Language:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用语言："
+          }
+        }
+      }
+    },
     "App Theme": {
       "localizations": {
         "zh-Hans": {
@@ -16600,6 +16610,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "延迟"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Language, theme, font, and layout density for the debugging workspace.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调试工作区的语言、主题、字体和布局密度。"
           }
         }
       }
@@ -32694,6 +32724,26 @@
         }
       }
     },
+    "System Default": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统默认"
+          }
+        }
+      }
+    },
+    "System Default follows your Mac. Choosing another language changes Rockxy immediately.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统默认会跟随 Mac 的语言。选择其他语言会立即更改 Rockxy。"
+          }
+        }
+      }
+    },
     "System Proxy": {
       "localizations": {
         "zh-Hans": {
@@ -34487,16 +34537,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "watchOS 和 tvOS 的 Xcode 模拟器共享 Mac 的网络，因此通常无需 LAN 设置即可访问 Rockxy 的回环地址。"
-          }
-        }
-      }
-    },
-    "Theme, font, and layout density for the debugging workspace.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "调试工作区的主题、字体和布局密度。"
           }
         }
       }

@@ -107,8 +107,8 @@ struct InspectorTabStrip<TrailingContent: View>: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(String(localized: "More inspector tabs"))
-        .accessibilityLabel(String(localized: "More inspector tabs"))
+        .help(String(localized: "More inspector tabs", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "More inspector tabs", bundle: RockxyLocalization.bundle))
     }
 
     @ViewBuilder

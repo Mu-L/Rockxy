@@ -19,17 +19,17 @@ enum SetupTargetCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .pinned:
-            String(localized: "Pinned")
+            String(localized: "Pinned", bundle: RockxyLocalization.bundle)
         case .runtime:
-            String(localized: "Runtimes")
+            String(localized: "Runtimes", bundle: RockxyLocalization.bundle)
         case .browserClient:
-            String(localized: "Browsers & Clients")
+            String(localized: "Browsers & Clients", bundle: RockxyLocalization.bundle)
         case .device:
-            String(localized: "Devices")
+            String(localized: "Devices", bundle: RockxyLocalization.bundle)
         case .framework:
-            String(localized: "Frameworks")
+            String(localized: "Frameworks", bundle: RockxyLocalization.bundle)
         case .environment:
-            String(localized: "Environments")
+            String(localized: "Environments", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -56,18 +56,18 @@ enum SetupSupportStatus: String, Equatable {
     var title: String {
         switch self {
         case .availableNow:
-            String(localized: "Available now")
+            String(localized: "Available now", bundle: RockxyLocalization.bundle)
         case .guideOnly:
-            String(localized: "Guide only")
+            String(localized: "Guide only", bundle: RockxyLocalization.bundle)
         }
     }
 
     var bannerTitle: String {
         switch self {
         case .availableNow:
-            String(localized: "Setup guide available")
+            String(localized: "Setup guide available", bundle: RockxyLocalization.bundle)
         case .guideOnly:
-            String(localized: "Guide-only target")
+            String(localized: "Guide-only target", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -83,18 +83,18 @@ enum SetupAutomationSupport: String, Equatable {
     var title: String {
         switch self {
         case .none:
-            String(localized: "Manual Setup")
+            String(localized: "Manual Setup", bundle: RockxyLocalization.bundle)
         case .runtimeTerminal:
-            String(localized: "Automatic Setup")
+            String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle)
         }
     }
 
     var badgeTitle: String {
         switch self {
         case .none:
-            String(localized: "Manual Setup")
+            String(localized: "Manual Setup", bundle: RockxyLocalization.bundle)
         case .runtimeTerminal:
-            String(localized: "Automatic Setup")
+            String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -105,9 +105,9 @@ enum SetupAutomationSupport: String, Equatable {
     var entryActionTitle: String {
         switch self {
         case .none:
-            String(localized: "Use Manual Setup")
+            String(localized: "Use Manual Setup", bundle: RockxyLocalization.bundle)
         case .runtimeTerminal:
-            String(localized: "Automatic Setup…")
+            String(localized: "Automatic Setup…", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -130,15 +130,15 @@ enum SetupDetailTab: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .overview:
-            String(localized: "Overview")
+            String(localized: "Overview", bundle: RockxyLocalization.bundle)
         case .setup:
-            String(localized: "Guide")
+            String(localized: "Guide", bundle: RockxyLocalization.bundle)
         case .snippets:
-            String(localized: "Snippets")
+            String(localized: "Snippets", bundle: RockxyLocalization.bundle)
         case .validate:
-            String(localized: "Check")
+            String(localized: "Check", bundle: RockxyLocalization.bundle)
         case .troubleshooting:
-            String(localized: "Help")
+            String(localized: "Help", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -167,9 +167,9 @@ enum SetupModeSelection: String, CaseIterable, Identifiable, Equatable {
     var title: String {
         switch self {
         case .manual:
-            String(localized: "Manual Setup")
+            String(localized: "Manual Setup", bundle: RockxyLocalization.bundle)
         case .automatic:
-            String(localized: "Automatic Setup")
+            String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -190,13 +190,22 @@ struct SetupModeActionState: Equatable {
 
     init(target: SetupTarget) {
         preferredMode = target.automationSupport.isAvailable ? .automatic : .manual
-        manualTitle = String(localized: "Manual Setup")
-        manualCaption = String(localized: "Follow the proxy, certificate, snippet, device, or runtime guide.")
-        automaticTitle = String(localized: "Automatic Setup")
+        manualTitle = String(localized: "Manual Setup", bundle: RockxyLocalization.bundle)
+        manualCaption = String(
+            localized: "Follow the proxy, certificate, snippet, device, or runtime guide.",
+            bundle: RockxyLocalization.bundle
+        )
+        automaticTitle = String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle)
         isAutomaticEnabled = target.automationSupport.isAvailable
         automaticCaption = target.automationSupport.isAvailable
-            ? String(localized: "Open a scoped Rockxy-prepared session for this target.")
-            : String(localized: "Automatic Setup applies to terminal runtimes. Use Manual Setup for this target.")
+            ? String(
+                localized: "Open a scoped Rockxy-prepared session for this target.",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(
+                localized: "Automatic Setup applies to terminal runtimes. Use Manual Setup for this target.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     // MARK: Internal
@@ -235,31 +244,31 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
     var title: String {
         switch self {
         case .runtimeNotInstalled:
-            String(localized: "Runtime not installed")
+            String(localized: "Runtime not installed", bundle: RockxyLocalization.bundle)
         case .proxyStopped:
-            String(localized: "Proxy stopped")
+            String(localized: "Proxy stopped", bundle: RockxyLocalization.bundle)
         case .recordingPaused:
-            String(localized: "Recording paused")
+            String(localized: "Recording paused", bundle: RockxyLocalization.bundle)
         case .certificateNotTrusted:
-            String(localized: "Certificate not trusted")
+            String(localized: "Certificate not trusted", bundle: RockxyLocalization.bundle)
         case .certificateExportUnavailable:
-            String(localized: "Certificate export/setup incomplete")
+            String(localized: "Certificate export/setup incomplete", bundle: RockxyLocalization.bundle)
         case .deviceProxyUnreachable:
-            String(localized: "Device proxy unreachable")
+            String(localized: "Device proxy unreachable", bundle: RockxyLocalization.bundle)
         case .noTrafficDetected:
-            String(localized: "No traffic detected")
+            String(localized: "No traffic detected", bundle: RockxyLocalization.bundle)
         case .localProbeUnavailable:
-            String(localized: "Local probe unavailable")
+            String(localized: "Local probe unavailable", bundle: RockxyLocalization.bundle)
         case .localProbeNotCaptured:
-            String(localized: "Local probe not captured")
+            String(localized: "Local probe not captured", bundle: RockxyLocalization.bundle)
         case .allowListBlockedValidation:
-            String(localized: "Allow List hides the validation probe")
+            String(localized: "Allow List hides the validation probe", bundle: RockxyLocalization.bundle)
         case .wrongSnippetChosen:
-            String(localized: "Wrong snippet chosen")
+            String(localized: "Wrong snippet chosen", bundle: RockxyLocalization.bundle)
         case .manualValidationOnly:
-            String(localized: "Manual validation only")
+            String(localized: "Manual validation only", bundle: RockxyLocalization.bundle)
         case .targetIsGuideOnly:
-            String(localized: "Guide-only target")
+            String(localized: "Guide-only target", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -267,73 +276,98 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
         switch self {
         case .runtimeNotInstalled:
             String(
-                localized: "Install the selected runtime, toolchain, or client on this Mac before validating this manual flow."
+                localized: "Install the selected runtime, toolchain, or client on this Mac before validating this manual flow.",
+                bundle: RockxyLocalization.bundle
             )
         case .proxyStopped:
-            String(localized: "Start the Rockxy proxy before validating captured traffic.")
+            String(
+                localized: "Start the Rockxy proxy before validating captured traffic.",
+                bundle: RockxyLocalization.bundle
+            )
         case .recordingPaused:
-            String(localized: "Resume recording so new requests appear in the traffic list.")
+            String(
+                localized: "Resume recording so new requests appear in the traffic list.",
+                bundle: RockxyLocalization.bundle
+            )
         case .certificateNotTrusted:
-            String(localized: "Install and trust the Rockxy root certificate before validating HTTPS traffic.")
+            String(
+                localized: "Install and trust the Rockxy root certificate before validating HTTPS traffic.",
+                bundle: RockxyLocalization.bundle
+            )
         case .certificateExportUnavailable:
-            String(localized: "Generate and export the Rockxy root certificate so the selected client can trust it.")
+            String(
+                localized: "Generate and export the Rockxy root certificate so the selected client can trust it.",
+                bundle: RockxyLocalization.bundle
+            )
         case .deviceProxyUnreachable:
             String(
                 localized: """
                 Physical devices cannot reach Rockxy while the proxy only listens on localhost. \
                 Turn off Only Listen on localhost, restart the proxy, and use the Device Proxy host plus active port.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         case .noTrafficDetected:
-            String(localized: "Run the test request again and make sure it points at the Rockxy proxy port.")
+            String(
+                localized: "Run the test request again and make sure it points at the Rockxy proxy port.",
+                bundle: RockxyLocalization.bundle
+            )
         case .localProbeUnavailable:
             String(
-                localized: "Rockxy could not start the local validation probe. Reopen Developer Setup, then try again."
+                localized: "Rockxy could not start the local validation probe. Reopen Developer Setup, then try again.",
+                bundle: RockxyLocalization.bundle
             )
         case .localProbeNotCaptured:
             String(
-                localized: "Run the local probe again and make sure the selected runtime sends it through Rockxy's proxy port."
+                localized: "Run the local probe again and make sure the selected runtime sends it through Rockxy's proxy port.",
+                bundle: RockxyLocalization.bundle
             )
         case .allowListBlockedValidation:
             String(
-                localized: "Allow List is active and does not allow the local validation probe URL, so Rockxy forwards it but does not record it."
+                localized: "Allow List is active and does not allow the local validation probe URL, so Rockxy forwards it but does not record it.",
+                bundle: RockxyLocalization.bundle
             )
         case .wrongSnippetChosen:
-            String(localized: "Switch to the snippet that matches the runtime, library, or tool you are using.")
+            String(
+                localized: "Switch to the snippet that matches the runtime, library, or tool you are using.",
+                bundle: RockxyLocalization.bundle
+            )
         case .manualValidationOnly:
-            String(localized: "Use the manual validation steps in this Dev Hub guide.")
+            String(
+                localized: "Use the manual validation steps in this Dev Hub guide.",
+                bundle: RockxyLocalization.bundle
+            )
         case .targetIsGuideOnly:
-            String(localized: "This target currently ships as guidance only.")
+            String(localized: "This target currently ships as guidance only.", bundle: RockxyLocalization.bundle)
         }
     }
 
     var actionTitle: String {
         switch self {
         case .runtimeNotInstalled:
-            String(localized: "View Setup")
+            String(localized: "View Setup", bundle: RockxyLocalization.bundle)
         case .proxyStopped:
-            String(localized: "Start Proxy")
+            String(localized: "Start Proxy", bundle: RockxyLocalization.bundle)
         case .recordingPaused:
-            String(localized: "Resume Recording")
+            String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
         case .certificateNotTrusted,
              .certificateExportUnavailable:
-            String(localized: "Open Certificate Guide")
+            String(localized: "Open Certificate Guide", bundle: RockxyLocalization.bundle)
         case .deviceProxyUnreachable:
-            String(localized: "Open Proxy Settings")
+            String(localized: "Open Proxy Settings", bundle: RockxyLocalization.bundle)
         case .noTrafficDetected:
-            String(localized: "Run Test Again")
+            String(localized: "Run Test Again", bundle: RockxyLocalization.bundle)
         case .localProbeUnavailable:
-            String(localized: "Retry")
+            String(localized: "Retry", bundle: RockxyLocalization.bundle)
         case .localProbeNotCaptured:
-            String(localized: "Run Probe Again")
+            String(localized: "Run Probe Again", bundle: RockxyLocalization.bundle)
         case .allowListBlockedValidation:
-            String(localized: "Open Allow List")
+            String(localized: "Open Allow List", bundle: RockxyLocalization.bundle)
         case .wrongSnippetChosen:
-            String(localized: "View Snippets")
+            String(localized: "View Snippets", bundle: RockxyLocalization.bundle)
         case .manualValidationOnly:
-            String(localized: "View Validation")
+            String(localized: "View Validation", bundle: RockxyLocalization.bundle)
         case .targetIsGuideOnly:
-            String(localized: "View Overview")
+            String(localized: "View Overview", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -366,19 +400,19 @@ enum VerificationState: Equatable {
     var title: String {
         switch self {
         case .idle:
-            String(localized: "Idle")
+            String(localized: "Idle", bundle: RockxyLocalization.bundle)
         case .readinessFailed:
-            String(localized: "Fix setup first")
+            String(localized: "Fix setup first", bundle: RockxyLocalization.bundle)
         case .readyToVerify:
-            String(localized: "Ready to verify")
+            String(localized: "Ready to verify", bundle: RockxyLocalization.bundle)
         case .waitingForTraffic:
-            String(localized: "Waiting for local probe")
+            String(localized: "Waiting for local probe", bundle: RockxyLocalization.bundle)
         case .success:
-            String(localized: "Local probe captured")
+            String(localized: "Local probe captured", bundle: RockxyLocalization.bundle)
         case .timedOut:
-            String(localized: "Timed out")
+            String(localized: "Timed out", bundle: RockxyLocalization.bundle)
         case .cancelled:
-            String(localized: "Cancelled")
+            String(localized: "Cancelled", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -457,11 +491,11 @@ struct SetupSnapshot: Equatable {
 
     var proxyStepActionTitle: String {
         if !proxyRunning {
-            return String(localized: "Start Proxy")
+            return String(localized: "Start Proxy", bundle: RockxyLocalization.bundle)
         }
         return recordingEnabled
-            ? String(localized: "Refresh Status")
-            : String(localized: "Resume Recording")
+            ? String(localized: "Refresh Status", bundle: RockxyLocalization.bundle)
+            : String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
     }
 }
 

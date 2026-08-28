@@ -11,7 +11,7 @@ enum ScriptQuotaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .limitReached(max):
-            String(localized: "Script plugin limit reached (maximum \(max))")
+            String(localized: "Script plugin limit reached (maximum \(max))", bundle: RockxyLocalization.bundle)
         }
     }
 }

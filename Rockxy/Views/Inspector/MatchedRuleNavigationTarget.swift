@@ -16,17 +16,35 @@ enum MatchedRuleNavigationTarget: Equatable {
     init(action: RuleAction) {
         switch action {
         case .breakpoint:
-            self = .toolWindow(id: "breakpointRules", windowTitle: String(localized: "Breakpoint Rules"))
+            self = .toolWindow(
+                id: "breakpointRules",
+                windowTitle: String(localized: "Breakpoint Rules", bundle: RockxyLocalization.bundle)
+            )
         case .mapLocal:
-            self = .toolWindow(id: "mapLocal", windowTitle: String(localized: "Map Local"))
+            self = .toolWindow(
+                id: "mapLocal",
+                windowTitle: String(localized: "Map Local", bundle: RockxyLocalization.bundle)
+            )
         case .mapRemote:
-            self = .toolWindow(id: "mapRemote", windowTitle: String(localized: "Map Remote"))
+            self = .toolWindow(
+                id: "mapRemote",
+                windowTitle: String(localized: "Map Remote", bundle: RockxyLocalization.bundle)
+            )
         case .block:
-            self = .toolWindow(id: "blockList", windowTitle: String(localized: "Block List"))
+            self = .toolWindow(
+                id: "blockList",
+                windowTitle: String(localized: "Block List", bundle: RockxyLocalization.bundle)
+            )
         case .modifyHeader:
-            self = .toolWindow(id: "modifyHeaders", windowTitle: String(localized: "Modify Headers"))
+            self = .toolWindow(
+                id: "modifyHeaders",
+                windowTitle: String(localized: "Modify Headers", bundle: RockxyLocalization.bundle)
+            )
         case .networkCondition:
-            self = .toolWindow(id: "networkConditions", windowTitle: String(localized: "Network Conditions"))
+            self = .toolWindow(
+                id: "networkConditions",
+                windowTitle: String(localized: "Network Conditions", bundle: RockxyLocalization.bundle)
+            )
         case .throttle:
             // Throttle rules have no standalone tool window; they live in the generic rule list.
             self = .unavailable
@@ -46,7 +64,7 @@ enum MatchedRuleNavigationTarget: Equatable {
     var openHelp: String? {
         switch self {
         case let .toolWindow(_, windowTitle):
-            String(localized: "Open the \(windowTitle) window")
+            String(localized: "Open the \(windowTitle) window", bundle: RockxyLocalization.bundle)
         case .unavailable:
             nil
         }

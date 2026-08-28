@@ -27,11 +27,12 @@ final class ComposeHistoryStore: @unchecked Sendable {
 
     // MARK: Internal
 
+    static let defaultMaxEntries = 200
+    static let defaultBodySizeLimit = 256 * 1_024
+
     static var live: ComposeHistoryStore {
         ComposeHistoryStore()
     }
-    static let defaultMaxEntries = 200
-    static let defaultBodySizeLimit = 256 * 1_024
 
     let maxEntries: Int
     let bodySizeLimit: Int
@@ -79,6 +80,7 @@ final class ComposeHistoryStore: @unchecked Sendable {
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "ComposeHistoryStore")
+
     private let fileURL: URL
     private let fileManager: FileManager
     private let decoder = JSONDecoder()
@@ -94,7 +96,9 @@ final class ComposeHistoryStore: @unchecked Sendable {
     private static func boundedEntry(
         _ entry: ComposeHistoryEntry,
         bodySizeLimit: Int
-    ) -> ComposeHistoryEntry {
+    )
+        -> ComposeHistoryEntry
+    {
         let bodySnapshot = capped(entry.body, maximumBytes: bodySizeLimit)
         let responseSnapshot = entry.responseBody.map {
             capped($0, maximumBytes: bodySizeLimit)
@@ -119,7 +123,9 @@ final class ComposeHistoryStore: @unchecked Sendable {
     private static func entryForPersistence(
         _ entry: ComposeHistoryEntry,
         bodySizeLimit: Int
-    ) -> ComposeHistoryEntry {
+    )
+        -> ComposeHistoryEntry
+    {
         let boundedEntry = boundedEntry(entry, bodySizeLimit: bodySizeLimit)
         return ComposeHistoryEntry(
             id: boundedEntry.id,
@@ -146,7 +152,7 @@ final class ComposeHistoryStore: @unchecked Sendable {
             return EditableReplayHeader(
                 id: header.id,
                 name: header.name,
-                value: String(localized: "<redacted before saving>"),
+                value: String(localized: "<redacted before saving>", bundle: RockxyLocalization.bundle),
                 isEnabled: false
             )
         }
@@ -155,7 +161,9 @@ final class ComposeHistoryStore: @unchecked Sendable {
     private static func capped(
         _ text: String,
         maximumBytes: Int
-    ) -> (value: String, truncated: Bool) {
+    )
+        -> (value: String, truncated: Bool)
+    {
         guard text.utf8.count > maximumBytes else {
             return (text, false)
         }
@@ -189,7 +197,9 @@ private final class ComposeHistoryPersistenceCoordinator: @unchecked Sendable {
     func cacheLoadedEntriesIfAbsent(
         _ entries: [ComposeHistoryEntry],
         for fileURL: URL
-    ) -> [ComposeHistoryEntry] {
+    )
+        -> [ComposeHistoryEntry]
+    {
         lock.lock()
         defer { lock.unlock() }
         if let cachedEntries = cachedEntriesByURL[fileURL] {
@@ -223,7 +233,7 @@ private final class ComposeHistoryPersistenceCoordinator: @unchecked Sendable {
 // MARK: - ComposeHistoryWriter
 
 private actor ComposeHistoryWriter {
-    private var latestRevisionByURL: [URL: Int] = [:]
+    // MARK: Internal
 
     func write(_ data: Data, to fileURL: URL, revision: Int) throws {
         guard revision > (latestRevisionByURL[fileURL] ?? 0) else {
@@ -236,4 +246,8 @@ private actor ComposeHistoryWriter {
         )
         try data.write(to: fileURL, options: .atomic)
     }
+
+    // MARK: Private
+
+    private var latestRevisionByURL: [URL: Int] = [:]
 }

@@ -68,6 +68,8 @@ final class HelperManager {
         case unexpectedAssociatedBundleIdentifiers([String])
         case unknown(Error)
 
+        // MARK: Internal
+
         static func == (lhs: HelperPlistValidationError, rhs: HelperPlistValidationError) -> Bool {
             switch (lhs, rhs) {
             case (.malformedPlist, .malformedPlist),
@@ -75,21 +77,24 @@ final class HelperManager {
                  (.missingBundleProgram, .missingBundleProgram),
                  (.missingMachServices, .missingMachServices),
                  (.missingAssociatedBundleIdentifiers, .missingAssociatedBundleIdentifiers):
-                return true
+                true
             case let (.unexpectedLabel(lhsLabel), .unexpectedLabel(rhsLabel)):
-                return lhsLabel == rhsLabel
+                lhsLabel == rhsLabel
             case let (.unexpectedBundleProgram(lhsProgram), .unexpectedBundleProgram(rhsProgram)):
-                return lhsProgram == rhsProgram
+                lhsProgram == rhsProgram
             case let (.missingMachService(lhsService), .missingMachService(rhsService)):
-                return lhsService == rhsService
+                lhsService == rhsService
             case let (.disabledMachService(lhsService), .disabledMachService(rhsService)):
-                return lhsService == rhsService
-            case let (.unexpectedAssociatedBundleIdentifiers(lhsIdentifiers), .unexpectedAssociatedBundleIdentifiers(rhsIdentifiers)):
-                return lhsIdentifiers == rhsIdentifiers
+                lhsService == rhsService
+            case let (
+                .unexpectedAssociatedBundleIdentifiers(lhsIdentifiers),
+                .unexpectedAssociatedBundleIdentifiers(rhsIdentifiers)
+            ):
+                lhsIdentifiers == rhsIdentifiers
             case let (.unknown(lhsError), .unknown(rhsError)):
-                return String(describing: lhsError) == String(describing: rhsError)
+                String(describing: lhsError) == String(describing: rhsError)
             default:
-                return false
+                false
             }
         }
     }
@@ -108,12 +113,23 @@ final class HelperManager {
         case invalidBundledLaunchdPlist(HelperPlistValidationError)
         case invalidBundledHelperMetadata(HelperMetadataValidationError)
 
+        // MARK: Internal
+
         var errorDescription: String? {
             HelperManager.helperPackageIncompleteMessage
         }
     }
 
     static let shared = HelperManager()
+
+    nonisolated static let bundledHelperBinaryRelativePath = "Contents/Library/HelperTools/RockxyHelperTool"
+
+    nonisolated static var applicationMustReopenMessage: String {
+        String(
+            localized: "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
 
     private(set) var signingIssue: SigningIssue?
     private(set) var installedInfo: HelperInfo?
@@ -162,7 +178,9 @@ final class HelperManager {
         expectedBundleProgram: String,
         expectedMachServiceName: String,
         expectedAssociatedBundleIdentifiers: [String]
-    ) throws {
+    )
+        throws
+    {
         let plistObject: Any
         do {
             plistObject = try PropertyListSerialization.propertyList(from: data, format: nil)
@@ -214,7 +232,9 @@ final class HelperManager {
     nonisolated static func validateBundledHelperInfoDictionary(
         _ info: [String: Any],
         expectedIdentity: RockxyIdentity
-    ) throws {
+    )
+        throws
+    {
         let bundleIdentifier = stringValue(forKey: "CFBundleIdentifier", in: info)
         guard !bundleIdentifier.isEmpty else {
             throw HelperMetadataValidationError.missingValue("CFBundleIdentifier")
@@ -278,7 +298,9 @@ final class HelperManager {
         bundle: Bundle = .main,
         fileManager: FileManager = .default,
         helperInfoDictionaryProvider: (URL) -> [String: Any]? = HelperManager.bundledHelperInfoDictionary
-    ) throws {
+    )
+        throws
+    {
         let identity = RockxyIdentity(bundle: bundle)
         let appBundleURL = bundle.bundleURL
         let helperBinaryURL = appBundleURL.appendingPathComponent(bundledHelperBinaryRelativePath)
@@ -293,8 +315,8 @@ final class HelperManager {
         guard helperBinaryResourceValues?.isRegularFile == true,
               helperBinaryResourceValues?.isDirectory != true,
               fileManager.isReadableFile(atPath: helperBinaryURL.path),
-              fileManager.isExecutableFile(atPath: helperBinaryURL.path)
-        else {
+              fileManager.isExecutableFile(atPath: helperBinaryURL.path) else
+        {
             throw HelperInstallPreflightError.missingBundledHelperBinary(path: helperBinaryURL.path)
         }
         guard fileManager.fileExists(atPath: helperPlistURL.path) else {
@@ -356,7 +378,7 @@ final class HelperManager {
                 macOS blocked helper registration before Rockxy could finish installing it. \
                 Open System Settings > Login Items and approve Rockxy if it appears there. \
                 If Rockxy is not listed, clear stale Rockxy helper registrations and try installing again.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         }
 
@@ -376,6 +398,30 @@ final class HelperManager {
             || currentReachable != previousReachable
             || currentInfo != previousInfo
             || currentSigningIssue != previousSigningIssue
+    }
+
+    nonisolated static func bundledHelperInfoDictionary(at helperBinaryURL: URL) -> [String: Any]? {
+        if let infoDictionary = signedExecutableInfoDictionary(at: helperBinaryURL) {
+            return infoDictionary
+        }
+
+        if let infoDictionary = sidecarInfoDictionary(at: helperBinaryURL) {
+            return infoDictionary
+        }
+
+        if let bundle = Bundle(url: helperBinaryURL),
+           let infoDictionary = bundle.infoDictionary
+        {
+            return infoDictionary
+        }
+
+        if let bundle = Bundle(path: helperBinaryURL.path),
+           let infoDictionary = bundle.infoDictionary
+        {
+            return infoDictionary
+        }
+
+        return nil
     }
 
     /// Register the helper daemon via SMAppService.
@@ -691,49 +737,28 @@ final class HelperManager {
         category: "HelperManager"
     )
     private static let plistName = RockxyIdentity.current.helperPlistName
-    nonisolated static let applicationMustReopenMessage = String(
-        localized: "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again."
-    )
-    nonisolated static let bundledHelperBinaryRelativePath = "Contents/Library/HelperTools/RockxyHelperTool"
-    nonisolated private static let helperApprovalMessage = String(
-        localized: "Approve the helper tool in System Settings > Login Items to finish installation."
-    )
-    nonisolated private static let helperPackageIncompleteMessage = String(
-        localized: """
-        This Rockxy app package is incomplete, so the helper tool cannot be installed. \
-        Reinstall the latest Rockxy release. If you installed Rockxy from Homebrew, \
-        reinstall it after the fixed release is published.
-        """
-    )
     private static let helperProbeAttempts = 3
     private static let helperProbeRetryDelay = Duration.milliseconds(750)
 
-    nonisolated private static func bundledHelperPlistRelativePath(plistName: String) -> String {
-        "Contents/Library/LaunchDaemons/\(plistName)"
+    nonisolated private static var helperApprovalMessage: String {
+        String(
+            localized: "Approve the helper tool in System Settings > Login Items to finish installation.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
-    nonisolated static func bundledHelperInfoDictionary(at helperBinaryURL: URL) -> [String: Any]? {
-        if let infoDictionary = signedExecutableInfoDictionary(at: helperBinaryURL) {
-            return infoDictionary
-        }
+    nonisolated private static var helperPackageIncompleteMessage: String {
+        String(
+            localized: """
+            This Rockxy app package is incomplete, so the helper tool cannot be installed. \
+            Reinstall the latest Rockxy release. If you installed Rockxy from Homebrew, \
+            reinstall it after the fixed release is published.
+            """, bundle: RockxyLocalization.bundle
+        )
+    }
 
-        if let infoDictionary = sidecarInfoDictionary(at: helperBinaryURL) {
-            return infoDictionary
-        }
-
-        if let bundle = Bundle(url: helperBinaryURL),
-           let infoDictionary = bundle.infoDictionary
-        {
-            return infoDictionary
-        }
-
-        if let bundle = Bundle(path: helperBinaryURL.path),
-           let infoDictionary = bundle.infoDictionary
-        {
-            return infoDictionary
-        }
-
-        return nil
+    nonisolated private static func bundledHelperPlistRelativePath(plistName: String) -> String {
+        "Contents/Library/LaunchDaemons/\(plistName)"
     }
 
     nonisolated private static func sidecarInfoDictionary(at helperBinaryURL: URL) -> [String: Any]? {
@@ -782,8 +807,8 @@ final class HelperManager {
             &signingInfo
         ) == errSecSuccess,
             let signingInfo = signingInfo as? [String: Any],
-            let infoDictionary = signingInfo[kSecCodeInfoPList as String] as? [String: Any]
-        else {
+            let infoDictionary = signingInfo[kSecCodeInfoPList as String] as? [String: Any] else
+        {
             return nil
         }
 
@@ -876,7 +901,10 @@ final class HelperManager {
         do {
             try Self.validateBundledHelperInstallResources()
         } catch let error as HelperInstallPreflightError {
-            Self.logger.error("Bundled helper install preflight failed: \(Self.helperPreflightFailureReason(error), privacy: .private)")
+            Self.logger
+                .error(
+                    "Bundled helper install preflight failed: \(Self.helperPreflightFailureReason(error), privacy: .private)"
+                )
             status = .notInstalled
             installedInfo = nil
             isReachable = false
@@ -946,7 +974,9 @@ final class HelperManager {
         service: SMAppService,
         reason: String,
         message: String
-    ) async throws {
+    )
+        async throws
+    {
         if Self.shouldUseLegacyInstallFallbackForCurrentBundle() {
             try await installLegacyHelperForXcode(service: service, reason: reason)
             return
@@ -999,7 +1029,8 @@ final class HelperManager {
         do {
             try await service.unregister()
         } catch {
-            Self.logger.warning("Legacy helper repair could not unregister SMAppService job: \(error.localizedDescription)")
+            Self.logger
+                .warning("Legacy helper repair could not unregister SMAppService job: \(error.localizedDescription)")
         }
 
         HelperConnection.shared.resetConnection()
@@ -1188,7 +1219,7 @@ final class HelperManager {
             localized: """
             Helper is registered in macOS but Rockxy could not reach it. \
             Check again, reinstall the helper from the current build, or use Force Reset if macOS Login Items is stuck.
-            """
+            """, bundle: RockxyLocalization.bundle
         )
         status = .unreachable
     }
@@ -1204,7 +1235,8 @@ final class HelperManager {
         case let .appSignatureInvalid(detail):
             Self.logger.error("App signature validation failed: \(detail)")
             lastErrorMessage = String(
-                localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
+                localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again.",
+                bundle: RockxyLocalization.bundle
             )
         case let .identityMismatch(app, helper):
             lastErrorMessage = String(
@@ -1212,7 +1244,7 @@ final class HelperManager {
                 This app is signed by \u{201C}\(app)\u{201D} but the installed helper expects \
                 \u{201C}\(helper)\u{201D}. Reinstall the helper from the current build, \
                 or run the matching release version.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         }
         status = .signingMismatch

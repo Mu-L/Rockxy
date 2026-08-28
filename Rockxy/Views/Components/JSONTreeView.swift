@@ -69,13 +69,37 @@ struct JSONTreeView: View {
         }
     }
 
+    private var activeFilter: JSONTreeRenderFilter? {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, queryError == nil else {
+            return nil
+        }
+        return JSONTreeRenderFilter(
+            includedPaths: queryResult.includedPaths,
+            matchedPaths: Set(queryResult.matches.map(\.path)),
+            selectedPath: selectedMatchPath
+        )
+    }
+
+    private var statusText: String {
+        if let queryError {
+            return queryError
+        }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ""
+        }
+        let suffix = queryResult.isTruncated ? "+" : ""
+        return "\(queryResult.matches.count)\(suffix) selected"
+    }
+
     @ViewBuilder private var content: some View {
         switch state {
         case .loading:
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.small)
-                Text(String(localized: "Parsing JSON..."))
+                Text(String(localized: "Parsing JSON...", bundle: RockxyLocalization.bundle))
                     .font(metrics.swiftUIFont())
                     .foregroundStyle(.secondary)
             }
@@ -95,21 +119,9 @@ struct JSONTreeView: View {
                 .textSelection(.enabled)
 
         case .unavailable:
-            Text(String(localized: "Unable to display content"))
+            Text(String(localized: "Unable to display content", bundle: RockxyLocalization.bundle))
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private var activeFilter: JSONTreeRenderFilter? {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, queryError == nil else {
-            return nil
-        }
-        return JSONTreeRenderFilter(
-            includedPaths: queryResult.includedPaths,
-            matchedPaths: Set(queryResult.matches.map(\.path)),
-            selectedPath: selectedMatchPath
-        )
     }
 
     private var filterBar: some View {
@@ -142,7 +154,7 @@ struct JSONTreeView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help(String(localized: "Clear"))
+                .help(String(localized: "Clear", bundle: RockxyLocalization.bundle))
             }
 
             Divider()
@@ -180,16 +192,15 @@ struct JSONTreeView: View {
         .opacity(0)
     }
 
-    private var statusText: String {
-        if let queryError {
-            return queryError
+    nonisolated private static func parse(_ data: Data) -> JSONTreeLoadState {
+        do {
+            return try .parsed(JSONPathDocument(data: data))
+        } catch {
+            if let text = String(data: data, encoding: .utf8) {
+                return .text(text)
+            }
+            return .unavailable
         }
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ""
-        }
-        let suffix = queryResult.isTruncated ? "+" : ""
-        return "\(queryResult.matches.count)\(suffix) selected"
     }
 
     @MainActor
@@ -281,17 +292,6 @@ struct JSONTreeView: View {
         queryResult = .empty
         selectedMatchPath = nil
         isSearchFocused = true
-    }
-
-    nonisolated private static func parse(_ data: Data) -> JSONTreeLoadState {
-        do {
-            return .parsed(try JSONPathDocument(data: data))
-        } catch {
-            if let text = String(data: data, encoding: .utf8) {
-                return .text(text)
-            }
-            return .unavailable
-        }
     }
 }
 
@@ -430,18 +430,14 @@ private struct JSONTreeNodeView: View {
         .buttonStyle(.borderless)
     }
 
-    private func visibleObjectPairs(_ pairs: [(key: String, value: JSONPathNode)]) -> [(key: String, value: JSONPathNode)] {
-        guard let filter else {
-            return pairs
+    @ViewBuilder private var matchBackground: some View {
+        if filter?.isSelected(node) == true {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.accentColor.opacity(0.32))
+        } else if filter?.isMatch(node) == true {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color.accentColor.opacity(0.18))
         }
-        return pairs.filter { filter.includes($0.value) }
-    }
-
-    private func visibleArrayItems(_ items: [JSONPathNode]) -> [JSONPathNode] {
-        guard let filter else {
-            return items
-        }
-        return items.filter(filter.includes)
     }
 
     private func containerView(
@@ -503,13 +499,20 @@ private struct JSONTreeNodeView: View {
         .id(node.path)
     }
 
-    @ViewBuilder private var matchBackground: some View {
-        if filter?.isSelected(node) == true {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.accentColor.opacity(0.32))
-        } else if filter?.isMatch(node) == true {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.accentColor.opacity(0.18))
+    private func visibleObjectPairs(_ pairs: [(key: String, value: JSONPathNode)]) -> [(
+        key: String,
+        value: JSONPathNode
+    )] {
+        guard let filter else {
+            return pairs
         }
+        return pairs.filter { filter.includes($0.value) }
+    }
+
+    private func visibleArrayItems(_ items: [JSONPathNode]) -> [JSONPathNode] {
+        guard let filter else {
+            return items
+        }
+        return items.filter(filter.includes)
     }
 }

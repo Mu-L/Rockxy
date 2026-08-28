@@ -12,6 +12,8 @@ enum AssistantRuntimeSetupState: Equatable {
     case ready(version: String)
     case failed(message: String)
 
+    // MARK: Internal
+
     var isBusy: Bool {
         switch self {
         case .downloading,
@@ -33,6 +35,8 @@ protocol AssistantRuntimeApplicationOpening {
     @MainActor
     func open(applicationURL: URL) async throws
 }
+
+// MARK: - NSWorkspaceAssistantRuntimeApplicationOpener
 
 struct NSWorkspaceAssistantRuntimeApplicationOpener: AssistantRuntimeApplicationOpening {
     func open(applicationURL: URL) async throws {
@@ -97,11 +101,12 @@ struct AssistantRuntimeSetupSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "Install Ollama"))
+            Text(String(localized: "Install Ollama", bundle: RockxyLocalization.bundle))
                 .font(.system(size: max(16, settingsMetrics.bodyFontSize + 3), weight: .semibold))
             Text(
                 String(
-                    localized: "Ollama runs local models used by Rockxy. The app is downloaded from ollama.com."
+                    localized: "Ollama runs local models used by Rockxy. The app is downloaded from ollama.com.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(settingsMetrics.secondaryFont())
@@ -113,17 +118,18 @@ struct AssistantRuntimeSetupSheet: View {
     private var installationSummary: some View {
         Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
             detailRow(
-                String(localized: "Application"),
+                String(localized: "Application", bundle: RockxyLocalization.bundle),
                 value: runtime.applicationName
             )
             detailRow(
-                String(localized: "Download"),
+                String(localized: "Download", bundle: RockxyLocalization.bundle),
                 value: approximateSize(runtime.approximateDownloadBytes)
             )
             detailRow(
-                String(localized: "Disk Space"),
+                String(localized: "Disk Space", bundle: RockxyLocalization.bundle),
                 value: String(
-                    localized: "\(approximateSize(runtime.approximateInstalledBytes)), excluding models"
+                    localized: "\(approximateSize(runtime.approximateInstalledBytes)), excluding models",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -132,7 +138,7 @@ struct AssistantRuntimeSetupSheet: View {
 
     private var installLocation: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Install in:"))
+            Text(String(localized: "Install in:", bundle: RockxyLocalization.bundle))
                 .font(settingsMetrics.secondaryFont(weight: .medium))
 
             HStack(spacing: 8) {
@@ -143,7 +149,7 @@ struct AssistantRuntimeSetupSheet: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: settingsMetrics.controlHeight)
 
-                Button(String(localized: "Choose…")) {
+                Button(String(localized: "Choose…", bundle: RockxyLocalization.bundle)) {
                     viewModel.chooseRuntimeInstallDestination()
                 }
                 .disabled(viewModel.runtimeSetupState.isBusy)
@@ -151,7 +157,8 @@ struct AssistantRuntimeSetupSheet: View {
 
             Text(
                 String(
-                    localized: "Models are installed separately by Ollama and may require several GB each."
+                    localized: "Models are installed separately by Ollama and may require several GB each.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(settingsMetrics.metadataFont())
@@ -164,7 +171,10 @@ struct AssistantRuntimeSetupSheet: View {
         switch viewModel.runtimeSetupState {
         case .idle:
             Label(
-                String(localized: "The developer signature and Gatekeeper approval are checked before installation."),
+                String(
+                    localized: "The developer signature and Gatekeeper approval are checked before installation.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "checkmark.shield"
             )
             .font(settingsMetrics.secondaryFont())
@@ -182,25 +192,37 @@ struct AssistantRuntimeSetupSheet: View {
             }
         case .verifying:
             progressStatus(
-                String(localized: "Verifying archive, developer signature, and Gatekeeper approval…")
+                String(
+                    localized: "Verifying archive, developer signature, and Gatekeeper approval…",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         case .installing:
-            progressStatus(String(localized: "Installing the verified application…"))
+            progressStatus(String(localized: "Installing the verified application…", bundle: RockxyLocalization.bundle))
         case .starting:
-            progressStatus(String(localized: "Starting Ollama and checking the local service…"))
+            progressStatus(String(
+                localized: "Starting Ollama and checking the local service…",
+                bundle: RockxyLocalization.bundle
+            ))
         case let .ready(version):
-            Label(String(localized: "Ollama \(version) is ready on this Mac."), systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+            Label(
+                String(localized: "Ollama \(version) is ready on this Mac.", bundle: RockxyLocalization.bundle),
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
         case let .failed(message):
             VStack(alignment: .leading, spacing: 6) {
                 Label(message, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                 if viewModel.ollamaApplicationURL != nil {
-                    Text(String(localized: "The verified app remains installed. Rockxy can open it and check the service again without downloading it twice."))
-                        .font(settingsMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "The verified app remains installed. Rockxy can open it and check the service again without downloading it twice.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -211,12 +233,12 @@ struct AssistantRuntimeSetupSheet: View {
             Spacer()
 
             if viewModel.runtimeSetupState.isBusy {
-                Button(String(localized: "Cancel")) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                     viewModel.cancelRuntimeInstall()
                 }
                 .keyboardShortcut(.cancelAction)
             } else {
-                Button(String(localized: "Cancel")) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -224,19 +246,19 @@ struct AssistantRuntimeSetupSheet: View {
 
             switch viewModel.runtimeSetupState {
             case .ready:
-                Button(String(localized: "Done")) {
+                Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
                 .rockxyGlassButtonStyle(prominent: true)
             case .failed where viewModel.ollamaApplicationURL != nil:
-                Button(String(localized: "Open & Check Again")) {
+                Button(String(localized: "Open & Check Again", bundle: RockxyLocalization.bundle)) {
                     viewModel.retryInstalledOllamaRuntime()
                 }
                 .keyboardShortcut(.defaultAction)
                 .rockxyGlassButtonStyle(prominent: true)
             default:
-                Button(String(localized: "Install")) {
+                Button(String(localized: "Install", bundle: RockxyLocalization.bundle)) {
                     viewModel.installOllamaRuntime()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -268,16 +290,22 @@ struct AssistantRuntimeSetupSheet: View {
     }
 
     private func approximateSize(_ bytes: Int64) -> String {
-        String(localized: "About \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))")
+        String(
+            localized: "About \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func downloadStatus(receivedBytes: Int64, totalBytes: Int64?) -> String {
         let received = ByteCountFormatter.string(fromByteCount: receivedBytes, countStyle: .file)
         guard let totalBytes, totalBytes > 0 else {
-            return String(localized: "Downloading official runtime: \(received)")
+            return String(localized: "Downloading official runtime: \(received)", bundle: RockxyLocalization.bundle)
         }
         let total = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
-        return String(localized: "Downloading official runtime: \(received) of \(total)")
+        return String(
+            localized: "Downloading official runtime: \(received) of \(total)",
+            bundle: RockxyLocalization.bundle
+        )
     }
 }
 

@@ -3,6 +3,8 @@ import Foundation
 // MARK: - QuickPreviewDetector
 
 enum QuickPreviewDetector {
+    // MARK: Internal
+
     static let maxSelectionBytes = 256 * 1_024
 
     static func availableActions(for selection: String) -> [QuickPreviewAction] {
@@ -32,12 +34,18 @@ enum QuickPreviewDetector {
     static func preview(selection: String, action: QuickPreviewAction) -> QuickPreviewResult {
         let trimmed = selection.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return .error(title: String(localized: "No Selection"), message: String(localized: "Select text to preview."))
+            return .error(
+                title: String(localized: "No Selection", bundle: RockxyLocalization.bundle),
+                message: String(localized: "Select text to preview.", bundle: RockxyLocalization.bundle)
+            )
         }
         guard trimmed.utf8.count <= maxSelectionBytes else {
             return .error(
-                title: String(localized: "Selection Too Large"),
-                message: String(localized: "Selections over 256 KB are not previewed.")
+                title: String(localized: "Selection Too Large", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Selections over 256 KB are not previewed.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
 
@@ -57,10 +65,16 @@ enum QuickPreviewDetector {
         guard let data = text.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data),
               JSONSerialization.isValidJSONObject(object),
-              let prettyData = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
-              let pretty = String(data: prettyData, encoding: .utf8)
-        else {
-            return .error(title: String(localized: "Invalid JSON"), message: String(localized: "Selection is not valid JSON."))
+              let prettyData = try? JSONSerialization.data(
+                  withJSONObject: object,
+                  options: [.prettyPrinted, .sortedKeys]
+              ),
+              let pretty = String(data: prettyData, encoding: .utf8) else
+        {
+            return .error(
+                title: String(localized: "Invalid JSON", bundle: RockxyLocalization.bundle),
+                message: String(localized: "Selection is not valid JSON.", bundle: RockxyLocalization.bundle)
+            )
         }
         return .json(title: "JSON", text: pretty)
     }
@@ -124,31 +138,39 @@ enum QuickPreviewDetector {
             }
     }
 
+    // MARK: Private
+
     private static func base64Preview(_ text: String) -> QuickPreviewResult {
         guard let decoded = decodeBase64(text) else {
             return .error(
-                title: String(localized: "Invalid Base64"),
-                message: String(localized: "Selection could not be decoded as Base64.")
+                title: String(localized: "Invalid Base64", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Selection could not be decoded as Base64.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
-        return .text(title: String(localized: "Decoded Base64"), text: decoded)
+        return .text(title: String(localized: "Decoded Base64", bundle: RockxyLocalization.bundle), text: decoded)
     }
 
     private static func keyValuePreview(_ text: String) -> QuickPreviewResult {
         let rows = parseKeyValueRows(text)
         guard !rows.isEmpty else {
             return .error(
-                title: String(localized: "No Key-Value Pairs"),
-                message: String(localized: "Selection does not contain key-value pairs.")
+                title: String(localized: "No Key-Value Pairs", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Selection does not contain key-value pairs.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
-        return .keyValue(title: String(localized: "Key-Value"), rows: rows)
+        return .keyValue(title: String(localized: "Key-Value", bundle: RockxyLocalization.bundle), rows: rows)
     }
 
     private static func isJSONObject(_ text: String) -> Bool {
         guard let data = text.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data)
-        else {
+              let object = try? JSONSerialization.jsonObject(with: data) else
+        {
             return false
         }
         return JSONSerialization.isValidJSONObject(object)

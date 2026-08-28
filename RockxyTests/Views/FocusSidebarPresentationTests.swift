@@ -11,8 +11,10 @@ struct FocusSidebarPresentationTests {
     func focusSectionActionsUseVisibleNativeButtons() throws {
         let source = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")
 
-        #expect(source.contains("actionLabel: String(localized: \"Create Focus Set\")"))
-        #expect(source.contains("actionLabel: String(localized: \"Configure Noise Control\")"))
+        #expect(source
+            .contains("actionLabel: String(localized: \"Create Focus Set\", bundle: RockxyLocalization.bundle)"))
+        #expect(source
+            .contains("actionLabel: String(localized: \"Configure Noise Control\", bundle: RockxyLocalization.bundle)"))
         #expect(source.contains(".rockxyGlassButtonStyle()"))
         #expect(source.contains(".controlSize(.small)"))
         #expect(source.contains(".accessibilityLabel(actionLabel)"))
@@ -74,7 +76,10 @@ struct FocusSidebarPresentationTests {
         #expect(source.contains("NSSearchField()"))
         #expect(source.contains("searchField.sendsSearchStringImmediately = true"))
         #expect(source.contains("func controlTextDidChange"))
-        #expect(source.contains("searchField.placeholderString = String(localized: \"Filter\")"))
+        #expect(source
+            .contains(
+                "searchField.placeholderString = String(localized: \"Filter\", bundle: RockxyLocalization.bundle)"
+            ))
         #expect(source.contains("systemSymbolName: \"line.3.horizontal.decrease.circle\""))
         #expect(source.contains(".frame(maxWidth: .infinity, minHeight: 28)"))
         #expect(!source.contains("TextField("))

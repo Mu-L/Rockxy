@@ -81,9 +81,10 @@ Before opening, check:
 
 Rockxy ships native Xcode String Catalogs (`Rockxy/Localizable.xcstrings` and
 `Rockxy/InfoPlist.xcstrings`); the Git-tracked catalogs are canonical and there is
-no in-app language picker (macOS drives the language). To add or improve a language,
-edit the catalogs in Xcode, preserve every placeholder and plural/format token, then
-validate before pushing:
+an app-language picker under **Settings › Appearance › Language**. **System Default**
+follows the macOS language; choosing another bundled language updates Rockxy
+immediately. To add or improve a language, edit the catalogs in Xcode, preserve every
+placeholder and plural/format token, then validate before pushing:
 
 ```bash
 python3 .github/tools/validate_xcstrings.py

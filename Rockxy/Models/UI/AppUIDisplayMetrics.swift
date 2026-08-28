@@ -707,6 +707,7 @@ struct AppUIDisplayMetricsProvider<Content: View>: View {
     var body: some View {
         content
             .appUIDisplayMetrics(AppUIDisplayMetrics(settings: settingsManager.appUI))
+            .environment(\.locale, RockxyLocalization.locale)
             .environment(
                 \.colorScheme,
                 settingsManager.appTheme.resolvedColorScheme(inheriting: inheritedColorScheme)
@@ -716,6 +717,7 @@ struct AppUIDisplayMetricsProvider<Content: View>: View {
     // MARK: Private
 
     @Environment(\.colorScheme) private var inheritedColorScheme
+
     private let settingsManager = AppSettingsManager.shared
 }
 

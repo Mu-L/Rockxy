@@ -118,7 +118,8 @@ struct SettingsWindowReadabilityTests {
         #expect(appSource.contains("openWindow(id: \"settings\")"))
         #expect(!appSource.contains("Settings {"))
         #expect(sceneSource.contains("struct SettingsWindowScene: Scene"))
-        #expect(sceneSource.contains("Window(String(localized: \"Settings\"), id: \"settings\")"))
+        #expect(sceneSource
+            .contains("Window(String(localized: \"Settings\", bundle: RockxyLocalization.bundle), id: \"settings\")"))
         #expect(sceneSource.contains(".defaultSize(width: 1_000, height: 640)"))
         #expect(sceneSource.contains(".defaultPosition(.center)"))
         #expect(sceneSource.contains(".windowResizability(.contentMinSize)"))
@@ -140,8 +141,8 @@ struct SettingsWindowReadabilityTests {
         #expect(componentSource.contains(".padding(.leading, settingsMetrics.rowLeading)"))
 
         let githubSource = try readProjectFile("Rockxy/Views/Settings/GitHubSettingsTab.swift")
-        #expect(githubSource.contains("? String(localized: \"Reconnect...\")"))
-        #expect(githubSource.contains(": String(localized: \"Authorize...\")"))
+        #expect(githubSource.contains("? String(localized: \"Reconnect...\", bundle: RockxyLocalization.bundle)"))
+        #expect(githubSource.contains(": String(localized: \"Authorize...\", bundle: RockxyLocalization.bundle)"))
         #expect(!githubSource.contains("String(localized: viewModel.isConnected ?"))
 
         let standardPanePaths = [
@@ -170,8 +171,10 @@ struct SettingsWindowReadabilityTests {
         #expect(!appearanceSource.contains(".padding(.horizontal, 18)"))
 
         let advancedSource = try readProjectFile("Rockxy/Views/Settings/AdvancedSettingsTab.swift")
-        #expect(!advancedSource.contains("settingsRow(label: String(localized: \"Software Update:\"))"))
-        #expect(advancedSource.contains("SettingsFieldRow(String(localized: \"Check Frequency\"))"))
+        #expect(!advancedSource
+            .contains("settingsRow(label: String(localized: \"Software Update:\", bundle: RockxyLocalization.bundle))"))
+        #expect(advancedSource
+            .contains("SettingsFieldRow(String(localized: \"Check Frequency\", bundle: RockxyLocalization.bundle))"))
         #expect(advancedSource.contains(".labelsHidden()"))
 
         // Plugins intentionally keeps a full-bleed master/detail surface with
@@ -194,17 +197,37 @@ struct SettingsWindowReadabilityTests {
         #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
         #expect(source.components(separatedBy: "settingsMetrics.fieldWidth(520)").count - 1 == 1)
         #expect(source.components(separatedBy: ".layoutPriority(1)").count - 1 >= 3)
-        #expect(source.contains("modelAction(model)\n                    .fixedSize(horizontal: true, vertical: false)"))
+        #expect(source
+            .contains("modelAction(model)\n                    .fixedSize(horizontal: true, vertical: false)"))
     }
 
     @Test("MCP configuration remains readable without wrapping long paths")
     func mcpConfigurationUsesScrollableCodeSurface() throws {
         let source = try readProjectFile("Rockxy/Views/Settings/MCPSettingsTab.swift")
 
-        #expect(source.contains("SettingsSection(String(localized: \"Client Configuration\"))"))
+        #expect(source
+            .contains(
+                "SettingsSection(String(localized: \"Client Configuration\", bundle: RockxyLocalization.bundle))"
+            ))
         #expect(source.contains("ScrollView(.horizontal)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: true)"))
         #expect(source.contains(".textSelection(.enabled)"))
+    }
+
+    @Test("Appearance settings changes the bundle-driven app language without restarting")
+    func appearanceSettingsChangesAppLanguageImmediately() throws {
+        let appearance = try readProjectFile("Rockxy/Views/Settings/AppearanceSettingsTab.swift")
+        let general = try readProjectFile("Rockxy/Views/Settings/GeneralSettingsTab.swift")
+        let metricsProvider = try readProjectFile("Rockxy/Models/UI/AppUIDisplayMetrics.swift")
+
+        #expect(appearance
+            .contains("SettingsSection(String(localized: \"Language\", bundle: RockxyLocalization.bundle))"))
+        #expect(appearance.contains("languageController.availableOptions"))
+        #expect(appearance.contains(".pickerStyle(.menu)"))
+        #expect(appearance.contains("languageController.select(optionID: newValue)"))
+        #expect(metricsProvider.contains(".environment(\\.locale, RockxyLocalization.locale)"))
+        #expect(!appearance.contains("requestQuitForRequiredReopen"))
+        #expect(!general.contains("AppLanguageController"))
     }
 
     // MARK: Private

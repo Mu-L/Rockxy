@@ -25,7 +25,10 @@ enum ProtobufSchemaDecodeError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notImplemented:
-            String(localized: "Schema-based Protobuf decoding is not implemented in this build.")
+            String(
+                localized: "Schema-based Protobuf decoding is not implemented in this build.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

@@ -40,7 +40,7 @@ enum ProjectStructuralLimits {
 
     /// Title of the guaranteed non-closable default tab.
     static let defaultTabTitle: String = {
-        let localized = String(localized: "All Traffic")
+        let localized = String(localized: "All Traffic", bundle: RockxyLocalization.bundle)
         return (try? ProjectNormalization.normalizedDisplayName(localized)) ?? "All Traffic"
     }()
 }

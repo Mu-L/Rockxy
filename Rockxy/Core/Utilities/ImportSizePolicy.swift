@@ -61,10 +61,14 @@ enum ImportSizeError: Error, LocalizedError {
             let actualMB = Double(actual) / (1_024 * 1_024)
             let limitMB = Double(limit) / (1_024 * 1_024)
             return String(
-                localized: "File is too large (\(String(format: "%.1f", actualMB)) MB). Maximum supported size is \(String(format: "%.0f", limitMB)) MB."
+                localized: "File is too large (\(String(format: "%.1f", actualMB)) MB). Maximum supported size is \(String(format: "%.0f", limitMB)) MB.",
+                bundle: RockxyLocalization.bundle
             )
         case let .attributeError(error):
-            return String(localized: "Could not read file: \(error.localizedDescription)")
+            return String(
+                localized: "Could not read file: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

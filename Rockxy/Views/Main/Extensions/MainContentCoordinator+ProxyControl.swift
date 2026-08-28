@@ -26,7 +26,8 @@ extension MainContentCoordinator {
 
             guard await ensureProjectCatalogReadyForDataIntake() else {
                 proxyError = String(
-                    localized: "Projects could not be loaded. Repair Projects before starting capture."
+                    localized: "Projects could not be loaded. Repair Projects before starting capture.",
+                    bundle: RockxyLocalization.bundle
                 )
                 return
             }
@@ -581,7 +582,7 @@ extension MainContentCoordinator {
         _ transactions: [HTTPTransaction],
         in workspace: WorkspaceState
     ) {
-        let unknownApp = String(localized: "Unknown")
+        let unknownApp = String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         for transaction in transactions {
             let destinationApp = transaction.clientApp?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !destinationApp.isEmpty else {

@@ -96,16 +96,19 @@ struct ExportScopeSheet: View {
 
     private var scopeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel(String(localized: "Traffic to export"))
+            sectionLabel(String(localized: "Traffic to export", bundle: RockxyLocalization.bundle))
 
             if context.availableScopes.isEmpty {
-                Text(String(localized: "Nothing in this workspace can be exported in this format."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("exportScope.empty")
+                Text(String(
+                    localized: "Nothing in this workspace can be exported in this format.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("exportScope.empty")
             } else {
-                Picker(String(localized: "Scope"), selection: $selectedScope) {
+                Picker(String(localized: "Scope", bundle: RockxyLocalization.bundle), selection: $selectedScope) {
                     ForEach(ExportScope.allCases, id: \.self) { scope in
                         Text(optionLabel(for: scope))
                             .tag(scope)
@@ -129,7 +132,10 @@ struct ExportScopeSheet: View {
             ForEach(context.unavailableScopes, id: \.self) { scope in
                 if let reason = context.reason(for: scope) {
                     noteRow(
-                        String(localized: "\(context.label(for: scope)) — \(reason)"),
+                        String(
+                            localized: "\(context.label(for: scope)) — \(reason)",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         systemImage: "minus.circle",
                         identifier: "exportScope.unavailable.\(scope.rawValue)"
                     )
@@ -141,7 +147,7 @@ struct ExportScopeSheet: View {
 
     private var lockedSelectionSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel(String(localized: "Traffic to export"))
+            sectionLabel(String(localized: "Traffic to export", bundle: RockxyLocalization.bundle))
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.fill")
@@ -164,7 +170,8 @@ struct ExportScopeSheet: View {
 
                     Text(
                         String(
-                            localized: "This review is limited to the selected requests. Other traffic will not be included."
+                            localized: "This review is limited to the selected requests. Other traffic will not be included.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .font(toolMetrics.secondaryFont())
@@ -208,7 +215,7 @@ struct ExportScopeSheet: View {
             Button {
                 onCancel()
             } label: {
-                Text(String(localized: "Cancel"))
+                Text(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                     .frame(width: footerActionWidth)
             }
             .rockxyGlassButtonStyle()
@@ -219,7 +226,7 @@ struct ExportScopeSheet: View {
             Button {
                 onExport(selectedScope)
             } label: {
-                Text(String(localized: "Export\u{2026}"))
+                Text(String(localized: "Export\u{2026}", bundle: RockxyLocalization.bundle))
                     .frame(width: footerActionWidth)
             }
             .rockxyGlassButtonStyle(prominent: true)

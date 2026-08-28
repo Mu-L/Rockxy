@@ -33,7 +33,7 @@ enum ScriptListRuntimeStatus: Equatable {
     case error
     case loading
 
-    // MARK: Internal
+    // MARK: Lifecycle
 
     init(_ status: PluginStatus) {
         switch status {
@@ -48,16 +48,18 @@ enum ScriptListRuntimeStatus: Equatable {
         }
     }
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .active:
-            String(localized: "Active")
+            String(localized: "Active", bundle: RockxyLocalization.bundle)
         case .disabled:
-            String(localized: "Disabled")
+            String(localized: "Disabled", bundle: RockxyLocalization.bundle)
         case .error:
-            String(localized: "Error")
+            String(localized: "Error", bundle: RockxyLocalization.bundle)
         case .loading:
-            String(localized: "Loading…")
+            String(localized: "Loading…", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -117,9 +119,9 @@ enum ScriptListFilterColumn: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .name: String(localized: "Name")
-        case .method: String(localized: "Method")
-        case .urlPattern: String(localized: "Matching Rule")
+        case .name: String(localized: "Name", bundle: RockxyLocalization.bundle)
+        case .method: String(localized: "Method", bundle: RockxyLocalization.bundle)
+        case .urlPattern: String(localized: "Matching Rule", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -298,7 +300,10 @@ final class ScriptingListViewModel {
                 }
             }
             Self.logger.error("Create script failed: \(error.localizedDescription)")
-            operationError = String(localized: "Could not create the script. \(error.localizedDescription)")
+            operationError = String(
+                localized: "Could not create the script. \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
             return nil
         }
     }
@@ -309,7 +314,7 @@ final class ScriptingListViewModel {
         filterColumn = .name
         let id = folderStore.createFolder()
         renamingFolderID = id
-        renamingFolderText = String(localized: "Untitled")
+        renamingFolderText = String(localized: "Untitled", bundle: RockxyLocalization.bundle)
         selectedRowID = .folder(id)
     }
 
@@ -363,14 +368,18 @@ final class ScriptingListViewModel {
                 }
             } catch {
                 Self.logger.error("Delete script failed: \(error.localizedDescription)")
-                operationError = String(localized: "Could not delete the script. \(error.localizedDescription)")
+                operationError = String(
+                    localized: "Could not delete the script. \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
                 do {
                     try await pluginManager.reloadPlugin(id: id)
                 } catch {
                     Self.logger.error("Restore after failed delete failed: \(error.localizedDescription)")
                     operationError = String(
                         localized:
-                        "Could not delete the script, and Rockxy could not restore its runtime. \(error.localizedDescription)"
+                        "Could not delete the script, and Rockxy could not restore its runtime. \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
                     )
                 }
             }
@@ -400,7 +409,7 @@ final class ScriptingListViewModel {
             let manifestURL = destDir.appendingPathComponent("plugin.json")
             let data = try Data(contentsOf: manifestURL)
             let manifest = try JSONDecoder().decode(PluginManifest.self, from: data)
-            let newName = source.name + " " + String(localized: "(Copy)")
+            let newName = source.name + " " + String(localized: "(Copy)", bundle: RockxyLocalization.bundle)
             let copy = PluginManifest(
                 id: newID,
                 name: newName,
@@ -434,7 +443,10 @@ final class ScriptingListViewModel {
                 }
             }
             Self.logger.error("Duplicate failed: \(error.localizedDescription)")
-            operationError = String(localized: "Could not duplicate the script. \(error.localizedDescription)")
+            operationError = String(
+                localized: "Could not duplicate the script. \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -453,7 +465,10 @@ final class ScriptingListViewModel {
                 try await ScriptPolicyGate.shared.enablePlugin(id: id, using: pluginManager)
             } catch {
                 Self.logger.error("Enable failed: \(error.localizedDescription)")
-                operationError = String(localized: "Could not enable the script. \(error.localizedDescription)")
+                operationError = String(
+                    localized: "Could not enable the script. \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         } else {
             await pluginManager.disablePlugin(id: id)
@@ -487,7 +502,10 @@ final class ScriptingListViewModel {
                     try await ScriptPolicyGate.shared.enablePlugin(id: plugin.id, using: pluginManager)
                 } catch {
                     Self.logger.error("Enable failed: \(error.localizedDescription)")
-                    operationError = String(localized: "Could not enable the script. \(error.localizedDescription)")
+                    operationError = String(
+                        localized: "Could not enable the script. \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 }
             } else {
                 await pluginManager.disablePlugin(id: plugin.id)

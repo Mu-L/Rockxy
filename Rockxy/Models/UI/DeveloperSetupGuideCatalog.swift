@@ -478,8 +478,22 @@ enum DeveloperSetupGuideCatalog {
     {
         SetupGuideTip(
             id: id,
-            title: title,
-            message: message
+            title: runtimeLocalized(title),
+            message: runtimeLocalized(message)
+        )
+    }
+
+    /// Rebinds a call-site `LocalizedStringResource` literal to Rockxy's runtime
+    /// bundle and locale so guide tips resolve through the currently selected app
+    /// language instead of the bundle/locale captured when the literal was built.
+    /// The call-site literals stay compile-time extractable; only the lookup is
+    /// re-pointed at runtime.
+    private static func runtimeLocalized(_ resource: LocalizedStringResource) -> LocalizedStringResource {
+        LocalizedStringResource(
+            String.LocalizationValue(resource.key),
+            table: resource.table,
+            locale: RockxyLocalization.locale,
+            bundle: .atURL(RockxyLocalization.bundle.bundleURL)
         )
     }
 }

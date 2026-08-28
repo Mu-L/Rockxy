@@ -16,39 +16,42 @@ enum ProxyDisplayState: Equatable {
     var title: String {
         switch self {
         case .starting:
-            String(localized: "Starting")
+            String(localized: "Starting", bundle: RockxyLocalization.bundle)
         case .running:
-            String(localized: "Running")
+            String(localized: "Running", bundle: RockxyLocalization.bundle)
         case .paused:
-            String(localized: "Paused")
+            String(localized: "Paused", bundle: RockxyLocalization.bundle)
         case .stopped:
-            String(localized: "Stopped")
+            String(localized: "Stopped", bundle: RockxyLocalization.bundle)
         }
     }
 
     var captureTitle: String {
         switch self {
         case .starting:
-            String(localized: "Starting Capture")
+            String(localized: "Starting Capture", bundle: RockxyLocalization.bundle)
         case .running:
-            String(localized: "Capturing Traffic")
+            String(localized: "Capturing Traffic", bundle: RockxyLocalization.bundle)
         case .paused:
-            String(localized: "Capture Paused")
+            String(localized: "Capture Paused", bundle: RockxyLocalization.bundle)
         case .stopped:
-            String(localized: "Capture Stopped")
+            String(localized: "Capture Stopped", bundle: RockxyLocalization.bundle)
         }
     }
 
     var captureDescription: String {
         switch self {
         case .starting:
-            String(localized: "Preparing the listener and system routing.")
+            String(localized: "Preparing the listener and system routing.", bundle: RockxyLocalization.bundle)
         case .running:
-            String(localized: "New traffic is being added to the active workspace.")
+            String(localized: "New traffic is being added to the active workspace.", bundle: RockxyLocalization.bundle)
         case .paused:
-            String(localized: "The listener stays available, but new traffic is not being added.")
+            String(
+                localized: "The listener stays available, but new traffic is not being added.",
+                bundle: RockxyLocalization.bundle
+            )
         case .stopped:
-            String(localized: "No new traffic is being captured.")
+            String(localized: "No new traffic is being captured.", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -68,12 +71,12 @@ enum ProxyDisplayState: Equatable {
     var captureActionTitle: String {
         switch self {
         case .starting:
-            String(localized: "Starting…")
+            String(localized: "Starting…", bundle: RockxyLocalization.bundle)
         case .running,
              .paused:
-            String(localized: "Stop Capture")
+            String(localized: "Stop Capture", bundle: RockxyLocalization.bundle)
         case .stopped:
-            String(localized: "Start Capture")
+            String(localized: "Start Capture", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -716,13 +719,13 @@ struct SystemProxyWarning {
         var title: String {
             switch self {
             case .retry:
-                String(localized: "Retry")
+                String(localized: "Retry", bundle: RockxyLocalization.bundle)
             case .openGeneralSettings:
-                String(localized: "Open Certificate Settings")
+                String(localized: "Open Certificate Settings", bundle: RockxyLocalization.bundle)
             case .openAdvancedProxySettings:
-                String(localized: "Open Advanced Proxy Settings")
+                String(localized: "Open Advanced Proxy Settings", bundle: RockxyLocalization.bundle)
             case .reinstallAndTrust:
-                String(localized: "Install & Trust Certificate")
+                String(localized: "Install & Trust Certificate", bundle: RockxyLocalization.bundle)
             }
         }
     }

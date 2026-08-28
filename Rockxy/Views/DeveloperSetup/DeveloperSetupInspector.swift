@@ -38,23 +38,29 @@ struct DeveloperSetupInspector: View {
 
     private var readinessSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader(String(localized: "Readiness"))
+            sectionHeader(String(localized: "Readiness", bundle: RockxyLocalization.bundle))
             readinessRow(
-                title: String(localized: "Proxy"),
-                value: snapshot.proxyRunning ? String(localized: "Running") : String(localized: "Stopped")
+                title: String(localized: "Proxy", bundle: RockxyLocalization.bundle),
+                value: snapshot.proxyRunning ? String(localized: "Running", bundle: RockxyLocalization.bundle) : String(
+                    localized: "Stopped",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             readinessRow(
-                title: String(localized: "Recording"),
-                value: snapshot.recordingEnabled ? String(localized: "On") : String(localized: "Paused")
+                title: String(localized: "Recording", bundle: RockxyLocalization.bundle),
+                value: snapshot.recordingEnabled ? String(localized: "On", bundle: RockxyLocalization.bundle) : String(
+                    localized: "Paused",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             readinessRow(
-                title: String(localized: "Certificate"),
+                title: String(localized: "Certificate", bundle: RockxyLocalization.bundle),
                 value: snapshot.certificateTrusted
-                    ? String(localized: "Trusted")
-                    : String(localized: "Needs attention")
+                    ? String(localized: "Trusted", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Needs attention", bundle: RockxyLocalization.bundle)
             )
             readinessRow(
-                title: String(localized: "Port"),
+                title: String(localized: "Port", bundle: RockxyLocalization.bundle),
                 value: "\(snapshot.activePort)"
             )
         }
@@ -64,7 +70,7 @@ struct DeveloperSetupInspector: View {
     @ViewBuilder private var statusSection: some View {
         if let activeIssue {
             VStack(alignment: .leading, spacing: 8) {
-                sectionHeader(String(localized: "Current issue"))
+                sectionHeader(String(localized: "Current issue", bundle: RockxyLocalization.bundle))
                 Text(activeIssue.title)
                     .font(setupMetrics.font(weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
@@ -79,7 +85,7 @@ struct DeveloperSetupInspector: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                sectionHeader(String(localized: "Last check"))
+                sectionHeader(String(localized: "Last check", bundle: RockxyLocalization.bundle))
                 Text(snapshot.verificationState.title)
                     .font(setupMetrics.font(weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
@@ -90,7 +96,7 @@ struct DeveloperSetupInspector: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    Button(String(localized: "Reveal in Main Window")) {
+                    Button(String(localized: "Reveal in Main Window", bundle: RockxyLocalization.bundle)) {
                         onReveal()
                     }
                 }

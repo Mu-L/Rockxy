@@ -352,8 +352,8 @@ struct NativeWorkspaceSplitViewTests {
             willBeInsertedIntoToolbar: false
         ))
 
-        #expect(separator.label == String(localized: "Source List Divider"))
-        #expect(separator.paletteLabel == String(localized: "Divider"))
+        #expect(separator.label == String(localized: "Source List Divider", bundle: RockxyLocalization.bundle))
+        #expect(separator.paletteLabel == String(localized: "Divider", bundle: RockxyLocalization.bundle))
     }
 
     @Test("Optional toolbar items can be removed and restored independently")
@@ -665,8 +665,11 @@ struct NativeWorkspaceSplitViewTests {
         let activeProxyItem = try #require(toolbar.managedToolbar.items.first {
             $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
         })
-        #expect(activeProxyItem.label == String(localized: "Start"))
-        #expect(activeProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+        #expect(activeProxyItem.label == String(localized: "Start", bundle: RockxyLocalization.bundle))
+        #expect(activeProxyItem.paletteLabel == String(
+            localized: "Start or Stop Proxy",
+            bundle: RockxyLocalization.bundle
+        ))
 
         // AppKit asks for separate item instances while constructing the palette.
         // That must not replace the live toolbar instance tracked by state updates.
@@ -676,11 +679,14 @@ struct NativeWorkspaceSplitViewTests {
             willBeInsertedIntoToolbar: false
         )
         coordinator.isProxyRunning = true
-        for _ in 0 ..< 6 where activeProxyItem.label != String(localized: "Stop") {
+        for _ in 0 ..< 6 where activeProxyItem.label != String(localized: "Stop", bundle: RockxyLocalization.bundle) {
             await Task.yield()
         }
-        #expect(activeProxyItem.label == String(localized: "Stop"))
-        #expect(activeProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+        #expect(activeProxyItem.label == String(localized: "Stop", bundle: RockxyLocalization.bundle))
+        #expect(activeProxyItem.paletteLabel == String(
+            localized: "Start or Stop Proxy",
+            bundle: RockxyLocalization.bundle
+        ))
 
         let proxyIndex = try #require(toolbar.managedToolbar.items.firstIndex {
             $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
@@ -693,14 +699,19 @@ struct NativeWorkspaceSplitViewTests {
         let restoredProxyItem = try #require(toolbar.managedToolbar.items.first {
             $0.itemIdentifier == NativeWorkspaceToolbar.proxyToggleIdentifier
         })
-        #expect(restoredProxyItem.label == String(localized: "Stop"))
-        #expect(restoredProxyItem.paletteLabel == String(localized: "Start or Stop Proxy"))
+        #expect(restoredProxyItem.label == String(localized: "Stop", bundle: RockxyLocalization.bundle))
+        #expect(restoredProxyItem.paletteLabel == String(
+            localized: "Start or Stop Proxy",
+            bundle: RockxyLocalization.bundle
+        ))
 
         coordinator.isProxyRunning = false
-        for _ in 0 ..< 6 where restoredProxyItem.label != String(localized: "Start") {
+        for _ in 0 ..< 6
+            where restoredProxyItem.label != String(localized: "Start", bundle: RockxyLocalization.bundle)
+        {
             await Task.yield()
         }
-        #expect(restoredProxyItem.label == String(localized: "Start"))
+        #expect(restoredProxyItem.label == String(localized: "Start", bundle: RockxyLocalization.bundle))
 
         let transaction = TestFixtures.makeTransaction()
         coordinator.selectedTransaction = transaction
@@ -712,7 +723,7 @@ struct NativeWorkspaceSplitViewTests {
             await Task.yield()
         }
         #expect(bottomItem.isEnabled)
-        #expect(bottomItem.toolTip == String(localized: "Hide Bottom Inspector"))
+        #expect(bottomItem.toolTip == String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle))
 
         let contextItem = try #require(toolbar.managedToolbar.items.first {
             $0.itemIdentifier == NativeWorkspaceToolbar.contextDockIdentifier
@@ -721,8 +732,8 @@ struct NativeWorkspaceSplitViewTests {
         let action = try #require(contextItem.action)
         NSApp.sendAction(action, to: contextItem.target, from: contextItem)
         let expectedContextToolTip = initialContextVisibility
-            ? String(localized: "Show Context Dock")
-            : String(localized: "Hide Context Dock")
+            ? String(localized: "Show Context Dock", bundle: RockxyLocalization.bundle)
+            : String(localized: "Hide Context Dock", bundle: RockxyLocalization.bundle)
         for _ in 0 ..< 6 where contextItem.toolTip != expectedContextToolTip {
             await Task.yield()
         }
@@ -743,14 +754,17 @@ struct NativeWorkspaceSplitViewTests {
             await Task.yield()
         }
         #expect(recordingItem.isEnabled)
-        #expect(recordingItem.label == String(localized: "Pause Recording"))
+        #expect(recordingItem.label == String(localized: "Pause Recording", bundle: RockxyLocalization.bundle))
 
         coordinator.isRecording = false
-        for _ in 0 ..< 6 where recordingItem.label != String(localized: "Resume Recording") {
+        for _ in 0 ..< 6 where recordingItem.label != String(
+            localized: "Resume Recording",
+            bundle: RockxyLocalization.bundle
+        ) {
             await Task.yield()
         }
-        #expect(recordingItem.label == String(localized: "Resume Recording"))
-        #expect(recordingItem.paletteLabel == String(localized: "Toggle Recording"))
+        #expect(recordingItem.label == String(localized: "Resume Recording", bundle: RockxyLocalization.bundle))
+        #expect(recordingItem.paletteLabel == String(localized: "Toggle Recording", bundle: RockxyLocalization.bundle))
 
         toolbar.managedToolbar.insertItem(
             withItemIdentifier: NativeWorkspaceToolbar.detachedInspectorIdentifier,

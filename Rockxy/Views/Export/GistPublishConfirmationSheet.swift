@@ -16,7 +16,7 @@ struct GistPublishReviewSummary: Equatable {
         var ordered: [String] = []
         for transaction in transactions {
             let host = transaction.request.host
-            let normalized = host.isEmpty ? String(localized: "Unknown host") : host
+            let normalized = host.isEmpty ? String(localized: "Unknown host", bundle: RockxyLocalization.bundle) : host
             if seen.insert(normalized).inserted {
                 ordered.append(normalized)
             }
@@ -41,39 +41,59 @@ struct GistPublishReviewSummary: Equatable {
     }
 
     var requestSummary: String {
-        String(AttributedString(localized: "^[\(requestCount) request](inflect: true) selected").characters)
+        String(AttributedString(
+            localized: "^[\(requestCount) request](inflect: true) selected",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     /// Compact host line: names for one or two hosts, then a "+N more" overflow.
     var hostSummary: String {
         switch hosts.count {
         case 0:
-            return String(localized: "No hosts")
+            return String(localized: "No hosts", bundle: RockxyLocalization.bundle)
         case 1:
             return hosts[0]
         case 2:
             return "\(hosts[0]), \(hosts[1])"
         default:
             let remaining = hosts.count - 2
-            return String(localized: "\(hosts[0]), \(hosts[1]) +\(remaining) more")
+            return String(localized: "\(hosts[0]), \(hosts[1]) +\(remaining) more", bundle: RockxyLocalization.bundle)
         }
     }
 
     var hostCountLabel: String {
-        String(AttributedString(localized: "^[\(uniqueHostCount) host](inflect: true)").characters)
+        String(AttributedString(
+            localized: "^[\(uniqueHostCount) host](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     var fileSummary: String {
-        var parts = [String(localized: "README"), String(localized: "HAR")]
-        parts.append(String(AttributedString(localized: "^[\(requestCount) transaction file](inflect: true)").characters))
+        var parts = [
+            String(localized: "README", bundle: RockxyLocalization.bundle),
+            String(localized: "HAR", bundle: RockxyLocalization.bundle)
+        ]
+        parts
+            .append(String(AttributedString(
+                localized: "^[\(requestCount) transaction file](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
         if hasWebSocketFrames {
-            parts.append(String(localized: "WebSocket frames"))
+            parts.append(String(localized: "WebSocket frames", bundle: RockxyLocalization.bundle))
         }
         return parts.joined(separator: ", ")
     }
 
     var fileCountLabel: String {
-        String(AttributedString(localized: "^[\(fileCount) file](inflect: true)").characters)
+        String(AttributedString(
+            localized: "^[\(fileCount) file](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }
 
@@ -82,17 +102,26 @@ struct GistPublishReviewSummary: Equatable {
 /// Truthful, testable copy for the confirmation surface. GitHub calls non-public
 /// Gists "secret": they are unlisted, but anyone with the URL can read them.
 enum GistPublishCopy {
-    static let redactionDescription = String(
-        localized: "Redacts recognized sensitive headers, URLs, and body values (Authorization, Cookie, API keys) before upload. Best-effort, not a guarantee."
-    )
+    static var redactionDescription: String {
+        String(
+            localized: "Redacts recognized sensitive headers, URLs, and body values (Authorization, Cookie, API keys) before upload. Best-effort, not a guarantee.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
 
-    static let redactionOffWarning = String(
-        localized: "Redaction is off. Captured headers, URLs, and bodies upload exactly as recorded."
-    )
+    static var redactionOffWarning: String {
+        String(
+            localized: "Redaction is off. Captured headers, URLs, and bodies upload exactly as recorded.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
 
-    static let publicWarning = String(
-        localized: "Public Gists are discoverable and searchable on GitHub. Anyone can find this traffic."
-    )
+    static var publicWarning: String {
+        String(
+            localized: "Public Gists are discoverable and searchable on GitHub. Anyone can find this traffic.",
+            bundle: RockxyLocalization.bundle
+        )
+    }
 
     static func visibilityTitle(_ visibility: GitHubGistVisibility) -> String {
         visibility.title
@@ -170,24 +199,31 @@ struct GistPublishConfirmationSheet: View {
 
     private var title: String {
         summary.requestCount == 1
-            ? String(localized: "Publish to GitHub Gist")
-            : String(localized: "Publish Selected to GitHub Gist")
+            ? String(localized: "Publish to GitHub Gist", bundle: RockxyLocalization.bundle)
+            : String(localized: "Publish Selected to GitHub Gist", bundle: RockxyLocalization.bundle)
     }
 
     private var publishButtonTitle: String {
         isPublishing
-            ? String(localized: "Publishing\u{2026}")
-            : String(localized: "Publish")
+            ? String(localized: "Publishing\u{2026}", bundle: RockxyLocalization.bundle)
+            : String(localized: "Publish", bundle: RockxyLocalization.bundle)
+    }
+
+    private var footerActionWidth: CGFloat {
+        max(120, toolMetrics.bodyFontSize * 6.5)
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(toolMetrics.font(weight: .semibold))
-            Text(String(localized: "Review what leaves this Mac before uploading to GitHub."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(
+                localized: "Review what leaves this Mac before uploading to GitHub.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -224,7 +260,7 @@ struct GistPublishConfirmationSheet: View {
 
     private var visibilitySection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker(String(localized: "Publish as"), selection: $visibility) {
+            Picker(String(localized: "Publish as", bundle: RockxyLocalization.bundle), selection: $visibility) {
                 Text(GistPublishCopy.visibilityTitle(.secret)).tag(GitHubGistVisibility.secret)
                 Text(GistPublishCopy.visibilityTitle(.public)).tag(GitHubGistVisibility.public)
             }
@@ -241,25 +277,34 @@ struct GistPublishConfirmationSheet: View {
 
     private var privacyControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(String(localized: "Redact recognized sensitive data"), isOn: $redactSensitiveData)
-                .toggleStyle(.checkbox)
-                .disabled(isPublishing)
-                .accessibilityIdentifier("gistPublish.redactToggle")
+            Toggle(
+                String(localized: "Redact recognized sensitive data", bundle: RockxyLocalization.bundle),
+                isOn: $redactSensitiveData
+            )
+            .toggleStyle(.checkbox)
+            .disabled(isPublishing)
+            .accessibilityIdentifier("gistPublish.redactToggle")
 
             Text(GistPublishCopy.redactionDescription)
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Toggle(String(localized: "Open Gist in default web browser"), isOn: $openInBrowser)
-                .toggleStyle(.checkbox)
-                .disabled(isPublishing)
-                .accessibilityIdentifier("gistPublish.openInBrowserToggle")
+            Toggle(
+                String(localized: "Open Gist in default web browser", bundle: RockxyLocalization.bundle),
+                isOn: $openInBrowser
+            )
+            .toggleStyle(.checkbox)
+            .disabled(isPublishing)
+            .accessibilityIdentifier("gistPublish.openInBrowserToggle")
 
-            Toggle(String(localized: "Copy Gist URL to clipboard"), isOn: $copyURLToClipboard)
-                .toggleStyle(.checkbox)
-                .disabled(isPublishing)
-                .accessibilityIdentifier("gistPublish.copyURLToggle")
+            Toggle(
+                String(localized: "Copy Gist URL to clipboard", bundle: RockxyLocalization.bundle),
+                isOn: $copyURLToClipboard
+            )
+            .toggleStyle(.checkbox)
+            .disabled(isPublishing)
+            .accessibilityIdentifier("gistPublish.copyURLToggle")
         }
     }
 
@@ -279,7 +324,7 @@ struct GistPublishConfirmationSheet: View {
             Button {
                 onCancel()
             } label: {
-                Text(String(localized: "Cancel"))
+                Text(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                     .frame(width: footerActionWidth)
                     .frame(minHeight: toolMetrics.formControlHeight)
             }
@@ -312,10 +357,6 @@ struct GistPublishConfirmationSheet: View {
         Rectangle()
             .fill(Color(nsColor: .separatorColor))
             .frame(height: 1)
-    }
-
-    private var footerActionWidth: CGFloat {
-        max(120, toolMetrics.bodyFontSize * 6.5)
     }
 
     private func summaryRow(

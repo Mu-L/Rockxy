@@ -142,16 +142,47 @@ struct AddSSLAppDomainSheet: View {
         !filteredApps.isEmpty || !filteredDomains.isEmpty
     }
 
+    private var addButtonTitle: String {
+        let count = newDomainsForSelection.count
+        return count > 1
+            ? String(localized: "Add \(count)", bundle: RockxyLocalization.bundle)
+            : String(localized: "Add", bundle: RockxyLocalization.bundle)
+    }
+
+    private var selectionSummary: String {
+        guard selectedItem != nil else {
+            return String(
+                localized: "Choose an app or host to preview what will be added.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        let newCount = newDomainsForSelection.count
+        var parts = [String(localized: "\(newCount) new", bundle: RockxyLocalization.bundle)]
+        if duplicateCount > 0 {
+            parts.append(String(localized: "\(duplicateCount) already exists", bundle: RockxyLocalization.bundle))
+        }
+        if overlapCount > 0 {
+            parts.append(
+                String(
+                    localized: "\(overlapCount) overlaps; Tunnel Without Decryption takes priority",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
+        }
+        return parts.joined(separator: " · ")
+    }
+
     // MARK: - Sections
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(String(localized: "Add Observed Domains"))
+            Text(String(localized: "Add Observed Domains", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
             Text(
                 String(
                     localized:
-                    "Choosing an app adds the hosts it has contacted so far. Rules apply to those hosts for every client."
+                    "Choosing an app adds the hosts it has contacted so far. Rules apply to those hosts for every client.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -166,7 +197,7 @@ struct AddSSLAppDomainSheet: View {
 
     private var behaviorSection: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Behavior"))
+            Text(String(localized: "Behavior", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font())
                 .foregroundStyle(.secondary)
             Picker("", selection: $listType) {
@@ -178,7 +209,7 @@ struct AddSSLAppDomainSheet: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
-            .accessibilityLabel(String(localized: "Rule behavior"))
+            .accessibilityLabel(String(localized: "Rule behavior", bundle: RockxyLocalization.bundle))
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -188,9 +219,9 @@ struct AddSSLAppDomainSheet: View {
     private var searchSection: some View {
         HStack {
             TextField(
-                String(localized: "Search app or domain"),
+                String(localized: "Search app or domain", bundle: RockxyLocalization.bundle),
                 text: $searchText,
-                prompt: Text(String(localized: "Search app or domain (⌘F)"))
+                prompt: Text(String(localized: "Search app or domain (⌘F)", bundle: RockxyLocalization.bundle))
             )
             .textFieldStyle(.roundedBorder)
             .font(toolMetrics.font())
@@ -212,13 +243,19 @@ struct AddSSLAppDomainSheet: View {
             if !hasFilteredResults {
                 ContentUnavailableView(
                     hasObservedTraffic
-                        ? String(localized: "No Matching Observed Hosts")
-                        : String(localized: "No Observed Hosts Yet"),
+                        ? String(localized: "No Matching Observed Hosts", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Observed Hosts Yet", bundle: RockxyLocalization.bundle),
                     systemImage: hasObservedTraffic ? "magnifyingglass" : "network.slash",
                     description: Text(
                         hasObservedTraffic
-                            ? String(localized: "Try a different app or host search.")
-                            : String(localized: "Capture traffic from an app or website, then return here.")
+                            ? String(
+                                localized: "Try a different app or host search.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Capture traffic from an app or website, then return here.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -246,7 +283,11 @@ struct AddSSLAppDomainSheet: View {
                 }
             }
         } header: {
-            sectionHeader(String(localized: "Apps"), systemImage: "square.grid.2x2", count: filteredApps.count)
+            sectionHeader(
+                String(localized: "Apps", bundle: RockxyLocalization.bundle),
+                systemImage: "square.grid.2x2",
+                count: filteredApps.count
+            )
         }
     }
 
@@ -256,7 +297,11 @@ struct AddSSLAppDomainSheet: View {
                 domainRow(domain)
             }
         } header: {
-            sectionHeader(String(localized: "Domains"), systemImage: "globe", count: filteredDomains.count)
+            sectionHeader(
+                String(localized: "Domains", bundle: RockxyLocalization.bundle),
+                systemImage: "globe",
+                count: filteredDomains.count
+            )
         }
     }
 
@@ -277,7 +322,7 @@ struct AddSSLAppDomainSheet: View {
             Button {
                 dismiss()
             } label: {
-                footerButtonLabel(String(localized: "Cancel"))
+                footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
             }
             .keyboardShortcut(.cancelAction)
 
@@ -342,40 +387,15 @@ struct AddSSLAppDomainSheet: View {
         dismiss()
     }
 
-    private var addButtonTitle: String {
-        let count = newDomainsForSelection.count
-        return count > 1
-            ? String(localized: "Add \(count)")
-            : String(localized: "Add")
-    }
-
-    private var selectionSummary: String {
-        guard selectedItem != nil else {
-            return String(localized: "Choose an app or host to preview what will be added.")
-        }
-        let newCount = newDomainsForSelection.count
-        var parts = [String(localized: "\(newCount) new")]
-        if duplicateCount > 0 {
-            parts.append(String(localized: "\(duplicateCount) already exists"))
-        }
-        if overlapCount > 0 {
-            parts.append(
-                String(localized: "\(overlapCount) overlaps; Tunnel Without Decryption takes priority")
-            )
-        }
-        return parts.joined(separator: " · ")
-    }
-
     private func reconcileSelection() {
         guard let selectedItem else {
             return
         }
-        let isVisible: Bool
-        switch selectedItem {
+        let isVisible: Bool = switch selectedItem {
         case let .app(name):
-            isVisible = filteredApps.contains { $0.name == name }
+            filteredApps.contains { $0.name == name }
         case let .domain(domain):
-            isVisible = filteredDomains.contains(domain)
+            filteredDomains.contains(domain)
                 || filteredApps.contains { $0.domains.contains(domain) }
         }
         if !isVisible {

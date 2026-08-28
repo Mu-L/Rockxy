@@ -12,10 +12,10 @@ struct ToolsSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "Request Behavior")) {
+            SettingsSection(String(localized: "Request Behavior", bundle: RockxyLocalization.bundle)) {
                 SettingsIndentedContent {
                     Toggle(
-                        String(localized: "Disable caching (No-Cache headers)"),
+                        String(localized: "Disable caching (No-Cache headers)", bundle: RockxyLocalization.bundle),
                         isOn: $noCaching
                     )
                     .toggleStyle(.checkbox)

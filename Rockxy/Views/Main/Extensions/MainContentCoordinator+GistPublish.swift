@@ -14,7 +14,10 @@ extension MainContentCoordinator {
     func publishSelectedTransactionsToGist() {
         let selected = resolveSelectedTransactions()
         guard !selected.isEmpty else {
-            activeToast = ToastMessage(style: .error, text: String(localized: "Select a request to publish to Gist"))
+            activeToast = ToastMessage(
+                style: .error,
+                text: String(localized: "Select a request to publish to Gist", bundle: RockxyLocalization.bundle)
+            )
             return
         }
         presentGistPublish(transactions: selected)
@@ -31,7 +34,10 @@ extension MainContentCoordinator {
     func reviewSelectedTransactionsForGist() {
         let selected = resolveSelectedTransactions()
         guard !selected.isEmpty else {
-            activeToast = ToastMessage(style: .error, text: String(localized: "Select a request to share"))
+            activeToast = ToastMessage(
+                style: .error,
+                text: String(localized: "Select a request to share", bundle: RockxyLocalization.bundle)
+            )
             return
         }
         gistPublishContext = GistPublishContext(transactions: selected)
@@ -63,7 +69,10 @@ extension MainContentCoordinator {
 
         activeToast = ToastMessage(
             style: .success,
-            text: String(localized: "Published \(transactions.count) request\(transactions.count == 1 ? "" : "s") to Gist")
+            text: String(
+                localized: "Published \(transactions.count) request\(transactions.count == 1 ? "" : "s") to Gist",
+                bundle: RockxyLocalization.bundle
+            )
         )
         gistPublishContext = nil
         return result
@@ -89,13 +98,15 @@ extension MainContentCoordinator {
                 )
             } catch {
                 showExportError(
-                    title: String(localized: "Publish to Gist Failed"),
+                    title: String(localized: "Publish to Gist Failed", bundle: RockxyLocalization.bundle),
                     message: error.localizedDescription
                 )
             }
         }
     }
 }
+
+// MARK: - GistPublishConfirmationPolicy
 
 enum GistPublishConfirmationPolicy {
     static func requiresReview(askBeforePublishing: Bool, redactsSensitiveData: Bool) -> Bool {
@@ -108,10 +119,15 @@ enum GistPublishConfirmationPolicy {
 enum GistPublishError: LocalizedError, Equatable {
     case notAuthorized
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .notAuthorized:
-            String(localized: "Authorize GitHub in Settings before publishing to Gist.")
+            String(
+                localized: "Authorize GitHub in Settings before publishing to Gist.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

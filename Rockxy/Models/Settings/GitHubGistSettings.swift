@@ -15,18 +15,21 @@ enum GitHubGistVisibility: String, CaseIterable, Codable {
     var title: String {
         switch self {
         case .secret:
-            String(localized: "Secret Gist")
+            String(localized: "Secret Gist", bundle: RockxyLocalization.bundle)
         case .public:
-            String(localized: "Public Gist")
+            String(localized: "Public Gist", bundle: RockxyLocalization.bundle)
         }
     }
 
     var sharingDescription: String {
         switch self {
         case .secret:
-            String(localized: "Unlisted and not searchable on GitHub, but anyone with the link can open it.")
+            String(
+                localized: "Unlisted and not searchable on GitHub, but anyone with the link can open it.",
+                bundle: RockxyLocalization.bundle
+            )
         case .public:
-            String(localized: "Discoverable and searchable on GitHub by anyone.")
+            String(localized: "Discoverable and searchable on GitHub by anyone.", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -77,7 +80,8 @@ enum GitHubSettingsStore {
                 return string.contains(token)
             }
             if let data = value as? Data,
-               let string = String(data: data, encoding: .utf8) {
+               let string = String(data: data, encoding: .utf8)
+            {
                 return string.contains(token)
             }
             return false

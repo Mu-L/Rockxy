@@ -40,57 +40,57 @@ struct FooterActionDescriptor: Identifiable, Equatable {
         let catalog: [Self] = [
             .init(
                 id: .blockList,
-                title: String(localized: "Block List"),
+                title: String(localized: "Block List", bundle: RockxyLocalization.bundle),
                 systemImage: "hand.raised.slash",
-                help: String(localized: "Open Block List"),
+                help: String(localized: "Open Block List", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
             .init(
                 id: .allowList,
-                title: String(localized: "Allow List"),
+                title: String(localized: "Allow List", bundle: RockxyLocalization.bundle),
                 systemImage: "checkmark.shield",
-                help: String(localized: "Open Allow List"),
+                help: String(localized: "Open Allow List", bundle: RockxyLocalization.bundle),
                 isActive: isAllowListActive,
                 isEnabled: true
             ),
             .init(
                 id: .mapLocal,
-                title: String(localized: "Map Local"),
+                title: String(localized: "Map Local", bundle: RockxyLocalization.bundle),
                 systemImage: "folder.badge.gearshape",
-                help: String(localized: "Open Map Local"),
+                help: String(localized: "Open Map Local", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
             .init(
                 id: .scripting,
-                title: String(localized: "Scripting"),
+                title: String(localized: "Scripting", bundle: RockxyLocalization.bundle),
                 systemImage: "curlybraces",
-                help: String(localized: "Open Scripting"),
+                help: String(localized: "Open Scripting", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
             .init(
                 id: .mapRemote,
-                title: String(localized: "Map Remote"),
+                title: String(localized: "Map Remote", bundle: RockxyLocalization.bundle),
                 systemImage: "arrow.triangle.branch",
-                help: String(localized: "Open Map Remote"),
+                help: String(localized: "Open Map Remote", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
             .init(
                 id: .breakpoint,
-                title: String(localized: "Breakpoint"),
+                title: String(localized: "Breakpoint", bundle: RockxyLocalization.bundle),
                 systemImage: "pause.circle",
-                help: String(localized: "Open Breakpoint Rules"),
+                help: String(localized: "Open Breakpoint Rules", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
             .init(
                 id: .networkConditions,
-                title: String(localized: "Network Conditions"),
+                title: String(localized: "Network Conditions", bundle: RockxyLocalization.bundle),
                 systemImage: "speedometer",
-                help: String(localized: "Open Network Conditions"),
+                help: String(localized: "Open Network Conditions", bundle: RockxyLocalization.bundle),
                 isActive: false,
                 isEnabled: true
             ),
@@ -100,9 +100,12 @@ struct FooterActionDescriptor: Identifiable, Equatable {
         if isProxyOverridden {
             actions.append(.init(
                 id: .proxyOverride,
-                title: String(localized: "Proxy Overridden"),
+                title: String(localized: "Proxy Overridden", bundle: RockxyLocalization.bundle),
                 systemImage: "checkmark.circle.fill",
-                help: String(localized: "Show system proxy override details. Toggle by: ⌥⌘O"),
+                help: String(
+                    localized: "Show system proxy override details. Toggle by: ⌥⌘O",
+                    bundle: RockxyLocalization.bundle
+                ),
                 isActive: true,
                 isEnabled: true
             ))
@@ -155,9 +158,9 @@ struct FooterMutationIndicator: Identifiable, Equatable {
 
         var title: String {
             switch self {
-            case .mapLocal: String(localized: "Map Local")
-            case .mapRemote: String(localized: "Map Remote")
-            case .breakpoint: String(localized: "Breakpoints")
+            case .mapLocal: String(localized: "Map Local", bundle: RockxyLocalization.bundle)
+            case .mapRemote: String(localized: "Map Remote", bundle: RockxyLocalization.bundle)
+            case .breakpoint: String(localized: "Breakpoints", bundle: RockxyLocalization.bundle)
             }
         }
 
@@ -189,24 +192,39 @@ struct FooterMutationIndicator: Identifiable, Equatable {
         switch id {
         case .mapLocal:
             if count == 1 {
-                return String(localized: "1 active Map Local rule. Open Map Local.")
+                return String(localized: "1 active Map Local rule. Open Map Local.", bundle: RockxyLocalization.bundle)
             }
-            return String(localized: "\(count) active Map Local rules. Open Map Local.")
+            return String(
+                localized: "\(count) active Map Local rules. Open Map Local.",
+                bundle: RockxyLocalization.bundle
+            )
         case .mapRemote:
             if count == 1 {
-                return String(localized: "1 active Map Remote rule. Open Map Remote.")
+                return String(
+                    localized: "1 active Map Remote rule. Open Map Remote.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "\(count) active Map Remote rules. Open Map Remote.")
+            return String(
+                localized: "\(count) active Map Remote rules. Open Map Remote.",
+                bundle: RockxyLocalization.bundle
+            )
         case .breakpoint:
             if count == 1 {
-                return String(localized: "1 active Breakpoint rule. Open Breakpoint Rules.")
+                return String(
+                    localized: "1 active Breakpoint rule. Open Breakpoint Rules.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "\(count) active Breakpoint rules. Open Breakpoint Rules.")
+            return String(
+                localized: "\(count) active Breakpoint rules. Open Breakpoint Rules.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
     var accessibilityLabel: String {
-        String(localized: "\(id.title), \(count) active rules")
+        String(localized: "\(id.title), \(count) active rules", bundle: RockxyLocalization.bundle)
     }
 }
 
@@ -275,7 +293,7 @@ struct FooterToolingButton: View {
         .disabled(!descriptor.isEnabled)
         .help(descriptor.help)
         .accessibilityLabel(descriptor.title)
-        .accessibilityValue(descriptor.isActive ? String(localized: "Active") : "")
+        .accessibilityValue(descriptor.isActive ? String(localized: "Active", bundle: RockxyLocalization.bundle) : "")
     }
 
     // MARK: Private
@@ -298,12 +316,12 @@ private struct FooterMutationIndicatorButton: View {
 
     var body: some View {
         Button(action: action) { label }
-        .controlSize(.small)
-        .rockxyGlassButtonStyle()
-        .tint(indicatorColor)
-        .help(indicator.help)
-        .accessibilityLabel(indicator.accessibilityLabel)
-        .accessibilityValue(String(localized: "\(indicator.count) active rules"))
+            .controlSize(.small)
+            .rockxyGlassButtonStyle()
+            .tint(indicatorColor)
+            .help(indicator.help)
+            .accessibilityLabel(indicator.accessibilityLabel)
+            .accessibilityValue(String(localized: "\(indicator.count) active rules", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -386,7 +404,7 @@ private struct FooterProxyOverridePopover: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
 
-            Button(String(localized: "Switch Off")) {
+            Button(String(localized: "Switch Off", bundle: RockxyLocalization.bundle)) {
                 isPresented = false
                 onSwitchOff()
             }
@@ -402,7 +420,10 @@ private struct FooterProxyOverridePopover: View {
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var statusText: String {
-        String(localized: "System Proxy is Overridden by Rockxy (IP=\(proxyHost) Port=\(proxyPort)) (Toggle by: ⌥⌘O)")
+        String(
+            localized: "System Proxy is Overridden by Rockxy (IP=\(proxyHost) Port=\(proxyPort)) (Toggle by: ⌥⌘O)",
+            bundle: RockxyLocalization.bundle
+        )
     }
 }
 
@@ -419,17 +440,23 @@ enum StatusBarRequestSummary {
     {
         if activeFilterCount > 0, visibleCount != availableCount {
             if selectedCount > 0 {
-                return String(localized: "\(selectedCount) selected, \(visibleCount) of \(availableCount) shown")
+                return String(
+                    localized: "\(selectedCount) selected, \(visibleCount) of \(availableCount) shown",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "\(visibleCount) of \(availableCount) requests")
+            return String(localized: "\(visibleCount) of \(availableCount) requests", bundle: RockxyLocalization.bundle)
         }
         if visibleCount == 0 {
-            return String(localized: "No requests")
+            return String(localized: "No requests", bundle: RockxyLocalization.bundle)
         }
         if selectedCount > 0 {
-            return String(localized: "\(selectedCount)/\(visibleCount) rows selected")
+            return String(
+                localized: "\(selectedCount)/\(visibleCount) rows selected",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "\(visibleCount) requests")
+        return String(localized: "\(visibleCount) requests", bundle: RockxyLocalization.bundle)
     }
 }
 
@@ -565,7 +592,7 @@ struct StatusBarView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: metrics.badgeFontSize))
-                    Text(String(localized: "\(errorCount) errors"))
+                    Text(String(localized: "\(errorCount) errors", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize))
                 }
                 .foregroundStyle(Color(nsColor: .systemRed))
@@ -604,11 +631,14 @@ struct StatusBarView: View {
             }
 
             if isAllowListActive {
-                statusPill(String(localized: "Allow List"), color: Color.accentColor)
+                statusPill(String(localized: "Allow List", bundle: RockxyLocalization.bundle), color: Color.accentColor)
             }
 
             if isNoCachingActive {
-                statusPill(String(localized: "No Cache"), color: Color(nsColor: .systemOrange))
+                statusPill(
+                    String(localized: "No Cache", bundle: RockxyLocalization.bundle),
+                    color: Color(nsColor: .systemOrange)
+                )
             }
         }
         .lineLimit(1)
@@ -642,8 +672,8 @@ struct StatusBarView: View {
             .font(.system(size: metrics.secondaryFontSize, weight: .medium))
             .controlSize(.regular)
             .rockxyGlassButtonStyle()
-            .help(String(localized: "Customize Quick Tools"))
-            .accessibilityLabel(String(localized: "Customize Quick Tools"))
+            .help(String(localized: "Customize Quick Tools", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Customize Quick Tools", bundle: RockxyLocalization.bundle))
             .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
                 QuickToolsEditor(
                     layout: quickToolsLayout,
@@ -666,13 +696,13 @@ struct StatusBarView: View {
                 }
             }
             Divider()
-            Button(String(localized: "Customize Quick Tools…")) {
+            Button(String(localized: "Customize Quick Tools…", bundle: RockxyLocalization.bundle)) {
                 DispatchQueue.main.async {
                     isCustomizingQuickTools = true
                 }
             }
         } label: {
-            Label(String(localized: "Quick Tools"), systemImage: "hammer")
+            Label(String(localized: "Quick Tools", bundle: RockxyLocalization.bundle), systemImage: "hammer")
                 .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
@@ -682,8 +712,8 @@ struct StatusBarView: View {
         .menuIndicator(.visible)
         .controlSize(.regular)
         .rockxyGlassButtonStyle()
-        .help(String(localized: "Open Quick Tools"))
-        .accessibilityLabel(String(localized: "Quick Tools"))
+        .help(String(localized: "Open Quick Tools", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "Quick Tools", bundle: RockxyLocalization.bundle))
         .popover(isPresented: $isCustomizingQuickTools, arrowEdge: .bottom) {
             QuickToolsEditor(
                 layout: quickToolsLayout,
@@ -728,8 +758,8 @@ struct StatusBarView: View {
         .rockxyGlassButtonStyle()
         .tint(Color(nsColor: .systemOrange))
         .fixedSize()
-        .help(String(localized: "Active mutation rules"))
-        .accessibilityLabel(String(localized: "Active mutation rules"))
+        .help(String(localized: "Active mutation rules", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "Active mutation rules", bundle: RockxyLocalization.bundle))
     }
 
     private func statusPill(_ title: String, color: Color) -> some View {

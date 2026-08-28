@@ -42,9 +42,18 @@ struct ComposeRequestEditor: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    // MARK: - Bindings
+
+    private var bodyBinding: Binding<String> {
+        Binding(
+            get: { viewModel.body },
+            set: { viewModel.replaceUnavailableBody(with: $0) }
+        )
+    }
+
     private var headerBar: some View {
         HStack(spacing: toolMetrics.headerSpacing) {
-            Text(String(localized: "Request"))
+            Text(String(localized: "Request", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             tabPicker
@@ -59,7 +68,7 @@ struct ComposeRequestEditor: View {
 
     @ViewBuilder private var tabPicker: some View {
         if toolMetrics.bodyFontSize >= 20 {
-            Picker(String(localized: "Request Section"), selection: $selectedTab) {
+            Picker(String(localized: "Request Section", bundle: RockxyLocalization.bundle), selection: $selectedTab) {
                 ForEach(ComposeRequestTab.allCases) { tab in
                     Text(tab.title).tag(tab)
                 }
@@ -67,9 +76,9 @@ struct ComposeRequestEditor: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(minWidth: 130)
-            .accessibilityLabel(String(localized: "Request section"))
+            .accessibilityLabel(String(localized: "Request section", bundle: RockxyLocalization.bundle))
         } else {
-            Picker(String(localized: "Request Section"), selection: $selectedTab) {
+            Picker(String(localized: "Request Section", bundle: RockxyLocalization.bundle), selection: $selectedTab) {
                 ForEach(ComposeRequestTab.allCases) { tab in
                     Text(tab.title).tag(tab)
                 }
@@ -77,22 +86,22 @@ struct ComposeRequestEditor: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .fixedSize()
-            .accessibilityLabel(String(localized: "Request section"))
+            .accessibilityLabel(String(localized: "Request section", bundle: RockxyLocalization.bundle))
         }
     }
 
     private var requestMenu: some View {
         Menu {
-            Button(String(localized: "Load from File...")) {
+            Button(String(localized: "Load from File...", bundle: RockxyLocalization.bundle)) {
                 onLoadFromFile()
                 selectedTab = .body
             }
             Divider()
-            Button(String(localized: "JSON Prettier")) {
+            Button(String(localized: "JSON Prettier", bundle: RockxyLocalization.bundle)) {
                 viewModel.prettifyJSONBody()
                 selectedTab = .body
             }
-            Button(String(localized: "Prettify XML")) {
+            Button(String(localized: "Prettify XML", bundle: RockxyLocalization.bundle)) {
                 viewModel.prettifyXMLBody()
                 selectedTab = .body
             }
@@ -101,7 +110,7 @@ struct ComposeRequestEditor: View {
                 .imageScale(.large)
         }
         .menuStyle(.button)
-        .help(String(localized: "Request Body Options"))
+        .help(String(localized: "Request Body Options", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: - Headers Tab
@@ -119,7 +128,7 @@ struct ComposeRequestEditor: View {
                             .frame(width: 24)
 
                         TextField(
-                            String(localized: "e.g. Content-Type"),
+                            String(localized: "e.g. Content-Type", bundle: RockxyLocalization.bundle),
                             text: headerNameBinding(for: header.id)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -127,7 +136,7 @@ struct ComposeRequestEditor: View {
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         TextField(
-                            String(localized: "e.g. application/json"),
+                            String(localized: "e.g. application/json", bundle: RockxyLocalization.bundle),
                             text: headerValueBinding(for: header.id)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -141,7 +150,7 @@ struct ComposeRequestEditor: View {
                     .padding(.vertical, 4)
                 }
 
-                addButton(String(localized: "Add Header")) {
+                addButton(String(localized: "Add Header", bundle: RockxyLocalization.bundle)) {
                     viewModel.addHeader()
                 }
             }
@@ -162,7 +171,7 @@ struct ComposeRequestEditor: View {
                         Color.clear.frame(width: 24)
 
                         TextField(
-                            String(localized: "e.g. page"),
+                            String(localized: "e.g. page", bundle: RockxyLocalization.bundle),
                             text: queryNameBinding(for: item.id)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -170,7 +179,7 @@ struct ComposeRequestEditor: View {
                         .frame(minHeight: toolMetrics.formControlHeight)
 
                         TextField(
-                            String(localized: "e.g. 1"),
+                            String(localized: "e.g. 1", bundle: RockxyLocalization.bundle),
                             text: queryValueBinding(for: item.id)
                         )
                         .textFieldStyle(.roundedBorder)
@@ -184,7 +193,7 @@ struct ComposeRequestEditor: View {
                     .padding(.vertical, 4)
                 }
 
-                addButton(String(localized: "Add Parameter")) {
+                addButton(String(localized: "Add Parameter", bundle: RockxyLocalization.bundle)) {
                     viewModel.addQueryItem()
                 }
             }
@@ -251,7 +260,7 @@ struct ComposeRequestEditor: View {
                 .frame(width: 24)
         }
         .buttonStyle(.plain)
-        .help(String(localized: "Remove"))
+        .help(String(localized: "Remove", bundle: RockxyLocalization.bundle))
     }
 
     private func addButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -264,15 +273,6 @@ struct ComposeRequestEditor: View {
             Spacer()
         }
         .padding(.top, 2)
-    }
-
-    // MARK: - Bindings
-
-    private var bodyBinding: Binding<String> {
-        Binding(
-            get: { viewModel.body },
-            set: { viewModel.replaceUnavailableBody(with: $0) }
-        )
     }
 
     private func headerEnabledBinding(for id: UUID) -> Binding<Bool> {
@@ -349,10 +349,10 @@ private enum ComposeRequestTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .headers: String(localized: "Header")
-        case .query: String(localized: "Query")
-        case .body: String(localized: "Body")
-        case .raw: String(localized: "Raw")
+        case .headers: String(localized: "Header", bundle: RockxyLocalization.bundle)
+        case .query: String(localized: "Query", bundle: RockxyLocalization.bundle)
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
         }
     }
 }

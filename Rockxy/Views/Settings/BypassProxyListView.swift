@@ -37,7 +37,7 @@ struct BypassProxyListView: View {
             exportDocument = nil
         }
         .alert(
-            String(localized: "Full Proxy Bypass"),
+            String(localized: "Full Proxy Bypass", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { isPresented in
@@ -47,7 +47,7 @@ struct BypassProxyListView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) {
                 errorMessage = nil
             }
         } message: {
@@ -56,7 +56,7 @@ struct BypassProxyListView: View {
             }
         }
         .confirmationDialog(
-            String(localized: "Remove selected bypass entries?"),
+            String(localized: "Remove selected bypass entries?", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { !pendingRemovalIDs.isEmpty },
                 set: { isPresented in
@@ -68,36 +68,41 @@ struct BypassProxyListView: View {
             titleVisibility: .visible
         ) {
             Button(
-                String(localized: "Remove \(pendingRemovalIDs.count) Entries"),
+                String(localized: "Remove \(pendingRemovalIDs.count) Entries", bundle: RockxyLocalization.bundle),
                 role: .destructive
             ) {
                 removeDomains(pendingRemovalIDs)
                 pendingRemovalIDs.removeAll()
             }
-            Button(String(localized: "Cancel"), role: .cancel) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                 pendingRemovalIDs.removeAll()
             }
         } message: {
             Text(
                 String(
-                    localized: "Rockxy will remove these exclusions from the system proxy configuration for new connections."
+                    localized: "Rockxy will remove these exclusions from the system proxy configuration for new connections.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
         .confirmationDialog(
-            String(localized: "Replace existing Full Proxy Bypass entries?"),
+            String(localized: "Replace existing Full Proxy Bypass entries?", bundle: RockxyLocalization.bundle),
             isPresented: $isConfirmingImport,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Choose File and Replace…"), role: .destructive) {
+            Button(
+                String(localized: "Choose File and Replace…", bundle: RockxyLocalization.bundle),
+                role: .destructive
+            ) {
                 showingImporter = true
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
                 String(
                     localized:
-                    "Import replaces the complete list. Export first if you need a backup."
+                    "Import replaces the complete list. Export first if you need a backup.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -147,33 +152,58 @@ struct BypassProxyListView: View {
 
     private var behaviorNoticeText: String {
         let systemProxyCopy = String(
-            localized: "System-proxy clients matching these patterns connect directly and are not captured."
+            localized: "System-proxy clients matching these patterns connect directly and are not captured.",
+            bundle: RockxyLocalization.bundle
         )
         let manualProxyCopy = String(
-            localized: "Manually configured clients that still reach Rockxy remain encrypted and are tunneled."
+            localized: "Manually configured clients that still reach Rockxy remain encrypted and are tunneled.",
+            bundle: RockxyLocalization.bundle
         )
         return "\(systemProxyCopy) \(manualProxyCopy)"
+    }
+
+    private var ruleCountText: String {
+        let count = manager.domains.count
+        return count == 1
+            ? String(localized: "1 host pattern", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(count) host patterns", bundle: RockxyLocalization.bundle)
+    }
+
+    private var activeStatusText: String {
+        activeCount == 0
+            ? String(localized: "No Enabled Bypasses", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(activeCount) Enabled", bundle: RockxyLocalization.bundle)
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Full Proxy Bypass"))
+                Text(String(localized: "Full Proxy Bypass", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "Send matching system traffic directly instead of through Rockxy."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Send matching system traffic directly instead of through Rockxy.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search host patterns"), text: $searchText)
+            TextField(String(localized: "Search host patterns", bundle: RockxyLocalization.bundle), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .frame(width: toolMetrics.fieldWidth(230), height: toolMetrics.formControlHeight)
                 .focused($isSearchFocused)
-                .accessibilityLabel(String(localized: "Search Full Proxy Bypass entries"))
+                .accessibilityLabel(String(
+                    localized: "Search Full Proxy Bypass entries",
+                    bundle: RockxyLocalization.bundle
+                ))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -186,9 +216,9 @@ struct BypassProxyListView: View {
                 .foregroundStyle(.secondary)
 
             Text(behaviorNoticeText)
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
         }
@@ -201,9 +231,9 @@ struct BypassProxyListView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: toolMetrics.controlSpacing) {
                 TextField(
-                    String(localized: "Host pattern"),
+                    String(localized: "Host pattern", bundle: RockxyLocalization.bundle),
                     text: $newPattern,
-                    prompt: Text(String(localized: "example.com or *.internal"))
+                    prompt: Text(String(localized: "example.com or *.internal", bundle: RockxyLocalization.bundle))
                 )
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font(monospaced: true))
@@ -214,7 +244,7 @@ struct BypassProxyListView: View {
                     validationError = nil
                 }
 
-                Button(String(localized: "Add Host")) {
+                Button(String(localized: "Add Host", bundle: RockxyLocalization.bundle)) {
                     addDomain()
                 }
                 .frame(width: toolMetrics.footerButtonWidth)
@@ -229,7 +259,8 @@ struct BypassProxyListView: View {
             } else {
                 Text(
                     String(
-                        localized: "A bare domain also covers its subdomains. Use *.domain.com when only subdomains should match."
+                        localized: "A bare domain also covers its subdomains. Use *.domain.com when only subdomains should match.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -242,7 +273,7 @@ struct BypassProxyListView: View {
 
     private var tableContent: some View {
         Table(filteredDomains, selection: $selectedDomainIDs) {
-            TableColumn(String(localized: "Enabled")) { domain in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { domain in
                 Toggle("", isOn: Binding(
                     get: { domain.isEnabled },
                     set: { _ in manager.toggleDomain(id: domain.id) }
@@ -250,11 +281,11 @@ struct BypassProxyListView: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel(String(localized: "Enable \(domain.domain)"))
+                .accessibilityLabel(String(localized: "Enable \(domain.domain)", bundle: RockxyLocalization.bundle))
             }
             .width(72)
 
-            TableColumn(String(localized: "Host Pattern")) { domain in
+            TableColumn(String(localized: "Host Pattern", bundle: RockxyLocalization.bundle)) { domain in
                 Text(domain.domain)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -271,15 +302,18 @@ struct BypassProxyListView: View {
             if filteredDomains.isEmpty {
                 ContentUnavailableView(
                     searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? String(localized: "No Full Proxy Bypass Entries")
-                        : String(localized: "No Matching Host Patterns"),
+                        ? String(localized: "No Full Proxy Bypass Entries", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Matching Host Patterns", bundle: RockxyLocalization.bundle),
                     systemImage: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? "arrow.triangle.branch"
                         : "magnifyingglass",
                     description: Text(
                         searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? String(localized: "Add a host pattern above or choose the local-network presets.")
-                            : String(localized: "Try a different host pattern.")
+                            ? String(
+                                localized: "Add a host pattern above or choose the local-network presets.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(localized: "Try a different host pattern.", bundle: RockxyLocalization.bundle)
                     )
                 )
             }
@@ -329,8 +363,8 @@ struct BypassProxyListView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "Add Host Pattern"))
-            .accessibilityLabel(String(localized: "Add Host Pattern"))
+            .help(String(localized: "Add Host Pattern", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Add Host Pattern", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -347,8 +381,8 @@ struct BypassProxyListView: View {
             }
             .buttonStyle(.plain)
             .disabled(selectedDomainIDs.isEmpty)
-            .help(String(localized: "Remove Selected Entries"))
-            .accessibilityLabel(String(localized: "Remove Selected Entries"))
+            .help(String(localized: "Remove Selected Entries", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Remove Selected Entries", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -360,18 +394,18 @@ struct BypassProxyListView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Find…")) {
+            Button(String(localized: "Find…", bundle: RockxyLocalization.bundle)) {
                 isSearchFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
 
-            Button(String(localized: "Add Local Network Presets")) {
+            Button(String(localized: "Add Local Network Presets", bundle: RockxyLocalization.bundle)) {
                 manager.addPresets()
             }
 
             Divider()
 
-            Button(String(localized: "Import…")) {
+            Button(String(localized: "Import…", bundle: RockxyLocalization.bundle)) {
                 if manager.domains.isEmpty {
                     showingImporter = true
                 } else {
@@ -379,43 +413,26 @@ struct BypassProxyListView: View {
                 }
             }
 
-            Button(String(localized: "Export…")) {
+            Button(String(localized: "Export…", bundle: RockxyLocalization.bundle)) {
                 prepareExport()
             }
             .disabled(manager.domains.isEmpty)
 
             Divider()
 
-            Button(String(localized: "Remove Selected"), role: .destructive) {
+            Button(String(localized: "Remove Selected", bundle: RockxyLocalization.bundle), role: .destructive) {
                 requestRemoval(selectedDomainIDs)
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(selectedDomainIDs.isEmpty)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
         }
         .menuIndicator(.hidden)
-    }
-
-    private var ruleCountText: String {
-        let count = manager.domains.count
-        return count == 1
-            ? String(localized: "1 host pattern")
-            : String(localized: "\(count) host patterns")
-    }
-
-    private var activeStatusText: String {
-        activeCount == 0
-            ? String(localized: "No Enabled Bypasses")
-            : String(localized: "\(activeCount) Enabled")
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     @ViewBuilder
@@ -426,8 +443,8 @@ struct BypassProxyListView: View {
         {
             Button(
                 domain.isEnabled
-                    ? String(localized: "Disable")
-                    : String(localized: "Enable")
+                    ? String(localized: "Disable", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Enable", bundle: RockxyLocalization.bundle)
             ) {
                 manager.toggleDomain(id: id)
             }
@@ -435,10 +452,26 @@ struct BypassProxyListView: View {
 
         Divider()
 
-        Button(String(localized: "Remove"), role: .destructive) {
+        Button(String(localized: "Remove", bundle: RockxyLocalization.bundle), role: .destructive) {
             requestRemoval(ids)
         }
         .disabled(ids.isEmpty)
+    }
+
+    private static func validationError(for value: String) -> String? {
+        guard !value.isEmpty else {
+            return String(localized: "Enter a host pattern.", bundle: RockxyLocalization.bundle)
+        }
+        if value == "*" {
+            return String(
+                localized: "Full Proxy Bypass does not support a global * pattern.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        if BypassDomain.isIPv4PrefixWildcard(value) {
+            return nil
+        }
+        return SSLHostPatternValidation.message(for: value)
     }
 
     private func addDomain() {
@@ -449,7 +482,10 @@ struct BypassProxyListView: View {
         }
 
         if manager.domains.contains(where: { $0.domain.caseInsensitiveCompare(trimmed) == .orderedSame }) {
-            validationError = String(localized: "This host pattern is already in Full Proxy Bypass.")
+            validationError = String(
+                localized: "This host pattern is already in Full Proxy Bypass.",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
 
@@ -503,7 +539,10 @@ struct BypassProxyListView: View {
 
     private func prepareExport() {
         guard let data = manager.exportDomains() else {
-            errorMessage = String(localized: "Rockxy could not prepare the Full Proxy Bypass export.")
+            errorMessage = String(
+                localized: "Rockxy could not prepare the Full Proxy Bypass export.",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
         exportDocument = BypassJSONFileDocument(data: data)
@@ -543,8 +582,8 @@ struct BypassProxyListView: View {
             let uniquePatterns = Set(normalizedPatterns)
             guard uniqueIDs.count == decoded.count,
                   uniquePatterns.count == decoded.count,
-                  decoded.allSatisfy({ Self.validationError(for: $0.domain) == nil })
-            else {
+                  decoded.allSatisfy({ Self.validationError(for: $0.domain) == nil }) else
+            {
                 throw BypassProxyListImportError.invalidEntries
             }
 
@@ -555,19 +594,6 @@ struct BypassProxyListView: View {
             errorMessage = error.localizedDescription
         }
     }
-
-    private static func validationError(for value: String) -> String? {
-        guard !value.isEmpty else {
-            return String(localized: "Enter a host pattern.")
-        }
-        if value == "*" {
-            return String(localized: "Full Proxy Bypass does not support a global * pattern.")
-        }
-        if BypassDomain.isIPv4PrefixWildcard(value) {
-            return nil
-        }
-        return SSLHostPatternValidation.message(for: value)
-    }
 }
 
 // MARK: - BypassProxyListImportError
@@ -577,14 +603,19 @@ private enum BypassProxyListImportError: LocalizedError {
     case invalidEntries
     case notRegularFile
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .fileTooLarge:
-            String(localized: "The import file must be 1 MB or smaller.")
+            String(localized: "The import file must be 1 MB or smaller.", bundle: RockxyLocalization.bundle)
         case .invalidEntries:
-            String(localized: "The import contains invalid or duplicate Full Proxy Bypass entries.")
+            String(
+                localized: "The import contains invalid or duplicate Full Proxy Bypass entries.",
+                bundle: RockxyLocalization.bundle
+            )
         case .notRegularFile:
-            String(localized: "Choose a regular JSON file.")
+            String(localized: "Choose a regular JSON file.", bundle: RockxyLocalization.bundle)
         }
     }
 }

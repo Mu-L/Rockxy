@@ -88,6 +88,13 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
 
     // MARK: Internal
 
+    struct ToolWindowItemDescriptor {
+        let identifier: NSToolbarItem.Identifier
+        let label: String
+        let systemImage: String
+        let windowID: String
+    }
+
     static let toolbarIdentifier = NSToolbar.Identifier(
         "\(RockxyIdentity.current.logSubsystem).main.toolbar.customizable.v1"
     )
@@ -170,99 +177,10 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         "\(RockxyIdentity.current.logSubsystem).toolbar.previewTabs"
     )
 
-    struct ToolWindowItemDescriptor {
-        let identifier: NSToolbarItem.Identifier
-        let label: String
-        let systemImage: String
-        let windowID: String
-    }
-
-    static let toolWindowItemDescriptors: [ToolWindowItemDescriptor] = [
-        .init(
-            identifier: blockListIdentifier,
-            label: String(localized: "Block List"),
-            systemImage: "hand.raised.slash",
-            windowID: "blockList"
-        ),
-        .init(
-            identifier: allowListIdentifier,
-            label: String(localized: "Allow List"),
-            systemImage: "checkmark.shield",
-            windowID: "allowList"
-        ),
-        .init(
-            identifier: mapLocalIdentifier,
-            label: String(localized: "Map Local"),
-            systemImage: "folder.badge.gearshape",
-            windowID: "mapLocal"
-        ),
-        .init(
-            identifier: mapRemoteIdentifier,
-            label: String(localized: "Map Remote"),
-            systemImage: "arrow.triangle.branch",
-            windowID: "mapRemote"
-        ),
-        .init(
-            identifier: scriptingIdentifier,
-            label: String(localized: "Scripting"),
-            systemImage: "curlybraces",
-            windowID: "scriptingList"
-        ),
-        .init(
-            identifier: breakpointRulesIdentifier,
-            label: String(localized: "Breakpoint Rules"),
-            systemImage: "pause.circle",
-            windowID: "breakpointRules"
-        ),
-        .init(
-            identifier: networkConditionsIdentifier,
-            label: String(localized: "Network Conditions"),
-            systemImage: "speedometer",
-            windowID: "networkConditions"
-        ),
-        .init(
-            identifier: sslProxyingIdentifier,
-            label: String(localized: "HTTPS Decryption"),
-            systemImage: "lock.open",
-            windowID: "sslProxyingList"
-        ),
-        .init(
-            identifier: bypassProxyIdentifier,
-            label: String(localized: "Proxy Bypass"),
-            systemImage: "arrow.uturn.left.circle",
-            windowID: "bypassProxyList"
-        ),
-        .init(
-            identifier: externalProxyIdentifier,
-            label: String(localized: "External Proxy"),
-            systemImage: "globe",
-            windowID: "externalProxySettings"
-        ),
-        .init(
-            identifier: modifyHeadersIdentifier,
-            label: String(localized: "Modify Headers"),
-            systemImage: "slider.horizontal.3",
-            windowID: "modifyHeaders"
-        ),
-        .init(
-            identifier: diffIdentifier,
-            label: String(localized: "Diff"),
-            systemImage: "doc.text.magnifyingglass",
-            windowID: "diff"
-        ),
-        .init(
-            identifier: customColumnsIdentifier,
-            label: String(localized: "Header Columns"),
-            systemImage: "rectangle.split.3x1",
-            windowID: "customColumns"
-        ),
-        .init(
-            identifier: previewTabsIdentifier,
-            label: String(localized: "Inspector Preview Tabs"),
-            systemImage: "rectangle.stack",
-            windowID: "bodyPreviewerTabs"
-        ),
-    ]
+    /// Stable identifiers for the tool-window items, cached so allowed/customizable
+    /// identifier sets stay constant across a language switch even though the
+    /// descriptor labels are re-resolved on demand.
+    static let toolWindowItemIdentifiers: [NSToolbarItem.Identifier] = toolWindowItemDescriptors.map(\.identifier)
 
     static let defaultItemIdentifiers: [NSToolbarItem.Identifier] = [
         .flexibleSpace,
@@ -291,7 +209,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         composeIdentifier,
         clearSessionIdentifier,
         detachedInspectorIdentifier,
-    ] + toolWindowItemDescriptors.map(\.identifier) + [
+    ] + toolWindowItemIdentifiers + [
         .space,
         .flexibleSpace,
     ]
@@ -308,7 +226,96 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         composeIdentifier,
         clearSessionIdentifier,
         detachedInspectorIdentifier,
-    ] + toolWindowItemDescriptors.map(\.identifier)
+    ] + toolWindowItemIdentifiers
+
+    static var toolWindowItemDescriptors: [ToolWindowItemDescriptor] {
+        [
+            .init(
+                identifier: blockListIdentifier,
+                label: String(localized: "Block List", bundle: RockxyLocalization.bundle),
+                systemImage: "hand.raised.slash",
+                windowID: "blockList"
+            ),
+            .init(
+                identifier: allowListIdentifier,
+                label: String(localized: "Allow List", bundle: RockxyLocalization.bundle),
+                systemImage: "checkmark.shield",
+                windowID: "allowList"
+            ),
+            .init(
+                identifier: mapLocalIdentifier,
+                label: String(localized: "Map Local", bundle: RockxyLocalization.bundle),
+                systemImage: "folder.badge.gearshape",
+                windowID: "mapLocal"
+            ),
+            .init(
+                identifier: mapRemoteIdentifier,
+                label: String(localized: "Map Remote", bundle: RockxyLocalization.bundle),
+                systemImage: "arrow.triangle.branch",
+                windowID: "mapRemote"
+            ),
+            .init(
+                identifier: scriptingIdentifier,
+                label: String(localized: "Scripting", bundle: RockxyLocalization.bundle),
+                systemImage: "curlybraces",
+                windowID: "scriptingList"
+            ),
+            .init(
+                identifier: breakpointRulesIdentifier,
+                label: String(localized: "Breakpoint Rules", bundle: RockxyLocalization.bundle),
+                systemImage: "pause.circle",
+                windowID: "breakpointRules"
+            ),
+            .init(
+                identifier: networkConditionsIdentifier,
+                label: String(localized: "Network Conditions", bundle: RockxyLocalization.bundle),
+                systemImage: "speedometer",
+                windowID: "networkConditions"
+            ),
+            .init(
+                identifier: sslProxyingIdentifier,
+                label: String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle),
+                systemImage: "lock.open",
+                windowID: "sslProxyingList"
+            ),
+            .init(
+                identifier: bypassProxyIdentifier,
+                label: String(localized: "Proxy Bypass", bundle: RockxyLocalization.bundle),
+                systemImage: "arrow.uturn.left.circle",
+                windowID: "bypassProxyList"
+            ),
+            .init(
+                identifier: externalProxyIdentifier,
+                label: String(localized: "External Proxy", bundle: RockxyLocalization.bundle),
+                systemImage: "globe",
+                windowID: "externalProxySettings"
+            ),
+            .init(
+                identifier: modifyHeadersIdentifier,
+                label: String(localized: "Modify Headers", bundle: RockxyLocalization.bundle),
+                systemImage: "slider.horizontal.3",
+                windowID: "modifyHeaders"
+            ),
+            .init(
+                identifier: diffIdentifier,
+                label: String(localized: "Diff", bundle: RockxyLocalization.bundle),
+                systemImage: "doc.text.magnifyingglass",
+                windowID: "diff"
+            ),
+            .init(
+                identifier: customColumnsIdentifier,
+                label: String(localized: "Header Columns", bundle: RockxyLocalization.bundle),
+                systemImage: "rectangle.split.3x1",
+                windowID: "customColumns"
+            ),
+            .init(
+                identifier: previewTabsIdentifier,
+                label: String(localized: "Inspector Preview Tabs", bundle: RockxyLocalization.bundle),
+                systemImage: "rectangle.stack",
+                windowID: "bodyPreviewerTabs"
+            ),
+        ]
+    }
 
     let managedToolbar: NSToolbar
 
@@ -345,6 +352,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     }
 
     func startObservingState() {
+        lastLanguageOptionID = AppLanguageController.shared.selectedOptionID
         syncActionItems()
         guard !isObservingState else {
             return
@@ -396,18 +404,18 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                 splitView: splitView,
                 dividerIndex: 0
             )
-            item.label = String(localized: "Source List Divider")
+            item.label = String(localized: "Source List Divider", bundle: RockxyLocalization.bundle)
             // The tracking separator has only a narrow preview cell in AppKit's draggable
             // default-set row. Keep its descriptive toolbar label, but use a compact palette
             // label so it does not collide with Flexible Space and Project labels.
-            item.paletteLabel = String(localized: "Divider")
+            item.paletteLabel = String(localized: "Divider", bundle: RockxyLocalization.bundle)
             return item
         case Self.projectSelectorIdentifier:
             let item = hostingItem(
                 identifier: itemIdentifier,
                 rootView: AnyView(ProjectToolbarSelectorView(coordinator: coordinator))
             )
-            item.label = String(localized: "Project")
+            item.label = String(localized: "Project", bundle: RockxyLocalization.bundle)
             item.paletteLabel = item.label
             item.visibilityPriority = .high
             return item
@@ -418,7 +426,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                     ProxyToolbarStatusView(coordinator: coordinator)
                 )
             )
-            item.label = String(localized: "Proxy Status")
+            item.label = String(localized: "Proxy Status", bundle: RockxyLocalization.bundle)
             item.paletteLabel = item.label
             return item
         case Self.proxyToggleIdentifier:
@@ -455,35 +463,36 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private let onOpenToolWindow: (String) -> Void
     private let onToggleProxy: () -> Void
     private var isObservingState = false
+    private var lastLanguageOptionID = AppLanguageController.shared.selectedOptionID
 
     private var proxyToolTip: String {
         coordinator.isProxyRunning
-            ? String(localized: "Stop proxy")
-            : String(localized: "Start proxy")
+            ? String(localized: "Stop proxy", bundle: RockxyLocalization.bundle)
+            : String(localized: "Start proxy", bundle: RockxyLocalization.bundle)
     }
 
     private var bottomInspectorToolTip: String {
         guard coordinator.canToggleBottomInspector else {
-            return String(localized: "Select a request to use the bottom inspector")
+            return String(localized: "Select a request to use the bottom inspector", bundle: RockxyLocalization.bundle)
         }
         return coordinator.isBottomInspectorEffectivelyPresented
-            ? String(localized: "Hide Bottom Inspector")
-            : String(localized: "Show Bottom Inspector")
+            ? String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle)
+            : String(localized: "Show Bottom Inspector", bundle: RockxyLocalization.bundle)
     }
 
     private var contextDockToolTip: String {
         coordinator.isContextDockVisible
-            ? String(localized: "Hide Context Dock")
-            : String(localized: "Show Context Dock")
+            ? String(localized: "Hide Context Dock", bundle: RockxyLocalization.bundle)
+            : String(localized: "Show Context Dock", bundle: RockxyLocalization.bundle)
     }
 
     private var recordingToolTip: String {
         guard coordinator.isProxyRunning else {
-            return String(localized: "Start the proxy before changing recording")
+            return String(localized: "Start the proxy before changing recording", bundle: RockxyLocalization.bundle)
         }
         return coordinator.isRecording
-            ? String(localized: "Pause Recording")
-            : String(localized: "Resume Recording")
+            ? String(localized: "Pause Recording", bundle: RockxyLocalization.bundle)
+            : String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
     }
 
     private var canClearSession: Bool {
@@ -516,6 +525,9 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
             _ = coordinator.isClearingSession
             _ = coordinator.selectedTransaction
             _ = coordinator.selectedTransactionIDs
+            // Re-arm when the runtime language changes so existing toolbar items refresh
+            // their localized labels/palette labels/tooltips in place.
+            _ = AppLanguageController.shared.selectedOptionID
         } onChange: { [weak self] in
             // `onChange` runs inside the mutating turn. Hop to a fresh main-actor turn and yield
             // before touching AppKit-owned toolbar items: mutating NSToolbarItem geometry while
@@ -527,7 +539,37 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
                     return
                 }
                 self.syncActionItems()
+                self.refreshLocalizedLabelsIfLanguageChanged()
                 self.armObservation()
+            }
+        }
+    }
+
+    /// Re-applies every managed item's localized label, palette label, tooltip, and
+    /// possible labels when the runtime language has changed since the last pass. The
+    /// toolbar's identifiers, order, customization, actions, and visibility are left
+    /// untouched — only the localized text is refreshed on the existing items.
+    private func refreshLocalizedLabelsIfLanguageChanged() {
+        let current = AppLanguageController.shared.selectedOptionID
+        guard current != lastLanguageOptionID else {
+            return
+        }
+        lastLanguageOptionID = current
+        for item in managedToolbar.items {
+            guard let refreshed = toolbar(
+                managedToolbar,
+                itemForItemIdentifier: item.itemIdentifier,
+                willBeInsertedIntoToolbar: true
+            ) else {
+                continue
+            }
+            item.label = refreshed.label
+            item.paletteLabel = refreshed.paletteLabel
+            if let toolTip = refreshed.toolTip {
+                item.toolTip = toolTip
+            }
+            if !refreshed.possibleLabels.isEmpty {
+                item.possibleLabels = refreshed.possibleLabels
             }
         }
     }
@@ -535,12 +577,12 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeSidebarToggleItem() -> NSToolbarItem {
         let item = imageItem(
             identifier: Self.sidebarToggleIdentifier,
-            label: String(localized: "Source List"),
+            label: String(localized: "Source List", bundle: RockxyLocalization.bundle),
             systemImage: "sidebar.leading",
             action: #selector(toggleSidebar(_:))
         )
         item.isBordered = true
-        item.toolTip = String(localized: "Show or hide the Source List")
+        item.toolTip = String(localized: "Show or hide the Source List", bundle: RockxyLocalization.bundle)
         return item
     }
 
@@ -548,13 +590,16 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         let item = imageItem(
             identifier: Self.proxyToggleIdentifier,
             label: coordinator.isProxyRunning
-                ? String(localized: "Stop")
-                : String(localized: "Start"),
-            paletteLabel: String(localized: "Start or Stop Proxy"),
+                ? String(localized: "Stop", bundle: RockxyLocalization.bundle)
+                : String(localized: "Start", bundle: RockxyLocalization.bundle),
+            paletteLabel: String(localized: "Start or Stop Proxy", bundle: RockxyLocalization.bundle),
             systemImage: coordinator.isProxyRunning ? "stop.fill" : "play.fill",
             action: #selector(toggleProxy(_:))
         )
-        item.possibleLabels = [String(localized: "Start"), String(localized: "Stop")]
+        item.possibleLabels = [
+            String(localized: "Start", bundle: RockxyLocalization.bundle),
+            String(localized: "Stop", bundle: RockxyLocalization.bundle)
+        ]
         item.visibilityPriority = .high
         item.toolTip = proxyToolTip
         return item
@@ -563,7 +608,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeDeveloperHubItem() -> NSToolbarItem {
         imageItem(
             identifier: Self.developerHubIdentifier,
-            label: String(localized: "Developer Hub"),
+            label: String(localized: "Developer Hub", bundle: RockxyLocalization.bundle),
             systemImage: "command",
             action: #selector(openDeveloperHub(_:))
         )
@@ -572,7 +617,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeBottomInspectorItem() -> NSToolbarItem {
         let item = imageItem(
             identifier: Self.bottomInspectorIdentifier,
-            label: String(localized: "Bottom Inspector"),
+            label: String(localized: "Bottom Inspector", bundle: RockxyLocalization.bundle),
             systemImage: "rectangle.split.1x2",
             action: #selector(toggleBottomInspector(_:))
         )
@@ -584,7 +629,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeContextDockItem() -> NSToolbarItem {
         let item = imageItem(
             identifier: Self.contextDockIdentifier,
-            label: String(localized: "Context Dock"),
+            label: String(localized: "Context Dock", bundle: RockxyLocalization.bundle),
             systemImage: "sidebar.trailing",
             action: #selector(toggleContextDock(_:))
         )
@@ -596,15 +641,15 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         let item = imageItem(
             identifier: Self.recordingIdentifier,
             label: coordinator.isRecording
-                ? String(localized: "Pause Recording")
-                : String(localized: "Resume Recording"),
-            paletteLabel: String(localized: "Toggle Recording"),
+                ? String(localized: "Pause Recording", bundle: RockxyLocalization.bundle)
+                : String(localized: "Resume Recording", bundle: RockxyLocalization.bundle),
+            paletteLabel: String(localized: "Toggle Recording", bundle: RockxyLocalization.bundle),
             systemImage: coordinator.isRecording ? "pause.circle" : "record.circle",
             action: #selector(toggleRecording(_:))
         )
         item.possibleLabels = [
-            String(localized: "Pause Recording"),
-            String(localized: "Resume Recording"),
+            String(localized: "Pause Recording", bundle: RockxyLocalization.bundle),
+            String(localized: "Resume Recording", bundle: RockxyLocalization.bundle),
         ]
         item.isEnabled = coordinator.isProxyRunning
         item.toolTip = recordingToolTip
@@ -614,7 +659,7 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeComposeItem() -> NSToolbarItem {
         imageItem(
             identifier: Self.composeIdentifier,
-            label: String(localized: "Compose"),
+            label: String(localized: "Compose", bundle: RockxyLocalization.bundle),
             systemImage: "square.and.pencil",
             action: #selector(composeRequest(_:))
         )
@@ -623,27 +668,30 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
     private func makeClearSessionItem() -> NSToolbarItem {
         let item = imageItem(
             identifier: Self.clearSessionIdentifier,
-            label: String(localized: "Clear"),
-            paletteLabel: String(localized: "Clear Session"),
+            label: String(localized: "Clear", bundle: RockxyLocalization.bundle),
+            paletteLabel: String(localized: "Clear Session", bundle: RockxyLocalization.bundle),
             systemImage: "trash",
             action: #selector(clearSession(_:))
         )
         item.isEnabled = canClearSession
-        item.toolTip = String(localized: "Clear the current traffic session")
+        item.toolTip = String(localized: "Clear the current traffic session", bundle: RockxyLocalization.bundle)
         return item
     }
 
     private func makeDetachedInspectorItem() -> NSToolbarItem {
         let item = imageItem(
             identifier: Self.detachedInspectorIdentifier,
-            label: String(localized: "Detach Inspector"),
+            label: String(localized: "Detach Inspector", bundle: RockxyLocalization.bundle),
             systemImage: "rectangle.on.rectangle.angled",
             action: #selector(detachInspector(_:))
         )
         item.isEnabled = canDetachInspector
         item.toolTip = canDetachInspector
-            ? String(localized: "Open the selected request in a separate Inspector window")
-            : String(localized: "Select one request to detach its Inspector")
+            ? String(
+                localized: "Open the selected request in a separate Inspector window",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(localized: "Select one request to detach its Inspector", bundle: RockxyLocalization.bundle)
         return item
     }
 
@@ -703,7 +751,10 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
 
     private func syncActionItems() {
         let isRunning = coordinator.isProxyRunning
-        let label = isRunning ? String(localized: "Stop") : String(localized: "Start")
+        let label = isRunning ? String(localized: "Stop", bundle: RockxyLocalization.bundle) : String(
+            localized: "Start",
+            bundle: RockxyLocalization.bundle
+        )
         let proxyToggleItem = toolbarItem(identifier: Self.proxyToggleIdentifier)
         proxyToggleItem?.label = label
         proxyToggleItem?.toolTip = proxyToolTip
@@ -720,8 +771,8 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
 
         let recordingItem = toolbarItem(identifier: Self.recordingIdentifier)
         let recordingLabel = coordinator.isRecording
-            ? String(localized: "Pause Recording")
-            : String(localized: "Resume Recording")
+            ? String(localized: "Pause Recording", bundle: RockxyLocalization.bundle)
+            : String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
         recordingItem?.label = recordingLabel
         recordingItem?.isEnabled = coordinator.isProxyRunning
         recordingItem?.toolTip = recordingToolTip
@@ -735,8 +786,11 @@ final class NativeWorkspaceToolbar: NSObject, NSToolbarDelegate {
         let detachedInspectorItem = toolbarItem(identifier: Self.detachedInspectorIdentifier)
         detachedInspectorItem?.isEnabled = canDetachInspector
         detachedInspectorItem?.toolTip = canDetachInspector
-            ? String(localized: "Open the selected request in a separate Inspector window")
-            : String(localized: "Select one request to detach its Inspector")
+            ? String(
+                localized: "Open the selected request in a separate Inspector window",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(localized: "Select one request to detach its Inspector", bundle: RockxyLocalization.bundle)
     }
 
     private func toolbarItem(identifier: NSToolbarItem.Identifier) -> NSToolbarItem? {

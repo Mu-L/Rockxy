@@ -19,7 +19,7 @@ extension MainContentCoordinator {
                 Self.logger.info("Rule add rejected — quota reached for \(rule.action.toolCategory)")
                 activeToast = ToastMessage(
                     style: .error,
-                    text: String(localized: "Rule limit reached for this category")
+                    text: String(localized: "Rule limit reached for this category", bundle: RockxyLocalization.bundle)
                 )
             }
         }
@@ -38,7 +38,7 @@ extension MainContentCoordinator {
                 Self.logger.info("Rule toggle rejected — quota reached")
                 activeToast = ToastMessage(
                     style: .error,
-                    text: String(localized: "Rule limit reached for this category")
+                    text: String(localized: "Rule limit reached for this category", bundle: RockxyLocalization.bundle)
                 )
             }
         }

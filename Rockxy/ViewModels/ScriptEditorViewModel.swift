@@ -18,10 +18,10 @@ enum ScriptConsoleLogLevel: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .errors: String(localized: "Errors")
-        case .warnings: String(localized: "Warnings")
-        case .userLogs: String(localized: "User Logs")
-        case .system: String(localized: "System")
+        case .errors: String(localized: "Errors", bundle: RockxyLocalization.bundle)
+        case .warnings: String(localized: "Warnings", bundle: RockxyLocalization.bundle)
+        case .userLogs: String(localized: "User Logs", bundle: RockxyLocalization.bundle)
+        case .system: String(localized: "System", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -94,9 +94,9 @@ enum ScriptMatchPatternMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .wildcard: String(localized: "Use Wildcard")
-        case .regex: String(localized: "Use Regex")
-        case .advanced: String(localized: "Advanced")
+        case .wildcard: String(localized: "Use Wildcard", bundle: RockxyLocalization.bundle)
+        case .regex: String(localized: "Use Regex", bundle: RockxyLocalization.bundle)
+        case .advanced: String(localized: "Advanced", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -283,7 +283,7 @@ final class ScriptEditorViewModel {
     /// Display name for confirmations / prompts naming the current script.
     var currentScriptDisplayName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? String(localized: "this script") : trimmed
+        return trimmed.isEmpty ? String(localized: "this script", bundle: RockxyLocalization.bundle) : trimmed
     }
 
     /// Console entries passing the active level filter.
@@ -443,11 +443,14 @@ final class ScriptEditorViewModel {
         guard let pluginID else {
             savedAndActive = false
             statusTone = .warning
-            statusMessage = String(localized: "No script is loaded to save.")
+            statusMessage = String(localized: "No script is loaded to save.", bundle: RockxyLocalization.bundle)
             appendConsole(.init(
                 timestamp: .now,
                 level: .warnings,
-                message: String(localized: "Save skipped: no script is loaded in the editor.")
+                message: String(
+                    localized: "Save skipped: no script is loaded in the editor.",
+                    bundle: RockxyLocalization.bundle
+                )
             ))
             return false
         }
@@ -526,7 +529,10 @@ final class ScriptEditorViewModel {
                     quotaReached = true
                 } catch {
                     enableSucceeded = false
-                    enableErrorMessage = String(localized: "Enable failed: \(error.localizedDescription)")
+                    enableErrorMessage = String(
+                        localized: "Enable failed: \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 }
             }
 
@@ -548,28 +554,32 @@ final class ScriptEditorViewModel {
             savedAndActive = isLiveActive
             if isLiveActive {
                 statusTone = .success
-                statusMessage = String(localized: "Saved and Active!")
+                statusMessage = String(localized: "Saved and Active!", bundle: RockxyLocalization.bundle)
                 appendConsole(.init(
                     timestamp: .now,
                     level: .userLogs,
-                    message: String(localized: "Script saved and active.")
+                    message: String(localized: "Script saved and active.", bundle: RockxyLocalization.bundle)
                 ))
             } else if quotaReached {
                 statusTone = .warning
-                statusMessage = String(localized: "Saved (script quota reached — not active)")
+                statusMessage = String(
+                    localized: "Saved (script quota reached — not active)",
+                    bundle: RockxyLocalization.bundle
+                )
                 appendConsole(.init(
                     timestamp: .now,
                     level: .warnings,
                     message: String(
-                        localized: "Saved, but the 10-enabled-script quota is reached. Disable another script to activate this one."
+                        localized: "Saved, but the 10-enabled-script quota is reached. Disable another script to activate this one.",
+                        bundle: RockxyLocalization.bundle
                     )
                 ))
             } else if !enableSucceeded {
                 statusTone = .neutral
-                statusMessage = String(localized: "Saved (not active)")
+                statusMessage = String(localized: "Saved (not active)", bundle: RockxyLocalization.bundle)
             } else if let afterSnapshot, case let .error(reason) = afterSnapshot.status {
                 statusTone = .error
-                statusMessage = String(localized: "Saved, but script failed to load")
+                statusMessage = String(localized: "Saved, but script failed to load", bundle: RockxyLocalization.bundle)
                 appendConsole(.init(
                     timestamp: .now,
                     level: .errors,
@@ -577,7 +587,7 @@ final class ScriptEditorViewModel {
                 ))
             } else {
                 statusTone = .neutral
-                statusMessage = String(localized: "Saved (not active)")
+                statusMessage = String(localized: "Saved (not active)", bundle: RockxyLocalization.bundle)
             }
             return true
         } catch {
@@ -586,11 +596,14 @@ final class ScriptEditorViewModel {
             }
             savedAndActive = false
             statusTone = .error
-            statusMessage = String(localized: "Save failed")
+            statusMessage = String(localized: "Save failed", bundle: RockxyLocalization.bundle)
             appendConsole(.init(
                 timestamp: .now,
                 level: .errors,
-                message: String(localized: "Save failed: \(error.localizedDescription)")
+                message: String(
+                    localized: "Save failed: \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             ))
             Self.logger.error("Save failed: \(error.localizedDescription)")
             return false
@@ -607,7 +620,7 @@ final class ScriptEditorViewModel {
         appendConsole(.init(
             timestamp: .now,
             level: .system,
-            message: String(localized: "Code beautified (indentation normalized).")
+            message: String(localized: "Code beautified (indentation normalized).", bundle: RockxyLocalization.bundle)
         ))
     }
 
@@ -650,20 +663,20 @@ final class ScriptEditorViewModel {
         switch result {
         case .valid:
             statusTone = .success
-            statusMessage = String(localized: "Script is valid")
+            statusMessage = String(localized: "Script is valid", bundle: RockxyLocalization.bundle)
             appendConsole(.init(
                 timestamp: .now,
                 level: .system,
-                message: String(localized: "Validation passed.")
+                message: String(localized: "Validation passed.", bundle: RockxyLocalization.bundle)
             ))
         case let .invalid(reason):
             savedAndActive = false
             statusTone = .error
-            statusMessage = String(localized: "Validation failed")
+            statusMessage = String(localized: "Validation failed", bundle: RockxyLocalization.bundle)
             appendConsole(.init(
                 timestamp: .now,
                 level: .errors,
-                message: String(localized: "Validation failed: \(reason)")
+                message: String(localized: "Validation failed: \(reason)", bundle: RockxyLocalization.bundle)
             ))
         }
     }
@@ -699,11 +712,14 @@ final class ScriptEditorViewModel {
         let effectiveSample = sample.isEmpty ? "https://api.example.com/path" : sample
         switch evaluateRule(against: effectiveSample) {
         case .match:
-            testRulePreview = String(localized: "Matches: \(effectiveSample)")
+            testRulePreview = String(localized: "Matches: \(effectiveSample)", bundle: RockxyLocalization.bundle)
         case .noMatch:
-            testRulePreview = String(localized: "No match for: \(effectiveSample)")
+            testRulePreview = String(localized: "No match for: \(effectiveSample)", bundle: RockxyLocalization.bundle)
         case .invalidPattern:
-            testRulePreview = String(localized: "The matching pattern is not a valid regular expression.")
+            testRulePreview = String(
+                localized: "The matching pattern is not a valid regular expression.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -724,7 +740,11 @@ final class ScriptEditorViewModel {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(prefix) {
             defaults.removeObject(forKey: key)
         }
-        appendConsole(.init(timestamp: .now, level: .system, message: String(localized: "Shared state cleared.")))
+        appendConsole(.init(
+            timestamp: .now,
+            level: .system,
+            message: String(localized: "Shared state cleared.", bundle: RockxyLocalization.bundle)
+        ))
     }
 
     // MARK: Private
@@ -863,10 +883,17 @@ final class ScriptEditorViewModel {
             code = (try? String(contentsOf: scriptURL, encoding: .utf8)) ?? ScriptTemplates.defaultSource
             savedAndActive = info?.isEnabled == true && info?.status == .active
             statusTone = savedAndActive ? .success : .neutral
-            statusMessage = savedAndActive ? String(localized: "Saved and Active!") : String(localized: "Saved")
+            statusMessage = savedAndActive ? String(localized: "Saved and Active!", bundle: RockxyLocalization.bundle) :
+                String(
+                    localized: "Saved",
+                    bundle: RockxyLocalization.bundle
+                )
         } catch {
             statusTone = .error
-            statusMessage = String(localized: "Load failed: \(error.localizedDescription)")
+            statusMessage = String(
+                localized: "Load failed: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
             appendConsole(.init(timestamp: .now, level: .errors, message: statusMessage))
         }
     }
@@ -878,8 +905,11 @@ final class ScriptEditorViewModel {
         let trimmedName = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedName.isEmpty {
             return (
-                status: String(localized: "Name is required"),
-                consoleMessage: String(localized: "Save blocked: the script name cannot be empty.")
+                status: String(localized: "Name is required", bundle: RockxyLocalization.bundle),
+                consoleMessage: String(
+                    localized: "Save blocked: the script name cannot be empty.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
 
@@ -887,9 +917,10 @@ final class ScriptEditorViewModel {
         let usesRegex = draft.patternMode == .regex || draft.patternMode == .advanced
         if usesRegex, !trimmedPattern.isEmpty, (try? NSRegularExpression(pattern: trimmedPattern)) == nil {
             return (
-                status: String(localized: "Invalid matching pattern"),
+                status: String(localized: "Invalid matching pattern", bundle: RockxyLocalization.bundle),
                 consoleMessage: String(
-                    localized: "Save blocked: the matching pattern is not a valid regular expression."
+                    localized: "Save blocked: the matching pattern is not a valid regular expression.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -904,8 +935,8 @@ final class ScriptEditorViewModel {
             return nil
         case let .invalid(reason):
             return (
-                status: String(localized: "Cannot save this script"),
-                consoleMessage: String(localized: "Save blocked: \(reason)")
+                status: String(localized: "Cannot save this script", bundle: RockxyLocalization.bundle),
+                consoleMessage: String(localized: "Save blocked: \(reason)", bundle: RockxyLocalization.bundle)
             )
         }
     }

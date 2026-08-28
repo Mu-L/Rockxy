@@ -5,9 +5,13 @@ description: "How Rockxy is localized, how to add or improve a language, and the
 
 Rockxy uses native Xcode **String Catalogs** (`.xcstrings`). The catalogs checked
 into the repository are the single source of truth for every translation. There is
-no in-app language picker: Rockxy follows the macOS **system language** and the
-per-app language you set in **System Settings › General › Language & Region ›
-Applications**.
+an app-language picker under **Settings › Appearance › Language**. **System Default**
+follows the macOS language; choosing another bundled language updates the running
+Rockxy UI immediately without stopping capture or reopening the app.
+
+The picker reads the localizations available in the application bundle instead of
+hardcoding a language list, so a newly contributed and shipped catalog appears there
+automatically.
 
 ## Where the strings live
 

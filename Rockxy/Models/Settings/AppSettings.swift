@@ -15,9 +15,9 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system: String(localized: "System")
-        case .light: String(localized: "Light")
-        case .dark: String(localized: "Dark")
+        case .system: String(localized: "System", bundle: RockxyLocalization.bundle)
+        case .light: String(localized: "Light", bundle: RockxyLocalization.bundle)
+        case .dark: String(localized: "Dark", bundle: RockxyLocalization.bundle)
         }
     }
 }

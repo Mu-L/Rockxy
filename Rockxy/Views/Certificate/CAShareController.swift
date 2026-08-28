@@ -7,8 +7,50 @@ import os
 
 @MainActor
 final class CAShareController: ObservableObject {
+    // MARK: Internal
+
     @Published var currentSession: RootCADownloadSession?
     @Published var currentFingerprint: String?
+
+    static func userFacingMessage(for error: Error) -> String {
+        switch error {
+        case let error as RootCADownloadError:
+            switch error {
+            case .tokenGenerationFailed:
+                String(
+                    localized: "Could not create a secure certificate sharing token. Try again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            case .invalidSessionURL:
+                String(
+                    localized: "Could not build the certificate sharing URL. Try again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            case .noReachableLANAddress:
+                String(
+                    localized: "No reachable Wi-Fi or Ethernet IPv4 address was found. Connect this Mac to the same network as the device, then try again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            case .noRootCA:
+                String(
+                    localized: "No Root CA certificate is available. Generate a Root CA first.",
+                    bundle: RockxyLocalization.bundle
+                )
+            case .portUnavailable:
+                String(
+                    localized: "Could not start the temporary certificate sharing server. Try again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            }
+        case let error as RootCAShareValidationError:
+            error.localizedDescription
+        default:
+            String(
+                localized: "Certificate sharing could not be started. Check your network and try again.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+    }
 
     func startSharing() async throws -> RootCADownloadSession {
         operationGeneration += 1
@@ -56,7 +98,10 @@ final class CAShareController: ObservableObject {
             throw RootCAShareValidationError.missingFingerprint
         }
         guard currentSession?.publicURL == sessionURL else {
-            Self.logger.error("Refused to copy Root CA share URL because the session URL no longer matches the active share session.")
+            Self.logger
+                .error(
+                    "Refused to copy Root CA share URL because the session URL no longer matches the active share session."
+                )
             throw RootCADownloadError.invalidSessionURL
         }
 
@@ -68,7 +113,9 @@ final class CAShareController: ObservableObject {
     func stopSharing(
         clearSession: Bool,
         expectedSessionID: RootCADownloadSession.ID? = nil
-    ) async {
+    )
+        async
+    {
         if let expectedSessionID, currentSession?.id != expectedSessionID {
             return
         }
@@ -80,32 +127,13 @@ final class CAShareController: ObservableObject {
         await shareServer.stop()
     }
 
-    static func userFacingMessage(for error: Error) -> String {
-        switch error {
-        case let error as RootCADownloadError:
-            switch error {
-            case .tokenGenerationFailed:
-                String(localized: "Could not create a secure certificate sharing token. Try again.")
-            case .invalidSessionURL:
-                String(localized: "Could not build the certificate sharing URL. Try again.")
-            case .noReachableLANAddress:
-                String(localized: "No reachable Wi-Fi or Ethernet IPv4 address was found. Connect this Mac to the same network as the device, then try again.")
-            case .noRootCA:
-                String(localized: "No Root CA certificate is available. Generate a Root CA first.")
-            case .portUnavailable:
-                String(localized: "Could not start the temporary certificate sharing server. Try again.")
-            }
-        case let error as RootCAShareValidationError:
-            error.localizedDescription
-        default:
-            String(localized: "Certificate sharing could not be started. Check your network and try again.")
-        }
-    }
+    // MARK: Private
 
-    private let shareServer = RootCADownloadServer()
-    private var operationGeneration = 0
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "CAShareController"
     )
+
+    private let shareServer = RootCADownloadServer()
+    private var operationGeneration = 0
 }

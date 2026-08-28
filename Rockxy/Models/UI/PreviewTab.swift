@@ -26,18 +26,18 @@ enum PreviewRenderMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .json: String(localized: "JSON")
-        case .jsonTree: String(localized: "JSON Treeview")
-        case .formURLEncoded: String(localized: "Form URL-Encoded")
-        case .html: String(localized: "HTML")
-        case .htmlPreview: String(localized: "HTML Preview")
-        case .css: String(localized: "CSS")
-        case .javascript: String(localized: "JavaScript")
-        case .xml: String(localized: "XML")
-        case .images: String(localized: "Images")
-        case .hex: String(localized: "Hex")
-        case .jwt: String(localized: "JWT")
-        case .raw: String(localized: "Raw")
+        case .json: String(localized: "JSON", bundle: RockxyLocalization.bundle)
+        case .jsonTree: String(localized: "JSON Treeview", bundle: RockxyLocalization.bundle)
+        case .formURLEncoded: String(localized: "Form URL-Encoded", bundle: RockxyLocalization.bundle)
+        case .html: String(localized: "HTML", bundle: RockxyLocalization.bundle)
+        case .htmlPreview: String(localized: "HTML Preview", bundle: RockxyLocalization.bundle)
+        case .css: String(localized: "CSS", bundle: RockxyLocalization.bundle)
+        case .javascript: String(localized: "JavaScript", bundle: RockxyLocalization.bundle)
+        case .xml: String(localized: "XML", bundle: RockxyLocalization.bundle)
+        case .images: String(localized: "Images", bundle: RockxyLocalization.bundle)
+        case .hex: String(localized: "Hex", bundle: RockxyLocalization.bundle)
+        case .jwt: String(localized: "JWT", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
         }
     }
 

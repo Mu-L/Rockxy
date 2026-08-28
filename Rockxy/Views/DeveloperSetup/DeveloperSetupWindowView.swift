@@ -27,7 +27,7 @@ struct DeveloperSetupWindowView: View {
                 text: $viewModel.sourceListSearchText,
                 isPresented: $searchPresented,
                 placement: .sidebar,
-                prompt: Text(String(localized: "Search setups"))
+                prompt: Text(String(localized: "Search setups", bundle: RockxyLocalization.bundle))
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
@@ -37,7 +37,7 @@ struct DeveloperSetupWindowView: View {
                         .inspectorColumnWidth(min: 240, ideal: 280, max: 360)
                 }
         }
-        .navigationTitle(String(localized: "Developer Setup"))
+        .navigationTitle(String(localized: "Developer Setup", bundle: RockxyLocalization.bundle))
         .toolbar { toolbarContent }
         .frame(minWidth: 820, minHeight: 560)
         .background {
@@ -130,20 +130,25 @@ struct DeveloperSetupWindowView: View {
     }
 
     private var deviceProxyHostText: String {
-        viewModel.snapshot.reachableLANAddress ?? String(localized: "Unavailable")
+        viewModel.snapshot.reachableLANAddress ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
     }
 
     private var deviceProxyCaption: String {
         if viewModel.snapshot.effectiveListenAddress == "127.0.0.1" {
             return String(
-                localized: "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy."
+                localized: "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.",
+                bundle: RockxyLocalization.bundle
             )
         }
         guard viewModel.snapshot.reachableLANAddress != nil else {
-            return String(localized: "Connect this Mac to Wi-Fi or Ethernet to expose a reachable LAN IP.")
+            return String(
+                localized: "Connect this Mac to Wi-Fi or Ethernet to expose a reachable LAN IP.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return String(
-            localized: "Use this host and port when configuring a device, simulator, or client on the same network."
+            localized: "Use this host and port when configuring a device, simulator, or client on the same network.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -156,17 +161,17 @@ struct DeveloperSetupWindowView: View {
 
         ToolbarItemGroup(placement: .primaryAction) {
             Menu {
-                Button(String(localized: "Open Setup Guide…")) {
+                Button(String(localized: "Open Setup Guide…", bundle: RockxyLocalization.bundle)) {
                     openManualSetup()
                 }
                 if viewModel.selectedTarget.isRuntimeTerminalTarget {
-                    Button(String(localized: "Open Configured Terminal…")) {
+                    Button(String(localized: "Open Configured Terminal…", bundle: RockxyLocalization.bundle)) {
                         openAutomaticSetup()
                     }
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text(String(localized: "Set Up…"))
+                    Text(String(localized: "Set Up…", bundle: RockxyLocalization.bundle))
                     Image(systemName: "chevron.down")
                         .font(setupMetrics.secondaryFont(weight: .semibold))
                 }
@@ -181,7 +186,10 @@ struct DeveloperSetupWindowView: View {
                 interactive: true,
                 in: Capsule(style: .continuous)
             )
-            .help(String(localized: "Open a guided or configured setup for this target"))
+            .help(String(
+                localized: "Open a guided or configured setup for this target",
+                bundle: RockxyLocalization.bundle
+            ))
 
             Button {
                 inspectorPresented.toggle()
@@ -195,8 +203,8 @@ struct DeveloperSetupWindowView: View {
                 interactive: true,
                 in: Capsule(style: .continuous)
             )
-            .help(String(localized: "Toggle the readiness inspector"))
-            .accessibilityLabel(String(localized: "Toggle readiness inspector"))
+            .help(String(localized: "Toggle the readiness inspector", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Toggle readiness inspector", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -208,15 +216,15 @@ struct DeveloperSetupWindowView: View {
 
     private var proxyOverviewCaption: String {
         viewModel.snapshot.proxyRunning
-            ? String(localized: "Rockxy is capturing traffic on this Mac.")
-            : String(localized: "Start Rockxy before pointing traffic at the proxy.")
+            ? String(localized: "Rockxy is capturing traffic on this Mac.", bundle: RockxyLocalization.bundle)
+            : String(localized: "Start Rockxy before pointing traffic at the proxy.", bundle: RockxyLocalization.bundle)
     }
 
     private var proxyOverviewAction: (title: String, perform: () -> Void)? {
         guard !viewModel.snapshot.proxyRunning else {
             return nil
         }
-        return (String(localized: "Start Proxy"), { coordinator.startProxy() })
+        return (String(localized: "Start Proxy", bundle: RockxyLocalization.bundle), { coordinator.startProxy() })
     }
 
     private var endpointOverviewValue: String {
@@ -225,19 +233,22 @@ struct DeveloperSetupWindowView: View {
 
     private var endpointOverviewCaption: String {
         viewModel.snapshot.proxyRunning
-            ? String(localized: "Rockxy is listening on this address now.")
-            : String(localized: "Rockxy will bind this address when the proxy starts.")
+            ? String(localized: "Rockxy is listening on this address now.", bundle: RockxyLocalization.bundle)
+            : String(
+                localized: "Rockxy will bind this address when the proxy starts.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     private var recordingOverviewCaption: String {
-        String(localized: "Requests must be recorded to run the capture check.")
+        String(localized: "Requests must be recorded to run the capture check.", bundle: RockxyLocalization.bundle)
     }
 
     private var recordingOverviewAction: (title: String, perform: () -> Void)? {
         guard !viewModel.snapshot.recordingEnabled else {
             return nil
         }
-        return (String(localized: "Resume Recording"), {
+        return (String(localized: "Resume Recording", bundle: RockxyLocalization.bundle), {
             if !coordinator.isRecording {
                 coordinator.toggleRecording()
             }
@@ -246,14 +257,20 @@ struct DeveloperSetupWindowView: View {
 
     private var certificateOverviewValue: String {
         viewModel.snapshot.certificateTrusted
-            ? String(localized: "Trusted")
-            : String(localized: "Needs attention")
+            ? String(localized: "Trusted", bundle: RockxyLocalization.bundle)
+            : String(localized: "Needs attention", bundle: RockxyLocalization.bundle)
     }
 
     private var certificateOverviewCaption: String {
         viewModel.snapshot.certificateFileReady
-            ? String(localized: "A root certificate is available for your client configuration.")
-            : String(localized: "Generate or export the root certificate before validating HTTPS traffic.")
+            ? String(
+                localized: "A root certificate is available for your client configuration.",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(
+                localized: "Generate or export the root certificate before validating HTTPS traffic.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     private var certificateOverviewAction: (title: String, perform: () -> Void)? {
@@ -261,8 +278,8 @@ struct DeveloperSetupWindowView: View {
             return nil
         }
         let title = viewModel.selectedTarget.supportsCertificateSharing
-            ? String(localized: "Share Certificate")
-            : String(localized: "Open Certificate")
+            ? String(localized: "Share Certificate", bundle: RockxyLocalization.bundle)
+            : String(localized: "Open Certificate", bundle: RockxyLocalization.bundle)
         return (title, {
             if viewModel.selectedTarget.supportsCertificateSharing {
                 shareRootCAForSelectedTarget()
@@ -276,7 +293,10 @@ struct DeveloperSetupWindowView: View {
         guard viewModel.snapshot.reachableLANAddress == nil else {
             return nil
         }
-        return (String(localized: "Open Proxy Settings"), { openWindow(id: "advancedProxySettings") })
+        return (
+            String(localized: "Open Proxy Settings", bundle: RockxyLocalization.bundle),
+            { openWindow(id: "advancedProxySettings") }
+        )
     }
 
     // MARK: Guide
@@ -293,6 +313,14 @@ struct DeveloperSetupWindowView: View {
 
     private var troubleshootingGuideTips: [SetupGuideTip] {
         viewModel.currentGuideContent?.troubleshootingTips ?? []
+    }
+
+    private var toolbarGlassTint: Color? {
+        colorScheme == .light ? Color.white.opacity(0.28) : nil
+    }
+
+    private var toolbarSelectionFill: Color {
+        Color.primary.opacity(colorScheme == .light ? 0.10 : 0.14)
     }
 
     // MARK: Detail column
@@ -345,7 +373,7 @@ struct DeveloperSetupWindowView: View {
             in: Capsule(style: .continuous)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Section"))
+        .accessibilityLabel(String(localized: "Section", bundle: RockxyLocalization.bundle))
     }
 
     private var menuTabPicker: some View {
@@ -378,15 +406,7 @@ struct DeveloperSetupWindowView: View {
             interactive: true,
             in: Capsule(style: .continuous)
         )
-        .accessibilityLabel(String(localized: "Section"))
-    }
-
-    private var toolbarGlassTint: Color? {
-        colorScheme == .light ? Color.white.opacity(0.28) : nil
-    }
-
-    private var toolbarSelectionFill: Color {
-        Color.primary.opacity(colorScheme == .light ? 0.10 : 0.14)
+        .accessibilityLabel(String(localized: "Section", bundle: RockxyLocalization.bundle))
     }
 
     private var centerContent: some View {
@@ -426,32 +446,32 @@ struct DeveloperSetupWindowView: View {
     private var overviewContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             overviewRow(
-                label: String(localized: "Proxy"),
+                label: String(localized: "Proxy", bundle: RockxyLocalization.bundle),
                 value: viewModel.snapshot.proxyRunning
-                    ? String(localized: "Running")
-                    : String(localized: "Stopped"),
+                    ? String(localized: "Running", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Stopped", bundle: RockxyLocalization.bundle),
                 caption: proxyOverviewCaption,
                 action: proxyOverviewAction
             )
             Divider()
             overviewRow(
-                label: String(localized: "Endpoint"),
+                label: String(localized: "Endpoint", bundle: RockxyLocalization.bundle),
                 value: endpointOverviewValue,
                 caption: endpointOverviewCaption,
                 action: nil
             )
             Divider()
             overviewRow(
-                label: String(localized: "Recording"),
+                label: String(localized: "Recording", bundle: RockxyLocalization.bundle),
                 value: viewModel.snapshot.recordingEnabled
-                    ? String(localized: "Enabled")
-                    : String(localized: "Paused"),
+                    ? String(localized: "Enabled", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Paused", bundle: RockxyLocalization.bundle),
                 caption: recordingOverviewCaption,
                 action: recordingOverviewAction
             )
             Divider()
             overviewRow(
-                label: String(localized: "Certificate"),
+                label: String(localized: "Certificate", bundle: RockxyLocalization.bundle),
                 value: certificateOverviewValue,
                 caption: certificateOverviewCaption,
                 action: certificateOverviewAction
@@ -459,7 +479,7 @@ struct DeveloperSetupWindowView: View {
             if viewModel.selectedTarget.requiresReachableLANProxy {
                 Divider()
                 overviewRow(
-                    label: String(localized: "Device Endpoint"),
+                    label: String(localized: "Device Endpoint", bundle: RockxyLocalization.bundle),
                     value: deviceProxyHostText,
                     caption: deviceProxyCaption,
                     action: deviceEndpointOverviewAction
@@ -483,7 +503,10 @@ struct DeveloperSetupWindowView: View {
                     if !setupSteps.isEmpty {
                         Divider()
                     }
-                    tipSection(title: String(localized: "Manual guide"), tips: setupGuideTips)
+                    tipSection(
+                        title: String(localized: "Manual guide", bundle: RockxyLocalization.bundle),
+                        tips: setupGuideTips
+                    )
                 }
 
                 if viewModel.selectedTarget.supportsCertificateSharing {
@@ -494,7 +517,7 @@ struct DeveloperSetupWindowView: View {
                 }
             } else {
                 guideOnlySection(
-                    title: String(localized: "Manual guide"),
+                    title: String(localized: "Manual guide", bundle: RockxyLocalization.bundle),
                     message: viewModel.selectedTarget.manualSummary
                 )
             }
@@ -504,13 +527,13 @@ struct DeveloperSetupWindowView: View {
 
     private var certificateShareSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(String(localized: "Device certificate"))
+            sectionHeader(String(localized: "Device certificate", bundle: RockxyLocalization.bundle))
             Text(
                 String(
                     localized: """
                     Share the public Rockxy Root CA from this Mac as a temporary local QR code and link, \
                     then finish the platform trust steps on the device or simulator.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(setupMetrics.font())
@@ -518,7 +541,8 @@ struct DeveloperSetupWindowView: View {
 
             Text(
                 String(
-                    localized: "The link only serves the public PEM, expires automatically, and stops when this sheet closes."
+                    localized: "The link only serves the public PEM, expires automatically, and stops when this sheet closes.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(setupMetrics.secondaryFont())
@@ -526,12 +550,12 @@ struct DeveloperSetupWindowView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
-                Button(String(localized: "Share Certificate")) {
+                Button(String(localized: "Share Certificate", bundle: RockxyLocalization.bundle)) {
                     shareRootCAForSelectedTarget()
                 }
                 .rockxyGlassButtonStyle()
 
-                Button(String(localized: "Open Certificate Guide")) {
+                Button(String(localized: "Open Certificate Guide", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "certificateSetup")
                 }
             }
@@ -563,8 +587,14 @@ struct DeveloperSetupWindowView: View {
             } else {
                 emptyStateSection(
                     title: viewModel.usesGuideSetupContent
-                        ? String(localized: "No runtime snippet needed for this device flow")
-                        : String(localized: "No first-party snippet in Rockxy for this target yet"),
+                        ? String(
+                            localized: "No runtime snippet needed for this device flow",
+                            bundle: RockxyLocalization.bundle
+                        )
+                        : String(
+                            localized: "No first-party snippet in Rockxy for this target yet",
+                            bundle: RockxyLocalization.bundle
+                        ),
                     message: viewModel.selectedTarget.currentSupportSummary
                 )
             }
@@ -573,7 +603,10 @@ struct DeveloperSetupWindowView: View {
     }
 
     private var snippetSelector: some View {
-        Picker(String(localized: "Snippet"), selection: $viewModel.selectedSnippetID) {
+        Picker(
+            String(localized: "Snippet", bundle: RockxyLocalization.bundle),
+            selection: $viewModel.selectedSnippetID
+        ) {
             ForEach(viewModel.currentSnippetOptions) { snippet in
                 Text(snippet.title).tag(snippet.id)
             }
@@ -584,7 +617,7 @@ struct DeveloperSetupWindowView: View {
     }
 
     private var copySnippetButton: some View {
-        Button(String(localized: "Copy Snippet")) {
+        Button(String(localized: "Copy Snippet", bundle: RockxyLocalization.bundle)) {
             copySnippetToPasteboard()
         }
         .keyboardShortcut("c", modifiers: [.command, .shift])
@@ -596,11 +629,17 @@ struct DeveloperSetupWindowView: View {
         VStack(alignment: .leading, spacing: 14) {
             if viewModel.supportsValidation, let currentSnippetText = viewModel.currentValidationSnippetText {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(String(localized: "Run this probe while Rockxy waits for the request."))
-                        .font(setupMetrics.font())
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Run this probe while Rockxy waits for the request.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(setupMetrics.font())
+                    .fixedSize(horizontal: false, vertical: true)
                     Text(
-                        String(localized: "Checks proxy capture only; it does not identify the source app or process.")
+                        String(
+                            localized: "Checks proxy capture only; it does not identify the source app or process.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                     .font(setupMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
@@ -627,10 +666,16 @@ struct DeveloperSetupWindowView: View {
                     issueBlock(issue)
                 }
             } else if let guideContent = viewModel.currentGuideContent, !guideContent.validationTips.isEmpty {
-                tipSection(title: String(localized: "Manual validation"), tips: guideContent.validationTips)
+                tipSection(
+                    title: String(localized: "Manual validation", bundle: RockxyLocalization.bundle),
+                    tips: guideContent.validationTips
+                )
             } else {
                 emptyStateSection(
-                    title: String(localized: "Interactive validation is not available for this target"),
+                    title: String(
+                        localized: "Interactive validation is not available for this target",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     message: viewModel.selectedTarget.manualSummary
                 )
             }
@@ -639,11 +684,11 @@ struct DeveloperSetupWindowView: View {
     }
 
     @ViewBuilder private var checkActions: some View {
-        Button(String(localized: "Copy Command")) {
+        Button(String(localized: "Copy Command", bundle: RockxyLocalization.bundle)) {
             copySnippetToPasteboard()
         }
 
-        Button(String(localized: "Start Check")) {
+        Button(String(localized: "Start Check", bundle: RockxyLocalization.bundle)) {
             viewModel.startValidation()
         }
         .rockxyGlassButtonStyle(prominent: true)
@@ -653,7 +698,7 @@ struct DeveloperSetupWindowView: View {
         if viewModel.snapshot.verificationState == .success,
            viewModel.snapshot.matchedTransactionID != nil
         {
-            Button(String(localized: "Reveal in Main Window")) {
+            Button(String(localized: "Reveal in Main Window", bundle: RockxyLocalization.bundle)) {
                 viewModel.revealMatchedTransaction()
             }
         }
@@ -662,7 +707,10 @@ struct DeveloperSetupWindowView: View {
     private var troubleshootingContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !troubleshootingGuideTips.isEmpty {
-                tipSection(title: String(localized: "Common issues"), tips: troubleshootingGuideTips)
+                tipSection(
+                    title: String(localized: "Common issues", bundle: RockxyLocalization.bundle),
+                    tips: troubleshootingGuideTips
+                )
             }
 
             if viewModel.selectedTarget.supportStatus == .availableNow, viewModel.supportsValidation {
@@ -674,7 +722,7 @@ struct DeveloperSetupWindowView: View {
                 }
             } else if troubleshootingGuideTips.isEmpty {
                 guideOnlySection(
-                    title: String(localized: "Current limitation"),
+                    title: String(localized: "Current limitation", bundle: RockxyLocalization.bundle),
                     message: viewModel.selectedTarget.currentSupportSummary
                 )
             }
@@ -828,7 +876,7 @@ struct DeveloperSetupWindowView: View {
                         )
                 )
         }
-        .accessibilityLabel(String(localized: "Generated setup snippet"))
+        .accessibilityLabel(String(localized: "Generated setup snippet", bundle: RockxyLocalization.bundle))
         .accessibilityValue(text)
     }
 
@@ -908,8 +956,8 @@ struct DeveloperSetupWindowView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         actionStatusMessage = viewModel.selectedTab == .validate
-            ? String(localized: "Probe command copied.")
-            : String(localized: "Snippet copied.")
+            ? String(localized: "Probe command copied.", bundle: RockxyLocalization.bundle)
+            : String(localized: "Snippet copied.", bundle: RockxyLocalization.bundle)
     }
 
     private func handleStepAction(_ step: SetupStep) {
@@ -975,7 +1023,10 @@ struct DeveloperSetupWindowView: View {
         let generation = certificateShareGeneration
         Task { @MainActor in
             do {
-                certificateShareStatusMessage = String(localized: "Preparing certificate sharing link...")
+                certificateShareStatusMessage = String(
+                    localized: "Preparing certificate sharing link...",
+                    bundle: RockxyLocalization.bundle
+                )
                 let session = try await caShareController.startSharing()
                 guard certificateShareGeneration == generation else {
                     return
@@ -983,7 +1034,10 @@ struct DeveloperSetupWindowView: View {
                 presentedShareSession = session
                 presentedShareSessionID = session.id
                 certificateShareStatusMessage =
-                    String(localized: "Certificate sharing link started for \(viewModel.selectedTarget.title).")
+                    String(
+                        localized: "Certificate sharing link started for \(viewModel.selectedTarget.title).",
+                        bundle: RockxyLocalization.bundle
+                    )
                 await viewModel.refreshSnapshot()
             } catch {
                 guard certificateShareGeneration == generation else {
@@ -1024,7 +1078,10 @@ struct DeveloperSetupWindowView: View {
     private func copyRootCAShareURL(_ url: URL) {
         do {
             try caShareController.copyShareURL(sessionURL: url)
-            certificateShareStatusMessage = String(localized: "Certificate sharing URL copied.")
+            certificateShareStatusMessage = String(
+                localized: "Certificate sharing URL copied.",
+                bundle: RockxyLocalization.bundle
+            )
         } catch {
             certificateShareStatusMessage = certificateShareFailureMessage(for: error)
         }
@@ -1038,7 +1095,8 @@ struct DeveloperSetupWindowView: View {
             error.localizedDescription
         default:
             String(
-                localized: "Certificate sharing could not be started for \(viewModel.selectedTarget.title). Check your network and try again."
+                localized: "Certificate sharing could not be started for \(viewModel.selectedTarget.title). Check your network and try again.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }

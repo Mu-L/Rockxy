@@ -10,7 +10,7 @@ struct CertificateSetupView: View {
 
     var body: some View {
         Form {
-            Section(String(localized: "Root CA Status")) {
+            Section(String(localized: "Root CA Status", bundle: RockxyLocalization.bundle)) {
                 CertificateStatusPanel(
                     snapshot: certSnapshot,
                     isLoading: certLoading,
@@ -26,7 +26,7 @@ struct CertificateSetupView: View {
                 }
             }
 
-            Section(String(localized: "About")) {
+            Section(String(localized: "About", bundle: RockxyLocalization.bundle)) {
                 Text(
                     String(
                         localized: """
@@ -34,7 +34,7 @@ struct CertificateSetupView: View {
                         per-host certificates for HTTPS traffic interception. The root CA \
                         must be installed and trusted in your macOS Keychain. No certificate \
                         data leaves your machine.
-                        """
+                        """, bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.callout)
@@ -44,17 +44,19 @@ struct CertificateSetupView: View {
         .formStyle(.grouped)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert(
-            String(localized: "Reset Certificates"),
+            String(localized: "Reset Certificates", bundle: RockxyLocalization.bundle),
             isPresented: $showResetConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Reset"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Reset", bundle: RockxyLocalization.bundle), role: .destructive) {
                 resetCertificates()
             }
         } message: {
             Text(
                 String(
-                    localized: "This will delete the root CA and all generated host certificates. You will need to generate and install a new root CA to resume HTTPS interception."
+                    // swiftlint:disable:next line_length
+                    localized: "This will delete the root CA and all generated host certificates. You will need to generate and install a new root CA to resume HTTPS interception.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -104,17 +106,17 @@ struct CertificateSetupView: View {
                 switch action {
                 case .generate:
                     try await CertificateManager.shared.ensureRootCA()
-                    statusMessage = String(localized: "Root CA generated successfully.")
+                    statusMessage = String(localized: "Root CA generated successfully.", bundle: RockxyLocalization.bundle)
                     Self.logger.info("Root CA generated")
 
                 case .installAndTrust:
                     try await CertificateManager.shared.installAndTrust()
-                    statusMessage = String(localized: "Root CA installed and trusted in Keychain.")
+                    statusMessage = String(localized: "Root CA installed and trusted in Keychain.", bundle: RockxyLocalization.bundle)
                     Self.logger.info("Root CA installed and trusted")
 
                 case .export:
                     guard let pem = try await CertificateManager.shared.getRootCAPEM() else {
-                        statusMessage = String(localized: "No Root CA to export. Generate one first.")
+                        statusMessage = String(localized: "No Root CA to export. Generate one first.", bundle: RockxyLocalization.bundle)
                         return
                     }
                     let panel = NSSavePanel()
@@ -126,13 +128,13 @@ struct CertificateSetupView: View {
                         await MainActor.run {
                             AppSettingsManager.shared.updateLastExportedRootCAPath(url.path)
                         }
-                        statusMessage = String(localized: "Certificate exported to \(url.lastPathComponent).")
+                        statusMessage = String(localized: "Certificate exported to \(url.lastPathComponent).", bundle: RockxyLocalization.bundle)
                         Self.logger.info("Root CA exported to \(url.path)")
                     }
 
                 case .share:
                     let session = try await caShareController.startSharing()
-                    statusMessage = String(localized: "Certificate sharing link started.")
+                    statusMessage = String(localized: "Certificate sharing link started.", bundle: RockxyLocalization.bundle)
                     Self.logger.info("Root CA sharing started on \(session.host):\(session.port)")
 
                 case .reset:
@@ -163,11 +165,11 @@ struct CertificateSetupView: View {
                 await MainActor.run {
                     AppSettingsManager.shared.updateLastExportedRootCAPath(nil)
                 }
-                statusMessage = String(localized: "All certificates have been reset.")
+                statusMessage = String(localized: "All certificates have been reset.", bundle: RockxyLocalization.bundle)
                 await checkCAStatus()
                 Self.logger.info("Certificates reset")
             } catch {
-                statusMessage = String(localized: "Reset failed: \(error.localizedDescription)")
+                statusMessage = String(localized: "Reset failed: \(error.localizedDescription)", bundle: RockxyLocalization.bundle)
                 Self.logger.error("Certificate reset failed: \(error)")
             }
         }
@@ -176,7 +178,7 @@ struct CertificateSetupView: View {
     private func copyShareURL(_ url: URL) {
         do {
             try caShareController.copyShareURL(sessionURL: url)
-            statusMessage = String(localized: "Certificate sharing URL copied.")
+            statusMessage = String(localized: "Certificate sharing URL copied.", bundle: RockxyLocalization.bundle)
         } catch {
             statusMessage = CAShareController.userFacingMessage(for: error)
         }

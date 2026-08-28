@@ -14,15 +14,15 @@ enum BreakpointTemplateKind: String, CaseIterable, Codable, Identifiable {
 
     var singularTitle: String {
         switch self {
-        case .request: String(localized: "Request Template")
-        case .response: String(localized: "Response Template")
+        case .request: String(localized: "Request Template", bundle: RockxyLocalization.bundle)
+        case .response: String(localized: "Response Template", bundle: RockxyLocalization.bundle)
         }
     }
 
     var pluralTitle: String {
         switch self {
-        case .request: String(localized: "Request Templates")
-        case .response: String(localized: "Response Templates")
+        case .request: String(localized: "Request Templates", bundle: RockxyLocalization.bundle)
+        case .response: String(localized: "Response Templates", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -32,15 +32,15 @@ enum BreakpointTemplateKind: String, CaseIterable, Codable, Identifiable {
 
     var defaultName: String {
         switch self {
-        case .request: String(localized: "JSON Request")
-        case .response: String(localized: "JSON Response")
+        case .request: String(localized: "JSON Request", bundle: RockxyLocalization.bundle)
+        case .response: String(localized: "JSON Response", bundle: RockxyLocalization.bundle)
         }
     }
 
     var emptyName: String {
         switch self {
-        case .request: String(localized: "Untitled Request Template")
-        case .response: String(localized: "Untitled Response Template")
+        case .request: String(localized: "Untitled Request Template", bundle: RockxyLocalization.bundle)
+        case .response: String(localized: "Untitled Response Template", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -104,6 +104,19 @@ struct BreakpointTemplate: Identifiable, Codable, Equatable {
 
     // MARK: Internal
 
+    static let defaultTemplates: [BreakpointTemplate] = [
+        BreakpointTemplate(
+            kind: .request,
+            name: String(localized: "JSON Request", bundle: RockxyLocalization.bundle),
+            rawMessage: BreakpointTemplateKind.request.sampleMessage
+        ),
+        BreakpointTemplate(
+            kind: .response,
+            name: String(localized: "JSON Response", bundle: RockxyLocalization.bundle),
+            rawMessage: BreakpointTemplateKind.response.sampleMessage
+        ),
+    ]
+
     let id: UUID
     let kind: BreakpointTemplateKind
     var name: String
@@ -118,19 +131,6 @@ struct BreakpointTemplate: Identifiable, Codable, Equatable {
     var applicationPayload: BreakpointTemplateApplication? {
         BreakpointTemplateApplication(template: self)
     }
-
-    static let defaultTemplates: [BreakpointTemplate] = [
-        BreakpointTemplate(
-            kind: .request,
-            name: String(localized: "JSON Request"),
-            rawMessage: BreakpointTemplateKind.request.sampleMessage
-        ),
-        BreakpointTemplate(
-            kind: .response,
-            name: String(localized: "JSON Response"),
-            rawMessage: BreakpointTemplateKind.response.sampleMessage
-        ),
-    ]
 
     static func defaultRawMessage(for kind: BreakpointTemplateKind) -> String {
         kind.sampleMessage
@@ -174,6 +174,8 @@ enum BreakpointTemplateParsedMessage: Equatable {
     case response(BreakpointTemplateParsedResponse)
 }
 
+// MARK: - BreakpointTemplateParsedRequest
+
 struct BreakpointTemplateParsedRequest: Equatable {
     let method: String
     let target: String
@@ -181,6 +183,8 @@ struct BreakpointTemplateParsedRequest: Equatable {
     let headers: [BreakpointTemplateHeader]
     let body: String
 }
+
+// MARK: - BreakpointTemplateParsedResponse
 
 struct BreakpointTemplateParsedResponse: Equatable {
     let httpVersion: String
@@ -241,6 +245,11 @@ struct BreakpointTemplateApplication: Equatable {
 enum BreakpointTemplateValidator {
     // MARK: Internal
 
+    enum ParseResult: Equatable {
+        case valid(summary: String, parsed: BreakpointTemplateParsedMessage)
+        case invalid(String)
+    }
+
     static func validate(rawMessage: String, kind: BreakpointTemplateKind) -> BreakpointTemplateValidation {
         switch parse(rawMessage: rawMessage, kind: kind) {
         case let .valid(summary, _):
@@ -253,7 +262,7 @@ enum BreakpointTemplateValidator {
     static func parse(rawMessage: String, kind: BreakpointTemplateKind) -> ParseResult {
         let normalized = normalize(rawMessage)
         guard !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .invalid(String(localized: "Message is empty."))
+            return .invalid(String(localized: "Message is empty.", bundle: RockxyLocalization.bundle))
         }
 
         let split = splitHeadAndBody(normalized)
@@ -261,7 +270,7 @@ enum BreakpointTemplateValidator {
         guard let startLine = headerLines.first?.trimmingCharacters(in: .whitespacesAndNewlines),
               !startLine.isEmpty else
         {
-            return .invalid(String(localized: "Missing HTTP start line."))
+            return .invalid(String(localized: "Missing HTTP start line.", bundle: RockxyLocalization.bundle))
         }
         headerLines.removeFirst()
 
@@ -275,8 +284,8 @@ enum BreakpointTemplateValidator {
 
     // MARK: Private
 
-    enum ParseResult: Equatable {
-        case valid(summary: String, parsed: BreakpointTemplateParsedMessage)
+    private enum HeaderParseResult {
+        case valid([BreakpointTemplateHeader])
         case invalid(String)
     }
 
@@ -289,17 +298,26 @@ enum BreakpointTemplateValidator {
     {
         let parts = startLine.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
         guard parts.count == 3 else {
-            return .invalid(String(localized: "Request line must be METHOD target HTTP/version."))
+            return .invalid(String(
+                localized: "Request line must be METHOD target HTTP/version.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         let method = parts[0].uppercased()
         guard method.range(of: #"^[A-Z]+$"#, options: .regularExpression) != nil else {
-            return .invalid(String(localized: "Request method must contain only letters."))
+            return .invalid(String(
+                localized: "Request method must contain only letters.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         guard parts[2].hasPrefix("HTTP/") else {
-            return .invalid(String(localized: "Request line must end with an HTTP version."))
+            return .invalid(String(
+                localized: "Request line must end with an HTTP version.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         guard !parts[1].isEmpty else {
-            return .invalid(String(localized: "Request target is empty."))
+            return .invalid(String(localized: "Request target is empty.", bundle: RockxyLocalization.bundle))
         }
 
         let headers = parseHeaders(headerLines)
@@ -307,7 +325,7 @@ enum BreakpointTemplateValidator {
             if case let .invalid(message) = headers {
                 return .invalid(message)
             }
-            return .invalid(String(localized: "Invalid headers."))
+            return .invalid(String(localized: "Invalid headers.", bundle: RockxyLocalization.bundle))
         }
         if let jsonError = validateJSONBodyIfNeeded(body, headers: parsedHeaders) {
             return .invalid(jsonError)
@@ -321,7 +339,7 @@ enum BreakpointTemplateValidator {
             body: body
         )
         return .valid(
-            summary: String(localized: "Valid request message"),
+            summary: String(localized: "Valid request message", bundle: RockxyLocalization.bundle),
             parsed: .request(parsed)
         )
     }
@@ -335,13 +353,22 @@ enum BreakpointTemplateValidator {
     {
         let parts = startLine.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true).map(String.init)
         guard parts.count >= 2 else {
-            return .invalid(String(localized: "Response line must be HTTP/version status."))
+            return .invalid(String(
+                localized: "Response line must be HTTP/version status.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         guard parts[0].hasPrefix("HTTP/") else {
-            return .invalid(String(localized: "Response line must start with an HTTP version."))
+            return .invalid(String(
+                localized: "Response line must start with an HTTP version.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
-        guard let statusCode = Int(parts[1]), (100...999).contains(statusCode) else {
-            return .invalid(String(localized: "Response status must be a three-digit code."))
+        guard let statusCode = Int(parts[1]), (100 ... 999).contains(statusCode) else {
+            return .invalid(String(
+                localized: "Response status must be a three-digit code.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         let headers = parseHeaders(headerLines)
@@ -349,7 +376,7 @@ enum BreakpointTemplateValidator {
             if case let .invalid(message) = headers {
                 return .invalid(message)
             }
-            return .invalid(String(localized: "Invalid headers."))
+            return .invalid(String(localized: "Invalid headers.", bundle: RockxyLocalization.bundle))
         }
         if let jsonError = validateJSONBodyIfNeeded(body, headers: parsedHeaders) {
             return .invalid(jsonError)
@@ -363,7 +390,7 @@ enum BreakpointTemplateValidator {
             body: body
         )
         return .valid(
-            summary: String(localized: "Valid response message"),
+            summary: String(localized: "Valid response message", bundle: RockxyLocalization.bundle),
             parsed: .response(parsed)
         )
     }
@@ -372,16 +399,22 @@ enum BreakpointTemplateValidator {
         var headers: [BreakpointTemplateHeader] = []
         for line in lines where !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             guard let colon = line.firstIndex(of: ":") else {
-                return .invalid(String(localized: "Header lines must contain a colon."))
+                return .invalid(String(
+                    localized: "Header lines must contain a colon.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
             let name = String(line[..<colon]).trimmingCharacters(in: .whitespacesAndNewlines)
             let valueStart = line.index(after: colon)
             let value = String(line[valueStart...]).trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else {
-                return .invalid(String(localized: "Header name is empty."))
+                return .invalid(String(localized: "Header name is empty.", bundle: RockxyLocalization.bundle))
             }
             guard name.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
-                return .invalid(String(localized: "Header names cannot contain spaces."))
+                return .invalid(String(
+                    localized: "Header names cannot contain spaces.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
             headers.append(BreakpointTemplateHeader(name: name, value: value))
         }
@@ -400,8 +433,8 @@ enum BreakpointTemplateValidator {
                   $0.name.caseInsensitiveCompare("content-type") == .orderedSame
                       && $0.value.localizedCaseInsensitiveContains("json")
               }),
-              let data = trimmedBody.data(using: .utf8)
-        else {
+              let data = trimmedBody.data(using: .utf8) else
+        {
             return nil
         }
 
@@ -409,7 +442,10 @@ enum BreakpointTemplateValidator {
             _ = try JSONSerialization.jsonObject(with: data)
             return nil
         } catch {
-            return String(localized: "Invalid JSON body: \(error.localizedDescription)")
+            return String(
+                localized: "Invalid JSON body: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -426,11 +462,6 @@ enum BreakpointTemplateValidator {
         let head = String(message[..<separator.lowerBound])
         let body = String(message[separator.upperBound...])
         return (head, body)
-    }
-
-    private enum HeaderParseResult {
-        case valid([BreakpointTemplateHeader])
-        case invalid(String)
     }
 }
 
@@ -473,7 +504,9 @@ enum BreakpointRawMessage {
         _ rawMessage: String,
         kind: BreakpointTemplateKind,
         to draft: BreakpointRequestData
-    ) throws -> BreakpointRequestData {
+    )
+        throws -> BreakpointRequestData
+    {
         switch BreakpointTemplateValidator.parse(rawMessage: rawMessage, kind: kind) {
         case let .valid(_, parsed):
             return apply(parsed, to: draft)

@@ -33,7 +33,7 @@ struct PluginsSettingsTab: View {
         .font(settingsMetrics.font())
         .task { await viewModel.loadPlugins() }
         .alert(
-            String(localized: "Plugin Error"),
+            String(localized: "Plugin Error", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { viewModel.lastEnableError != nil },
                 set: { newValue in
@@ -43,7 +43,7 @@ struct PluginsSettingsTab: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { viewModel.lastEnableError = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { viewModel.lastEnableError = nil }
         } message: {
             Text(viewModel.lastEnableError ?? "")
         }
@@ -60,11 +60,14 @@ struct PluginsSettingsTab: View {
 
     private var pluginListPanel: some View {
         VStack(spacing: 0) {
-            TextField(String(localized: "Search Plugins"), text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .font(settingsMetrics.font())
-                .frame(minHeight: settingsMetrics.controlHeight)
-                .padding(8)
+            TextField(
+                String(localized: "Search Plugins", bundle: RockxyLocalization.bundle),
+                text: $viewModel.searchText
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(settingsMetrics.font())
+            .frame(minHeight: settingsMetrics.controlHeight)
+            .padding(8)
 
             Divider()
 
@@ -92,17 +95,21 @@ struct PluginsSettingsTab: View {
     private var categoryFilterBar: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 4) {
-                categoryPill(String(localized: "All"), category: nil)
-                categoryPill(String(localized: "Inspector"), category: .inspector)
-                categoryPill(String(localized: "Exporter"), category: .exporter)
-                categoryPill(String(localized: "Script"), category: .script)
+                categoryPill(String(localized: "All", bundle: RockxyLocalization.bundle), category: nil)
+                categoryPill(String(localized: "Inspector", bundle: RockxyLocalization.bundle), category: .inspector)
+                categoryPill(String(localized: "Exporter", bundle: RockxyLocalization.bundle), category: .exporter)
+                categoryPill(String(localized: "Script", bundle: RockxyLocalization.bundle), category: .script)
             }
 
-            Picker(String(localized: "Plugin Category"), selection: $viewModel.selectedCategory) {
-                Text(String(localized: "All")).tag(PluginType?.none)
-                Text(String(localized: "Inspector")).tag(PluginType?.some(.inspector))
-                Text(String(localized: "Exporter")).tag(PluginType?.some(.exporter))
-                Text(String(localized: "Script")).tag(PluginType?.some(.script))
+            Picker(
+                String(localized: "Plugin Category", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.selectedCategory
+            ) {
+                Text(String(localized: "All", bundle: RockxyLocalization.bundle)).tag(PluginType?.none)
+                Text(String(localized: "Inspector", bundle: RockxyLocalization.bundle))
+                    .tag(PluginType?.some(.inspector))
+                Text(String(localized: "Exporter", bundle: RockxyLocalization.bundle)).tag(PluginType?.some(.exporter))
+                Text(String(localized: "Script", bundle: RockxyLocalization.bundle)).tag(PluginType?.some(.script))
             }
             .pickerStyle(.menu)
             .labelsHidden()
@@ -111,7 +118,10 @@ struct PluginsSettingsTab: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(String(localized: "No Plugin Selected"), systemImage: "puzzlepiece.extension")
+            Label(
+                String(localized: "No Plugin Selected", bundle: RockxyLocalization.bundle),
+                systemImage: "puzzlepiece.extension"
+            )
         } description: {
             Text("Select a plugin from the list to view its details and configuration.")
         }
@@ -122,18 +132,21 @@ struct PluginsSettingsTab: View {
             Button {
                 viewModel.openPluginsFolder()
             } label: {
-                Label(String(localized: "Open Plugins Folder"), systemImage: "folder")
+                Label(
+                    String(localized: "Open Plugins Folder", bundle: RockxyLocalization.bundle),
+                    systemImage: "folder"
+                )
             }
 
             Button {
                 viewModel.installFromFile()
             } label: {
-                Label(String(localized: "Install from File…"), systemImage: "plus")
+                Label(String(localized: "Install from File…", bundle: RockxyLocalization.bundle), systemImage: "plus")
             }
 
             Spacer()
 
-            Text(String(localized: "\(viewModel.plugins.count) plugins"))
+            Text(String(localized: "\(viewModel.plugins.count) plugins", bundle: RockxyLocalization.bundle))
                 .font(settingsMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }

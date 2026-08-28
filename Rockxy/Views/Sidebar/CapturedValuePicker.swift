@@ -78,11 +78,12 @@ struct CapturedApplicationSelectionField: View {
             } label: {
                 HStack(spacing: 8) {
                     CapturedApplicationIconView(name: selection, size: 20)
-                    Text(selection.isEmpty ? String(localized: "Any application") : selection)
+                    Text(selection
+                        .isEmpty ? String(localized: "Any application", bundle: RockxyLocalization.bundle) : selection)
                         .foregroundStyle(selection.isEmpty ? Color.secondary : Color.primary)
                         .lineLimit(1)
                     Spacer(minLength: 8)
-                    Text(String(localized: "Choose…"))
+                    Text(String(localized: "Choose…", bundle: RockxyLocalization.bundle))
                         .foregroundStyle(.secondary)
                     Image(systemName: "chevron.down")
                         .font(.caption2)
@@ -101,9 +102,9 @@ struct CapturedApplicationSelectionField: View {
             }
             .popover(isPresented: $isPickerPresented, arrowEdge: .trailing) {
                 CapturedValuePicker(
-                    title: String(localized: "Choose Application"),
-                    searchPrompt: String(localized: "Search captured applications"),
-                    emptySelectionTitle: String(localized: "Any Application"),
+                    title: String(localized: "Choose Application", bundle: RockxyLocalization.bundle),
+                    searchPrompt: String(localized: "Search captured applications", bundle: RockxyLocalization.bundle),
+                    emptySelectionTitle: String(localized: "Any Application", bundle: RockxyLocalization.bundle),
                     selection: selection,
                     suggestions: suggestions,
                     kind: .application
@@ -121,7 +122,7 @@ struct CapturedApplicationSelectionField: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Use any application"))
+                .help(String(localized: "Use any application", bundle: RockxyLocalization.bundle))
             }
         }
     }
@@ -151,11 +152,11 @@ struct CapturedTextSuggestionField: View {
             TextField(placeholder, text: $text)
                 .textFieldStyle(.roundedBorder)
                 .focused($isTextFieldFocused)
-            Button(String(localized: "Browse…")) {
+            Button(String(localized: "Browse…", bundle: RockxyLocalization.bundle)) {
                 isPickerPresented.toggle()
             }
             .fixedSize()
-            .help(String(localized: "Search values seen in captured traffic"))
+            .help(String(localized: "Search values seen in captured traffic", bundle: RockxyLocalization.bundle))
             .popover(isPresented: $isPickerPresented, arrowEdge: .trailing) {
                 CapturedValuePicker(
                     title: pickerTitle,
@@ -224,10 +225,13 @@ private struct CapturedValuePicker: View {
                     }
 
                     if matchingSuggestions.isEmpty, !trimmedSearchText.isEmpty {
-                        Text(String(localized: "No captured value matches your search."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(14)
+                        Text(String(
+                            localized: "No captured value matches your search.",
+                            bundle: RockxyLocalization.bundle
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(14)
                     }
                 }
             }
@@ -237,7 +241,8 @@ private struct CapturedValuePicker: View {
                 Divider()
                 Text(
                     String(
-                        localized: "Showing \(displayedSuggestions.count) of \(matchingSuggestions.count). Search to find more."
+                        localized: "Showing \(displayedSuggestions.count) of \(matchingSuggestions.count). Search to find more.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.caption)
@@ -300,7 +305,7 @@ private struct CapturedValuePicker: View {
                     Text("\(requestCount)")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .help(String(localized: "\(requestCount) captured requests"))
+                        .help(String(localized: "\(requestCount) captured requests", bundle: RockxyLocalization.bundle))
                 }
                 if selection == value {
                     Image(systemName: "checkmark")

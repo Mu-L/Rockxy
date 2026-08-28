@@ -62,7 +62,10 @@ struct ContentView: View {
                     if let warning = coordinator.projectPersistenceWarningMessage {
                         SystemProxyWarningBanner(
                             message: warning,
-                            primaryActionTitle: String(localized: "Repair Projects…"),
+                            primaryActionTitle: String(
+                                localized: "Repair Projects…",
+                                bundle: RockxyLocalization.bundle
+                            ),
                             onPrimaryAction: {
                                 coordinator.isProjectRecoveryPresented = true
                             }
@@ -156,7 +159,7 @@ struct ContentView: View {
         }
         .modifier(ConditionalScriptingWindowOpeners(isEnabled: managesLifecycle, openWindow: openWindow))
         .alert(
-            String(localized: "Proxy Error"),
+            String(localized: "Proxy Error", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { coordinator.proxyError != nil && !coordinator.isProxyRunning },
                 set: {
@@ -166,7 +169,7 @@ struct ContentView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) {
                 coordinator.proxyError = nil
             }
         } message: {
@@ -186,10 +189,10 @@ struct ContentView: View {
             )
         ) {
             if let invitation = nearbyTransferReceiver.pendingInvitation {
-                Button(String(localized: "Accept and Add iOS Workspace")) {
+                Button(String(localized: "Accept and Add iOS Workspace", bundle: RockxyLocalization.bundle)) {
                     nearbyTransferReceiver.approve(invitation)
                 }
-                Button(String(localized: "Decline"), role: .cancel) {
+                Button(String(localized: "Decline", bundle: RockxyLocalization.bundle), role: .cancel) {
                     nearbyTransferReceiver.decline(invitation)
                 }
             }
@@ -240,7 +243,7 @@ struct ContentView: View {
             ProjectRecoverySheet(coordinator: coordinator)
         }
         .alert(
-            String(localized: "Project Operation Failed"),
+            String(localized: "Project Operation Failed", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { coordinator.lastProjectOperationError != nil },
                 set: {
@@ -250,7 +253,7 @@ struct ContentView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) {
                 coordinator.lastProjectOperationError = nil
             }
         } message: {
@@ -291,9 +294,9 @@ struct ContentView: View {
 
     private var nearbyTransferTitle: String {
         guard let invitation = nearbyTransferReceiver.pendingInvitation else {
-            return String(localized: "Receive Rockxy iOS Session")
+            return String(localized: "Receive Rockxy iOS Session", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Receive from \(invitation.deviceName)?")
+        return String(localized: "Receive from \(invitation.deviceName)?", bundle: RockxyLocalization.bundle)
     }
 
     @ViewBuilder private var toastOverlay: some View {
@@ -325,7 +328,10 @@ struct ContentView: View {
                 } catch {
                     coordinator.activeToast = ToastMessage(
                         style: .error,
-                        text: String(localized: "Failed to install certificate — \(error.localizedDescription)")
+                        text: String(
+                            localized: "Failed to install certificate — \(error.localizedDescription)",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 }
                 await ReadinessCoordinator.shared.deepRefresh()

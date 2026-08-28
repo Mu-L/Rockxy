@@ -46,11 +46,12 @@ struct PreviewerTabSettingsView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Inspector Preview Tabs"))
+                Text(String(localized: "Inspector Preview Tabs", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .semibold))
                 Text(
                     String(
-                        localized: "Choose which built-in format tabs appear in the request and response inspectors."
+                        localized: "Choose which built-in format tabs appear in the request and response inspectors.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -59,7 +60,7 @@ struct PreviewerTabSettingsView: View {
 
             Spacer()
 
-            Text(String(localized: "APPLIES IMMEDIATELY"))
+            Text(String(localized: "APPLIES IMMEDIATELY", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.metadataFont(weight: .semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 10)
@@ -82,7 +83,7 @@ struct PreviewerTabSettingsView: View {
                     """
                     Raw includes the request or status line and headers. Other formats focus on body content and may show \
                     an unavailable state when the selected payload does not match.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -96,19 +97,19 @@ struct PreviewerTabSettingsView: View {
 
     private var previewMatrix: some View {
         Table(PreviewRenderMode.allCases) {
-            TableColumn(String(localized: "Format")) { mode in
+            TableColumn(String(localized: "Format", bundle: RockxyLocalization.bundle)) { mode in
                 Text(mode.displayName)
                     .font(toolMetrics.font())
                     .lineLimit(1)
             }
             .width(min: 260, ideal: 360)
 
-            TableColumn(String(localized: "Request")) { mode in
+            TableColumn(String(localized: "Request", bundle: RockxyLocalization.bundle)) { mode in
                 centeredToggle(for: mode, panel: .request)
             }
             .width(120)
 
-            TableColumn(String(localized: "Response")) { mode in
+            TableColumn(String(localized: "Response", bundle: RockxyLocalization.bundle)) { mode in
                 centeredToggle(for: mode, panel: .response)
             }
             .width(120)
@@ -126,7 +127,7 @@ struct PreviewerTabSettingsView: View {
     private var footer: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
             Toggle(
-                String(localized: "Beautify minified HTML, CSS, and JavaScript"),
+                String(localized: "Beautify minified HTML, CSS, and JavaScript", bundle: RockxyLocalization.bundle),
                 isOn: Binding(
                     get: { store.autoBeautify },
                     set: { store.autoBeautify = $0 }
@@ -140,7 +141,8 @@ struct PreviewerTabSettingsView: View {
             Text(
                 String(
                     localized:
-                    "\(requestEnabledCount) request tabs · \(responseEnabledCount) response tabs"
+                    "\(requestEnabledCount) request tabs · \(responseEnabledCount) response tabs",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -172,7 +174,8 @@ struct PreviewerTabSettingsView: View {
             .accessibilityLabel(
                 String(
                     localized:
-                    "\(mode.displayName) \(panel == .request ? "Request" : "Response") preview"
+                    "\(mode.displayName) \(panel == .request ? "Request" : "Response") preview",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             Spacer(minLength: 0)

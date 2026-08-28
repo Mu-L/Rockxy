@@ -13,13 +13,13 @@ enum UpstreamProxyType: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .automatic:
-            String(localized: "Automatic")
+            String(localized: "Automatic", bundle: RockxyLocalization.bundle)
         case .http:
-            String(localized: "HTTP")
+            String(localized: "HTTP", bundle: RockxyLocalization.bundle)
         case .https:
-            String(localized: "HTTPS")
+            String(localized: "HTTPS", bundle: RockxyLocalization.bundle)
         case .socks5:
-            String(localized: "SOCKS5")
+            String(localized: "SOCKS5", bundle: RockxyLocalization.bundle)
         }
     }
 }

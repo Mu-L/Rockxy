@@ -21,7 +21,7 @@ final class DeveloperSetupViewModel {
         self.coordinator = coordinator
         self.pinnedStore = pinnedStore
         pinnedTargetIDs = pinnedStore.pinnedTargetIDs
-        selectedTarget = .python
+        selectedTargetID = .python
         selectedSnippetID = .pythonRequests
         snapshot = SetupSnapshot(
             supportStatus: .availableNow,
@@ -51,7 +51,10 @@ final class DeveloperSetupViewModel {
 
     let coordinator: MainContentCoordinator
 
-    var selectedTarget: SetupTarget
+    /// The selection is tracked by stable identity so it survives a runtime language
+    /// switch; `selectedTarget` re-derives from the catalog on every read, presenting
+    /// freshly localized title/summary values for the same logical target.
+    var selectedTargetID: SetupTarget.ID
     var pinnedTargetIDs: Set<SetupTarget.ID>
     var selectedTab: SetupDetailTab = .overview
     var sourceListSearchText = ""
@@ -62,6 +65,14 @@ final class DeveloperSetupViewModel {
         didSet {
             snapshot.selectedSnippetID = selectedSnippetID
         }
+    }
+
+    /// The currently selected target, re-derived from `selectedTargetID` so its
+    /// localized presentation reflects the current app language. Falls back to
+    /// Python if the catalog ever lacks the stored identifier.
+    var selectedTarget: SetupTarget {
+        get { SetupTarget.target(for: selectedTargetID) ?? .python }
+        set { selectedTargetID = newValue.id }
     }
 
     var filteredTargetSections: [SetupTargetSection] {
@@ -153,7 +164,8 @@ final class DeveloperSetupViewModel {
                 return [
                     selectedTarget.currentSupportSummary,
                     String(
-                        localized: "Automatic Setup can prepare a scoped session for this target; Manual Setup remains available."
+                        localized: "Automatic Setup can prepare a scoped session for this target; Manual Setup remains available.",
+                        bundle: RockxyLocalization.bundle
                     ),
                 ].joined(separator: " ")
             }
@@ -169,16 +181,16 @@ final class DeveloperSetupViewModel {
 
     var bottomStatusText: String {
         let snippetTitle: String = if selectedTarget.supportStatus != .availableNow {
-            String(localized: "Guide only")
+            String(localized: "Guide only", bundle: RockxyLocalization.bundle)
         } else if currentWorkflow.supportsSnippets {
             selectedSnippetTitle
         } else {
-            String(localized: "Manual guide")
+            String(localized: "Manual guide", bundle: RockxyLocalization.bundle)
         }
 
         let automationTitle = selectedTarget.automationSupport.isAvailable
             ? selectedTarget.automationSupport.badgeTitle
-            : String(localized: "Manual Setup")
+            : String(localized: "Manual Setup", bundle: RockxyLocalization.bundle)
 
         return [
             selectedTarget.title,
@@ -249,7 +261,7 @@ final class DeveloperSetupViewModel {
             return URL(fileURLWithPath: path).lastPathComponent
         }
 
-        return String(localized: "Export required")
+        return String(localized: "Export required", bundle: RockxyLocalization.bundle)
     }
 
     var currentSetupSteps: [SetupStep] {
@@ -266,7 +278,10 @@ final class DeveloperSetupViewModel {
 
     var validationInstruction: String {
         currentValidationSpec?.instruction
-            ?? String(localized: "Interactive validation is not available for this target.")
+            ?? String(
+                localized: "Interactive validation is not available for this target.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     var troubleshootingIssues: [SetupIssue] {
@@ -410,23 +425,23 @@ final class DeveloperSetupViewModel {
         let originalTargetID = selectedTarget.id
         let certificateSnapshot = await CertificateManager.shared.rootCAStatusSnapshot(performValidation: false)
         guard targetGeneration == generation,
-              snapshotRefreshGeneration == refreshGeneration
-        else {
+              snapshotRefreshGeneration == refreshGeneration else
+        {
             return
         }
         let pem = try? await CertificateManager.shared.getRootCAPEM()
         guard targetGeneration == generation,
               snapshotRefreshGeneration == refreshGeneration,
-              selectedTarget.id == originalTargetID
-        else {
+              selectedTarget.id == originalTargetID else
+        {
             return
         }
 
         let runtimeReadiness = await DeveloperSetupRuntimeTooling.readinessAsync(for: originalTargetID)
         guard targetGeneration == generation,
               snapshotRefreshGeneration == refreshGeneration,
-              selectedTarget.id == originalTargetID
-        else {
+              selectedTarget.id == originalTargetID else
+        {
             return
         }
         let workflow = currentWorkflow
@@ -465,8 +480,8 @@ final class DeveloperSetupViewModel {
         )
         guard targetGeneration == generation,
               snapshotRefreshGeneration == refreshGeneration,
-              selectedTarget.id == originalTargetID
-        else {
+              selectedTarget.id == originalTargetID else
+        {
             return
         }
         let validationSpec = probeReady ? currentValidationSpec : nil
@@ -561,15 +576,15 @@ final class DeveloperSetupViewModel {
         guard let route,
               route.destination == .hub,
               route.generation > lastAppliedHubRouteGeneration,
-              let target = SetupTarget.target(for: route.targetID)
-        else {
+              let target = SetupTarget.target(for: route.targetID) else
+        {
             return
         }
         lastAppliedHubRouteGeneration = route.generation
         await selectTarget(target)
         guard lastAppliedHubRouteGeneration == route.generation,
-              selectedTarget.id == route.targetID
-        else {
+              selectedTarget.id == route.targetID else
+        {
             return
         }
         selectTab(route.tab)
@@ -783,7 +798,7 @@ final class DeveloperSetupViewModel {
 
     private var selectedSnippetTitle: String {
         currentSnippetOptions.first(where: { $0.id == selectedSnippetID })?.title
-            ?? String(localized: "Guide only")
+            ?? String(localized: "Guide only", bundle: RockxyLocalization.bundle)
     }
 
     private static func exportedCertificateFileReady(from settings: AppSettings) -> Bool {
@@ -836,7 +851,9 @@ final class DeveloperSetupViewModel {
     private func prepareValidationProbe(
         targetID: SetupTarget.ID,
         targetGeneration generation: Int
-    ) async -> Bool {
+    )
+        async -> Bool
+    {
         guard supportsValidation else {
             probeSession = nil
             await probeServer.stop()

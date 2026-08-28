@@ -182,9 +182,9 @@ final class BreakpointManager {
             }
         }
         guard let userAgent = headers.first(where: { $0.name.lowercased() == "user-agent" })?.value,
-              !userAgent.isEmpty
-        else {
-            return String(localized: "Unknown")
+              !userAgent.isEmpty else
+        {
+            return String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         }
         if !userAgent.contains("Mozilla/"), let slash = userAgent.firstIndex(of: "/") {
             let name = String(userAgent[..<slash])
@@ -214,12 +214,12 @@ final class BreakpointManager {
         guard let contentType = data.headers.first(where: {
             $0.name.caseInsensitiveCompare("content-type") == .orderedSame
         })?.value.lowercased(),
-              contentType.contains("json"),
-              let bodyData = data.body.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
-              let operationName = object["operationName"] as? String,
-              !operationName.isEmpty
-        else {
+            contentType.contains("json"),
+            let bodyData = data.body.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+            let operationName = object["operationName"] as? String,
+            !operationName.isEmpty else
+        {
             return ""
         }
         return operationName

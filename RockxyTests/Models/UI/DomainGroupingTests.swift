@@ -8,6 +8,8 @@ import Testing
 
 @MainActor
 struct DomainGroupingTests {
+    // MARK: Internal
+
     @Test("Groups root domains, subdomains, and paths into a recursive tree")
     func recursiveDomainTree() throws {
         let coordinator = MainContentCoordinator()
@@ -72,10 +74,10 @@ struct DomainGroupingTests {
         let request = transaction("https://api.example.com/users/100", sequence: 0)
 
         index.add(request)
-        #expect(index.makeNodes().map(\.name) == [String(localized: "Unknown")])
+        #expect(index.makeNodes().map(\.name) == [String(localized: "Unknown", bundle: RockxyLocalization.bundle)])
 
         request.clientApp = "Safari"
-        index.remove(request, appName: String(localized: "Unknown"))
+        index.remove(request, appName: String(localized: "Unknown", bundle: RockxyLocalization.bundle))
         index.add(request, appName: request.clientApp)
 
         let node = try #require(index.makeNodes().first)

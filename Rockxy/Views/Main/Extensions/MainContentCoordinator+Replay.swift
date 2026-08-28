@@ -23,13 +23,19 @@ extension MainContentCoordinator {
                 Self.logger.info("Replay completed: \(response.statusCode)")
                 activeToast = ToastMessage(
                     style: .success,
-                    text: String(localized: "Replay completed — \(response.statusCode)")
+                    text: String(
+                        localized: "Replay completed — \(response.statusCode)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             } catch {
                 Self.logger.error("Replay failed: \(error.localizedDescription)")
                 activeToast = ToastMessage(
                     style: .error,
-                    text: String(localized: "Replay failed — \(error.localizedDescription)")
+                    text: String(
+                        localized: "Replay failed — \(error.localizedDescription)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }

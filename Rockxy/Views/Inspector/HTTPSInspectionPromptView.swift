@@ -5,6 +5,8 @@ import SwiftUI
 
 /// Compact controls for CONNECT tunnels whose payload was not decrypted.
 struct HTTPSInspectionPromptView: View {
+    // MARK: Internal
+
     let prompt: HTTPSInspectionPromptModel
     let onAction: (HTTPSInspectionPromptAction) -> Void
 
@@ -39,6 +41,16 @@ struct HTTPSInspectionPromptView: View {
         max(78, metrics.controlFontSize * 6.25)
     }
 
+    private var scopeFooter: String {
+        if prompt.hostScope?.state == .ready {
+            return String(
+                localized: "Ready for new connections. Repeat the request.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(localized: "This response stays encrypted.", bundle: RockxyLocalization.bundle)
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
             if prompt.requiresCertificateSetup {
@@ -51,8 +63,8 @@ struct HTTPSInspectionPromptView: View {
 
             Text(
                 prompt.requiresCertificateSetup
-                    ? String(localized: "Certificate Required")
-                    : String(localized: "Encrypted HTTPS")
+                    ? String(localized: "Certificate Required", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Encrypted HTTPS", bundle: RockxyLocalization.bundle)
             )
             .font(.system(size: metrics.controlFontSize, weight: .semibold))
 
@@ -61,27 +73,73 @@ struct HTTPSInspectionPromptView: View {
             Button {
                 onAction(.openSSLProxyingList)
             } label: {
-                Label(String(localized: "Settings…"), systemImage: "gearshape")
+                Label(String(localized: "Settings…", bundle: RockxyLocalization.bundle), systemImage: "gearshape")
                     .lineLimit(1)
                     .frame(minWidth: promptActionLabelWidth)
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
             .fixedSize()
-            .help(String(localized: "Open HTTPS Decryption Settings"))
-            .accessibilityLabel(String(localized: "Open HTTPS Decryption Settings"))
+            .help(String(localized: "Open HTTPS Decryption Settings", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Open HTTPS Decryption Settings", bundle: RockxyLocalization.bundle))
         }
     }
 
     private var certificateAction: some View {
-        Button(String(localized: "Install & Trust…")) {
+        Button(String(localized: "Install & Trust…", bundle: RockxyLocalization.bundle)) {
             if let action = prompt.certificateAction {
                 onAction(action)
             }
         }
         .rockxyGlassButtonStyle(prominent: true)
         .controlSize(.small)
-        .accessibilityHint(String(localized: "Installs and trusts the Rockxy root certificate"))
+        .accessibilityHint(String(
+            localized: "Installs and trusts the Rockxy root certificate",
+            bundle: RockxyLocalization.bundle
+        ))
+    }
+
+    private var insightDetailsButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isInsightExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(isInsightExpanded ? String(localized: "Hide", bundle: RockxyLocalization.bundle) : String(
+                    localized: "Details",
+                    bundle: RockxyLocalization.bundle
+                ))
+                Image(systemName: isInsightExpanded ? "chevron.up" : "chevron.down")
+            }
+            .font(.system(size: metrics.metadataFontSize, weight: .medium))
+        }
+        .buttonStyle(.borderless)
+        .fixedSize()
+        .accessibilityHint(String(
+            localized: "Shows the evidence and recommended next step",
+            bundle: RockxyLocalization.bundle
+        ))
+    }
+
+    private var scopeControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(spacing: 0) {
+                if let hostScope = prompt.hostScope {
+                    scopeActionRow(scope: hostScope)
+                }
+
+                if let appScope = prompt.appScope {
+                    Divider()
+                    scopeActionRow(scope: appScope)
+                }
+            }
+
+            Text(scopeFooter)
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     @ViewBuilder
@@ -138,27 +196,16 @@ struct HTTPSInspectionPromptView: View {
         }
     }
 
-    private var insightDetailsButton: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.16)) {
-                isInsightExpanded.toggle()
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Text(isInsightExpanded ? String(localized: "Hide") : String(localized: "Details"))
-                Image(systemName: isInsightExpanded ? "chevron.up" : "chevron.down")
-            }
-            .font(.system(size: metrics.metadataFontSize, weight: .medium))
-        }
-        .buttonStyle(.borderless)
-        .fixedSize()
-        .accessibilityHint(String(localized: "Shows the evidence and recommended next step"))
-    }
-
     private func insightDetails(_ insight: HTTPSConnectionInsight) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            insightDetail(label: String(localized: "Evidence"), text: insight.evidence)
-            insightDetail(label: String(localized: "Next Step"), text: insight.nextStep)
+            insightDetail(
+                label: String(localized: "Evidence", bundle: RockxyLocalization.bundle),
+                text: insight.evidence
+            )
+            insightDetail(
+                label: String(localized: "Next Step", bundle: RockxyLocalization.bundle),
+                text: insight.nextStep
+            )
         }
     }
 
@@ -169,34 +216,6 @@ struct HTTPSInspectionPromptView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var scopeControls: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            VStack(spacing: 0) {
-                if let hostScope = prompt.hostScope {
-                    scopeActionRow(scope: hostScope)
-                }
-
-                if let appScope = prompt.appScope {
-                    Divider()
-                    scopeActionRow(scope: appScope)
-                }
-            }
-
-            Text(scopeFooter)
-                .font(.system(size: metrics.metadataFontSize))
-                .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var scopeFooter: String {
-        if prompt.hostScope?.state == .ready {
-            return String(localized: "Ready for new connections. Repeat the request.")
-        }
-        return String(localized: "This response stays encrypted.")
-    }
-
-    @ViewBuilder
     private func scopeActionRow(scope: HTTPSInspectionScopePresentation) -> some View {
         HStack(spacing: 8) {
             Text(scope.value)
@@ -218,7 +237,7 @@ struct HTTPSInspectionPromptView: View {
             scopeActionButton(scope)
 
         case .status:
-            Label(String(localized: "Ready"), systemImage: "checkmark.circle.fill")
+            Label(String(localized: "Ready", bundle: RockxyLocalization.bundle), systemImage: "checkmark.circle.fill")
                 .font(.system(size: metrics.metadataFontSize, weight: .medium))
                 .foregroundStyle(Color(nsColor: .systemGreen))
                 .fixedSize()
@@ -241,7 +260,10 @@ struct HTTPSInspectionPromptView: View {
             .fixedSize()
             .help(scope.actionDescription)
             .accessibilityLabel(scope.actionDescription)
-            .accessibilityHint(String(localized: "The current captured response is unchanged"))
+            .accessibilityHint(String(
+                localized: "The current captured response is unchanged",
+                bundle: RockxyLocalization.bundle
+            ))
         }
     }
 }
@@ -287,8 +309,11 @@ struct HTTPSInspectionScopePresentation: Equatable {
                 state: .partial,
                 control: .button,
                 action: .retryDomain(value),
-                controlTitle: String(localized: "Retry"),
-                actionDescription: String(localized: "Retry HTTPS decryption for \(value) on the next connection")
+                controlTitle: String(localized: "Retry", bundle: RockxyLocalization.bundle),
+                actionDescription: String(
+                    localized: "Retry HTTPS decryption for \(value) on the next connection",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
 
@@ -298,10 +323,16 @@ struct HTTPSInspectionScopePresentation: Equatable {
             state: isReady ? .ready : .available,
             control: isReady ? .status : .button,
             action: isReady ? nil : .enableDomain(value),
-            controlTitle: isReady ? nil : String(localized: "Decrypt Host"),
+            controlTitle: isReady ? nil : String(localized: "Decrypt Host", bundle: RockxyLocalization.bundle),
             actionDescription: isReady ?
-                String(localized: "HTTPS decryption is ready for new connections to \(value)") :
-                String(localized: "Turn on HTTPS decryption for new connections to \(value)")
+                String(
+                    localized: "HTTPS decryption is ready for new connections to \(value)",
+                    bundle: RockxyLocalization.bundle
+                ) :
+                String(
+                    localized: "Turn on HTTPS decryption for new connections to \(value)",
+                    bundle: RockxyLocalization.bundle
+                )
         )
     }
 
@@ -334,8 +365,11 @@ struct HTTPSInspectionScopePresentation: Equatable {
             state: state,
             control: .button,
             action: .enableApp(name, fallbackDomain: fallbackDomain),
-            controlTitle: String(localized: "Decrypt App"),
-            actionDescription: String(localized: "Turn on HTTPS decryption for other known hosts used by \(name)")
+            controlTitle: String(localized: "Decrypt App", bundle: RockxyLocalization.bundle),
+            actionDescription: String(
+                localized: "Turn on HTTPS decryption for other known hosts used by \(name)",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 }

@@ -34,8 +34,8 @@ struct DiffViewerView: View {
 
     private var partialTitle: String {
         viewModel.workspaceState == .missingLeft
-            ? String(localized: "Assign a Left Transaction")
-            : String(localized: "Assign a Right Transaction")
+            ? String(localized: "Assign a Left Transaction", bundle: RockxyLocalization.bundle)
+            : String(localized: "Assign a Right Transaction", bundle: RockxyLocalization.bundle)
     }
 
     private var partialIcon: String {
@@ -44,24 +44,14 @@ struct DiffViewerView: View {
 
     private var partialDescription: String {
         viewModel.workspaceState == .missingLeft
-            ? String(localized: "Click the L column on a candidate to finish this basic compare.")
-            : String(localized: "Click the R column on a candidate to finish this basic compare.")
-    }
-
-    // MARK: - Ready Content
-
-    private func comparisonContent(showsIdentity: Bool) -> some View {
-        VStack(spacing: 0) {
-            if showsIdentity {
-                identityHeader
-                Divider()
-            }
-            if viewModel.isComparing {
-                loadingState
-            } else {
-                diffContent
-            }
-        }
+            ? String(
+                localized: "Click the L column on a candidate to finish this basic compare.",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(
+                localized: "Click the R column on a candidate to finish this basic compare.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     @ViewBuilder private var diffContent: some View {
@@ -76,11 +66,17 @@ struct DiffViewerView: View {
 
     private var identityHeader: some View {
         HStack(spacing: 0) {
-            transactionIdentity(String(localized: "Left"), transaction: viewModel.leftTransaction)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            transactionIdentity(
+                String(localized: "Left", bundle: RockxyLocalization.bundle),
+                transaction: viewModel.leftTransaction
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
             Divider()
-            transactionIdentity(String(localized: "Right"), transaction: viewModel.rightTransaction)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            transactionIdentity(
+                String(localized: "Right", bundle: RockxyLocalization.bundle),
+                transaction: viewModel.rightTransaction
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
@@ -93,7 +89,7 @@ struct DiffViewerView: View {
     private var textPasteMode: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                Text(String(localized: "Side A — paste or type text"))
+                Text(String(localized: "Side A — paste or type text", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 8)
@@ -101,13 +97,13 @@ struct DiffViewerView: View {
                 TextEditor(text: $viewModel.textA)
                     .font(toolMetrics.font(monospaced: true))
                     .scrollContentBackground(.hidden)
-                    .accessibilityLabel(String(localized: "Left text"))
+                    .accessibilityLabel(String(localized: "Left text", bundle: RockxyLocalization.bundle))
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(String(localized: "Side B — paste or type text"))
+                Text(String(localized: "Side B — paste or type text", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 8)
@@ -115,7 +111,7 @@ struct DiffViewerView: View {
                 TextEditor(text: $viewModel.textB)
                     .font(toolMetrics.font(monospaced: true))
                     .scrollContentBackground(.hidden)
-                    .accessibilityLabel(String(localized: "Right text"))
+                    .accessibilityLabel(String(localized: "Right text", bundle: RockxyLocalization.bundle))
             }
         }
     }
@@ -135,11 +131,17 @@ struct DiffViewerView: View {
 
     private var missingBothState: some View {
         ContentUnavailableView {
-            Label(String(localized: "Choose Two Transactions"), systemImage: "rectangle.split.2x1")
-                .font(toolMetrics.font(weight: .medium))
+            Label(
+                String(localized: "Choose Two Transactions", bundle: RockxyLocalization.bundle),
+                systemImage: "rectangle.split.2x1"
+            )
+            .font(toolMetrics.font(weight: .medium))
         } description: {
-            Text(String(localized: "Compare two selected requests, then assign Left and Right in the comparison set."))
-                .font(toolMetrics.secondaryFont())
+            Text(String(
+                localized: "Compare two selected requests, then assign Left and Right in the comparison set.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -147,11 +149,27 @@ struct DiffViewerView: View {
     private var loadingState: some View {
         VStack(spacing: toolMetrics.controlSpacing) {
             ProgressView()
-            Text(String(localized: "Preparing bounded comparison…"))
+            Text(String(localized: "Preparing bounded comparison…", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Ready Content
+
+    private func comparisonContent(showsIdentity: Bool) -> some View {
+        VStack(spacing: 0) {
+            if showsIdentity {
+                identityHeader
+                Divider()
+            }
+            if viewModel.isComparing {
+                loadingState
+            } else {
+                diffContent
+            }
+        }
     }
 
     private func transactionIdentity(_ label: String, transaction: HTTPTransaction?) -> some View {
@@ -167,7 +185,7 @@ struct DiffViewerView: View {
                     .truncationMode(.middle)
                     .help(transaction.request.url.absoluteString)
             } else {
-                Text(String(localized: "Not assigned"))
+                Text(String(localized: "Not assigned", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.tertiary)
             }

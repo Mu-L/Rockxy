@@ -20,6 +20,8 @@ private enum MapLocalFileSource: Equatable {
     case externalReference
 }
 
+// MARK: - MapLocalExternalFileInterpretation
+
 private enum MapLocalExternalFileInterpretation: Equatable {
     case uninspected
     case rawBody
@@ -92,7 +94,8 @@ final class MapLocalEditorViewModel {
             return nil
         }
         return String(
-            localized: "This file starts like an HTTP response but is malformed. Rockxy will continue to the origin until the file is corrected."
+            localized: "This file starts like an HTTP response but is malformed. Rockxy will continue to the origin until the file is corrected.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -197,7 +200,8 @@ final class MapLocalEditorViewModel {
             return nil
         }
         return String(
-            localized: "Regex directory rules need a capture group, such as /assets/(.*), to choose a file inside the directory."
+            localized: "Regex directory rules need a capture group, such as /assets/(.*), to choose a file inside the directory.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -234,8 +238,8 @@ final class MapLocalEditorViewModel {
         panel.canChooseDirectories = targetMode == .localDirectory
         panel.allowsMultipleSelection = false
         panel.message = targetMode == .localDirectory
-            ? String(localized: "Select a local directory to serve files from")
-            : String(localized: "Select a local file to serve for matched requests")
+            ? String(localized: "Select a local directory to serve files from", bundle: RockxyLocalization.bundle)
+            : String(localized: "Select a local file to serve for matched requests", bundle: RockxyLocalization.bundle)
 
         if panel.runModal() == .OK, let url = panel.url {
             if targetMode == .localDirectory {
@@ -334,7 +338,10 @@ final class MapLocalEditorViewModel {
 
     func makeRule() -> ProxyRule? {
         guard isSaveEnabled else {
-            errorMessage = String(localized: "Complete the matching rule and local target before saving.")
+            errorMessage = String(
+                localized: "Complete the matching rule and local target before saving.",
+                bundle: RockxyLocalization.bundle
+            )
             return nil
         }
 
@@ -388,6 +395,15 @@ final class MapLocalEditorViewModel {
 
     // MARK: Private
 
+    private struct RuleTestConfiguration: Equatable {
+        let authoredPattern: String
+        let method: MapLocalHTTPMethod
+        let matchType: MapLocalMatchType
+        let includeSubpaths: Bool
+        let testURL: String
+        let testMethod: MapLocalHTTPMethod
+    }
+
     /// Root directory Rockxy owns for generated Map Local response files.
     private static var mapLocalDirectoryRoot: URL {
         RockxyIdentity.current
@@ -438,15 +454,6 @@ final class MapLocalEditorViewModel {
         case .localDirectory:
             isDirectoryValid
         }
-    }
-
-    private struct RuleTestConfiguration: Equatable {
-        let authoredPattern: String
-        let method: MapLocalHTTPMethod
-        let matchType: MapLocalMatchType
-        let includeSubpaths: Bool
-        let testURL: String
-        let testMethod: MapLocalHTTPMethod
     }
 
     private static func defaultMapLocalFilePath() -> String {

@@ -7,15 +7,16 @@ struct PrivacySettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "Data Storage")) {
+            SettingsSection(String(localized: "Data Storage", bundle: RockxyLocalization.bundle)) {
                 VStack(alignment: .leading, spacing: 12) {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "Local Traffic Storage"))
+                            Text(String(localized: "Local Traffic Storage", bundle: RockxyLocalization.bundle))
                                 .font(settingsMetrics.font(weight: .medium))
                             Text(
                                 String(
-                                    localized: "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac."
+                                    localized: "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac.",
+                                    bundle: RockxyLocalization.bundle
                                 )
                             )
                             .font(settingsMetrics.secondaryFont())
@@ -35,12 +36,15 @@ struct PrivacySettingsTab: View {
 
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(String(localized: "Large Response Bodies"))
+                            Text(String(localized: "Large Response Bodies", bundle: RockxyLocalization.bundle))
                                 .font(settingsMetrics.font(weight: .medium))
-                            Text(String(localized: "Responses larger than 1 MB are saved as separate files."))
-                                .font(settingsMetrics.secondaryFont())
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                            Text(String(
+                                localized: "Responses larger than 1 MB are saved as separate files.",
+                                bundle: RockxyLocalization.bundle
+                            ))
+                            .font(settingsMetrics.secondaryFont())
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                             Text("~" + "/Library/Application Support/" + RockxyIdentity.current
                                 .appSupportDirectoryName + "/bodies/")
                                 .font(settingsMetrics.secondaryFont(monospaced: true))
@@ -53,10 +57,10 @@ struct PrivacySettingsTab: View {
                 }
             }
 
-            SettingsSection(String(localized: "Exports & Sharing")) {
+            SettingsSection(String(localized: "Exports & Sharing", bundle: RockxyLocalization.bundle)) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(String(localized: "Exports Contain Full Traffic Data"))
+                        Text(String(localized: "Exports Contain Full Traffic Data", bundle: RockxyLocalization.bundle))
                             .font(settingsMetrics.font(weight: .medium))
                         Text(
                             String(
@@ -64,7 +68,7 @@ struct PrivacySettingsTab: View {
                                 HAR, session, and Gist exports can include captured headers, cookies, \
                                 authorization tokens, and request/response bodies. Review exports \
                                 before sharing or publishing.
-                                """
+                                """, bundle: RockxyLocalization.bundle
                             )
                         )
                         .font(settingsMetrics.secondaryFont())
@@ -76,13 +80,13 @@ struct PrivacySettingsTab: View {
                 }
             }
 
-            SettingsSection(String(localized: "Analytics & Telemetry")) {
+            SettingsSection(String(localized: "Analytics & Telemetry", bundle: RockxyLocalization.bundle)) {
                 Label {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(String(localized: "No Telemetry"))
+                            Text(String(localized: "No Telemetry", bundle: RockxyLocalization.bundle))
                                 .font(settingsMetrics.font(weight: .medium))
-                            Text(String(localized: "No Data Collected"))
+                            Text(String(localized: "No Data Collected", bundle: RockxyLocalization.bundle))
                                 .font(settingsMetrics.metadataFont(weight: .semibold))
                                 .foregroundStyle(.green)
                                 .padding(.horizontal, 6)
@@ -94,7 +98,7 @@ struct PrivacySettingsTab: View {
                                 localized: """
                                 Rockxy does not collect analytics or crash reports. Captured traffic stays on your \
                                 machine unless you explicitly export, share, or publish it.
-                                """
+                                """, bundle: RockxyLocalization.bundle
                             )
                         )
                         .font(settingsMetrics.secondaryFont())
@@ -108,7 +112,7 @@ struct PrivacySettingsTab: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Privacy Policy")) {
+                Button(String(localized: "Privacy Policy", bundle: RockxyLocalization.bundle)) {
                     if let url = URL(string: "https://www.rockxy.io/privacy") {
                         NSWorkspace.shared.open(url)
                     }

@@ -16,18 +16,18 @@ struct ProjectNameEditorContext: Identifiable, Equatable {
     var title: String {
         switch mode {
         case .create:
-            String(localized: "New Project")
+            String(localized: "New Project", bundle: RockxyLocalization.bundle)
         case .rename:
-            String(localized: "Rename Project")
+            String(localized: "Rename Project", bundle: RockxyLocalization.bundle)
         }
     }
 
     var actionTitle: String {
         switch mode {
         case .create:
-            String(localized: "Create")
+            String(localized: "Create", bundle: RockxyLocalization.bundle)
         case .rename:
-            String(localized: "Rename")
+            String(localized: "Rename", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -90,24 +90,24 @@ struct ProjectToolbarSelectorView: View {
 
             Divider()
 
-            Button(String(localized: "New Project…")) {
+            Button(String(localized: "New Project…", bundle: RockxyLocalization.bundle)) {
                 coordinator.presentNewProjectEditor()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(!canCreateProject)
 
-            Button(String(localized: "Rename Project…")) {
+            Button(String(localized: "Rename Project…", bundle: RockxyLocalization.bundle)) {
                 coordinator.presentRenameProjectEditor(id: coordinator.projectStore.activeProjectID)
             }
             .disabled(!canTransitionProjects)
 
-            Button(String(localized: "Manage Projects…")) {
+            Button(String(localized: "Manage Projects…", bundle: RockxyLocalization.bundle)) {
                 coordinator.isProjectManagerPresented = true
             }
 
             if case .failed = coordinator.projectStore.loadState {
                 Divider()
-                Button(String(localized: "Repair Projects…")) {
+                Button(String(localized: "Repair Projects…", bundle: RockxyLocalization.bundle)) {
                     coordinator.isProjectRecoveryPresented = true
                 }
             }
@@ -132,8 +132,11 @@ struct ProjectToolbarSelectorView: View {
         .menuStyle(.borderlessButton)
         .frame(width: preferredWidth, alignment: .leading)
         .fixedSize(horizontal: true, vertical: false)
-        .help(String(localized: "Active Project: \(coordinator.projectStore.activeProject.name)"))
-        .accessibilityLabel(String(localized: "Active Project"))
+        .help(String(
+            localized: "Active Project: \(coordinator.projectStore.activeProject.name)",
+            bundle: RockxyLocalization.bundle
+        ))
+        .accessibilityLabel(String(localized: "Active Project", bundle: RockxyLocalization.bundle))
         .accessibilityValue(coordinator.projectStore.activeProject.name)
     }
 
@@ -200,9 +203,12 @@ struct ProjectNameEditorSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(context.title)
                         .font(.headline)
-                    Text(String(localized: "Projects keep Traffic Tab layouts and filters together."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "Projects keep Traffic Tab layouts and filters together.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
@@ -211,13 +217,16 @@ struct ProjectNameEditorSheet: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 7) {
-                Text(String(localized: "Project Name"))
+                Text(String(localized: "Project Name", bundle: RockxyLocalization.bundle))
                     .font(.subheadline.weight(.medium))
-                TextField(String(localized: "For example: Checkout API"), text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: name) { _, _ in
-                        operationErrorMessage = nil
-                    }
+                TextField(
+                    String(localized: "For example: Checkout API", bundle: RockxyLocalization.bundle),
+                    text: $name
+                )
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: name) { _, _ in
+                    operationErrorMessage = nil
+                }
                 Text(editorMessage)
                     .font(.caption)
                     .foregroundStyle(hasEditorError ? Color.orange : Color.secondary)
@@ -228,7 +237,7 @@ struct ProjectNameEditorSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel"), role: .cancel) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -255,7 +264,8 @@ struct ProjectNameEditorSheet: View {
         validationMessage
             ?? operationErrorMessage
             ?? String(
-                localized: "1–\(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters. Names must be unique."
+                localized: "1–\(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters. Names must be unique.",
+                bundle: RockxyLocalization.bundle
             )
     }
 
@@ -269,7 +279,7 @@ struct ProjectNameEditorSheet: View {
 
     private var validationMessage: String? {
         guard let normalizedName else {
-            return String(localized: "Enter a name without control characters.")
+            return String(localized: "Enter a name without control characters.", bundle: RockxyLocalization.bundle)
         }
         let key = ProjectNormalization.foldedKey(for: normalizedName)
         let excludedID: UUID? = switch context.mode {
@@ -279,7 +289,7 @@ struct ProjectNameEditorSheet: View {
         if coordinator.projectStore.projects.contains(where: {
             $0.id != excludedID && ProjectNormalization.foldedKey(for: $0.name) == key
         }) {
-            return String(localized: "A Project with this name already exists.")
+            return String(localized: "A Project with this name already exists.", bundle: RockxyLocalization.bundle)
         }
         return nil
     }
@@ -296,7 +306,7 @@ struct ProjectNameEditorSheet: View {
         }
         guard succeeded else {
             operationErrorMessage = coordinator.projectOperationErrorMessage
-                ?? String(localized: "The Project could not be updated. Try again.")
+                ?? String(localized: "The Project could not be updated. Try again.", bundle: RockxyLocalization.bundle)
             return
         }
         RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
@@ -337,22 +347,29 @@ struct ProjectManagerSheet: View {
             idealHeight: max(540, toolMetrics.bodyFontSize * 16 + 340)
         )
         .confirmationDialog(
-            String(localized: "Delete Project?"),
+            String(localized: "Delete Project?", bundle: RockxyLocalization.bundle),
             isPresented: deleteConfirmation,
             titleVisibility: .visible,
             presenting: coordinator.projectDeletionRequest
         ) { request in
-            Button(String(localized: "Delete \(request.projectName)"), role: .destructive) {
+            Button(
+                String(localized: "Delete \(request.projectName)", bundle: RockxyLocalization.bundle),
+                role: .destructive
+            ) {
                 delete(request)
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: { _ in
             Text(
                 String(
-                    localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration."
+                    localized: "This removes the Project, its in-memory traffic history, and its saved Traffic Tab configuration.",
+                    bundle: RockxyLocalization.bundle
                 )
                     + " "
-                    + String(localized: "Manually saved session files, rules, and favorites are not deleted.")
+                    + String(
+                        localized: "Manually saved session files, rules, and favorites are not deleted.",
+                        bundle: RockxyLocalization.bundle
+                    )
             )
         }
         .sheet(item: Binding(
@@ -412,12 +429,15 @@ struct ProjectManagerSheet: View {
     private var projectSidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Projects"))
+                Text(String(localized: "Projects", bundle: RockxyLocalization.bundle))
                     .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
-                Text(String(localized: "Organize Project-scoped traffic and durable Traffic Tab layouts."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Organize Project-scoped traffic and durable Traffic Tab layouts.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.top, toolMetrics.headerTopPadding)
@@ -446,8 +466,11 @@ struct ProjectManagerSheet: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: toolMetrics.smallIconFontSize))
                                 .foregroundStyle(selection == project.id ? Color.primary : Color.accentColor)
-                                .help(String(localized: "Active Project"))
-                                .accessibilityLabel(String(localized: "Active Project"))
+                                .help(String(localized: "Active Project", bundle: RockxyLocalization.bundle))
+                                .accessibilityLabel(String(
+                                    localized: "Active Project",
+                                    bundle: RockxyLocalization.bundle
+                                ))
                         }
                     }
                     .tag(project.id)
@@ -469,11 +492,12 @@ struct ProjectManagerSheet: View {
                 Text("\(coordinator.projectStore.projects.count)/\(coordinator.projectStore.maxProjects)")
                     .font(toolMetrics.metadataFont(monospaced: true))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel(String(localized: "Project capacity"))
+                    .accessibilityLabel(String(localized: "Project capacity", bundle: RockxyLocalization.bundle))
                     .accessibilityValue(
                         String(
                             localized:
-                            "\(coordinator.projectStore.projects.count) of \(coordinator.projectStore.maxProjects) Projects"
+                            "\(coordinator.projectStore.projects.count) of \(coordinator.projectStore.maxProjects) Projects",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
             }
@@ -493,19 +517,19 @@ struct ProjectManagerSheet: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Text(project.id == coordinator.projectStore.activeProjectID
-                            ? String(localized: "Active Project")
-                            : String(localized: "Local Project"))
+                            ? String(localized: "Active Project", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Local Project", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.secondaryFont())
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     if project.id != coordinator.projectStore.activeProjectID {
-                        Button(String(localized: "Open Project")) {
+                        Button(String(localized: "Open Project", bundle: RockxyLocalization.bundle)) {
                             open(project)
                         }
                         .disabled(!canTransitionProjects)
                     }
-                    Button(String(localized: "Rename…")) {
+                    Button(String(localized: "Rename…", bundle: RockxyLocalization.bundle)) {
                         coordinator.presentRenameProjectEditor(id: project.id)
                     }
                     .disabled(!canTransitionProjects)
@@ -517,7 +541,7 @@ struct ProjectManagerSheet: View {
 
                 VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
                     HStack {
-                        Text(String(localized: "Traffic Tabs"))
+                        Text(String(localized: "Traffic Tabs", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.font(weight: .medium))
                         Spacer()
                         Text(trafficTabCountText(project.tabs.count))
@@ -536,9 +560,12 @@ struct ProjectManagerSheet: View {
                                     .truncationMode(.middle)
                                 Spacer()
                                 if tab.id == project.activeTabID {
-                                    Label(String(localized: "Current"), systemImage: "checkmark")
-                                        .font(toolMetrics.metadataFont())
-                                        .foregroundStyle(.secondary)
+                                    Label(
+                                        String(localized: "Current", bundle: RockxyLocalization.bundle),
+                                        systemImage: "checkmark"
+                                    )
+                                    .font(toolMetrics.metadataFont())
+                                    .foregroundStyle(.secondary)
                                 }
                             }
                             .frame(minHeight: toolMetrics.tableRowHeight)
@@ -546,8 +573,8 @@ struct ProjectManagerSheet: View {
                             .accessibilityLabel(tab.title)
                             .accessibilityValue(
                                 tab.id == project.activeTabID
-                                    ? String(localized: "Current Traffic Tab")
-                                    : String(localized: "Traffic Tab")
+                                    ? String(localized: "Current Traffic Tab", bundle: RockxyLocalization.bundle)
+                                    : String(localized: "Traffic Tab", bundle: RockxyLocalization.bundle)
                             )
                         }
                     }
@@ -568,9 +595,12 @@ struct ProjectManagerSheet: View {
             }
         } else {
             ContentUnavailableView(
-                String(localized: "Select a Project"),
+                String(localized: "Select a Project", bundle: RockxyLocalization.bundle),
                 systemImage: "folder",
-                description: Text(String(localized: "Choose a Project to view its Traffic Tabs."))
+                description: Text(String(
+                    localized: "Choose a Project to view its Traffic Tabs.",
+                    bundle: RockxyLocalization.bundle
+                ))
             )
         }
     }
@@ -591,8 +621,8 @@ struct ProjectManagerSheet: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .help(String(localized: "New Project"))
-            .accessibilityLabel(String(localized: "New Project"))
+            .help(String(localized: "New Project", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "New Project", bundle: RockxyLocalization.bundle))
             .disabled(!canCreateProject)
 
             Rectangle()
@@ -615,8 +645,8 @@ struct ProjectManagerSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(String(localized: "Delete Project"))
-            .accessibilityLabel(String(localized: "Delete Project"))
+            .help(String(localized: "Delete Project", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Delete Project", bundle: RockxyLocalization.bundle))
             .disabled(!canDeleteSelectedProject)
         }
         .frame(
@@ -634,7 +664,8 @@ struct ProjectManagerSheet: View {
     private var infoBanner: some View {
         Label(
             String(
-                localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic."
+                localized: "Projects save tab names, filters, and layout. Each Project keeps separate in-memory traffic.",
+                bundle: RockxyLocalization.bundle
             ),
             systemImage: "info.circle"
         )
@@ -650,34 +681,40 @@ struct ProjectManagerSheet: View {
         HStack(spacing: toolMetrics.controlSpacing) {
             if case .failed = coordinator.projectStore.loadState {
                 Label(
-                    String(localized: "Projects could not be loaded. Changes will not be saved."),
+                    String(
+                        localized: "Projects could not be loaded. Changes will not be saved.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.orange)
             } else if case .failed = coordinator.projectStore.persistenceStatus {
-                Label(String(localized: "Could not save Projects"), systemImage: "exclamationmark.triangle.fill")
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.orange)
+                Label(
+                    String(localized: "Could not save Projects", bundle: RockxyLocalization.bundle),
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.orange)
             } else {
-                Text(String(localized: "Projects are stored locally on this Mac."))
+                Text(String(localized: "Projects are stored locally on this Mac.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button(String(localized: "Import…")) {
+            Button(String(localized: "Import…", bundle: RockxyLocalization.bundle)) {
                 importProjectConfiguration()
             }
-            .help(String(localized: "Import Project Configuration"))
+            .help(String(localized: "Import Project Configuration", bundle: RockxyLocalization.bundle))
             .disabled(!canCreateProject)
 
-            Button(String(localized: "Export…")) {
+            Button(String(localized: "Export…", bundle: RockxyLocalization.bundle)) {
                 exportSelectedProjectConfiguration()
             }
-            .help(String(localized: "Export Selected Project Configuration"))
+            .help(String(localized: "Export Selected Project Configuration", bundle: RockxyLocalization.bundle))
             .disabled(!canExportSelectedProject)
 
-            Button(String(localized: "Done")) {
+            Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) {
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -689,14 +726,18 @@ struct ProjectManagerSheet: View {
     }
 
     private func trafficTabCountText(_ count: Int) -> String {
-        let inflected = AttributedString(localized: "^[\(count) Traffic Tab](inflect: true)")
+        let inflected = AttributedString(
+            localized: "^[\(count) Traffic Tab](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        )
         return String(inflected.characters)
     }
 
     private func projectAccessibilityValue(_ project: Project) -> String {
         let count = trafficTabCountText(project.tabs.count)
         if project.id == coordinator.projectStore.activeProjectID {
-            return String(localized: "\(count), Active Project")
+            return String(localized: "\(count), Active Project", bundle: RockxyLocalization.bundle)
         }
         return count
     }
@@ -753,19 +794,23 @@ struct ProjectRecoverySheet: View {
                     .font(.system(size: 30))
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(String(localized: "Projects Could Not Be Loaded"))
+                    Text(String(localized: "Projects Could Not Be Loaded", bundle: RockxyLocalization.bundle))
                         .font(.headline)
                     Text(
                         String(
-                            localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data."
+                            localized: "Rockxy kept the existing catalog unchanged and disabled Project edits to avoid overwriting data.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .foregroundStyle(.secondary)
-                    Text(coordinator.projectStore.loadFailureMessage ?? String(localized: "Unknown catalog error"))
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineLimit(4)
+                    Text(coordinator.projectStore.loadFailureMessage ?? String(
+                        localized: "Unknown catalog error",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(4)
                 }
                 Spacer()
             }
@@ -774,15 +819,15 @@ struct ProjectRecoverySheet: View {
             Divider()
 
             HStack {
-                Button(String(localized: "Close"), role: .cancel) {
+                Button(String(localized: "Close", bundle: RockxyLocalization.bundle), role: .cancel) {
                     coordinator.isProjectRecoveryPresented = false
                 }
                 .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(String(localized: "Reset Projects…"), role: .destructive) {
+                Button(String(localized: "Reset Projects…", bundle: RockxyLocalization.bundle), role: .destructive) {
                     confirmsReset = true
                 }
-                Button(String(localized: "Retry")) {
+                Button(String(localized: "Retry", bundle: RockxyLocalization.bundle)) {
                     retry()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -792,9 +837,9 @@ struct ProjectRecoverySheet: View {
             .frame(height: 56)
         }
         .frame(width: 540)
-        .alert(String(localized: "Reset Projects?"), isPresented: $confirmsReset) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Reset Projects"), role: .destructive) {
+        .alert(String(localized: "Reset Projects?", bundle: RockxyLocalization.bundle), isPresented: $confirmsReset) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Reset Projects", bundle: RockxyLocalization.bundle), role: .destructive) {
                 reset()
             }
         } message: {

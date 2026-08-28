@@ -10,22 +10,30 @@ import Foundation
 /// never be presented as a bare CONNECT/SNI host, such as URLs and host:port
 /// pairs, while retaining exact IPv4 and IPv6 support.
 enum SSLHostPatternValidation {
+    // MARK: Internal
+
     static func message(for rawValue: String) -> String? {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else {
             return nil
         }
         guard HostPatternMatcher.isValid(pattern: value) else {
-            return String(localized: "Host patterns must be 255 characters or fewer and contain no spaces.")
+            return String(
+                localized: "Host patterns must be 255 characters or fewer and contain no spaces.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         guard !value.contains("://"),
               !value.contains("/"),
               !value.contains("?"),
               !value.contains("#"),
               !value.contains("@"),
-              !value.contains(",")
-        else {
-            return String(localized: "Enter only a host pattern, without a scheme, path, query, or user information.")
+              !value.contains(",") else
+        {
+            return String(
+                localized: "Enter only a host pattern, without a scheme, path, query, or user information.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if value == "*" {
             return nil
@@ -33,20 +41,29 @@ enum SSLHostPatternValidation {
         if value.hasPrefix("*.") {
             let suffix = String(value.dropFirst(2))
             guard !suffix.isEmpty, !suffix.contains("*"), isValidHostname(suffix) else {
-                return String(localized: "Enter a complete wildcard host such as *.example.com.")
+                return String(
+                    localized: "Enter a complete wildcard host such as *.example.com.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
             return nil
         }
         guard !value.contains("*") else {
-            return String(localized: "Use * alone, or *.domain.com for subdomains.")
+            return String(localized: "Use * alone, or *.domain.com for subdomains.", bundle: RockxyLocalization.bundle)
         }
         if value.contains(":") {
             return isValidIPv6(value)
                 ? nil
-                : String(localized: "Ports are not supported. Enter a bare host or a valid unbracketed IPv6 address.")
+                : String(
+                    localized: "Ports are not supported. Enter a bare host or a valid unbracketed IPv6 address.",
+                    bundle: RockxyLocalization.bundle
+                )
         }
         guard isValidIPv4(value) || isValidHostname(value) else {
-            return String(localized: "Enter a valid hostname, IPv4 address, or IPv6 address.")
+            return String(
+                localized: "Enter a valid hostname, IPv4 address, or IPv6 address.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return nil
     }
@@ -154,7 +171,7 @@ final class SSLProxyingListViewModel {
     /// Enable/Disable label for the current selection.
     var enableDisableLabel: String {
         guard let id = selectedRuleID else {
-            return String(localized: "Enable Rule")
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
         return toggleLabel(for: id)
     }
@@ -163,20 +180,20 @@ final class SSLProxyingListViewModel {
     static func behaviorLabel(for listType: SSLProxyingListType) -> String {
         switch listType {
         case .include:
-            String(localized: "Decrypt HTTPS")
+            String(localized: "Decrypt HTTPS", bundle: RockxyLocalization.bundle)
         case .exclude:
-            String(localized: "Tunnel Without Decryption")
+            String(localized: "Tunnel Without Decryption", bundle: RockxyLocalization.bundle)
         }
     }
 
     /// Row-specific enable/disable label.
     func toggleLabel(for id: UUID) -> String {
         guard let rule = manager.rules.first(where: { $0.id == id }) else {
-            return String(localized: "Enable Rule")
+            return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
         return rule.isEnabled
-            ? String(localized: "Disable Rule")
-            : String(localized: "Enable Rule")
+            ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -190,8 +207,8 @@ final class SSLProxyingListViewModel {
         let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               SSLHostPatternValidation.message(for: trimmed) == nil,
-              !ruleExists(domain: trimmed, listType: listType)
-        else {
+              !ruleExists(domain: trimmed, listType: listType) else
+        {
             return false
         }
         let rule = SSLProxyingRule(domain: trimmed, listType: listType)
@@ -235,8 +252,8 @@ final class SSLProxyingListViewModel {
         let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               SSLHostPatternValidation.message(for: trimmed) == nil,
-              !ruleExists(domain: trimmed, listType: listType, excluding: id)
-        else {
+              !ruleExists(domain: trimmed, listType: listType, excluding: id) else
+        {
             return false
         }
         guard var rule = manager.rules.first(where: { $0.id == id }) else {
@@ -315,7 +332,9 @@ final class SSLProxyingListViewModel {
         domain: String,
         listType: SSLProxyingListType,
         excluding excludedID: UUID? = nil
-    ) -> Bool {
+    )
+        -> Bool
+    {
         manager.rules.contains {
             $0.id != excludedID
                 && $0.listType == listType

@@ -431,7 +431,7 @@ struct HelperManagerTests {
             issue: .applicationMustReopen
         )
 
-        #expect(label == String(localized: "Quit Rockxy"))
+        #expect(label == String(localized: "Quit Rockxy", bundle: RockxyLocalization.bundle))
         #expect(reason.localizedLowercase.contains("reopened"))
         #expect(!reason.localizedLowercase.contains("rebuild"))
     }
@@ -443,7 +443,7 @@ struct HelperManagerTests {
             status: .signingMismatch,
             signingIssue: .identityMismatch(appSigner: "Dev", helperSigner: "Prod")
         )
-        #expect(label == String(localized: "Reinstall"))
+        #expect(label == String(localized: "Reinstall", bundle: RockxyLocalization.bundle))
     }
 
     @Test("installedCompatible produces no action label")
@@ -665,10 +665,14 @@ private func makeForceRemoveIdentity() -> RockxyIdentity {
     ])
 }
 
+// MARK: - HelperBinaryKind
+
 private enum HelperBinaryKind {
     case regularFile(permissions: Int)
     case directory
 }
+
+// MARK: - HelperInstallResourceFixture
 
 private struct HelperInstallResourceFixture {
     let temporaryDirectory: URL
@@ -687,7 +691,9 @@ private func makeHelperInstallResourceFixture(helperKind: HelperBinaryKind) thro
 private func makeHelperInstallResourceFixture(
     helperKind: HelperBinaryKind,
     writesSidecarInfoPlist: Bool
-) throws -> HelperInstallResourceFixture {
+)
+    throws -> HelperInstallResourceFixture
+{
     let temporaryDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("rockxy-helper-fixture-\(UUID().uuidString)", isDirectory: true)
     let appBundleURL = temporaryDirectory.appendingPathComponent("Rockxy.app", isDirectory: true)
@@ -707,7 +713,10 @@ private func makeHelperInstallResourceFixture(
     try infoData.write(to: contentsURL.appendingPathComponent("Info.plist"))
 
     let helperBinaryURL = appBundleURL.appendingPathComponent(expectedHelperBundleProgram)
-    try FileManager.default.createDirectory(at: helperBinaryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: helperBinaryURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
     switch helperKind {
     case let .regularFile(permissions):
         try Data("helper".utf8).write(to: helperBinaryURL)
@@ -734,7 +743,10 @@ private func makeHelperInstallResourceFixture(
 
     let helperPlistURL = appBundleURL
         .appendingPathComponent("Contents/Library/LaunchDaemons/\(TestIdentity.helperPlistName)")
-    try FileManager.default.createDirectory(at: helperPlistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: helperPlistURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
     try makeHelperLaunchdPlistData().write(to: helperPlistURL)
 
     guard let bundle = Bundle(url: appBundleURL) else {

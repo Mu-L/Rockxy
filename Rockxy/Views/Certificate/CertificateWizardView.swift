@@ -17,11 +17,11 @@ private enum WizardStep: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .welcome: String(localized: "Welcome")
-        case .generate: String(localized: "Generate")
-        case .installTrust: String(localized: "Install")
-        case .verify: String(localized: "Verify")
-        case .complete: String(localized: "Complete")
+        case .welcome: String(localized: "Welcome", bundle: RockxyLocalization.bundle)
+        case .generate: String(localized: "Generate", bundle: RockxyLocalization.bundle)
+        case .installTrust: String(localized: "Install", bundle: RockxyLocalization.bundle)
+        case .verify: String(localized: "Verify", bundle: RockxyLocalization.bundle)
+        case .complete: String(localized: "Complete", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -110,7 +110,7 @@ struct CertificateWizardView: View {
                 .foregroundStyle(Color.accentColor)
                 .padding(.bottom, 4)
 
-            Text(String(localized: "HTTPS Traffic Interception"))
+            Text(String(localized: "HTTPS Traffic Interception", bundle: RockxyLocalization.bundle))
                 .font(.title2)
                 .fontWeight(.semibold)
 
@@ -120,7 +120,7 @@ struct CertificateWizardView: View {
                     Rockxy needs a Root CA certificate to inspect HTTPS traffic. \
                     This wizard will generate a local certificate, install it in your \
                     macOS Keychain, and verify the setup. No certificate data leaves your machine.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(.body)
@@ -153,18 +153,22 @@ struct CertificateWizardView: View {
                     .frame(maxWidth: 380)
             }
 
-            Text(String(localized: "Generate Root CA"))
+            Text(String(localized: "Generate Root CA", bundle: RockxyLocalization.bundle))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             if generateSuccess {
-                Text(String(localized: "Root CA certificate generated successfully."))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Root CA certificate generated successfully.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.body)
+                .foregroundStyle(.secondary)
             } else if !isGenerating, generateError == nil {
                 Text(
                     String(
-                        localized: "A P-256 elliptic curve root certificate will be created locally on this machine."
+                        localized: "A P-256 elliptic curve root certificate will be created locally on this machine.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.body)
@@ -197,14 +201,17 @@ struct CertificateWizardView: View {
                     .foregroundStyle(.orange)
             }
 
-            Text(String(localized: "Install & Trust Certificate"))
+            Text(String(localized: "Install & Trust Certificate", bundle: RockxyLocalization.bundle))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             if installSuccess {
-                Text(String(localized: "Certificate installed and trusted in your Keychain."))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Certificate installed and trusted in your Keychain.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.body)
+                .foregroundStyle(.secondary)
             } else if let error = installError {
                 Text(error)
                     .font(.callout)
@@ -217,7 +224,7 @@ struct CertificateWizardView: View {
                         localized: """
                         This will install the root certificate in your macOS Keychain and mark \
                         it as trusted. macOS will prompt you for your password to authorize this change.
-                        """
+                        """, bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.body)
@@ -230,7 +237,10 @@ struct CertificateWizardView: View {
                 Button {
                     installAndTrust()
                 } label: {
-                    Label(String(localized: "Install & Trust"), systemImage: "checkmark.shield.fill")
+                    Label(
+                        String(localized: "Install & Trust", bundle: RockxyLocalization.bundle),
+                        systemImage: "checkmark.shield.fill"
+                    )
                 }
                 .controlSize(.large)
                 .rockxyGlassButtonStyle(prominent: true)
@@ -261,24 +271,28 @@ struct CertificateWizardView: View {
                     .foregroundStyle(.red)
             }
 
-            Text(String(localized: "Verify Certificate"))
+            Text(String(localized: "Verify Certificate", bundle: RockxyLocalization.bundle))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             if isVerifying {
-                Text(String(localized: "Checking certificate status..."))
+                Text(String(localized: "Checking certificate status...", bundle: RockxyLocalization.bundle))
                     .font(.body)
                     .foregroundStyle(.secondary)
             } else if isTrusted {
-                Text(String(localized: "Certificate is installed and trusted. HTTPS interception is ready."))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
+                Text(String(
+                    localized: "Certificate is installed and trusted. HTTPS interception is ready.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
             } else if isInstalled {
                 Text(
                     String(
-                        localized: "Certificate is installed but not trusted. Go back and try \"Install & Trust\" again."
+                        localized: "Certificate is installed but not trusted. Go back and try \"Install & Trust\" again.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.body)
@@ -286,11 +300,14 @@ struct CertificateWizardView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 380)
             } else {
-                Text(String(localized: "Certificate is not installed. Go back and install it."))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
+                Text(String(
+                    localized: "Certificate is not installed. Go back and install it.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
             }
 
             if verifyCompleted, !isTrusted {
@@ -298,7 +315,10 @@ struct CertificateWizardView: View {
                     verifyCompleted = false
                     Task { await verifyCertificate() }
                 } label: {
-                    Label(String(localized: "Retry Verification"), systemImage: "arrow.clockwise")
+                    Label(
+                        String(localized: "Retry Verification", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.clockwise"
+                    )
                 }
                 .controlSize(.large)
                 .padding(.top, 8)
@@ -317,15 +337,21 @@ struct CertificateWizardView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(Color.accentColor)
 
-            Text(String(localized: "You\u{2019}re All Set!"))
+            Text(String(localized: "You\u{2019}re All Set!", bundle: RockxyLocalization.bundle))
                 .font(.title2)
                 .fontWeight(.semibold)
 
             VStack(alignment: .leading, spacing: 8) {
-                completionCheckmark(String(localized: "Root CA certificate generated"))
-                completionCheckmark(String(localized: "Installed in macOS Keychain"))
-                completionCheckmark(String(localized: "Marked as trusted for TLS"))
-                completionCheckmark(String(localized: "Ready for HTTPS interception"))
+                completionCheckmark(String(
+                    localized: "Root CA certificate generated",
+                    bundle: RockxyLocalization.bundle
+                ))
+                completionCheckmark(String(localized: "Installed in macOS Keychain", bundle: RockxyLocalization.bundle))
+                completionCheckmark(String(localized: "Marked as trusted for TLS", bundle: RockxyLocalization.bundle))
+                completionCheckmark(String(
+                    localized: "Ready for HTTPS interception",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
             .padding(.top, 4)
         }
@@ -339,7 +365,7 @@ struct CertificateWizardView: View {
             if currentStep.rawValue > WizardStep.welcome.rawValue,
                currentStep != .complete
             {
-                Button(String(localized: "Back")) {
+                Button(String(localized: "Back", bundle: RockxyLocalization.bundle)) {
                     goBack()
                 }
                 .disabled(isGenerating || isInstalling || isVerifying)
@@ -349,14 +375,14 @@ struct CertificateWizardView: View {
 
             switch currentStep {
             case .welcome:
-                Button(String(localized: "Get Started")) {
+                Button(String(localized: "Get Started", bundle: RockxyLocalization.bundle)) {
                     goForward()
                 }
                 .rockxyGlassButtonStyle(prominent: true)
                 .controlSize(.large)
 
             case .generate:
-                Button(String(localized: "Next")) {
+                Button(String(localized: "Next", bundle: RockxyLocalization.bundle)) {
                     goForward()
                 }
                 .rockxyGlassButtonStyle(prominent: true)
@@ -364,7 +390,7 @@ struct CertificateWizardView: View {
                 .disabled(!generateSuccess)
 
             case .installTrust:
-                Button(String(localized: "Next")) {
+                Button(String(localized: "Next", bundle: RockxyLocalization.bundle)) {
                     goForward()
                 }
                 .rockxyGlassButtonStyle(prominent: true)
@@ -372,7 +398,7 @@ struct CertificateWizardView: View {
                 .disabled(!installSuccess)
 
             case .verify:
-                Button(String(localized: "Next")) {
+                Button(String(localized: "Next", bundle: RockxyLocalization.bundle)) {
                     goForward()
                 }
                 .rockxyGlassButtonStyle(prominent: true)
@@ -380,7 +406,7 @@ struct CertificateWizardView: View {
                 .disabled(!isTrusted)
 
             case .complete:
-                Button(String(localized: "Start Using Rockxy")) {
+                Button(String(localized: "Start Using Rockxy", bundle: RockxyLocalization.bundle)) {
                     Self.logger.info("Certificate wizard completed")
                     onDismiss()
                 }
@@ -460,7 +486,8 @@ struct CertificateWizardView: View {
             Self.logger.info("Wizard: Root CA generated")
         } catch {
             generateError = String(
-                localized: "Failed to generate certificate: \(error.localizedDescription)"
+                localized: "Failed to generate certificate: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
             )
             Self.logger.error("Wizard: Root CA generation failed: \(error)")
         }
@@ -477,7 +504,7 @@ struct CertificateWizardView: View {
                 Self.logger.info("Wizard: Root CA installed and trusted")
             } catch {
                 installError = String(
-                    localized: "Installation failed: \(error.localizedDescription)"
+                    localized: "Installation failed: \(error.localizedDescription)", bundle: RockxyLocalization.bundle
                 )
                 Self.logger.error("Wizard: Root CA install failed: \(error)")
             }

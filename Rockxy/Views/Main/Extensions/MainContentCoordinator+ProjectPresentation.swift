@@ -44,40 +44,60 @@ extension MainContentCoordinator {
         case let .nameInvalid(reason):
             switch reason {
             case .empty:
-                String(localized: "Enter a Project name.")
+                String(localized: "Enter a Project name.", bundle: RockxyLocalization.bundle)
             case .containsControlCharacters:
-                String(localized: "Project names cannot contain control characters.")
+                String(localized: "Project names cannot contain control characters.", bundle: RockxyLocalization.bundle)
             case let .tooLong(count):
                 String(
-                    localized: "Project names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count))."
+                    localized: "Project names are limited to \(ProjectStructuralLimits.nameGraphemeRange.upperBound) characters (received \(count)).",
+                    bundle: RockxyLocalization.bundle
                 )
             case .notCanonical:
-                String(localized: "The Project name is not in canonical Unicode form.")
+                String(
+                    localized: "The Project name is not in canonical Unicode form.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         case .duplicateName:
-            String(localized: "A Project with this name already exists.")
+            String(localized: "A Project with this name already exists.", bundle: RockxyLocalization.bundle)
         case let .capacityReached(limit):
-            String(localized: "This build supports up to \(limit) Projects.")
+            String(localized: "This build supports up to \(limit) Projects.", bundle: RockxyLocalization.bundle)
         case let .tabCapacityReached(limit):
-            String(localized: "A Project can contain up to \(limit) Traffic Tabs in this build.")
+            String(
+                localized: "A Project can contain up to \(limit) Traffic Tabs in this build.",
+                bundle: RockxyLocalization.bundle
+            )
         case .projectNotFound:
-            String(localized: "The selected Project no longer exists.")
+            String(localized: "The selected Project no longer exists.", bundle: RockxyLocalization.bundle)
         case .cannotDeleteFinalProject:
-            String(localized: "Rockxy must keep at least one Project.")
+            String(localized: "Rockxy must keep at least one Project.", bundle: RockxyLocalization.bundle)
         case .captureClearInProgress:
-            String(localized: "Wait for the active Project capture to finish clearing, then try again.")
+            String(
+                localized: "Wait for the active Project capture to finish clearing, then try again.",
+                bundle: RockxyLocalization.bundle
+            )
         case .storeNotReady:
-            String(localized: "Projects are not ready. Retry loading the catalog first.")
+            String(
+                localized: "Projects are not ready. Retry loading the catalog first.",
+                bundle: RockxyLocalization.bundle
+            )
         case .revisionExhausted:
-            String(localized: "The Project catalog revision limit was reached.")
+            String(localized: "The Project catalog revision limit was reached.", bundle: RockxyLocalization.bundle)
         case .invalidTabSnapshot:
             String(
-                localized: "A Traffic Tab contains an invalid name or filter configuration. Rename or simplify that tab, then try again."
+                localized: "A Traffic Tab contains an invalid name or filter configuration. Rename or simplify that tab, then try again.",
+                bundle: RockxyLocalization.bundle
             )
         case .reconciledProjectsInvalid:
-            String(localized: "The reconciled Projects were structurally invalid and were not applied.")
+            String(
+                localized: "The reconciled Projects were structurally invalid and were not applied.",
+                bundle: RockxyLocalization.bundle
+            )
         case .staleRevision:
-            String(localized: "Projects changed since this update was prepared. Try again.")
+            String(
+                localized: "Projects changed since this update was prepared. Try again.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -86,12 +106,13 @@ extension MainContentCoordinator {
             return nil
         }
         return String(
-            localized: "Projects could not be loaded. Traffic Tab and filter changes will not be saved until Projects are repaired."
+            localized: "Projects could not be loaded. Traffic Tab and filter changes will not be saved until Projects are repaired.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
     private func nextUntakenProjectName() -> String {
-        let base = String(localized: "New Project")
+        let base = String(localized: "New Project", bundle: RockxyLocalization.bundle)
         let used = Set(projectStore.projects.map {
             ProjectNormalization.foldedKey(for: $0.name)
         })

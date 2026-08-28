@@ -56,11 +56,11 @@ struct AdvancedProxySettingsView: View {
             }
         }
         .alert(
-            String(localized: "Uninstall Helper Tool?"),
+            String(localized: "Uninstall Helper Tool?", bundle: RockxyLocalization.bundle),
             isPresented: $showingUninstallConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Uninstall"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle), role: .destructive) {
                 Task {
                     defer { coordinator.refreshProxyOverrideStatus() }
                     do {
@@ -73,7 +73,8 @@ struct AdvancedProxySettingsView: View {
         } message: {
             Text(
                 String(
-                    localized: "The helper tool will be removed. Rockxy will use networksetup and may ask for your password."
+                    localized: "The helper tool will be removed. Rockxy will use networksetup and may ask for your password.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -144,23 +145,28 @@ struct AdvancedProxySettingsView: View {
 
     private var routingTitle: String {
         guard coordinator.isProxyRunning else {
-            return String(localized: "Proxy Server Stopped")
+            return String(localized: "Proxy Server Stopped", bundle: RockxyLocalization.bundle)
         }
         return coordinator.isProxyOverridden
-            ? String(localized: "macOS System Proxy Enabled")
-            : String(localized: "macOS System Proxy Disabled")
+            ? String(localized: "macOS System Proxy Enabled", bundle: RockxyLocalization.bundle)
+            : String(localized: "macOS System Proxy Disabled", bundle: RockxyLocalization.bundle)
     }
 
     private var routingSubtitle: String {
         guard coordinator.isProxyRunning else {
-            return String(localized: "System routing is unavailable while the proxy server is stopped.")
+            return String(
+                localized: "System routing is unavailable while the proxy server is stopped.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return coordinator.isProxyOverridden
             ? String(
-                localized: "Proxy-aware traffic is routed to Rockxy. Some apps ignore the macOS system proxy and stay direct."
+                localized: "Proxy-aware traffic is routed to Rockxy. Some apps ignore the macOS system proxy and stay direct.",
+                bundle: RockxyLocalization.bundle
             )
             : String(
-                localized: "The proxy server is running, but proxy-aware traffic is not automatically routed through Rockxy."
+                localized: "The proxy server is running, but proxy-aware traffic is not automatically routed through Rockxy.",
+                bundle: RockxyLocalization.bundle
             )
     }
 
@@ -224,24 +230,24 @@ struct AdvancedProxySettingsView: View {
     private var helperStatusTitle: String {
         switch helperManager.status {
         case .notInstalled:
-            String(localized: "Not Installed")
+            String(localized: "Not Installed", bundle: RockxyLocalization.bundle)
         case .requiresApproval:
-            String(localized: "Requires Approval")
+            String(localized: "Requires Approval", bundle: RockxyLocalization.bundle)
         case .installedCompatible:
-            String(localized: "Installed")
+            String(localized: "Installed", bundle: RockxyLocalization.bundle)
         case .installedOutdated:
-            String(localized: "Update Available")
+            String(localized: "Update Available", bundle: RockxyLocalization.bundle)
         case .installedIncompatible:
-            String(localized: "Incompatible Version")
+            String(localized: "Incompatible Version", bundle: RockxyLocalization.bundle)
         case .unreachable:
-            String(localized: "Installed But Unreachable")
+            String(localized: "Installed But Unreachable", bundle: RockxyLocalization.bundle)
         case .signingMismatch:
             if case .applicationMustReopen = helperManager.signingIssue {
-                String(localized: "Reopen Required")
+                String(localized: "Reopen Required", bundle: RockxyLocalization.bundle)
             } else if case .appSignatureInvalid = helperManager.signingIssue {
-                String(localized: "Invalid App Signature")
+                String(localized: "Invalid App Signature", bundle: RockxyLocalization.bundle)
             } else {
-                String(localized: "Signing Mismatch")
+                String(localized: "Signing Mismatch", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -249,20 +255,38 @@ struct AdvancedProxySettingsView: View {
     private var helperStatusSubtitle: String {
         switch helperManager.status {
         case .notInstalled:
-            String(localized: "Rockxy will use networksetup and may ask for your password.")
+            String(
+                localized: "Rockxy will use networksetup and may ask for your password.",
+                bundle: RockxyLocalization.bundle
+            )
         case .requiresApproval:
-            String(localized: "Approve Rockxy Helper in System Settings \u{2192} General \u{2192} Login Items.")
+            String(
+                localized: "Approve Rockxy Helper in System Settings \u{2192} General \u{2192} Login Items.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedCompatible:
-            String(localized: "Helper is responding and matches the bundled version.")
+            String(
+                localized: "Helper is responding and matches the bundled version.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedOutdated:
-            String(localized: "A newer helper version is bundled with this app.")
+            String(localized: "A newer helper version is bundled with this app.", bundle: RockxyLocalization.bundle)
         case .installedIncompatible:
-            String(localized: "Installed helper is incompatible with this app version.")
+            String(
+                localized: "Installed helper is incompatible with this app version.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unreachable:
-            String(localized: "Rockxy could not communicate with the helper over XPC.")
+            String(
+                localized: "Rockxy could not communicate with the helper over XPC.",
+                bundle: RockxyLocalization.bundle
+            )
         case .signingMismatch:
             helperManager.lastErrorMessage
-                ?? String(localized: "The app and helper have mismatched signing certificates.")
+                ?? String(
+                    localized: "The app and helper have mismatched signing certificates.",
+                    bundle: RockxyLocalization.bundle
+                )
         }
     }
 
@@ -293,9 +317,9 @@ struct AdvancedProxySettingsView: View {
             "\u{2014}"
         default:
             if helperManager.isReachable {
-                String(localized: "Reachable")
+                String(localized: "Reachable", bundle: RockxyLocalization.bundle)
             } else {
-                String(localized: "Unreachable")
+                String(localized: "Unreachable", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -314,12 +338,15 @@ struct AdvancedProxySettingsView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Advanced Proxy Settings"))
+                Text(String(localized: "Advanced Proxy Settings", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "Diagnose system routing and configure how the proxy listens."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Diagnose system routing and configure how the proxy listens.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
@@ -333,7 +360,7 @@ struct AdvancedProxySettingsView: View {
 
     private var systemRoutingSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "System Routing"))
+            Text(String(localized: "System Routing", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
@@ -368,8 +395,8 @@ struct AdvancedProxySettingsView: View {
 
             HStack(spacing: toolMetrics.controlSpacing) {
                 Button(coordinator.isProxyOverridden
-                    ? String(localized: "Disable macOS System Proxy")
-                    : String(localized: "Enable macOS System Proxy"))
+                    ? String(localized: "Disable macOS System Proxy", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Enable macOS System Proxy", bundle: RockxyLocalization.bundle))
                 {
                     coordinator.toggleSystemProxyOverride()
                 }
@@ -379,9 +406,12 @@ struct AdvancedProxySettingsView: View {
             }
 
             if !coordinator.isProxyRunning {
-                Text(String(localized: "Start the proxy to route system traffic through Rockxy."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Start the proxy to route system traffic through Rockxy.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
         }
         .padding(toolMetrics.formHorizontalPadding)
@@ -392,7 +422,7 @@ struct AdvancedProxySettingsView: View {
 
     private var listenerSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-            Text(String(localized: "Listener"))
+            Text(String(localized: "Listener", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             if let endpoint = liveEndpointText {
@@ -403,33 +433,45 @@ struct AdvancedProxySettingsView: View {
 
             Toggle(isOn: $draft.autoSelectPort) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Auto-select an available port at launch"))
-                        .font(toolMetrics.font())
-                    Text(String(localized: "Automatically select a new available port if it's occupied at launch."))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Auto-select an available port at launch",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.font())
+                    Text(String(
+                        localized: "Automatically select a new available port if it's occupied at launch.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .toggleStyle(.checkbox)
 
             Toggle(isOn: $draft.onlyListenOnLocalhost) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Only listen on localhost"))
+                    Text(String(localized: "Only listen on localhost", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font())
-                    Text(String(localized: "Listen on 127.0.0.1 (localhost) instead of 0.0.0.0."))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Listen on 127.0.0.1 (localhost) instead of 0.0.0.0.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .toggleStyle(.checkbox)
 
             if !draft.onlyListenOnLocalhost {
-                Text(String(localized: "Rockxy binds IPv4 only. IPv6 dual-stack listening isn't available yet."))
-                    .font(toolMetrics.metadataFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Rockxy binds IPv4 only. IPv6 dual-stack listening isn't available yet.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             if listenerChangeNeedsRestart {
@@ -443,7 +485,7 @@ struct AdvancedProxySettingsView: View {
     private var portRow: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: toolMetrics.controlSpacing) {
-                Text(String(localized: "Port Number"))
+                Text(String(localized: "Port Number", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
                 TextField("", text: $draft.portText)
@@ -451,10 +493,11 @@ struct AdvancedProxySettingsView: View {
                     .font(toolMetrics.font(monospaced: true))
                     .frame(width: toolMetrics.fieldWidth(110))
                     .frame(height: toolMetrics.formControlHeight)
-                    .accessibilityLabel(String(localized: "Listener port number"))
+                    .accessibilityLabel(String(localized: "Listener port number", bundle: RockxyLocalization.bundle))
                     .accessibilityHint(
                         String(
-                            localized: "Enter a port between 1 and 65535. Applied changes take effect after the proxy restarts."
+                            localized: "Enter a port between 1 and 65535. Applied changes take effect after the proxy restarts.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
 
@@ -462,7 +505,7 @@ struct AdvancedProxySettingsView: View {
             }
 
             if !draft.isPortValid {
-                Text(String(localized: "Enter a port between 1 and 65535."))
+                Text(String(localized: "Enter a port between 1 and 65535.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.red)
             }
@@ -477,7 +520,8 @@ struct AdvancedProxySettingsView: View {
 
             Text(
                 String(
-                    localized: "Saved listener settings apply after the proxy restarts. The live endpoint above stays active until then."
+                    localized: "Saved listener settings apply after the proxy restarts. The live endpoint above stays active until then.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -492,7 +536,7 @@ struct AdvancedProxySettingsView: View {
 
     private var helperToolSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Privileged Helper Tool"))
+            Text(String(localized: "Privileged Helper Tool", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             helperSummaryRow
@@ -528,7 +572,7 @@ struct AdvancedProxySettingsView: View {
     private var helperDiagnosticsGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
             GridRow {
-                Text(String(localized: "Bundled Version:"))
+                Text(String(localized: "Bundled Version:", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.metadataFont())
                     .foregroundStyle(.secondary)
                     .gridColumnAlignment(.trailing)
@@ -536,7 +580,7 @@ struct AdvancedProxySettingsView: View {
                     .font(toolMetrics.metadataFont(monospaced: true))
             }
             GridRow {
-                Text(String(localized: "Installed Version:"))
+                Text(String(localized: "Installed Version:", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.metadataFont())
                     .foregroundStyle(.secondary)
                 Text(helperManager.installedInfo?.binaryVersion ?? "\u{2014}")
@@ -544,7 +588,7 @@ struct AdvancedProxySettingsView: View {
                     .foregroundStyle(installedVersionColor)
             }
             GridRow {
-                Text(String(localized: "Registration:"))
+                Text(String(localized: "Registration:", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.metadataFont())
                     .foregroundStyle(.secondary)
                 Text(helperManager.registrationStatus)
@@ -552,7 +596,7 @@ struct AdvancedProxySettingsView: View {
                     .foregroundStyle(registrationColor)
             }
             GridRow {
-                Text(String(localized: "XPC Reachability:"))
+                Text(String(localized: "XPC Reachability:", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.metadataFont())
                     .foregroundStyle(.secondary)
                 Text(xpcReachabilityLabel)
@@ -584,78 +628,78 @@ struct AdvancedProxySettingsView: View {
         Group {
             switch helperManager.status {
             case .notInstalled:
-                Button(String(localized: "Install Helper Tool")) {
+                Button(String(localized: "Install Helper Tool", bundle: RockxyLocalization.bundle)) {
                     installHelper()
                 }
                 .disabled(helperManager.isBusy)
 
             case .requiresApproval:
-                Button(String(localized: "Open System Settings")) {
+                Button(String(localized: "Open System Settings", bundle: RockxyLocalization.bundle)) {
                     SMAppService.openSystemSettingsLoginItems()
                 }
                 .disabled(helperManager.isBusy)
 
-                Button(String(localized: "Check Again")) {
+                Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                     Task { await helperManager.checkStatus() }
                 }
                 .disabled(helperManager.isBusy)
 
             case .installedCompatible:
-                Button(String(localized: "Check Again")) {
+                Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                     Task { await helperManager.checkStatus() }
                 }
                 .disabled(helperManager.isBusy)
 
-                Button(String(localized: "Uninstall")) {
+                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                     showingUninstallConfirmation = true
                 }
                 .disabled(helperManager.isBusy)
 
             case .installedOutdated,
                  .installedIncompatible:
-                Button(String(localized: "Update Helper")) {
+                Button(String(localized: "Update Helper", bundle: RockxyLocalization.bundle)) {
                     updateHelper()
                 }
                 .disabled(helperManager.isBusy)
 
-                Button(String(localized: "Uninstall")) {
+                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                     showingUninstallConfirmation = true
                 }
                 .disabled(helperManager.isBusy)
 
             case .unreachable:
-                Button(String(localized: "Retry Connection")) {
+                Button(String(localized: "Retry Connection", bundle: RockxyLocalization.bundle)) {
                     Task { await helperManager.retryConnection() }
                 }
                 .disabled(helperManager.isBusy)
 
-                Button(String(localized: "Reinstall")) {
+                Button(String(localized: "Reinstall", bundle: RockxyLocalization.bundle)) {
                     reinstallHelper()
                 }
                 .disabled(helperManager.isBusy)
 
-                Button(String(localized: "Uninstall")) {
+                Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                     showingUninstallConfirmation = true
                 }
                 .disabled(helperManager.isBusy)
 
             case .signingMismatch:
                 if case .applicationMustReopen = helperManager.signingIssue {
-                    Button(String(localized: "Quit Rockxy")) {
+                    Button(String(localized: "Quit Rockxy", bundle: RockxyLocalization.bundle)) {
                         HelperRecoveryPresenter.requestRequiredReopen()
                     }
                 } else if case .identityMismatch = helperManager.signingIssue {
-                    Button(String(localized: "Reinstall Helper")) {
+                    Button(String(localized: "Reinstall Helper", bundle: RockxyLocalization.bundle)) {
                         reinstallHelper()
                     }
                     .disabled(helperManager.isBusy)
 
-                    Button(String(localized: "Uninstall")) {
+                    Button(String(localized: "Uninstall", bundle: RockxyLocalization.bundle)) {
                         showingUninstallConfirmation = true
                     }
                     .disabled(helperManager.isBusy)
                 } else {
-                    Button(String(localized: "Check Again")) {
+                    Button(String(localized: "Check Again", bundle: RockxyLocalization.bundle)) {
                         Task { await helperManager.checkStatus() }
                     }
                     .disabled(helperManager.isBusy)
@@ -667,7 +711,7 @@ struct AdvancedProxySettingsView: View {
             Button(role: .destructive) {
                 HelperRecoveryPresenter.presentForceReset()
             } label: {
-                Text(String(localized: "Force Reset…"))
+                Text(String(localized: "Force Reset…", bundle: RockxyLocalization.bundle))
             }
             .disabled(helperManager.isBusy)
         }
@@ -701,7 +745,7 @@ struct AdvancedProxySettingsView: View {
     }
 
     private var restoreDefaultsButton: some View {
-        Button(String(localized: "Restore Defaults")) {
+        Button(String(localized: "Restore Defaults", bundle: RockxyLocalization.bundle)) {
             draft = .default
         }
     }
@@ -709,8 +753,8 @@ struct AdvancedProxySettingsView: View {
     private var footerStatusText: some View {
         Text(
             isDirty
-                ? String(localized: "Unsaved listener changes")
-                : String(localized: "Listener settings saved")
+                ? String(localized: "Unsaved listener changes", bundle: RockxyLocalization.bundle)
+                : String(localized: "Listener settings saved", bundle: RockxyLocalization.bundle)
         )
         .font(toolMetrics.secondaryFont())
         .foregroundStyle(.secondary)
@@ -721,7 +765,7 @@ struct AdvancedProxySettingsView: View {
             draft = savedDraft
             dismiss()
         } label: {
-            footerButtonLabel(String(localized: "Cancel"))
+            footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
         }
         .keyboardShortcut(.cancelAction)
     }
@@ -730,7 +774,7 @@ struct AdvancedProxySettingsView: View {
         Button {
             applyListenerSettings()
         } label: {
-            footerButtonLabel(String(localized: "Apply"))
+            footerButtonLabel(String(localized: "Apply", bundle: RockxyLocalization.bundle))
         }
         .keyboardShortcut(.defaultAction)
         .rockxyGlassButtonStyle(prominent: true)
@@ -739,7 +783,7 @@ struct AdvancedProxySettingsView: View {
 
     private func liveListenerRow(_ endpoint: String) -> some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Live listener"))
+            Text(String(localized: "Live listener", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
 
@@ -751,7 +795,7 @@ struct AdvancedProxySettingsView: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Live proxy listener"))
+        .accessibilityLabel(String(localized: "Live proxy listener", bundle: RockxyLocalization.bundle))
         .accessibilityValue(endpoint)
     }
 
@@ -772,7 +816,7 @@ struct AdvancedProxySettingsView: View {
 
     private func helperErrorDetail(_ errorMessage: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "Last Error"))
+            Text(String(localized: "Last Error", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.metadataFont(weight: .semibold))
             Text(errorMessage)
                 .font(toolMetrics.metadataFont(monospaced: true))

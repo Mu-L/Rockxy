@@ -1,9 +1,13 @@
 import SwiftUI
 import WebKit
 
+// MARK: - PreviewTabContentView
+
 // Renders the preview tab content interface for the request and response inspector.
 
 struct PreviewTabContentView: View {
+    // MARK: Internal
+
     let tab: PreviewTab
     let transaction: HTTPTransaction
     var beautify: Bool = false
@@ -24,6 +28,8 @@ struct PreviewTabContentView: View {
         }
     }
 
+    // MARK: Private
+
     @ViewBuilder
     private func jsonTreePreview(snapshot: InspectorTransactionSnapshot) -> some View {
         if let data = tab.panel == .request ? snapshot.request.body : snapshot.response?.displayBody {
@@ -32,21 +38,12 @@ struct PreviewTabContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             ContentUnavailableView {
-                Label(String(localized: "No Preview"), systemImage: "doc.text")
+                Label(String(localized: "No Preview", bundle: RockxyLocalization.bundle), systemImage: "doc.text")
             } description: {
-                Text(String(localized: "No body data"))
+                Text(String(localized: "No body data", bundle: RockxyLocalization.bundle))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-
-    private func renderID(snapshot: InspectorTransactionSnapshot) -> String {
-        let bodyCounts = if tab.panel == .request {
-            "\(snapshot.request.body?.count ?? 0)"
-        } else {
-            "\(snapshot.response?.body?.count ?? 0)-\(snapshot.response?.displayBody?.count ?? 0)"
-        }
-        return "\(snapshot.id.uuidString)-\(tab.id.uuidString)-\(tab.renderMode.rawValue)-\(beautify)-\(bodyCounts)"
     }
 
     nonisolated private static func renderPreview(
@@ -64,7 +61,7 @@ struct PreviewTabContentView: View {
                 if let rawResponse = InspectorPayloadFormatter.rawResponse(snapshot.response) {
                     return .text(rawResponse)
                 }
-                return .empty(reason: String(localized: "No response data"))
+                return .empty(reason: String(localized: "No response data", bundle: RockxyLocalization.bundle))
             }
         }
 
@@ -75,7 +72,7 @@ struct PreviewTabContentView: View {
         case let .hex(text):
             return .hex(text)
         case .json:
-            return .empty(reason: String(localized: "Body is not valid JSON"))
+            return .empty(reason: String(localized: "Body is not valid JSON", bundle: RockxyLocalization.bundle))
         case let .imageData(data, _, _):
             return .imageData(data)
         case let .empty(reason):
@@ -86,7 +83,9 @@ struct PreviewTabContentView: View {
     nonisolated private static func previewBodyData(
         tab: PreviewTab,
         snapshot: InspectorTransactionSnapshot
-    ) -> Data? {
+    )
+        -> Data?
+    {
         switch tab.panel {
         case .request:
             snapshot.request.body
@@ -94,11 +93,22 @@ struct PreviewTabContentView: View {
             tab.renderMode == .hex ? snapshot.response?.body : snapshot.response?.displayBody
         }
     }
+
+    private func renderID(snapshot: InspectorTransactionSnapshot) -> String {
+        let bodyCounts = if tab.panel == .request {
+            "\(snapshot.request.body?.count ?? 0)"
+        } else {
+            "\(snapshot.response?.body?.count ?? 0)-\(snapshot.response?.displayBody?.count ?? 0)"
+        }
+        return "\(snapshot.id.uuidString)-\(tab.id.uuidString)-\(tab.renderMode.rawValue)-\(beautify)-\(bodyCounts)"
+    }
 }
 
 // MARK: - AsyncPreviewTabRenderView
 
 private struct AsyncPreviewTabRenderView: View {
+    // MARK: Internal
+
     let renderID: String
     let mode: PreviewRenderMode
     let baseURL: URL
@@ -108,7 +118,10 @@ private struct AsyncPreviewTabRenderView: View {
         Group {
             switch state {
             case .loading:
-                InspectorLoadingStateView(title: String(localized: "Rendering Preview..."))
+                InspectorLoadingStateView(title: String(
+                    localized: "Rendering Preview...",
+                    bundle: RockxyLocalization.bundle
+                ))
             case let .loaded(result):
                 loadedContent(result)
             }
@@ -117,6 +130,8 @@ private struct AsyncPreviewTabRenderView: View {
             await renderCurrentPreview()
         }
     }
+
+    // MARK: Private
 
     @State private var state: AsyncPreviewLoadState = .loading
     @Environment(\.appUIDisplayMetrics) private var metrics
@@ -150,7 +165,7 @@ private struct AsyncPreviewTabRenderView: View {
             ImagePreviewView(data: data)
         case let .empty(reason):
             ContentUnavailableView {
-                Label(String(localized: "No Preview"), systemImage: "doc.text")
+                Label(String(localized: "No Preview", bundle: RockxyLocalization.bundle), systemImage: "doc.text")
             } description: {
                 Text(reason)
             }

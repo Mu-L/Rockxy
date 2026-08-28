@@ -18,10 +18,11 @@ struct GRPCInspectorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .unsupported:
                 InspectorEmptyStateView(
-                    String(localized: "No gRPC Metadata"),
+                    String(localized: "No gRPC Metadata", bundle: RockxyLocalization.bundle),
                     systemImage: "point.3.connected.trianglepath.dotted",
                     description: String(
-                        localized: "Open this tab when a request uses application/grpc metadata or length-prefixed gRPC messages."
+                        localized: "Open this tab when a request uses application/grpc metadata or length-prefixed gRPC messages.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             case let .loaded(inspection):
@@ -42,10 +43,10 @@ struct GRPCInspectorView: View {
     private var frameHeaderRow: some View {
         HStack(spacing: 0) {
             headerCell("#", width: 44)
-            headerCell(String(localized: "Dir"), width: 86)
-            headerCell(String(localized: "Compressed"), width: 102)
-            headerCell(String(localized: "Bytes"), width: 72)
-            headerCell(String(localized: "Decode"), width: nil)
+            headerCell(String(localized: "Dir", bundle: RockxyLocalization.bundle), width: 86)
+            headerCell(String(localized: "Compressed", bundle: RockxyLocalization.bundle), width: 102)
+            headerCell(String(localized: "Bytes", bundle: RockxyLocalization.bundle), width: 72)
+            headerCell(String(localized: "Decode", bundle: RockxyLocalization.bundle), width: nil)
         }
         .background(Color(nsColor: .controlBackgroundColor))
     }
@@ -68,20 +69,23 @@ struct GRPCInspectorView: View {
     private func callSummary(_ inspection: GRPCInspection) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                badge(String(localized: "gRPC"), color: .blue)
+                badge(String(localized: "gRPC", bundle: RockxyLocalization.bundle), color: .blue)
                 badge(
                     inspection.requestContentType ?? inspection.responseContentType ?? "application/grpc",
                     color: .secondary
                 )
-                badge(String(localized: "Wire-format heuristic"), color: .orange)
+                badge(String(localized: "Wire-format heuristic", bundle: RockxyLocalization.bundle), color: .orange)
                 if let grpcStatus = inspection.grpcStatus {
-                    badge(String(localized: "grpc-status: \(grpcStatus)"), color: grpcStatus == "0" ? .green : .red)
+                    badge(
+                        String(localized: "grpc-status: \(grpcStatus)", bundle: RockxyLocalization.bundle),
+                        color: grpcStatus == "0" ? .green : .red
+                    )
                 }
                 Spacer(minLength: 0)
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Service / method"))
+                Text(String(localized: "Service / method", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.metadataFontSize, weight: .medium))
                     .foregroundStyle(.secondary)
                 Text(methodTitle(inspection))
@@ -92,11 +96,23 @@ struct GRPCInspectorView: View {
             }
 
             HStack(spacing: 8) {
-                metric(String(localized: "HTTP"), value: httpStatusText(inspection), color: .green)
-                metric(String(localized: "Duration"), value: durationText(inspection), color: .primary)
-                metric(String(localized: "Messages"), value: "\(inspection.frames.count)", color: .primary)
                 metric(
-                    String(localized: "Payload"),
+                    String(localized: "HTTP", bundle: RockxyLocalization.bundle),
+                    value: httpStatusText(inspection),
+                    color: .green
+                )
+                metric(
+                    String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                    value: durationText(inspection),
+                    color: .primary
+                )
+                metric(
+                    String(localized: "Messages", bundle: RockxyLocalization.bundle),
+                    value: "\(inspection.frames.count)",
+                    color: .primary
+                )
+                metric(
+                    String(localized: "Payload", bundle: RockxyLocalization.bundle),
                     value: SizeFormatter.format(bytes: totalPayloadBytes(inspection)),
                     color: .primary
                 )
@@ -114,18 +130,22 @@ struct GRPCInspectorView: View {
     private func messageFrames(_ inspection: GRPCInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(String(localized: "Message Frames"))
+                Text(String(localized: "Message Frames", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.primaryFontSize, weight: .semibold))
-                badge(String(localized: "5-byte gRPC prefix visible"), color: .secondary)
+                badge(
+                    String(localized: "5-byte gRPC prefix visible", bundle: RockxyLocalization.bundle),
+                    color: .secondary
+                )
                 Spacer(minLength: 0)
             }
 
             if inspection.frames.isEmpty {
                 InspectorEmptyStateView(
-                    String(localized: "No Message Frames"),
+                    String(localized: "No Message Frames", bundle: RockxyLocalization.bundle),
                     systemImage: "shippingbox",
                     description: String(
-                        localized: "Headers identify gRPC, but no length-prefixed messages were captured."
+                        localized: "Headers identify gRPC, but no length-prefixed messages were captured.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .frame(minHeight: 120)
@@ -157,7 +177,13 @@ struct GRPCInspectorView: View {
             HStack(spacing: 0) {
                 frameCell("\(frame.index)", width: 44)
                 frameCell(frame.direction.displayName, width: 86, color: frame.direction == .request ? .blue : .green)
-                frameCell(frame.isCompressed ? String(localized: "Yes") : String(localized: "No"), width: 102)
+                frameCell(
+                    frame.isCompressed ? String(localized: "Yes", bundle: RockxyLocalization.bundle) : String(
+                        localized: "No",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                    width: 102
+                )
                 frameCell(SizeFormatter.format(bytes: frame.payload.count), width: 72)
                 frameCell(decodeStateText(frame), width: nil, color: decodeStateColor(frame))
             }
@@ -171,23 +197,27 @@ struct GRPCInspectorView: View {
     private func frameDetail(_ inspection: GRPCInspection) -> some View {
         let frame = selectedFrame(in: inspection)
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Decoded Payload"))
+            Text(String(localized: "Decoded Payload", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.primaryFontSize, weight: .semibold))
 
             if let frame {
                 HStack(spacing: 6) {
                     badge(frame.direction.displayName, color: frame.direction == .request ? .blue : .green)
-                    badge(String(localized: "Frame #\(frame.index)"), color: .secondary)
+                    badge(
+                        String(localized: "Frame #\(frame.index)", bundle: RockxyLocalization.bundle),
+                        color: .secondary
+                    )
                     badge(frameStatusText(frame), color: frameStatusColor(frame))
                     Spacer(minLength: 0)
                 }
 
                 if frame.isCompressed {
                     InspectorEmptyStateView(
-                        String(localized: "Compressed Message"),
+                        String(localized: "Compressed Message", bundle: RockxyLocalization.bundle),
                         systemImage: "archivebox",
                         description: String(
-                            localized: "This gRPC message is compressed. Rockxy preserves the frame boundary but does not decode compressed message payloads yet."
+                            localized: "This gRPC message is compressed. Rockxy preserves the frame boundary but does not decode compressed message payloads yet.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .frame(minHeight: 160)
@@ -201,26 +231,31 @@ struct GRPCInspectorView: View {
                         }
                     Text(
                         String(
-                            localized: "Field numbers are inferred heuristically; saved schemas are not applied in this build."
+                            localized: "Field numbers are inferred heuristically; saved schemas are not applied in this build.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
-                        .font(.system(size: metrics.secondaryFontSize))
-                        .foregroundStyle(.secondary)
+                    .font(.system(size: metrics.secondaryFontSize))
+                    .foregroundStyle(.secondary)
                 } else {
                     InspectorEmptyStateView(
-                        String(localized: "Raw Protobuf Payload"),
+                        String(localized: "Raw Protobuf Payload", bundle: RockxyLocalization.bundle),
                         systemImage: "doc.binary",
                         description: String(
-                            localized: "Rockxy captured the gRPC frame, but heuristic Protobuf decoding could not infer a safe tree."
+                            localized: "Rockxy captured the gRPC frame, but heuristic Protobuf decoding could not infer a safe tree.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .frame(minHeight: 160)
                 }
             } else {
                 InspectorEmptyStateView(
-                    String(localized: "No Frame Selected"),
+                    String(localized: "No Frame Selected", bundle: RockxyLocalization.bundle),
                     systemImage: "shippingbox",
-                    description: String(localized: "Select a gRPC message frame to inspect its payload.")
+                    description: String(
+                        localized: "Select a gRPC message frame to inspect its payload.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 .frame(minHeight: 160)
             }
@@ -229,25 +264,31 @@ struct GRPCInspectorView: View {
 
     private func metadataAndTrailers(_ inspection: GRPCInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Metadata And Trailers"))
+            Text(String(localized: "Metadata And Trailers", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.primaryFontSize, weight: .semibold))
 
             VStack(spacing: 0) {
                 metadataRow(
-                    String(localized: "grpc-encoding"),
+                    String(localized: "grpc-encoding", bundle: RockxyLocalization.bundle),
                     value: inspection.responseEncoding ?? inspection.requestEncoding ?? "identity"
                 )
                 metadataRow(
-                    String(localized: "grpc-status"),
-                    value: inspection.grpcStatus ?? String(localized: "Not captured")
+                    String(localized: "grpc-status", bundle: RockxyLocalization.bundle),
+                    value: inspection.grpcStatus ?? String(localized: "Not captured", bundle: RockxyLocalization.bundle)
                 )
                 metadataRow(
-                    String(localized: "grpc-message"),
-                    value: inspection.grpcMessage ?? String(localized: "Not captured")
+                    String(localized: "grpc-message", bundle: RockxyLocalization.bundle),
+                    value: inspection.grpcMessage ?? String(
+                        localized: "Not captured",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 metadataRow(
-                    String(localized: "grpc-status-details-bin"),
-                    value: inspection.grpcStatusDetails ?? String(localized: "Not captured")
+                    String(localized: "grpc-status-details-bin", bundle: RockxyLocalization.bundle),
+                    value: inspection.grpcStatusDetails ?? String(
+                        localized: "Not captured",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
             .background(Color(nsColor: .textBackgroundColor))
@@ -268,7 +309,7 @@ struct GRPCInspectorView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(String(localized: "Protobuf Mapping…")) {
+            Button(String(localized: "Protobuf Mapping…", bundle: RockxyLocalization.bundle)) {
                 onOpenToolWindow("protobufSettings")
             }
             .controlSize(.small)
@@ -391,19 +432,19 @@ struct GRPCInspectorView: View {
         if let serviceName = inspection.serviceName, let methodName = inspection.methodName {
             return "\(serviceName) / \(methodName)"
         }
-        return inspection.fullMethodPath ?? String(localized: "Unknown gRPC method")
+        return inspection.fullMethodPath ?? String(localized: "Unknown gRPC method", bundle: RockxyLocalization.bundle)
     }
 
     private func httpStatusText(_ inspection: GRPCInspection) -> String {
         guard let code = inspection.httpStatusCode else {
-            return String(localized: "No response")
+            return String(localized: "No response", bundle: RockxyLocalization.bundle)
         }
         return "\(code)"
     }
 
     private func durationText(_ inspection: GRPCInspection) -> String {
         guard let duration = inspection.duration else {
-            return String(localized: "Unknown")
+            return String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         }
         return String(format: "%.0f ms", duration * 1_000)
     }
@@ -417,10 +458,10 @@ struct GRPCInspectorView: View {
             return frameStatusText(frame)
         }
         if frame.isCompressed {
-            return String(localized: "Compressed")
+            return String(localized: "Compressed", bundle: RockxyLocalization.bundle)
         }
         if frame.heuristicTree != nil {
-            return String(localized: "Heuristic tree")
+            return String(localized: "Heuristic tree", bundle: RockxyLocalization.bundle)
         }
         return frameStatusText(frame)
     }
@@ -435,13 +476,13 @@ struct GRPCInspectorView: View {
     private func frameStatusText(_ frame: GRPCMessageFrame) -> String {
         switch frame.status {
         case .complete:
-            String(localized: "Raw bytes")
+            String(localized: "Raw bytes", bundle: RockxyLocalization.bundle)
         case let .incompleteHeader(remainingBytes):
-            String(localized: "Incomplete header · \(remainingBytes) bytes")
+            String(localized: "Incomplete header · \(remainingBytes) bytes", bundle: RockxyLocalization.bundle)
         case let .truncatedPayload(expectedBytes, actualBytes):
-            String(localized: "Truncated · \(actualBytes)/\(expectedBytes) bytes")
+            String(localized: "Truncated · \(actualBytes)/\(expectedBytes) bytes", bundle: RockxyLocalization.bundle)
         case let .unsupportedCompressionFlag(flag):
-            String(localized: "Unknown compression flag \(flag)")
+            String(localized: "Unknown compression flag \(flag)", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -463,7 +504,7 @@ struct GRPCInspectorView: View {
             """
             This view uses heuristic Protobuf decoding. Saved schemas and mapping definitions are \
             stored locally and are not applied to gRPC traffic in this build.
-            """
+            """, bundle: RockxyLocalization.bundle
         )
     }
 }
@@ -480,9 +521,9 @@ private extension GRPCMessageDirection {
     var displayName: String {
         switch self {
         case .request:
-            String(localized: "Request")
+            String(localized: "Request", bundle: RockxyLocalization.bundle)
         case .response:
-            String(localized: "Response")
+            String(localized: "Response", bundle: RockxyLocalization.bundle)
         }
     }
 }

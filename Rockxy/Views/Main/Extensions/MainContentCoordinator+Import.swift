@@ -17,7 +17,7 @@ extension MainContentCoordinator {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.rockxySession]
         panel.allowsMultipleSelection = false
-        panel.message = String(localized: "Choose a .rockxysession file to open")
+        panel.message = String(localized: "Choose a .rockxysession file to open", bundle: RockxyLocalization.bundle)
 
         guard panel.runModal() == .OK, let url = panel.url else {
             return
@@ -29,7 +29,7 @@ extension MainContentCoordinator {
         ) {
             Self.logger.error("Session import rejected: \(sizeError.localizedDescription)")
             showImportError(
-                title: String(localized: "Session Too Large"),
+                title: String(localized: "Session Too Large", bundle: RockxyLocalization.bundle),
                 message: sizeError.localizedDescription
             )
             return
@@ -58,17 +58,19 @@ extension MainContentCoordinator {
         } catch let error as SessionSerializerError {
             Self.logger.error("Failed to open session: \(error.localizedDescription)")
             showImportError(
-                title: String(localized: "Invalid Session File"),
+                title: String(localized: "Invalid Session File", bundle: RockxyLocalization.bundle),
                 message: String(
-                    localized: "\"\(url.lastPathComponent)\" could not be read.\n\n\(error.localizedDescription)"
+                    localized: "\"\(url.lastPathComponent)\" could not be read.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         } catch {
             Self.logger.error("Failed to open session: \(error.localizedDescription)")
             showImportError(
-                title: String(localized: "Session Import Failed"),
+                title: String(localized: "Session Import Failed", bundle: RockxyLocalization.bundle),
                 message: String(
-                    localized: "Could not read \"\(url.lastPathComponent)\".\n\n\(error.localizedDescription)"
+                    localized: "Could not read \"\(url.lastPathComponent)\".\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -80,7 +82,7 @@ extension MainContentCoordinator {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.har, .json]
         panel.allowsMultipleSelection = false
-        panel.message = String(localized: "Choose a HAR file to import")
+        panel.message = String(localized: "Choose a HAR file to import", bundle: RockxyLocalization.bundle)
 
         guard panel.runModal() == .OK, let url = panel.url else {
             return
@@ -92,7 +94,7 @@ extension MainContentCoordinator {
         ) {
             Self.logger.error("HAR import rejected: \(sizeError.localizedDescription)")
             showImportError(
-                title: String(localized: "HAR File Too Large"),
+                title: String(localized: "HAR File Too Large", bundle: RockxyLocalization.bundle),
                 message: sizeError.localizedDescription
             )
             return
@@ -122,9 +124,10 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to pre-parse HAR: \(error.localizedDescription)")
             showImportError(
-                title: String(localized: "HAR Import Failed"),
+                title: String(localized: "HAR Import Failed", bundle: RockxyLocalization.bundle),
                 message: String(
-                    localized: "Could not import \"\(url.lastPathComponent)\".\n\nThe file may not be a valid HAR archive. \(error.localizedDescription)"
+                    localized: "Could not import \"\(url.lastPathComponent)\".\n\nThe file may not be a valid HAR archive. \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -138,9 +141,10 @@ extension MainContentCoordinator {
         Task { @MainActor in
             guard await ensureProjectCatalogReadyForDataIntake() else {
                 showImportError(
-                    title: String(localized: "Import Unavailable"),
+                    title: String(localized: "Import Unavailable", bundle: RockxyLocalization.bundle),
                     message: String(
-                        localized: "Projects could not be loaded. Repair Projects before importing captured traffic."
+                        localized: "Projects could not be loaded. Repair Projects before importing captured traffic.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 return
@@ -198,15 +202,21 @@ extension MainContentCoordinator {
 
             activeToast = ToastMessage(
                 style: .success,
-                text: String(localized: "Imported \(importedTransactions.count) transactions from \(fileName)")
+                text: String(
+                    localized: "Imported \(importedTransactions.count) transactions from \(fileName)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
 
             Self.logger.info("Imported HAR from \(fileName): \(importedTransactions.count) transactions")
         } catch {
             Self.logger.error("Failed to import HAR: \(error.localizedDescription)")
             showImportError(
-                title: String(localized: "HAR Import Failed"),
-                message: String(localized: "Could not import \"\(fileName)\".\n\n\(error.localizedDescription)")
+                title: String(localized: "HAR Import Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not import \"\(fileName)\".\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -259,15 +269,21 @@ extension MainContentCoordinator {
 
             activeToast = ToastMessage(
                 style: .success,
-                text: String(localized: "Opened session with \(session.transactions.count) transactions")
+                text: String(
+                    localized: "Opened session with \(session.transactions.count) transactions",
+                    bundle: RockxyLocalization.bundle
+                )
             )
 
             Self.logger.info("Opened session from \(fileName): \(session.transactions.count) transactions")
         } catch {
             Self.logger.error("Failed to open session: \(error.localizedDescription)")
             showImportError(
-                title: String(localized: "Session Import Failed"),
-                message: String(localized: "Could not read \"\(fileName)\".\n\n\(error.localizedDescription)")
+                title: String(localized: "Session Import Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not read \"\(fileName)\".\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -277,7 +293,7 @@ extension MainContentCoordinator {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 }

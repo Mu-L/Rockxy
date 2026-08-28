@@ -77,7 +77,7 @@ struct AssistantConversationContextMismatchBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label(
-                String(localized: "This conversation belongs to different traffic"),
+                String(localized: "This conversation belongs to different traffic", bundle: RockxyLocalization.bundle),
                 systemImage: "arrow.trianglehead.branch"
             )
             .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
@@ -86,7 +86,8 @@ struct AssistantConversationContextMismatchBanner: View {
             if let context {
                 Text(
                     String(
-                        localized: "It was started with \(context.summary). Restore that selection or start a clean conversation for the traffic shown above."
+                        localized: "It was started with \(context.summary). Restore that selection or start a clean conversation for the traffic shown above.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(.system(size: metrics.metadataFontSize))
@@ -95,11 +96,11 @@ struct AssistantConversationContextMismatchBanner: View {
             }
 
             HStack(spacing: 7) {
-                Button(String(localized: "Restore Traffic"), action: onRestore)
+                Button(String(localized: "Restore Traffic", bundle: RockxyLocalization.bundle), action: onRestore)
                     .rockxyGlassButtonStyle()
                     .controlSize(.small)
 
-                Button(String(localized: "New Conversation"), action: onStartNew)
+                Button(String(localized: "New Conversation", bundle: RockxyLocalization.bundle), action: onStartNew)
                     .rockxyGlassButtonStyle(prominent: true)
                     .controlSize(.small)
             }
@@ -108,7 +109,7 @@ struct AssistantConversationContextMismatchBanner: View {
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Conversation traffic changed"))
+        .accessibilityLabel(String(localized: "Conversation traffic changed", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -145,7 +146,7 @@ struct AssistantUserMessageBubble: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "You: \(text)"))
+        .accessibilityLabel(String(localized: "You: \(text)", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -173,8 +174,12 @@ struct AssistantResponseActionBar<OverflowItems: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            compactAction(String(localized: "Copy"), systemImage: "doc.on.doc", action: onCopy)
-                .disabled(!canCopy)
+            compactAction(
+                String(localized: "Copy", bundle: RockxyLocalization.bundle),
+                systemImage: "doc.on.doc",
+                action: onCopy
+            )
+            .disabled(!canCopy)
             overflowMenu
             Spacer(minLength: 0)
         }
@@ -191,16 +196,22 @@ struct AssistantResponseActionBar<OverflowItems: View>: View {
         Menu {
             overflowItems
             Button(action: onFollowUp) {
-                Label(String(localized: "Follow Up"), systemImage: "arrowshape.turn.up.left")
+                Label(
+                    String(localized: "Follow Up", bundle: RockxyLocalization.bundle),
+                    systemImage: "arrowshape.turn.up.left"
+                )
             }
             if canRevealRequest {
                 Button(action: onRevealRequest) {
-                    Label(String(localized: "Reveal Request"), systemImage: "scope")
+                    Label(String(localized: "Reveal Request", bundle: RockxyLocalization.bundle), systemImage: "scope")
                 }
             }
             if canRetry {
                 Button(action: onRetry) {
-                    Label(String(localized: "Review & Retry"), systemImage: "arrow.clockwise")
+                    Label(
+                        String(localized: "Review & Retry", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.clockwise"
+                    )
                 }
             }
         } label: {
@@ -212,8 +223,8 @@ struct AssistantResponseActionBar<OverflowItems: View>: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .accessibilityLabel(String(localized: "More actions"))
-        .help(String(localized: "More actions"))
+        .accessibilityLabel(String(localized: "More actions", bundle: RockxyLocalization.bundle))
+        .help(String(localized: "More actions", bundle: RockxyLocalization.bundle))
     }
 
     private func compactAction(

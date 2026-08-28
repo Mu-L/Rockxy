@@ -69,13 +69,13 @@ struct NoiseControlManagerSheet: View {
 
     private var validationMessage: String? {
         guard let candidateSource else {
-            return String(localized: "Enter a source to mute.")
+            return String(localized: "Enter a source to mute.", bundle: RockxyLocalization.bundle)
         }
         if sourceKind == .path, !candidateSource.title.hasPrefix("/") {
-            return String(localized: "Path prefixes must start with /.")
+            return String(localized: "Path prefixes must start with /.", bundle: RockxyLocalization.bundle)
         }
         if coordinator.activeWorkspace.mutedTrafficSources.contains(candidateSource) {
-            return String(localized: "This source is already muted.")
+            return String(localized: "This source is already muted.", bundle: RockxyLocalization.bundle)
         }
         return nil
     }
@@ -92,25 +92,28 @@ struct NoiseControlManagerSheet: View {
     }
 
     private var sourcePlaceholder: String {
-        sourceKind == .domain ? String(localized: "example.com") : String(localized: "/analytics")
+        sourceKind == .domain ? String(localized: "example.com", bundle: RockxyLocalization.bundle) : String(
+            localized: "/analytics",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var sourcePickerTitle: String {
         sourceKind == .domain
-            ? String(localized: "Choose Domain to Mute")
-            : String(localized: "Choose Path Prefix to Mute")
+            ? String(localized: "Choose Domain to Mute", bundle: RockxyLocalization.bundle)
+            : String(localized: "Choose Path Prefix to Mute", bundle: RockxyLocalization.bundle)
     }
 
     private var sourceSearchPrompt: String {
         sourceKind == .domain
-            ? String(localized: "Search captured domains")
-            : String(localized: "Search captured paths")
+            ? String(localized: "Search captured domains", bundle: RockxyLocalization.bundle)
+            : String(localized: "Search captured paths", bundle: RockxyLocalization.bundle)
     }
 
     private var sourceHint: String {
         sourceKind == .domain
-            ? String(localized: "Matches this domain and all of its subdomains.")
-            : String(localized: "Matches this path and all child paths.")
+            ? String(localized: "Matches this domain and all of its subdomains.", bundle: RockxyLocalization.bundle)
+            : String(localized: "Matches this path and all child paths.", bundle: RockxyLocalization.bundle)
     }
 
     private var sourceMessage: String {
@@ -124,14 +127,21 @@ struct NoiseControlManagerSheet: View {
             && validationMessage != nil
     }
 
+    private var mutedSourceCountLabel: String {
+        allSources.count == 1
+            ? String(localized: "1 muted source", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(allSources.count) muted sources", bundle: RockxyLocalization.bundle)
+    }
+
     private var sheetHeader: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Noise Control"))
+                Text(String(localized: "Noise Control", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
                 Text(
                     String(
-                        localized: "Hide recurring traffic from the current Traffic Tab. Capture continues and no requests are deleted."
+                        localized: "Hide recurring traffic from the current Traffic Tab. Capture continues and no requests are deleted.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -141,10 +151,10 @@ struct NoiseControlManagerSheet: View {
 
             Spacer(minLength: 20)
 
-            TextField(String(localized: "Filter muted sources"), text: $searchText)
+            TextField(String(localized: "Filter muted sources", bundle: RockxyLocalization.bundle), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: toolMetrics.fieldWidth(210), height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Filter muted sources"))
+                .accessibilityLabel(String(localized: "Filter muted sources", bundle: RockxyLocalization.bundle))
                 .accessibilityIdentifier("noiseControl.filter")
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -161,12 +171,15 @@ struct NoiseControlManagerSheet: View {
 
             VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(String(localized: "Muted Sources"))
+                    Text(String(localized: "Muted Sources", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .semibold))
-                    Text(String(localized: "Muted sources apply regardless of the active Focus Set."))
-                        .font(toolMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Muted sources apply regardless of the active Focus Set.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 mutedSourcesTable
@@ -183,38 +196,46 @@ struct NoiseControlManagerSheet: View {
     private var addSourceGroup: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Mute a Source"))
+                Text(String(localized: "Mute a Source", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .semibold))
-                Text(String(localized: "Choose a captured domain or path, or enter a pattern."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Choose a captured domain or path, or enter a pattern.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(spacing: 10) {
-                conditionRow(title: String(localized: "Type")) {
-                    Picker(String(localized: "Source Type"), selection: $sourceKind) {
-                        Text(String(localized: "Domain")).tag(CapturedValueKind.domain)
-                        Text(String(localized: "Path Prefix")).tag(CapturedValueKind.path)
+                conditionRow(title: String(localized: "Type", bundle: RockxyLocalization.bundle)) {
+                    Picker(
+                        String(localized: "Source Type", bundle: RockxyLocalization.bundle),
+                        selection: $sourceKind
+                    ) {
+                        Text(String(localized: "Domain", bundle: RockxyLocalization.bundle))
+                            .tag(CapturedValueKind.domain)
+                        Text(String(localized: "Path Prefix", bundle: RockxyLocalization.bundle))
+                            .tag(CapturedValueKind.path)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .frame(width: toolMetrics.fieldWidth(250))
                 }
 
-                conditionRow(title: String(localized: "Pattern")) {
+                conditionRow(title: String(localized: "Pattern", bundle: RockxyLocalization.bundle)) {
                     HStack(alignment: .top, spacing: 8) {
                         CapturedTextSuggestionField(
                             text: $sourceDraft,
                             placeholder: sourcePlaceholder,
                             pickerTitle: sourcePickerTitle,
                             searchPrompt: sourceSearchPrompt,
-                            emptySelectionTitle: String(localized: "No Selection"),
+                            emptySelectionTitle: String(localized: "No Selection", bundle: RockxyLocalization.bundle),
                             suggestions: currentSuggestions,
                             kind: sourceKind,
                             requestsInitialFocus: true
                         )
-                        Button(String(localized: "Mute"), action: addSource)
+                        Button(String(localized: "Mute", bundle: RockxyLocalization.bundle), action: addSource)
                             .keyboardShortcut(.return, modifiers: [.command])
                             .rockxyGlassButtonStyle()
                             .disabled(validationMessage != nil)
@@ -239,7 +260,7 @@ struct NoiseControlManagerSheet: View {
 
     private var mutedSourcesTable: some View {
         Table(filteredSources) {
-            TableColumn(String(localized: "Source")) { source in
+            TableColumn(String(localized: "Source", bundle: RockxyLocalization.bundle)) { source in
                 HStack(spacing: 7) {
                     Image(systemName: source.systemImage)
                         .font(toolMetrics.metadataFont())
@@ -253,13 +274,13 @@ struct NoiseControlManagerSheet: View {
             }
             .width(min: 190, ideal: 250)
 
-            TableColumn(String(localized: "Type")) { source in
+            TableColumn(String(localized: "Type", bundle: RockxyLocalization.bundle)) { source in
                 Text(sourceKindLabel(source))
                     .foregroundStyle(.secondary)
             }
             .width(min: 130, ideal: 150)
 
-            TableColumn(String(localized: "Matches")) { source in
+            TableColumn(String(localized: "Matches", bundle: RockxyLocalization.bundle)) { source in
                 Text("\(coordinator.mutedTransactionCount(for: source))")
                     .font(toolMetrics.font(monospaced: true))
                     .foregroundStyle(.secondary)
@@ -274,8 +295,8 @@ struct NoiseControlManagerSheet: View {
                     Image(systemName: "minus.circle")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Unmute \(source.title)"))
-                .accessibilityLabel(String(localized: "Unmute \(source.title)"))
+                .help(String(localized: "Unmute \(source.title)", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Unmute \(source.title)", bundle: RockxyLocalization.bundle))
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             .width(32)
@@ -284,15 +305,21 @@ struct NoiseControlManagerSheet: View {
             if filteredSources.isEmpty {
                 ContentUnavailableView(
                     searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? String(localized: "No Muted Sources")
-                        : String(localized: "No Matching Sources"),
+                        ? String(localized: "No Muted Sources", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Matching Sources", bundle: RockxyLocalization.bundle),
                     systemImage: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? "eye.slash"
                         : "magnifyingglass",
                     description: Text(
                         searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? String(localized: "Mute a domain or path prefix to keep recurring traffic out of this Traffic Tab.")
-                            : String(localized: "Try a different domain or path prefix.")
+                            ? String(
+                                localized: "Mute a domain or path prefix to keep recurring traffic out of this Traffic Tab.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Try a different domain or path prefix.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -311,12 +338,12 @@ struct NoiseControlManagerSheet: View {
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
             Spacer()
-            Button(String(localized: "Unmute All"), role: .destructive) {
+            Button(String(localized: "Unmute All", bundle: RockxyLocalization.bundle), role: .destructive) {
                 coordinator.unmuteAllTrafficSources()
             }
             .rockxyGlassButtonStyle()
             .disabled(allSources.isEmpty)
-            Button(String(localized: "Done")) { dismiss() }
+            Button(String(localized: "Done", bundle: RockxyLocalization.bundle)) { dismiss() }
                 .keyboardShortcut(.defaultAction)
                 .rockxyGlassButtonStyle(prominent: true)
         }
@@ -346,16 +373,10 @@ struct NoiseControlManagerSheet: View {
     private func sourceKindLabel(_ source: MutedTrafficSource) -> String {
         switch source {
         case .host:
-            String(localized: "Domain and subdomains")
+            String(localized: "Domain and subdomains", bundle: RockxyLocalization.bundle)
         case .pathPrefix:
-            String(localized: "Path prefix")
+            String(localized: "Path prefix", bundle: RockxyLocalization.bundle)
         }
-    }
-
-    private var mutedSourceCountLabel: String {
-        allSources.count == 1
-            ? String(localized: "1 muted source")
-            : String(localized: "\(allSources.count) muted sources")
     }
 
     private func addSource() {

@@ -136,6 +136,6 @@ enum ProtocolFilterSelection {
 
     /// Menu row label. `.all` renders as "All Traffic"; everything else uses its display name.
     static func menuLabel(for filter: ProtocolFilter) -> String {
-        filter == .all ? String(localized: "All Traffic") : filter.displayName
+        filter == .all ? String(localized: "All Traffic", bundle: RockxyLocalization.bundle) : filter.displayName
     }
 }

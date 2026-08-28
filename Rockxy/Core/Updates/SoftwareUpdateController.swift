@@ -204,7 +204,7 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         activeAcknowledge = acknowledgement
         phase = .error(
             ErrorContext(
-                title: String(localized: "Software update couldn’t be completed"),
+                title: String(localized: "Software update couldn’t be completed", bundle: RockxyLocalization.bundle),
                 summary: error.localizedDescription,
                 recoverySuggestion: error.localizedRecoverySuggestion
             )
@@ -260,10 +260,12 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         let latestItem = error.userInfo[SPULatestAppcastItemFoundKey] as? SUAppcastItem
         let latestVersion = latestItem?.displayVersionString
         let latestPublishedFallback = String(
-            localized: "Release notes are unavailable for the latest published version."
+            localized: "Release notes are unavailable for the latest published version.",
+            bundle: RockxyLocalization.bundle
         )
         let localBuildFallback = String(
-            localized: "Release notes for this local build are unavailable because this version is not published to the update feed yet."
+            localized: "Release notes for this local build are unavailable because this version is not published to the update feed yet.",
+            bundle: RockxyLocalization.bundle
         )
         let matchesRunningVersion = latestItem.map {
             $0.displayVersionString == configuration.appVersion && $0.versionString == configuration.buildNumber
@@ -286,7 +288,7 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         }
 
         return NoUpdateContext(
-            title: String(localized: "Rockxy is up to date"),
+            title: String(localized: "Rockxy is up to date", bundle: RockxyLocalization.bundle),
             summary: error.localizedDescription,
             currentVersion: currentVersionSummary,
             latestVersion: latestVersion,
@@ -357,7 +359,7 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
             }
             let hostingController = NSHostingController(rootView: rootView)
             let window = NSWindow(contentViewController: hostingController)
-            window.title = String(localized: "Software Update")
+            window.title = String(localized: "Software Update", bundle: RockxyLocalization.bundle)
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.titlebarAppearsTransparent = false
             window.titleVisibility = .visible
@@ -472,16 +474,17 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
         let title = if let preferredTitle, !preferredTitle.isEmpty {
             preferredTitle
         } else {
-            String(localized: "A new version of Rockxy is available")
+            String(localized: "A new version of Rockxy is available", bundle: RockxyLocalization.bundle)
         }
 
         return UpdateContext(
             title: title,
             summary: item.isInformationOnlyUpdate
-                ? String(localized: "Review the latest release details for Rockxy.")
+                ? String(localized: "Review the latest release details for Rockxy.", bundle: RockxyLocalization.bundle)
                 :
                 String(
-                    localized: "Rockxy \(item.displayVersionString) is now available. You’re currently using \(configuration.appVersion)."
+                    localized: "Rockxy \(item.displayVersionString) is now available. You’re currently using \(configuration.appVersion).",
+                    bundle: RockxyLocalization.bundle
                 ),
             currentVersion: configuration.appVersion,
             latestVersion: item.displayVersionString,
@@ -535,13 +538,13 @@ final class SoftwareUpdateController: NSObject, ObservableObject, NSWindowDelega
     private func updateStageDescription(for stage: SPUUserUpdateStage) -> String {
         switch stage {
         case .notDownloaded:
-            String(localized: "Not downloaded")
+            String(localized: "Not downloaded", bundle: RockxyLocalization.bundle)
         case .downloaded:
-            String(localized: "Downloaded")
+            String(localized: "Downloaded", bundle: RockxyLocalization.bundle)
         case .installing:
-            String(localized: "Installing")
+            String(localized: "Installing", bundle: RockxyLocalization.bundle)
         @unknown default:
-            String(localized: "Preparing update")
+            String(localized: "Preparing update", bundle: RockxyLocalization.bundle)
         }
     }
 }

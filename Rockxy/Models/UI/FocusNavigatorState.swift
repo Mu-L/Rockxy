@@ -7,13 +7,17 @@ enum FocusNavigatorMode: String, CaseIterable, Identifiable {
     case focus
     case library
 
-    var id: Self { self }
+    // MARK: Internal
+
+    var id: Self {
+        self
+    }
 
     var title: String {
         switch self {
-        case .browse: String(localized: "Browse")
-        case .focus: String(localized: "Focus")
-        case .library: String(localized: "Library")
+        case .browse: String(localized: "Browse", bundle: RockxyLocalization.bundle)
+        case .focus: String(localized: "Focus", bundle: RockxyLocalization.bundle)
+        case .library: String(localized: "Library", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -38,15 +42,19 @@ enum TrafficSignal: String, CaseIterable, Identifiable {
     case graphQL
     case rulesHit
 
-    var id: Self { self }
+    // MARK: Internal
+
+    var id: Self {
+        self
+    }
 
     var title: String {
         switch self {
-        case .errors: String(localized: "Errors")
-        case .slow: String(localized: "Slow")
-        case .webSocket: String(localized: "WebSocket")
-        case .graphQL: String(localized: "GraphQL")
-        case .rulesHit: String(localized: "Rules Hit")
+        case .errors: String(localized: "Errors", bundle: RockxyLocalization.bundle)
+        case .slow: String(localized: "Slow", bundle: RockxyLocalization.bundle)
+        case .webSocket: String(localized: "WebSocket", bundle: RockxyLocalization.bundle)
+        case .graphQL: String(localized: "GraphQL", bundle: RockxyLocalization.bundle)
+        case .rulesHit: String(localized: "Rules Hit", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -63,15 +71,18 @@ enum TrafficSignal: String, CaseIterable, Identifiable {
     var explanation: String {
         switch self {
         case .errors:
-            String(localized: "HTTP 4xx/5xx responses and failed transports")
+            String(localized: "HTTP 4xx/5xx responses and failed transports", bundle: RockxyLocalization.bundle)
         case .slow:
-            String(localized: "Requests taking at least one second")
+            String(localized: "Requests taking at least one second", bundle: RockxyLocalization.bundle)
         case .webSocket:
-            String(localized: "WebSocket sessions and valid upgrade handshakes")
+            String(localized: "WebSocket sessions and valid upgrade handshakes", bundle: RockxyLocalization.bundle)
         case .graphQL:
-            String(localized: "GraphQL operations confirmed from captured request data")
+            String(
+                localized: "GraphQL operations confirmed from captured request data",
+                bundle: RockxyLocalization.bundle
+            )
         case .rulesHit:
-            String(localized: "Requests affected by a matching debugging rule")
+            String(localized: "Requests affected by a matching debugging rule", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -96,6 +107,8 @@ enum TrafficSignal: String, CaseIterable, Identifiable {
                 || transaction.matchedRulePattern != nil
         }
     }
+
+    // MARK: Private
 
     private static let slowThreshold: TimeInterval = 1
 
@@ -125,13 +138,7 @@ enum TrafficSignal: String, CaseIterable, Identifiable {
 
 /// A compact, reusable traffic scope. Empty fields are wildcards; exclusions always win.
 struct FocusSet: Identifiable, Codable, Equatable {
-    let id: UUID
-    var name: String
-    var appName: String
-    var domain: String
-    var pathPrefix: String
-    var excludedDomain: String
-    var excludedPathPrefix: String
+    // MARK: Lifecycle
 
     init(
         id: UUID = UUID(),
@@ -151,26 +158,15 @@ struct FocusSet: Identifiable, Codable, Equatable {
         self.excludedPathPrefix = excludedPathPrefix
     }
 
-    func matches(_ transaction: HTTPTransaction) -> Bool {
-        let host = transaction.request.host
-        let path = transaction.request.path
-        if !excludedDomain.isEmpty, DomainGrouping.host(host, matchesDomain: excludedDomain) {
-            return false
-        }
-        if !excludedPathPrefix.isEmpty, DomainGrouping.path(path, matchesPrefix: excludedPathPrefix) {
-            return false
-        }
-        if !appName.isEmpty, transaction.clientApp != appName {
-            return false
-        }
-        if !domain.isEmpty, !DomainGrouping.host(host, matchesDomain: domain) {
-            return false
-        }
-        if !pathPrefix.isEmpty, !DomainGrouping.path(path, matchesPrefix: pathPrefix) {
-            return false
-        }
-        return true
-    }
+    // MARK: Internal
+
+    let id: UUID
+    var name: String
+    var appName: String
+    var domain: String
+    var pathPrefix: String
+    var excludedDomain: String
+    var excludedPathPrefix: String
 
     var ruleCount: Int {
         [appName, domain, pathPrefix, excludedDomain, excludedPathPrefix].count { !$0.isEmpty }
@@ -188,9 +184,9 @@ struct FocusSet: Identifiable, Codable, Equatable {
             return includedScopeName
         }
         if let excludedScopeName {
-            return String(localized: "Hide \(excludedScopeName)")
+            return String(localized: "Hide \(excludedScopeName)", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "New Focus Set")
+        return String(localized: "New Focus Set", bundle: RockxyLocalization.bundle)
     }
 
     /// A collapsed-row summary for user-named sets. Expanded rows expose the same information
@@ -200,13 +196,13 @@ struct FocusSet: Identifiable, Codable, Equatable {
         let excluded = excludedScopeName
         switch (included, excluded) {
         case let (.some(included), .some(excluded)):
-            return String(localized: "\(included). Hide \(excluded).")
+            return String(localized: "\(included). Hide \(excluded).", bundle: RockxyLocalization.bundle)
         case let (.some(included), .none):
             return included
         case let (.none, .some(excluded)):
-            return String(localized: "Hide \(excluded)")
+            return String(localized: "Hide \(excluded)", bundle: RockxyLocalization.bundle)
         case (.none, .none):
-            return String(localized: "No conditions")
+            return String(localized: "No conditions", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -255,14 +251,35 @@ struct FocusSet: Identifiable, Codable, Equatable {
         let excluded = sidebarExcludedRules.isEmpty ? nil : excludedScopeName
         switch (included, excluded) {
         case let (.some(included), .some(excluded)):
-            return String(localized: "\(included). Hide \(excluded).")
+            return String(localized: "\(included). Hide \(excluded).", bundle: RockxyLocalization.bundle)
         case let (.some(included), .none):
             return included
         case let (.none, .some(excluded)):
-            return String(localized: "Hide \(excluded)")
+            return String(localized: "Hide \(excluded)", bundle: RockxyLocalization.bundle)
         case (.none, .none):
             return nil
         }
+    }
+
+    func matches(_ transaction: HTTPTransaction) -> Bool {
+        let host = transaction.request.host
+        let path = transaction.request.path
+        if !excludedDomain.isEmpty, DomainGrouping.host(host, matchesDomain: excludedDomain) {
+            return false
+        }
+        if !excludedPathPrefix.isEmpty, DomainGrouping.path(path, matchesPrefix: excludedPathPrefix) {
+            return false
+        }
+        if !appName.isEmpty, transaction.clientApp != appName {
+            return false
+        }
+        if !domain.isEmpty, !DomainGrouping.host(host, matchesDomain: domain) {
+            return false
+        }
+        if !pathPrefix.isEmpty, !DomainGrouping.path(path, matchesPrefix: pathPrefix) {
+            return false
+        }
+        return true
     }
 
     // MARK: Private
@@ -278,12 +295,12 @@ struct FocusSet: Identifiable, Codable, Equatable {
         guard let excludedScopeName else {
             return false
         }
-        return displayName == String(localized: "Hide \(excludedScopeName)")
+        return displayName == String(localized: "Hide \(excludedScopeName)", bundle: RockxyLocalization.bundle)
     }
 
     private var usesGeneratedName: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let candidates = [String(localized: "New Focus Set"), "New Focus Set"]
+        let candidates = [String(localized: "New Focus Set", bundle: RockxyLocalization.bundle), "New Focus Set"]
         return candidates.contains { baseName in
             if trimmed == baseName {
                 return true
@@ -308,7 +325,7 @@ struct FocusSet: Identifiable, Codable, Equatable {
 
         switch (appName.isEmpty ? nil : appName, target) {
         case let (.some(application), .some(target)):
-            return String(localized: "\(application) on \(target)")
+            return String(localized: "\(application) on \(target)", bundle: RockxyLocalization.bundle)
         case let (.some(application), .none):
             return application
         case let (.none, .some(target)):
@@ -319,17 +336,18 @@ struct FocusSet: Identifiable, Codable, Equatable {
     }
 
     private var excludedScopeName: String? {
-        switch (excludedDomain.isEmpty ? nil : excludedDomain,
-                excludedPathPrefix.isEmpty ? nil : excludedPathPrefix)
-        {
+        switch (
+            excludedDomain.isEmpty ? nil : excludedDomain,
+            excludedPathPrefix.isEmpty ? nil : excludedPathPrefix
+        ) {
         case let (.some(domain), .some(path)):
-            return String(localized: "\(domain) and paths under \(path)")
+            String(localized: "\(domain) and paths under \(path)", bundle: RockxyLocalization.bundle)
         case let (.some(domain), .none):
-            return domain
+            domain
         case let (.none, .some(path)):
-            return String(localized: "paths under \(path)")
+            String(localized: "paths under \(path)", bundle: RockxyLocalization.bundle)
         case (.none, .none):
-            return nil
+            nil
         }
     }
 }
@@ -360,6 +378,8 @@ struct FocusSetRuleDescriptor: Identifiable, Equatable {
 // MARK: - FocusSetPersistence
 
 enum FocusSetPersistence {
+    // MARK: Internal
+
     static func load() -> [FocusSet] {
         guard !RockxyIdentity.isRunningTests,
               let data = UserDefaults.standard.data(forKey: storageKey),
@@ -372,11 +392,14 @@ enum FocusSetPersistence {
 
     static func save(_ focusSets: [FocusSet]) {
         guard !RockxyIdentity.isRunningTests,
-              let data = try? JSONEncoder().encode(focusSets) else {
+              let data = try? JSONEncoder().encode(focusSets) else
+        {
             return
         }
         UserDefaults.standard.set(data, forKey: storageKey)
     }
+
+    // MARK: Private
 
     private static let storageKey = RockxyIdentity.current.defaultsKey("focusNavigator.focusSets")
 }
@@ -387,6 +410,8 @@ enum MutedTrafficSource: Hashable, Identifiable {
     case host(String)
     case pathPrefix(String)
 
+    // MARK: Internal
+
     var id: String {
         switch self {
         case let .host(value): "host:\(value)"
@@ -396,7 +421,8 @@ enum MutedTrafficSource: Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case let .host(value), let .pathPrefix(value): value
+        case let .host(value),
+             let .pathPrefix(value): value
         }
     }
 
