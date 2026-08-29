@@ -75,27 +75,20 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.36.0** — 2026-08-24
+**v0.37.0** — 2026-08-29
 
 ### Added
 
-- Added local Projects with project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only Project file import and export.
-- Added optional iCloud synchronization for Pro Projects, with conflict-safe merging and local recovery.
-- Added detachable transaction inspectors, letting you continue capturing traffic while reviewing a request in its own window.
-- Added a dedicated traffic command bar for recording controls, Follow Live, Clear Session, and faster traffic navigation.
+- Added native toolbar customization with a broader set of workspace actions.
+- Completed the Map Local response workflow for serving local files, directories, and custom responses.
+- Added complete Simplified Chinese localization across Rockxy and Pro workflows, including licensing, advanced inspection, Android automation, Project Cloud Sync, and Workspace login and upload.
+- Added live in-app language switching, with System Default following macOS immediately.
 
 ### Fixed
 
-- Prevented Developer Hub from appearing blank after traffic capture starts.
-- Hardened Project lifecycle, reopening, retention, and recovery behavior.
-- Preserved recovery options for oversized Project catalogs before size validation blocks normal loading.
-- Improved Settings and recovery presentation during invalid or damaged state handling.
-
-### Changed
-
-- Refreshed the workspace, Settings, and tool windows with native Liquid Glass styling that respects themes and accessibility preferences.
-- Improved transaction selection and per-workspace navigation so reveal and follow actions remain attached to the correct workspace.
-- Strengthened bounded traffic capture and Project retention to keep long-running sessions predictable.
+- Prevented side-by-side Diff views from overflowing their window.
+- Refined focus sheets and restored reliable sidebar toggle behavior.
+- Restored localized titles across app and utility windows.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
