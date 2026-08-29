@@ -15,6 +15,7 @@
 - [ ] `CHANGELOG.md` updated under `[Unreleased]` (skip for unreleased-only fixes)
 - [ ] Docs updated in `docs/` if the change affects user-facing behavior
 - [ ] User-facing strings localized with `String(localized:)`
+- [ ] If string catalogs changed: `python3 .github/tools/validate_xcstrings.py` passes (see `docs/development/localization.mdx`)
 - [ ] No SwiftLint / SwiftFormat violations (`swiftlint lint --strict && swiftformat .`)
 - [ ] If this PR touches helper packaging, release scripts, or platform compatibility claims, Intel + Apple Silicon validation was updated or re-run
 

@@ -14,23 +14,23 @@ struct DeveloperSetupManualWindowView: View {
 
     var body: some View {
         setupLayout
-        .frame(minWidth: 640, minHeight: 460)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .font(setupMetrics.font())
-        .centerOverRockxyMainWindowOnAppear()
-        .task {
-            viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
-            viewModel.refresh()
-            if viewModel.isRuntimeTerminalTarget {
-                viewModel.prepareScriptForDisplay()
+            .frame(minWidth: 640, minHeight: 460)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .font(setupMetrics.font())
+            .centerOverRockxyMainWindowOnAppear()
+            .task {
+                viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
+                viewModel.refresh()
+                if viewModel.isRuntimeTerminalTarget {
+                    viewModel.prepareScriptForDisplay()
+                }
             }
-        }
-        .onChange(of: routeStore.manualRoute) { _, _ in
-            viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
-            if viewModel.isRuntimeTerminalTarget {
-                viewModel.prepareScriptForDisplay()
+            .onChange(of: routeStore.manualRoute) { _, _ in
+                viewModel.applyRoute(routeStore.consumeManualRoute(), destination: .manual)
+                if viewModel.isRuntimeTerminalTarget {
+                    viewModel.prepareScriptForDisplay()
+                }
             }
-        }
     }
 
     // MARK: Private
@@ -102,7 +102,7 @@ struct DeveloperSetupManualWindowView: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Manual Setup"))
+                    Text(String(localized: "Manual Setup", bundle: RockxyLocalization.bundle))
                         .font(setupMetrics.font(size: setupMetrics.titleFontSize, weight: .semibold))
                     Text(viewModel.target.title)
                         .font(setupMetrics.secondaryFont())
@@ -120,22 +120,28 @@ struct DeveloperSetupManualWindowView: View {
     /// Terminal-runtime targets get the scoped-shell source-command flow.
     private var terminalCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Terminal session"))
+            Text(String(localized: "Terminal session", bundle: RockxyLocalization.bundle))
                 .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 16) {
                 instructionStep(
-                    title: String(localized: "1. Open your favorite Terminal app"),
-                    caption: String(localized: "Supports Terminal, iTerm2, Ghostty, Hyper, and Bash/Zsh/Fish shells.")
+                    title: String(localized: "1. Open your favorite Terminal app", bundle: RockxyLocalization.bundle),
+                    caption: String(
+                        localized: "Supports Terminal, iTerm2, Ghostty, Hyper, and Bash/Zsh/Fish shells.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: "2. Copy and paste this command into that terminal"))
-                        .font(setupMetrics.font(weight: .semibold))
+                    Text(String(
+                        localized: "2. Copy and paste this command into that terminal",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(setupMetrics.font(weight: .semibold))
 
                     commandBox(viewModel.manualSourceCommand)
 
-                    Button(String(localized: "Copy Setup Command")) {
+                    Button(String(localized: "Copy Setup Command", bundle: RockxyLocalization.bundle)) {
                         viewModel.copyManualCommand()
                     }
                     .controlSize(.regular)
@@ -143,8 +149,14 @@ struct DeveloperSetupManualWindowView: View {
                 }
 
                 instructionStep(
-                    title: String(localized: "3. Run \(viewModel.target.title) in that terminal session"),
-                    caption: String(localized: "Start your server or scripts there so Rockxy can capture the traffic."),
+                    title: String(
+                        localized: "3. Run \(viewModel.target.title) in that terminal session",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                    caption: String(
+                        localized: "Start your server or scripts there so Rockxy can capture the traffic.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     trailingSystemImage: "checkmark"
                 )
             }
@@ -160,7 +172,7 @@ struct DeveloperSetupManualWindowView: View {
     /// manual workflow snippet and guide, never the generic localhost terminal flow.
     private var targetManualCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "\(viewModel.target.title) manual setup"))
+            Text(String(localized: "\(viewModel.target.title) manual setup", bundle: RockxyLocalization.bundle))
                 .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 14) {
@@ -172,7 +184,7 @@ struct DeveloperSetupManualWindowView: View {
                 if let snippet = viewModel.targetSnippetText {
                     commandBox(snippet, minHeight: 120)
 
-                    Button(String(localized: "Copy Setup Command")) {
+                    Button(String(localized: "Copy Setup Command", bundle: RockxyLocalization.bundle)) {
                         viewModel.copyTargetSnippet()
                     }
                     .controlSize(.regular)
@@ -210,10 +222,13 @@ struct DeveloperSetupManualWindowView: View {
             }
 
             if viewModel.isRuntimeTerminalTarget {
-                Button(String(localized: "Show Setup Script in Finder")) {
+                Button(String(localized: "Show Setup Script in Finder", bundle: RockxyLocalization.bundle)) {
                     revealSetupScript()
                 }
-                .help(String(localized: "Reveal the generated setup script so you can inspect exactly what it exports"))
+                .help(String(
+                    localized: "Reveal the generated setup script so you can inspect exactly what it exports",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,7 +245,7 @@ struct DeveloperSetupManualWindowView: View {
         .frame(minHeight: minHeight)
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .accessibilityLabel(String(localized: "Generated setup command"))
+        .accessibilityLabel(String(localized: "Generated setup command", bundle: RockxyLocalization.bundle))
         .accessibilityValue(text)
     }
 
@@ -268,7 +283,10 @@ struct DeveloperSetupManualWindowView: View {
             NSWorkspace.shared.activateFileViewerSelecting([viewModel.scriptURL])
         } catch {
             viewModel
-                .statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+                .statusMessage = String(
+                    localized: "Could not prepare the setup script: \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
         }
     }
 }

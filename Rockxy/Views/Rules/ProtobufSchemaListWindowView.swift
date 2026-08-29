@@ -33,7 +33,7 @@ struct ProtobufSchemaListWindowView: View {
             importSchema(result)
         }
         .confirmationDialog(
-            String(localized: "Delete Schema?"),
+            String(localized: "Delete Schema?", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { pendingDeletion != nil },
                 set: {
@@ -44,10 +44,10 @@ struct ProtobufSchemaListWindowView: View {
             ),
             presenting: pendingDeletion
         ) { schema in
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 performDelete(schema)
             }
-            Button(String(localized: "Cancel"), role: .cancel) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                 pendingDeletion = nil
             }
         } message: { schema in
@@ -62,13 +62,15 @@ struct ProtobufSchemaListWindowView: View {
         case failure(String)
     }
 
-    private static let capabilityNotice = String(
-        localized:
-        """
-        Imported .proto files are stored locally on this Mac. Schema-aware decoding is unavailable \
-        in this build — captured Protobuf traffic is decoded with heuristics only.
-        """
-    )
+    private static var capabilityNotice: String {
+        String(
+            localized:
+            """
+            Imported .proto files are stored locally on this Mac. Schema-aware decoding is unavailable \
+            in this build — captured Protobuf traffic is decoded with heuristics only.
+            """, bundle: RockxyLocalization.bundle
+        )
+    }
 
     private static var allowedContentTypes: [UTType] {
         if let proto = UTType(filenameExtension: "proto") {
@@ -92,10 +94,13 @@ struct ProtobufSchemaListWindowView: View {
     private var footerHint: String {
         let used = schemaStore.schemasUsed
         let count = used == 1
-            ? String(localized: "1 schema")
-            : String(localized: "\(used) schemas")
+            ? String(localized: "1 schema", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(used) schemas", bundle: RockxyLocalization.bundle)
         if schemaStore.schemasLimit > 0 {
-            return String(localized: "\(count) of \(schemaStore.schemasLimit) stored")
+            return String(
+                localized: "\(count) of \(schemaStore.schemasLimit) stored",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return count
     }
@@ -104,12 +109,64 @@ struct ProtobufSchemaListWindowView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var availabilityIcon: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            "checkmark.circle"
+        case .policyUnavailable:
+            "lock"
+        case .limitReached:
+            "tray.full"
+        case .storageUnavailable:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var availabilityColor: Color {
+        schemaStore.importAvailability == .storageUnavailable ? .orange : .secondary
+    }
+
+    private var availabilityTitle: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            String(localized: "Local Import Available", bundle: RockxyLocalization.bundle)
+        case .policyUnavailable:
+            String(localized: "Local Import Unavailable", bundle: RockxyLocalization.bundle)
+        case .limitReached:
+            String(localized: "Schema Limit Reached", bundle: RockxyLocalization.bundle)
+        case .storageUnavailable:
+            String(localized: "Schema Storage Unavailable", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private var availabilityMessage: String {
+        switch schemaStore.importAvailability {
+        case .available:
+            String(localized: "Import a local .proto source file.", bundle: RockxyLocalization.bundle)
+        case .policyUnavailable:
+            String(
+                localized: "This version of Rockxy does not allow new local schema imports. Existing files can still be removed.",
+                bundle: RockxyLocalization.bundle
+            )
+        case let .limitReached(limit):
+            String(
+                localized: "This build stores up to \(limit) local schemas. Remove one before importing another.",
+                bundle: RockxyLocalization.bundle
+            )
+        case .storageUnavailable:
+            String(
+                localized: "The stored schema list could not be read. Retry before changing local schema files.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Local Protobuf Schemas"))
+                Text(String(localized: "Local Protobuf Schemas", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
-                Text(String(localized: "Store .proto source files on this Mac."))
+                Text(String(localized: "Store .proto source files on this Mac.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
@@ -123,7 +180,7 @@ struct ProtobufSchemaListWindowView: View {
 
     private var schemaTable: some View {
         Table(schemaStore.schemas, selection: $selectedSchemaID) {
-            TableColumn(String(localized: "Schema File Name")) { schema in
+            TableColumn(String(localized: "Schema File Name", bundle: RockxyLocalization.bundle)) { schema in
                 Text(schema.fileName)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -132,17 +189,17 @@ struct ProtobufSchemaListWindowView: View {
             }
             .width(min: 200, ideal: 300)
 
-            TableColumn(String(localized: "Referenced By")) { schema in
+            TableColumn(String(localized: "Referenced By", bundle: RockxyLocalization.bundle)) { schema in
                 let count = mappingStore.referenceCount(forSchema: schema.id)
                 Text(count == 1
-                    ? String(localized: "1 definition")
-                    : String(localized: "\(count) definitions"))
+                    ? String(localized: "1 definition", bundle: RockxyLocalization.bundle)
+                    : String(localized: "\(count) definitions", bundle: RockxyLocalization.bundle))
                     .foregroundStyle(count == 0 ? .secondary : .primary)
             }
             .width(min: 130, ideal: 160)
 
-            TableColumn(String(localized: "Runtime")) { _ in
-                Text(String(localized: "Not applied"))
+            TableColumn(String(localized: "Runtime", bundle: RockxyLocalization.bundle)) { _ in
+                Text(String(localized: "Not applied", bundle: RockxyLocalization.bundle))
                     .foregroundStyle(.secondary)
             }
             .width(min: 100, ideal: 120)
@@ -170,29 +227,44 @@ struct ProtobufSchemaListWindowView: View {
         switch schemaStore.importAvailability {
         case .available:
             ContentUnavailableView(
-                String(localized: "No Local Schemas"),
+                String(localized: "No Local Schemas", bundle: RockxyLocalization.bundle),
                 systemImage: "doc.badge.plus",
-                description: Text(String(localized: "Click \"+\" or press ⌘N to import a .proto file."))
+                description: Text(String(
+                    localized: "Click \"+\" or press ⌘N to import a .proto file.",
+                    bundle: RockxyLocalization.bundle
+                ))
             )
         case .policyUnavailable:
             ContentUnavailableView(
-                String(localized: "Schema Import Unavailable"),
+                String(localized: "Schema Import Unavailable", bundle: RockxyLocalization.bundle),
                 systemImage: "lock",
-                description: Text(String(localized: "Local schema import is unavailable in this version of Rockxy."))
+                description: Text(String(
+                    localized: "Local schema import is unavailable in this version of Rockxy.",
+                    bundle: RockxyLocalization.bundle
+                ))
             )
         case let .limitReached(limit):
             ContentUnavailableView(
-                String(localized: "Schema Limit Reached"),
+                String(localized: "Schema Limit Reached", bundle: RockxyLocalization.bundle),
                 systemImage: "tray.full",
-                description: Text(String(localized: "This build stores up to \(limit) local schemas."))
+                description: Text(String(
+                    localized: "This build stores up to \(limit) local schemas.",
+                    bundle: RockxyLocalization.bundle
+                ))
             )
         case .storageUnavailable:
             ContentUnavailableView {
-                Label(String(localized: "Schema Storage Unavailable"), systemImage: "exclamationmark.triangle")
+                Label(
+                    String(localized: "Schema Storage Unavailable", bundle: RockxyLocalization.bundle),
+                    systemImage: "exclamationmark.triangle"
+                )
             } description: {
-                Text(String(localized: "The stored schema list could not be read. Retry before changing local files."))
+                Text(String(
+                    localized: "The stored schema list could not be read. Retry before changing local files.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } actions: {
-                Button(String(localized: "Retry")) {
+                Button(String(localized: "Retry", bundle: RockxyLocalization.bundle)) {
                     schemaStore.reload()
                 }
             }
@@ -232,8 +304,8 @@ struct ProtobufSchemaListWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
             .disabled(!canImport)
-            .help(String(localized: "Import Protobuf Schema"))
-            .accessibilityLabel(String(localized: "Import local Protobuf schema"))
+            .help(String(localized: "Import Protobuf Schema", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Import local Protobuf schema", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -251,8 +323,11 @@ struct ProtobufSchemaListWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(selectedSchemaID == nil)
-            .help(String(localized: "Delete Protobuf Schema"))
-            .accessibilityLabel(String(localized: "Delete selected local Protobuf schema"))
+            .help(String(localized: "Delete Protobuf Schema", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(
+                localized: "Delete selected local Protobuf schema",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -265,20 +340,20 @@ struct ProtobufSchemaListWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Import…")) {
+            Button(String(localized: "Import…", bundle: RockxyLocalization.bundle)) {
                 showImporter = true
             }
             .disabled(!canImport)
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 requestDeleteSelected()
             }
             .disabled(selectedSchemaID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -302,56 +377,13 @@ struct ProtobufSchemaListWindowView: View {
             }
             Spacer(minLength: 0)
             if schemaStore.importAvailability == .storageUnavailable {
-                Button(String(localized: "Retry")) {
+                Button(String(localized: "Retry", bundle: RockxyLocalization.bundle)) {
                     schemaStore.reload()
                 }
             }
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.controlSpacing)
-    }
-
-    private var availabilityIcon: String {
-        switch schemaStore.importAvailability {
-        case .available:
-            "checkmark.circle"
-        case .policyUnavailable:
-            "lock"
-        case .limitReached:
-            "tray.full"
-        case .storageUnavailable:
-            "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var availabilityColor: Color {
-        schemaStore.importAvailability == .storageUnavailable ? .orange : .secondary
-    }
-
-    private var availabilityTitle: String {
-        switch schemaStore.importAvailability {
-        case .available:
-            String(localized: "Local Import Available")
-        case .policyUnavailable:
-            String(localized: "Local Import Unavailable")
-        case .limitReached:
-            String(localized: "Schema Limit Reached")
-        case .storageUnavailable:
-            String(localized: "Schema Storage Unavailable")
-        }
-    }
-
-    private var availabilityMessage: String {
-        switch schemaStore.importAvailability {
-        case .available:
-            String(localized: "Import a local .proto source file.")
-        case .policyUnavailable:
-            String(localized: "This version of Rockxy does not allow new local schema imports. Existing files can still be removed.")
-        case let .limitReached(limit):
-            String(localized: "This build stores up to \(limit) local schemas. Remove one before importing another.")
-        case .storageUnavailable:
-            String(localized: "The stored schema list could not be read. Retry before changing local schema files.")
-        }
     }
 
     private func statusLabel(_ status: ImportStatus) -> some View {
@@ -375,14 +407,14 @@ struct ProtobufSchemaListWindowView: View {
 
     @ViewBuilder
     private func schemaContextMenu(ids: Set<UUID>) -> some View {
-        Button(String(localized: "Import…")) {
+        Button(String(localized: "Import…", bundle: RockxyLocalization.bundle)) {
             showImporter = true
         }
         .disabled(!canImport)
 
         Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
+        Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
             if let id = ids.first {
                 requestDelete(id: id)
             }
@@ -412,7 +444,10 @@ struct ProtobufSchemaListWindowView: View {
                     fileName: url.lastPathComponent,
                     hostPattern: "*"
                 )
-                importStatus = .success(String(localized: "Imported \(descriptor.fileName)."))
+                importStatus = .success(String(
+                    localized: "Imported \(descriptor.fileName).",
+                    bundle: RockxyLocalization.bundle
+                ))
             } catch {
                 importStatus = .failure(error.localizedDescription)
             }
@@ -441,13 +476,17 @@ struct ProtobufSchemaListWindowView: View {
     private func deletionMessage(for schema: ProtobufSchemaDescriptor) -> String {
         let references = mappingStore.referenceCount(forSchema: schema.id)
         guard references > 0 else {
-            return String(localized: "This removes the stored \(schema.fileName) file from this Mac.")
+            return String(
+                localized: "This removes the stored \(schema.fileName) file from this Mac.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         let mappingCount = references == 1
-            ? String(localized: "1 mapping definition")
-            : String(localized: "\(references) mapping definitions")
+            ? String(localized: "1 mapping definition", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(references) mapping definitions", bundle: RockxyLocalization.bundle)
         return String(
-            localized: "\(mappingCount) reference this schema. Deleting it clears their schema selection."
+            localized: "\(mappingCount) reference this schema. Deleting it clears their schema selection.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -468,7 +507,7 @@ struct ProtobufSchemaListWindowView: View {
                             """
                             The schema was not deleted, but its mapping references could not be restored: \
                             \(restoreError.localizedDescription)
-                            """
+                            """, bundle: RockxyLocalization.bundle
                         )
                     )
                     return
@@ -480,8 +519,11 @@ struct ProtobufSchemaListWindowView: View {
             }
             importStatus = .success(
                 detached > 0
-                    ? String(localized: "Deleted schema and cleared \(detached) references.")
-                    : String(localized: "Deleted schema.")
+                    ? String(
+                        localized: "Deleted schema and cleared \(detached) references.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(localized: "Deleted schema.", bundle: RockxyLocalization.bundle)
             )
         } catch {
             importStatus = .failure(error.localizedDescription)

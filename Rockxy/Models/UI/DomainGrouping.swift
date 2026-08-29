@@ -197,13 +197,15 @@ struct AppGroupingIndex {
 
     private static func normalizedAppName(_ value: String?) -> String {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return normalized.isEmpty ? String(localized: "Unknown") : normalized
+        return normalized.isEmpty ? String(localized: "Unknown", bundle: RockxyLocalization.bundle) : normalized
     }
 }
 
 // MARK: - DomainGrouping
 
 enum DomainGrouping {
+    // MARK: Internal
+
     struct NodeSpec {
         let id: String
         let parentID: String?

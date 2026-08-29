@@ -49,15 +49,19 @@ struct DiffSection: Identifiable, Sendable {
 /// A paired row for side-by-side rendering. Both panes render from the same sequence,
 /// so lines always align vertically. nil means a spacer at that position.
 struct SideBySideRow: Identifiable, Sendable {
-    let id: UUID
-    let left: DiffLine?
-    let right: DiffLine?
+    // MARK: Lifecycle
 
     init(left: DiffLine?, right: DiffLine?) {
         id = left?.id ?? right?.id ?? UUID()
         self.left = left
         self.right = right
     }
+
+    // MARK: Internal
+
+    let id: UUID
+    let left: DiffLine?
+    let right: DiffLine?
 }
 
 // MARK: - DiffResult
@@ -215,6 +219,8 @@ enum DiffEngine {
 
     // MARK: Private
 
+    private static let hashChunkSize = 64 * 1_024
+
     private static func longestCommonSubsequence(_ a: [String], _ b: [String]) -> [String] {
         let m = a.count
         let n = b.count
@@ -267,7 +273,8 @@ enum DiffEngine {
         return lines.prefix(maximumLineCount - 1).map(boundedLine) + [
             String(
                 localized:
-                "Comparison limited to \(maximumLineCount - 1) of \(lines.count) lines · SHA-256 \(digest)"
+                "Comparison limited to \(maximumLineCount - 1) of \(lines.count) lines · SHA-256 \(digest)",
+                bundle: RockxyLocalization.bundle
             ),
         ]
     }
@@ -279,7 +286,8 @@ enum DiffEngine {
         let prefix = String(line.prefix(maximumLineLength))
         return String(
             localized:
-            "\(prefix)… [line limited to \(maximumLineLength) of \(line.count) characters · SHA-256 \(sha256(line))]"
+            "\(prefix)… [line limited to \(maximumLineLength) of \(line.count) characters · SHA-256 \(sha256(line))]",
+            bundle: RockxyLocalization.bundle
         )
     }
 
@@ -339,8 +347,6 @@ enum DiffEngine {
         return hexDigest(hasher.finalize())
     }
 
-    private static let hashChunkSize = 64 * 1_024
-
     private static func boundedTextLines(_ text: String) -> [String] {
         var hasher = SHA256()
         var hashBuffer = Data()
@@ -392,7 +398,8 @@ enum DiffEngine {
         lines.append(
             String(
                 localized:
-                "Comparison limited to \(retainedLineCount) of \(totalLineCount) lines and \(previewData.count) of \(totalByteCount) UTF-8 bytes · SHA-256 \(digest)"
+                "Comparison limited to \(retainedLineCount) of \(totalLineCount) lines and \(previewData.count) of \(totalByteCount) UTF-8 bytes · SHA-256 \(digest)",
+                bundle: RockxyLocalization.bundle
             )
         )
         return lines.map(boundedLine)

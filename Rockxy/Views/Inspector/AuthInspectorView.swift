@@ -13,14 +13,20 @@ struct AuthInspectorView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
-                        labelRow(String(localized: "Type"), authType(from: authHeader))
+                        labelRow(
+                            String(localized: "Type", bundle: RockxyLocalization.bundle),
+                            authType(from: authHeader)
+                        )
                         Spacer()
                         if JWTPreviewDecoder.looksLikeJWT(authHeader) {
                             Button {
                                 jwtPreview = JWTPreviewDecoder.decode(authHeader)
                                 isJWTPreviewPresented = true
                             } label: {
-                                Label(String(localized: "Preview JWT"), systemImage: "key.viewfinder")
+                                Label(
+                                    String(localized: "Preview JWT", bundle: RockxyLocalization.bundle),
+                                    systemImage: "key.viewfinder"
+                                )
                             }
                             .rockxyGlassButtonStyle()
                             .controlSize(.small)
@@ -32,15 +38,15 @@ struct AuthInspectorView: View {
                         }
                     }
                     Divider()
-                    labelRow(String(localized: "Full Value"), authHeader)
+                    labelRow(String(localized: "Full Value", bundle: RockxyLocalization.bundle), authHeader)
                 }
                 .padding()
             }
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Authorization"),
+                String(localized: "No Authorization", bundle: RockxyLocalization.bundle),
                 systemImage: "lock.open",
-                description: String(localized: "No Authorization header found")
+                description: String(localized: "No Authorization header found", bundle: RockxyLocalization.bundle)
             )
         }
     }
@@ -49,6 +55,8 @@ struct AuthInspectorView: View {
 
     @State private var isJWTPreviewPresented = false
     @State private var jwtPreview: QuickPreviewResult?
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private func labelRow(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -60,8 +68,6 @@ struct AuthInspectorView: View {
                 .textSelection(.enabled)
         }
     }
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private func findAuthHeader() -> String? {
         transaction.request.headers
@@ -77,6 +83,6 @@ struct AuthInspectorView: View {
         } else if value.lowercased().hasPrefix("digest") {
             return "Digest Auth"
         }
-        return String(localized: "Unknown")
+        return String(localized: "Unknown", bundle: RockxyLocalization.bundle)
     }
 }

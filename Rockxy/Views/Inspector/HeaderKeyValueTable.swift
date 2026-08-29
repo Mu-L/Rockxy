@@ -1,9 +1,13 @@
 import AppKit
 import SwiftUI
 
+// MARK: - HeaderKeyValueTable
+
 /// Dense two-column header table used by request and response inspectors.
 /// Keeps the column names visible so header values read like a native key/value grid.
 struct HeaderKeyValueTable: View {
+    // MARK: Internal
+
     let headers: [HTTPHeader]
     var highlightContext: InspectorHighlightContext = .empty
     var source: HeaderColumnSource?
@@ -29,18 +33,20 @@ struct HeaderKeyValueTable: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    // MARK: Private
+
     @Environment(\.appUIDisplayMetrics) private var metrics
 
     private var headerRow: some View {
         HStack(spacing: 0) {
-            Text(String(localized: "Key"))
+            Text(String(localized: "Key", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.fontSize, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 180, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
             Divider()
-            Text(String(localized: "Value"))
+            Text(String(localized: "Value", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.fontSize, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -89,13 +95,13 @@ struct HeaderKeyValueTable: View {
 
     @ViewBuilder
     private func headerContextMenu(_ header: HTTPHeader) -> some View {
-        Button(String(localized: "Copy Header Name")) {
+        Button(String(localized: "Copy Header Name", bundle: RockxyLocalization.bundle)) {
             copyToPasteboard(header.name)
         }
-        Button(String(localized: "Copy Header Value")) {
+        Button(String(localized: "Copy Header Value", bundle: RockxyLocalization.bundle)) {
             copyToPasteboard(header.value)
         }
-        Button(String(localized: "Copy Name: Value")) {
+        Button(String(localized: "Copy Name: Value", bundle: RockxyLocalization.bundle)) {
             copyToPasteboard("\(header.name): \(header.value)")
         }
 
@@ -112,14 +118,14 @@ struct HeaderKeyValueTable: View {
 
             Divider()
 
-            Button(String(localized: "Filter by Value")) {
+            Button(String(localized: "Filter by Value", bundle: RockxyLocalization.bundle)) {
                 if let suggestion = ContextFilterSuggestion.header(header, source: source) {
                     coordinator.applyContextFilter(suggestion)
                 }
             }
             .disabled(ContextFilterSuggestion.header(header, source: source) == nil)
 
-            Button(String(localized: "Exclude Value")) {
+            Button(String(localized: "Exclude Value", bundle: RockxyLocalization.bundle)) {
                 if let suggestion = ContextFilterSuggestion.header(header, source: source) {
                     coordinator.applyContextFilter(suggestion, excluding: true)
                 }
@@ -131,9 +137,9 @@ struct HeaderKeyValueTable: View {
     private func addColumnTitle(for source: HeaderColumnSource) -> String {
         switch source {
         case .request:
-            String(localized: "Add Request Header as Column")
+            String(localized: "Add Request Header as Column", bundle: RockxyLocalization.bundle)
         case .response:
-            String(localized: "Add Response Header as Column")
+            String(localized: "Add Response Header as Column", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -165,6 +171,8 @@ private extension Text {
     }
 }
 
+// MARK: - HighlightedInspectorText
+
 struct HighlightedInspectorText: View {
     let text: String
     var highlightContext: InspectorHighlightContext = .empty
@@ -173,6 +181,8 @@ struct HighlightedInspectorText: View {
         Text(text, highlightContext: highlightContext)
     }
 }
+
+// MARK: - HeaderDebugBadge
 
 private struct HeaderDebugBadge {
     let title: String
@@ -185,7 +195,7 @@ private struct HeaderDebugBadge {
         case "content-security-policy":
             HeaderDebugBadge(
                 title: "CSP",
-                help: String(localized: "Content Security Policy header"),
+                help: String(localized: "Content Security Policy header", bundle: RockxyLocalization.bundle),
                 foreground: .red,
                 background: .red.opacity(0.12)
             )
@@ -195,7 +205,7 @@ private struct HeaderDebugBadge {
              "access-control-allow-credentials":
             HeaderDebugBadge(
                 title: "CORS",
-                help: String(localized: "Cross-Origin Resource Sharing header"),
+                help: String(localized: "Cross-Origin Resource Sharing header", bundle: RockxyLocalization.bundle),
                 foreground: .blue,
                 background: .blue.opacity(0.12)
             )
@@ -203,7 +213,7 @@ private struct HeaderDebugBadge {
              "cookie":
             HeaderDebugBadge(
                 title: "Cookie",
-                help: String(localized: "Cookie header"),
+                help: String(localized: "Cookie header", bundle: RockxyLocalization.bundle),
                 foreground: .orange,
                 background: .orange.opacity(0.12)
             )
@@ -213,7 +223,7 @@ private struct HeaderDebugBadge {
              "last-modified":
             HeaderDebugBadge(
                 title: "Cache",
-                help: String(localized: "Cache debugging header"),
+                help: String(localized: "Cache debugging header", bundle: RockxyLocalization.bundle),
                 foreground: .indigo,
                 background: .indigo.opacity(0.12)
             )
@@ -222,7 +232,7 @@ private struct HeaderDebugBadge {
              "www-authenticate":
             HeaderDebugBadge(
                 title: "Auth",
-                help: String(localized: "Authentication header"),
+                help: String(localized: "Authentication header", bundle: RockxyLocalization.bundle),
                 foreground: .purple,
                 background: .purple.opacity(0.12)
             )
@@ -234,7 +244,7 @@ private struct HeaderDebugBadge {
              "forwarded":
             HeaderDebugBadge(
                 title: "Proxy",
-                help: String(localized: "Proxy or gateway header"),
+                help: String(localized: "Proxy or gateway header", bundle: RockxyLocalization.bundle),
                 foreground: .teal,
                 background: .teal.opacity(0.12)
             )

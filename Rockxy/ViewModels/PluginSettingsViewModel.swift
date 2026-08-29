@@ -126,8 +126,8 @@ final class PluginSettingsViewModel {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.title = String(localized: "Select Plugin Folder")
-        panel.prompt = String(localized: "Install")
+        panel.title = String(localized: "Select Plugin Folder", bundle: RockxyLocalization.bundle)
+        panel.prompt = String(localized: "Install", bundle: RockxyLocalization.bundle)
         if panel.runModal() == .OK, let url = panel.url {
             Task {
                 do {

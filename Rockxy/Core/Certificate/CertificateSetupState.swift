@@ -8,6 +8,8 @@ enum CertificateSetupState: Equatable {
     case generatedOnly
     case missing
 
+    // MARK: Lifecycle
+
     init(snapshot: RootCAStatusSnapshot) {
         if snapshot.isInstalledInKeychain, snapshot.isSystemTrustValidated {
             self = .installedAndTrusted
@@ -20,29 +22,40 @@ enum CertificateSetupState: Equatable {
         }
     }
 
+    // MARK: Internal
+
     var title: String {
         switch self {
         case .installedAndTrusted:
-            String(localized: "Installed & Trusted")
+            String(localized: "Installed & Trusted", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "Installed, Trust Required")
+            String(localized: "Installed, Trust Required", bundle: RockxyLocalization.bundle)
         case .generatedOnly:
-            String(localized: "Generated, Not Installed")
+            String(localized: "Generated, Not Installed", bundle: RockxyLocalization.bundle)
         case .missing:
-            String(localized: "Certificate Missing")
+            String(localized: "Certificate Missing", bundle: RockxyLocalization.bundle)
         }
     }
 
     var message: String {
         switch self {
         case .installedAndTrusted:
-            String(localized: "Rockxy Certificate is ready.")
+            String(localized: "Rockxy Certificate is ready.", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "The root CA is installed, but macOS has not fully trusted it for TLS yet.")
+            String(
+                localized: "The root CA is installed, but macOS has not fully trusted it for TLS yet.",
+                bundle: RockxyLocalization.bundle
+            )
         case .generatedOnly:
-            String(localized: "The root CA exists locally. Install and trust it in Keychain to decrypt HTTPS traffic.")
+            String(
+                localized: "The root CA exists locally. Install and trust it in Keychain to decrypt HTTPS traffic.",
+                bundle: RockxyLocalization.bundle
+            )
         case .missing:
-            String(localized: "Generate Rockxy's root CA, then install and trust it in Keychain.")
+            String(
+                localized: "Generate Rockxy's root CA, then install and trust it in Keychain.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 

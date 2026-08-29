@@ -167,11 +167,14 @@ enum ProtobufSchemaStoreError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .fileTooLarge:
-            String(localized: "Protobuf schema file must be 1 MB or smaller.")
+            String(localized: "Protobuf schema file must be 1 MB or smaller.", bundle: RockxyLocalization.bundle)
         case let .invalidHostPattern(pattern):
-            String(localized: "Protobuf schema host pattern is invalid: \(pattern)")
+            String(localized: "Protobuf schema host pattern is invalid: \(pattern)", bundle: RockxyLocalization.bundle)
         case .storageUnavailable:
-            String(localized: "The local schema storage could not be read. Retry before changing local schema files.")
+            String(
+                localized: "The local schema storage could not be read. Retry before changing local schema files.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
@@ -211,13 +214,16 @@ enum ProtobufSchemaImportError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidFileType:
-            String(localized: "Select a Protocol Buffers schema file with a .proto extension.")
+            String(
+                localized: "Select a Protocol Buffers schema file with a .proto extension.",
+                bundle: RockxyLocalization.bundle
+            )
         case .emptySource:
-            String(localized: "The selected .proto file is empty.")
+            String(localized: "The selected .proto file is empty.", bundle: RockxyLocalization.bundle)
         case .invalidEncoding:
-            String(localized: "The selected .proto file is not valid UTF-8 text.")
+            String(localized: "The selected .proto file is not valid UTF-8 text.", bundle: RockxyLocalization.bundle)
         case .fileTooLarge:
-            String(localized: "Protobuf schema file must be 1 MB or smaller.")
+            String(localized: "Protobuf schema file must be 1 MB or smaller.", bundle: RockxyLocalization.bundle)
         }
     }
 }

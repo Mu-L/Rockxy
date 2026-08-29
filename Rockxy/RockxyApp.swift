@@ -63,7 +63,7 @@ struct RockxyApp: App {
             BabylonCaptureCommands()
         }
 
-        Window(String(localized: "Advanced Proxy Settings"), id: "advancedProxySettings") {
+        Window(String(localized: "Advanced Proxy Settings", bundle: RockxyLocalization.bundle), id: "advancedProxySettings") {
             ToolWindowDisplayMetricsProvider {
                 AdvancedProxySettingsView(coordinator: mainCoordinator)
             }
@@ -73,7 +73,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Babylon Pairing"), id: "babylonPairing") {
+        Window(String(localized: "Babylon Pairing", bundle: RockxyLocalization.bundle), id: "babylonPairing") {
             ToolWindowDisplayMetricsProvider {
                 BabylonPairingView()
             }
@@ -84,7 +84,7 @@ struct RockxyApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .defaultSize(width: 460, height: 420)
 
-        Window(String(localized: "Babylon Runtime"), id: "babylonRuntime") {
+        Window(String(localized: "Babylon Runtime", bundle: RockxyLocalization.bundle), id: "babylonRuntime") {
             ToolWindowDisplayMetricsProvider {
                 BabylonRuntimeView()
             }
@@ -103,7 +103,7 @@ struct RockxyApp: App {
 
         customCertificatesWindow
 
-        Window(String(localized: "Automatic Setup"), id: "automaticSetup") {
+        Window(String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle), id: "automaticSetup") {
             AppUIDisplayMetricsProvider {
                 DeveloperSetupAutomaticWindowView(coordinator: mainCoordinator)
             }
@@ -114,7 +114,7 @@ struct RockxyApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .windowResizability(.contentMinSize)
 
-        Window(String(localized: "Manual Setup"), id: "manualSetup") {
+        Window(String(localized: "Manual Setup", bundle: RockxyLocalization.bundle), id: "manualSetup") {
             AppUIDisplayMetricsProvider {
                 DeveloperSetupManualWindowView(coordinator: mainCoordinator)
             }
@@ -125,7 +125,7 @@ struct RockxyApp: App {
         .windowToolbarStyle(.unifiedCompact)
         .windowResizability(.contentMinSize)
 
-        Window(String(localized: "Map Local"), id: "mapLocal") {
+        Window(String(localized: "Map Local", bundle: RockxyLocalization.bundle), id: "mapLocal") {
             ToolWindowDisplayMetricsProvider {
                 MapLocalWindowView()
             }
@@ -135,7 +135,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Map Local Editor"), id: "mapLocalEditor") {
+        Window(String(localized: "Map Local Editor", bundle: RockxyLocalization.bundle), id: "mapLocalEditor") {
             ToolWindowDisplayMetricsProvider {
                 MapLocalEditorWindowView()
             }
@@ -146,7 +146,7 @@ struct RockxyApp: App {
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Map Remote"), id: "mapRemote") {
+        Window(String(localized: "Map Remote", bundle: RockxyLocalization.bundle), id: "mapRemote") {
             ToolWindowDisplayMetricsProvider {
                 MapRemoteWindowView()
             }
@@ -156,7 +156,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Map Remote Editor"), id: "mapRemoteEditor") {
+        Window(String(localized: "Map Remote Editor", bundle: RockxyLocalization.bundle), id: "mapRemoteEditor") {
             ToolWindowDisplayMetricsProvider {
                 MapRemoteEditorWindowView()
             }
@@ -167,7 +167,7 @@ struct RockxyApp: App {
         .windowResizability(.contentSize)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Block List"), id: "blockList") {
+        Window(String(localized: "Block List", bundle: RockxyLocalization.bundle), id: "blockList") {
             ToolWindowDisplayMetricsProvider {
                 BlockListWindowView()
             }
@@ -177,7 +177,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Modify Headers"), id: "modifyHeaders") {
+        Window(String(localized: "Modify Headers", bundle: RockxyLocalization.bundle), id: "modifyHeaders") {
             ToolWindowDisplayMetricsProvider {
                 ModifyHeaderWindowView()
             }
@@ -187,7 +187,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Network Conditions"), id: "networkConditions") {
+        Window(String(localized: "Network Conditions", bundle: RockxyLocalization.bundle), id: "networkConditions") {
             ToolWindowDisplayMetricsProvider {
                 NetworkConditionsWindowView()
             }
@@ -197,7 +197,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList") {
+        Window(String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle), id: "sslProxyingList") {
             ToolWindowDisplayMetricsProvider {
                 SSLProxyingListView()
             }
@@ -207,7 +207,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList") {
+        Window(String(localized: "Full Proxy Bypass", bundle: RockxyLocalization.bundle), id: "bypassProxyList") {
             ToolWindowDisplayMetricsProvider {
                 BypassProxyListView()
             }
@@ -217,7 +217,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "External Proxy Settings"), id: "externalProxySettings") {
+        Window(String(localized: "External Proxy Settings", bundle: RockxyLocalization.bundle), id: "externalProxySettings") {
             ToolWindowDisplayMetricsProvider {
                 ExternalProxySettingsView()
             }
@@ -228,7 +228,7 @@ struct RockxyApp: App {
         .defaultSize(width: 900, height: 680)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "SOCKS Proxy Settings"), id: "socksProxySettings") {
+        Window(String(localized: "SOCKS Proxy Settings", bundle: RockxyLocalization.bundle), id: "socksProxySettings") {
             ToolWindowDisplayMetricsProvider {
                 SOCKSProxySettingsView()
             }
@@ -239,7 +239,7 @@ struct RockxyApp: App {
         .defaultSize(width: 640, height: 280)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Allow List"), id: "allowList") {
+        Window(String(localized: "Allow List", bundle: RockxyLocalization.bundle), id: "allowList") {
             ToolWindowDisplayMetricsProvider {
                 AllowListWindowView()
             }
@@ -249,7 +249,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Diff"), id: "diff") {
+        Window(String(localized: "Diff", bundle: RockxyLocalization.bundle), id: "diff") {
             ToolWindowDisplayMetricsProvider {
                 DiffWindowView()
             }
@@ -259,7 +259,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Scripting"), id: "scriptingList") {
+        Window(String(localized: "Scripting", bundle: RockxyLocalization.bundle), id: "scriptingList") {
             ToolWindowDisplayMetricsProvider {
                 ScriptingListWindowView()
             }
@@ -269,7 +269,7 @@ struct RockxyApp: App {
         .defaultSize(width: 1_120, height: 700)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Script Editor"), id: "scriptEditor") {
+        Window(String(localized: "Script Editor", bundle: RockxyLocalization.bundle), id: "scriptEditor") {
             ToolWindowDisplayMetricsProvider {
                 ScriptEditorWindowView()
             }
@@ -281,7 +281,7 @@ struct RockxyApp: App {
         .windowResizability(.contentMinSize)
         .rockxyDisablingRestorationOnModernMacOS()
 
-        Window(String(localized: "Inspector Preview Tabs"), id: "bodyPreviewerTabs") {
+        Window(String(localized: "Inspector Preview Tabs", bundle: RockxyLocalization.bundle), id: "bodyPreviewerTabs") {
             ToolWindowDisplayMetricsProvider {
                 PreviewerTabSettingsView(store: mainCoordinator.previewTabStore)
             }
@@ -292,7 +292,7 @@ struct RockxyApp: App {
         .defaultSize(width: 820, height: 560)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Custom Header Columns"), id: "customColumns") {
+        Window(String(localized: "Custom Header Columns", bundle: RockxyLocalization.bundle), id: "customColumns") {
             ToolWindowDisplayMetricsProvider {
                 CustomHeaderColumnsView(store: mainCoordinator.headerColumnStore)
             }
@@ -303,7 +303,7 @@ struct RockxyApp: App {
         .defaultSize(width: 900, height: 620)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Protobuf Mapping"), id: "protobufSettings") {
+        Window(String(localized: "Protobuf Mapping", bundle: RockxyLocalization.bundle), id: "protobufSettings") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSettingsWindowView()
             }
@@ -314,7 +314,7 @@ struct RockxyApp: App {
         .defaultSize(width: 940, height: 620)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Local Protobuf Schemas"), id: "protobufSchemaList") {
+        Window(String(localized: "Local Protobuf Schemas", bundle: RockxyLocalization.bundle), id: "protobufSchemaList") {
             ToolWindowDisplayMetricsProvider {
                 ProtobufSchemaListWindowView()
             }
@@ -325,7 +325,7 @@ struct RockxyApp: App {
         .defaultSize(width: 820, height: 560)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Rules"), id: "breakpointRules") {
+        Window(String(localized: "Breakpoint Rules", bundle: RockxyLocalization.bundle), id: "breakpointRules") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointRulesWindowView()
             }
@@ -335,7 +335,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Rule Editor"), id: "breakpointRuleEditor") {
+        Window(String(localized: "Breakpoint Rule Editor", bundle: RockxyLocalization.bundle), id: "breakpointRuleEditor") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointRuleEditorWindowView()
             }
@@ -345,7 +345,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Templates"), id: "breakpointTemplates") {
+        Window(String(localized: "Breakpoint Templates", bundle: RockxyLocalization.bundle), id: "breakpointTemplates") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointTemplateWindowView()
             }
@@ -355,7 +355,7 @@ struct RockxyApp: App {
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)
 
-        Window(String(localized: "Breakpoint Queue"), id: "breakpoints") {
+        Window(String(localized: "Breakpoint Queue", bundle: RockxyLocalization.bundle), id: "breakpoints") {
             ToolWindowDisplayMetricsProvider {
                 BreakpointWindowView()
             }
@@ -420,7 +420,7 @@ private struct DetachedInspectorWindowScene: Scene {
     // MARK: Private
 
     private var detachedInspectorWindow: some Scene {
-        let base = Window(String(localized: "Inspector"), id: "detachedInspector") {
+        let base = Window(String(localized: "Inspector", bundle: RockxyLocalization.bundle), id: "detachedInspector") {
             AppUIDisplayMetricsProvider {
                 DetachedInspectorWindowView(coordinator: coordinator)
             }
@@ -453,7 +453,7 @@ private struct CustomCertificatesWindowScene: Scene {
     // MARK: Private
 
     private var customCertificatesWindow: some Scene {
-        let base = Window(String(localized: "Custom Certificates"), id: "customCertificates") {
+        let base = Window(String(localized: "Custom Certificates", bundle: RockxyLocalization.bundle), id: "customCertificates") {
             ToolWindowDisplayMetricsProvider {
                 CustomCertificatesView()
             }
@@ -486,7 +486,7 @@ private struct MacCertificateSetupGuideWindowScene: Scene {
     // MARK: Private
 
     private var macCertificateSetupGuideWindow: some Scene {
-        let base = Window(String(localized: "Mac Setup Guide"), id: "certificateSetup") {
+        let base = Window(String(localized: "Mac Setup Guide", bundle: RockxyLocalization.bundle), id: "certificateSetup") {
             ToolWindowDisplayMetricsProvider {
                 MacCertificateSetupGuideView()
             }
@@ -521,7 +521,7 @@ private struct DeveloperSetupWindowScene: Scene {
     // MARK: Private
 
     private var developerSetupWindow: some Scene {
-        let base = Window(String(localized: "Developer Setup"), id: "developerSetupHub") {
+        let base = Window(String(localized: "Developer Setup", bundle: RockxyLocalization.bundle), id: "developerSetupHub") {
             AppUIDisplayMetricsProvider {
                 DeveloperSetupWindowView(coordinator: coordinator)
             }
@@ -554,7 +554,7 @@ private struct ComposeWindowScene: Scene {
     // MARK: Private
 
     private var composeWindow: some Scene {
-        let base = Window(String(localized: "Compose"), id: "compose") {
+        let base = Window(String(localized: "Compose", bundle: RockxyLocalization.bundle), id: "compose") {
             ToolWindowDisplayMetricsProvider {
                 ComposeWindowView()
             }
@@ -738,26 +738,26 @@ struct RockxyMenuCommands: Commands {
 
     @CommandsBuilder private var appMenu: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button(String(localized: "About Rockxy")) {
+            Button(String(localized: "About Rockxy", bundle: RockxyLocalization.bundle)) {
                 showAboutPanel()
             }
         }
 
         CommandGroup(replacing: .appSettings) {
-            Button(String(localized: "Check for Updates…")) {
+            Button(String(localized: "Check for Updates…", bundle: RockxyLocalization.bundle)) {
                 updater.checkForUpdates()
             }
             .disabled(!updater.canInitiateUpdateCheck)
 
             Divider()
 
-            Button(String(localized: "Change Logs…")) {
+            Button(String(localized: "Change Logs…", bundle: RockxyLocalization.bundle)) {
                 updater.openFullChangelog()
             }
 
             Divider()
 
-            Button(String(localized: "Settings…")) {
+            Button(String(localized: "Settings…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "settings")
             }
             .keyboardShortcut(",", modifiers: .command)
@@ -766,19 +766,19 @@ struct RockxyMenuCommands: Commands {
 
     private var fileMenu: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button(String(localized: "New Tab")) {
+            Button(String(localized: "New Tab", bundle: RockxyLocalization.bundle)) {
                 actions?.newWorkspaceTab()
             }
             .keyboardShortcut("t", modifiers: [.command])
             .disabled(actions?.canCreateWorkspaceTab != true)
 
-            Button(String(localized: "Close Tab")) {
+            Button(String(localized: "Close Tab", bundle: RockxyLocalization.bundle)) {
                 actions?.closeWorkspaceTab()
             }
             .keyboardShortcut("w", modifiers: [.command])
             .disabled(actions?.canCloseWorkspaceTab != true)
 
-            Button(String(localized: "Rename Tab…")) {
+            Button(String(localized: "Rename Tab…", bundle: RockxyLocalization.bundle)) {
                 if let actions {
                     actions.renameWorkspaceTab()
                 } else {
@@ -788,40 +788,40 @@ struct RockxyMenuCommands: Commands {
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(!(actions?.canRenameWorkspaceTab ?? RockxyWorkspaceWindowManager.shared.canRenameWorkspaceTab))
 
-            Button(String(localized: "New Session")) {
+            Button(String(localized: "New Session", bundle: RockxyLocalization.bundle)) {
                 actions?.clearSession()
             }
 
             Divider()
 
-            Button(String(localized: "Open Session…")) {
+            Button(String(localized: "Open Session…", bundle: RockxyLocalization.bundle)) {
                 actions?.openSession()
             }
             .keyboardShortcut("o", modifiers: [.command])
 
-            Button(String(localized: "Save Session…")) {
+            Button(String(localized: "Save Session…", bundle: RockxyLocalization.bundle)) {
                 actions?.saveSession()
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
 
             Divider()
 
-            Button(String(localized: "Import HAR…")) {
+            Button(String(localized: "Import HAR…", bundle: RockxyLocalization.bundle)) {
                 actions?.importHAR()
             }
             .keyboardShortcut("i", modifiers: [.command, .shift])
 
-            Button(String(localized: "Export HAR…")) {
+            Button(String(localized: "Export HAR…", bundle: RockxyLocalization.bundle)) {
                 actions?.exportHAR()
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
 
-            Button(String(localized: "Export OpenAPI YAML…")) {
+            Button(String(localized: "Export OpenAPI YAML…", bundle: RockxyLocalization.bundle)) {
                 actions?.exportOpenAPIYAML()
             }
             .disabled(actions?.canExportOpenAPI != true)
 
-            Button(String(localized: "Export OpenAPI HTML…")) {
+            Button(String(localized: "Export OpenAPI HTML…", bundle: RockxyLocalization.bundle)) {
                 actions?.exportOpenAPIHTML()
             }
             .disabled(actions?.canExportOpenAPI != true)
@@ -832,24 +832,24 @@ struct RockxyMenuCommands: Commands {
         CommandGroup(after: .pasteboard) {
             Divider()
 
-            Button(String(localized: "Copy URL")) {
+            Button(String(localized: "Copy URL", bundle: RockxyLocalization.bundle)) {
                 actions?.copyURL()
             }
             .keyboardShortcut("u", modifiers: [.command, .option])
             .disabled(actions?.hasSelectedTransaction != true)
 
-            Button(String(localized: "Copy as cURL")) {
+            Button(String(localized: "Copy as cURL", bundle: RockxyLocalization.bundle)) {
                 actions?.copyAsCURL()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             .disabled(actions?.hasSelectedTransaction != true)
 
-            Button(String(localized: "Focus on URL")) {
+            Button(String(localized: "Focus on URL", bundle: RockxyLocalization.bundle)) {
                 actions?.focusSearchField()
             }
             .keyboardShortcut("l", modifiers: [.command])
 
-            Button(String(localized: "Find in Capture")) {
+            Button(String(localized: "Find in Capture", bundle: RockxyLocalization.bundle)) {
                 actions?.focusSearchField()
             }
             .keyboardShortcut("f", modifiers: [.command])
@@ -857,30 +857,30 @@ struct RockxyMenuCommands: Commands {
     }
 
     private var projectMenu: some Commands {
-        CommandMenu(String(localized: "Project")) {
-            Button(String(localized: "New Project…")) {
+        CommandMenu(String(localized: "Project", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "New Project…", bundle: RockxyLocalization.bundle)) {
                 actions?.newProject()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(actions?.canCreateProject != true)
 
-            Button(String(localized: "Rename Project…")) {
+            Button(String(localized: "Rename Project…", bundle: RockxyLocalization.bundle)) {
                 actions?.renameActiveProject()
             }
             .disabled(actions?.canEditProjects != true)
 
-            Button(String(localized: "Manage Projects…")) {
+            Button(String(localized: "Manage Projects…", bundle: RockxyLocalization.bundle)) {
                 actions?.manageProjects()
             }
 
             Divider()
 
-            Button(String(localized: "Export Project Configuration…")) {
+            Button(String(localized: "Export Project Configuration…", bundle: RockxyLocalization.bundle)) {
                 actions?.exportProjectConfiguration()
             }
             .disabled(actions?.canEditProjects != true)
 
-            Button(String(localized: "Import Project Configuration…")) {
+            Button(String(localized: "Import Project Configuration…", bundle: RockxyLocalization.bundle)) {
                 actions?.importProjectConfiguration()
             }
             .disabled(actions?.canCreateProject != true)
@@ -902,7 +902,7 @@ struct RockxyMenuCommands: Commands {
 
             if actions?.projectsNeedRecovery == true {
                 Divider()
-                Button(String(localized: "Repair Projects…")) {
+                Button(String(localized: "Repair Projects…", bundle: RockxyLocalization.bundle)) {
                     actions?.showProjectRecovery()
                 }
             }
@@ -911,7 +911,7 @@ struct RockxyMenuCommands: Commands {
 
     private var viewMenu: some Commands {
         CommandGroup(after: .toolbar) {
-            Button(String(localized: "Filter Domain or App")) {
+            Button(String(localized: "Filter Domain or App", bundle: RockxyLocalization.bundle)) {
                 actions?.toggleFilterBar()
             }
             .keyboardShortcut("f", modifiers: [.command, .shift])
@@ -919,7 +919,7 @@ struct RockxyMenuCommands: Commands {
             Divider()
 
             Toggle(
-                String(localized: "Follow Live Traffic"),
+                String(localized: "Follow Live Traffic", bundle: RockxyLocalization.bundle),
                 isOn: Binding(
                     get: { actions?.isFollowingLiveTraffic == true },
                     set: { actions?.setFollowingLiveTraffic($0) }
@@ -929,7 +929,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Toggle Source List Panel")) {
+            Button(String(localized: "Toggle Source List Panel", bundle: RockxyLocalization.bundle)) {
                 actions?.toggleSourceList()
             }
             .keyboardShortcut("[", modifiers: [.command, .control])
@@ -938,8 +938,8 @@ struct RockxyMenuCommands: Commands {
 
             Button(
                 actions?.isBottomInspectorVisible == true
-                    ? String(localized: "Hide Bottom Inspector")
-                    : String(localized: "Show Bottom Inspector")
+                    ? String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Show Bottom Inspector", bundle: RockxyLocalization.bundle)
             ) {
                 actions?.toggleInspectorBottom()
             }
@@ -948,8 +948,8 @@ struct RockxyMenuCommands: Commands {
 
             Button(
                 actions?.isContextDockVisible == true
-                    ? String(localized: "Hide Context Dock")
-                    : String(localized: "Show Context Dock")
+                    ? String(localized: "Hide Context Dock", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Show Context Dock", bundle: RockxyLocalization.bundle)
             ) {
                 actions?.toggleInspectorRight()
             }
@@ -957,24 +957,24 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Select Next Tab")) {
+            Button(String(localized: "Select Next Tab", bundle: RockxyLocalization.bundle)) {
                 actions?.nextWorkspaceTab()
             }
             .keyboardShortcut("]", modifiers: [.command, .shift])
 
-            Button(String(localized: "Select Previous Tab")) {
+            Button(String(localized: "Select Previous Tab", bundle: RockxyLocalization.bundle)) {
                 actions?.previousWorkspaceTab()
             }
             .keyboardShortcut("[", modifiers: [.command, .shift])
 
             Divider()
 
-            Button(String(localized: "Jump to First Request")) {
+            Button(String(localized: "Jump to First Request", bundle: RockxyLocalization.bundle)) {
                 actions?.selectFirstTransaction()
             }
             .disabled(actions?.hasVisibleTransactions != true)
 
-            Button(String(localized: "Jump to Last Request")) {
+            Button(String(localized: "Jump to Last Request", bundle: RockxyLocalization.bundle)) {
                 actions?.selectLastTransaction()
             }
             .disabled(actions?.hasVisibleTransactions != true)
@@ -982,21 +982,21 @@ struct RockxyMenuCommands: Commands {
     }
 
     private var flowMenu: some Commands {
-        CommandMenu(String(localized: "Flow")) {
-            Button(String(localized: "Compose…")) {
+        CommandMenu(String(localized: "Flow", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Compose…", bundle: RockxyLocalization.bundle)) {
                 actions?.composeFreshRequest()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
 
             Divider()
 
-            Button(String(localized: "Repeat")) {
+            Button(String(localized: "Repeat", bundle: RockxyLocalization.bundle)) {
                 actions?.replayRequest()
             }
             .keyboardShortcut("r", modifiers: [.command])
             .disabled(actions?.hasSelectedTransaction != true)
 
-            Button(String(localized: "Edit and Repeat…")) {
+            Button(String(localized: "Edit and Repeat…", bundle: RockxyLocalization.bundle)) {
                 actions?.editAndRepeat()
             }
             .keyboardShortcut("e", modifiers: [.command])
@@ -1004,24 +1004,24 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Menu(String(localized: "Export")) {
-                Button(String(localized: "Export as HAR…")) {
+            Menu(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Export as HAR…", bundle: RockxyLocalization.bundle)) {
                     actions?.exportHAR()
                 }
 
-                Button(String(localized: "Export as OpenAPI YAML…")) {
+                Button(String(localized: "Export as OpenAPI YAML…", bundle: RockxyLocalization.bundle)) {
                     actions?.exportOpenAPIYAML()
                 }
                 .disabled(actions?.canExportOpenAPI != true)
 
-                Button(String(localized: "Export as OpenAPI HTML…")) {
+                Button(String(localized: "Export as OpenAPI HTML…", bundle: RockxyLocalization.bundle)) {
                     actions?.exportOpenAPIHTML()
                 }
                 .disabled(actions?.canExportOpenAPI != true)
 
                 Divider()
 
-                Button(String(localized: "Publish Selected to Gist…")) {
+                Button(String(localized: "Publish Selected to Gist…", bundle: RockxyLocalization.bundle)) {
                     actions?.publishSelectedToGist()
                 }
                 .disabled(actions?.canPublishGist != true)
@@ -1029,19 +1029,19 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Add Note…")) {
+            Button(String(localized: "Add Note…", bundle: RockxyLocalization.bundle)) {
                 actions?.addComment()
             }
             .disabled(actions?.hasSelectedTransaction != true)
 
-            Menu(String(localized: "Highlight")) {
+            Menu(String(localized: "Highlight", bundle: RockxyLocalization.bundle)) {
                 ForEach(HighlightColor.allCases, id: \.self) { color in
                     Button(color.rawValue.capitalized) {
                         actions?.setHighlight(color)
                     }
                 }
                 Divider()
-                Button(String(localized: "Remove Highlight")) {
+                Button(String(localized: "Remove Highlight", bundle: RockxyLocalization.bundle)) {
                     actions?.setHighlight(nil)
                 }
             }
@@ -1049,19 +1049,19 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Clear Session")) {
+            Button(String(localized: "Clear Session", bundle: RockxyLocalization.bundle)) {
                 actions?.clearSession()
             }
             .keyboardShortcut("k", modifiers: [.command])
 
-            Button(String(localized: "Clear Session and Filters")) {
+            Button(String(localized: "Clear Session and Filters", bundle: RockxyLocalization.bundle)) {
                 actions?.clearCaptureAndFilters()
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
 
             Divider()
 
-            Button(String(localized: "Delete")) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle)) {
                 actions?.deleteSelected()
             }
             .keyboardShortcut(.delete, modifiers: [.command])
@@ -1070,13 +1070,13 @@ struct RockxyMenuCommands: Commands {
     }
 
     private var toolsMenu: some Commands {
-        CommandMenu(String(localized: "Tools")) {
-            Button(String(localized: "Start Proxy")) {
+        CommandMenu(String(localized: "Tools", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Start Proxy", bundle: RockxyLocalization.bundle)) {
                 actions?.startProxy()
             }
             .disabled(actions?.isProxyRunning == true)
 
-            Button(String(localized: "Stop Proxy")) {
+            Button(String(localized: "Stop Proxy", bundle: RockxyLocalization.bundle)) {
                 actions?.stopProxy()
             }
             .keyboardShortcut(".", modifiers: [.command])
@@ -1084,15 +1084,15 @@ struct RockxyMenuCommands: Commands {
 
             Button(
                 actions?.isRecording == false
-                    ? String(localized: "Resume Recording")
-                    : String(localized: "Pause Recording")
+                    ? String(localized: "Resume Recording", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Pause Recording", bundle: RockxyLocalization.bundle)
             ) {
                 actions?.toggleRecording()
             }
             .keyboardShortcut("r", modifiers: [.command, .option])
             .disabled(actions?.canToggleRecording != true)
 
-            Button(String(localized: "Toggle System Proxy")) {
+            Button(String(localized: "Toggle System Proxy", bundle: RockxyLocalization.bundle)) {
                 actions?.toggleSystemProxyOverride()
             }
             .keyboardShortcut("o", modifiers: [.command, .option])
@@ -1100,118 +1100,121 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Debug My App…")) {
+            Button(String(localized: "Debug My App…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "developerSetupHub")
             }
 
             Divider()
 
-            Toggle(String(localized: "No Caching"), isOn: $isNoCachingEnabled)
+            Toggle(String(localized: "No Caching", bundle: RockxyLocalization.bundle), isOn: $isNoCachingEnabled)
 
             Divider()
 
-            Button(String(localized: "HTTPS Decryption…")) {
+            Button(String(localized: "HTTPS Decryption…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "sslProxyingList")
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
 
-            Button(String(localized: "Full Proxy Bypass…")) {
+            Button(String(localized: "Full Proxy Bypass…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "bypassProxyList")
             }
             .keyboardShortcut("b", modifiers: [.command, .option])
 
-            Menu(String(localized: "Proxy Settings")) {
-                Toggle(String(localized: "Use External Proxy"), isOn: externalProxyEnabledBinding)
-                    .help(externalProxyMenuState.isEnabled
-                        ? String(localized: "External Proxy is on")
-                        : String(localized: "External Proxy is off"))
-                    .keyboardShortcut("e", modifiers: [.command, .option])
+            Menu(String(localized: "Proxy Settings", bundle: RockxyLocalization.bundle)) {
+                Toggle(
+                    String(localized: "Use External Proxy", bundle: RockxyLocalization.bundle),
+                    isOn: externalProxyEnabledBinding
+                )
+                .help(externalProxyMenuState.isEnabled
+                    ? String(localized: "External Proxy is on", bundle: RockxyLocalization.bundle)
+                    : String(localized: "External Proxy is off", bundle: RockxyLocalization.bundle))
+                .keyboardShortcut("e", modifiers: [.command, .option])
 
-                Button(String(localized: "External Proxy Settings…")) {
+                Button(String(localized: "External Proxy Settings…", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "externalProxySettings")
                 }
             }
 
             Divider()
 
-            Button(String(localized: "Breakpoint Rules…")) {
+            Button(String(localized: "Breakpoint Rules…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointRules")
             }
             .keyboardShortcut("b", modifiers: [.command, .shift])
 
-            Button(String(localized: "Add Breakpoint Rule")) {
+            Button(String(localized: "Add Breakpoint Rule", bundle: RockxyLocalization.bundle)) {
                 actions?.addBreakpointRuleForSelection()
             }
             .keyboardShortcut("b", modifiers: [.command])
             .disabled(actions?.hasSelectedTransaction != true)
 
-            Button(String(localized: "Breakpoint Queue…")) {
+            Button(String(localized: "Breakpoint Queue…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpoints")
             }
 
-            Button(String(localized: "Breakpoint Templates…")) {
+            Button(String(localized: "Breakpoint Templates…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpointTemplates")
             }
 
             Divider()
 
-            Button(String(localized: "Map Local…")) {
+            Button(String(localized: "Map Local…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "mapLocal")
             }
             .keyboardShortcut("l", modifiers: [.command, .option])
 
-            Button(String(localized: "Map Remote…")) {
+            Button(String(localized: "Map Remote…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "mapRemote")
             }
 
             Divider()
 
-            Button(String(localized: "Block List…")) {
+            Button(String(localized: "Block List…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "blockList")
             }
             .keyboardShortcut("[", modifiers: [.command, .option])
 
-            Button(String(localized: "Allow List…")) {
+            Button(String(localized: "Allow List…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "allowList")
             }
             .keyboardShortcut("a", modifiers: [.command, .option])
 
-            Button(String(localized: "Modify Headers…")) {
+            Button(String(localized: "Modify Headers…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "modifyHeaders")
             }
 
             Divider()
 
-            Button(String(localized: "Protobuf…")) {
+            Button(String(localized: "Protobuf…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "protobufSettings")
             }
 
-            Button(String(localized: "Network Conditions…")) {
+            Button(String(localized: "Network Conditions…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "networkConditions")
             }
 
             Divider()
 
-            Button(String(localized: "Inspector Preview Tabs…")) {
+            Button(String(localized: "Inspector Preview Tabs…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "bodyPreviewerTabs")
             }
 
-            Button(String(localized: "Custom Header Columns…")) {
+            Button(String(localized: "Custom Header Columns…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "customColumns")
             }
         }
     }
 
     private var diffMenu: some Commands {
-        CommandMenu(String(localized: "Diff")) {
-            Button(String(localized: "Open Diff View…")) {
+        CommandMenu(String(localized: "Diff", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Open Diff View…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "diff")
             }
             .keyboardShortcut("y", modifiers: [.command, .option])
 
             Divider()
 
-            Button(String(localized: "Compare Selected")) {
+            Button(String(localized: "Compare Selected", bundle: RockxyLocalization.bundle)) {
                 actions?.compareSelected()
             }
             .keyboardShortcut("d", modifiers: [.command, .option])
@@ -1220,8 +1223,8 @@ struct RockxyMenuCommands: Commands {
     }
 
     private var scriptingMenu: some Commands {
-        CommandMenu(String(localized: "Scripting")) {
-            Button(String(localized: "Script List…")) {
+        CommandMenu(String(localized: "Scripting", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Script List…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "scriptingList")
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
@@ -1236,65 +1239,65 @@ struct RockxyMenuCommands: Commands {
     }
 
     private var certificateMenu: some Commands {
-        CommandMenu(String(localized: "Certificate")) {
-            Button(String(localized: "Install Certificate on This Mac…")) {
+        CommandMenu(String(localized: "Certificate", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Install Certificate on This Mac…", bundle: RockxyLocalization.bundle)) {
                 dispatchCertificateAction(.installOnMac)
             }
 
             Divider()
 
-            Menu(String(localized: "Install Certificate on iOS")) {
-                Button(String(localized: "iOS Simulator…")) {
+            Menu(String(localized: "Install Certificate on iOS", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "iOS Simulator…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOniOSSimulator)
                 }
-                Button(String(localized: "Physical iPhone or iPad…")) {
+                Button(String(localized: "Physical iPhone or iPad…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOniOSDevice)
                 }
             }
 
-            Menu(String(localized: "Install Certificate on Android")) {
-                Button(String(localized: "Android Emulator…")) {
+            Menu(String(localized: "Install Certificate on Android", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Android Emulator…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnAndroidEmulator)
                 }
-                Button(String(localized: "Android Device…")) {
+                Button(String(localized: "Android Device…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnAndroidDevice)
                 }
             }
 
             Divider()
 
-            Button(String(localized: "Install Certificate on Java VMs…")) {
+            Button(String(localized: "Install Certificate on Java VMs…", bundle: RockxyLocalization.bundle)) {
                 dispatchCertificateAction(.installOnJavaVMs)
             }
 
-            Menu(String(localized: "Install Certificate on Developments")) {
-                Button(String(localized: "Flutter…")) {
+            Menu(String(localized: "Install Certificate on Developments", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Flutter…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnDevelopment(.flutter))
                 }
-                Button(String(localized: "React Native…")) {
+                Button(String(localized: "React Native…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnDevelopment(.reactNative))
                 }
-                Button(String(localized: "Electron…")) {
+                Button(String(localized: "Electron…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnDevelopment(.electronJS))
                 }
-                Button(String(localized: "Next.js…")) {
+                Button(String(localized: "Next.js…", bundle: RockxyLocalization.bundle)) {
                     dispatchCertificateAction(.installOnDevelopment(.nextJS))
                 }
             }
 
-            Button(String(localized: "Install Certificate on Firefox Browsers…")) {
+            Button(String(localized: "Install Certificate on Firefox Browsers…", bundle: RockxyLocalization.bundle)) {
                 dispatchCertificateAction(.installOnFirefox)
             }
 
             Divider()
 
-            Button(String(localized: "Add Custom Certificates…")) {
+            Button(String(localized: "Add Custom Certificates…", bundle: RockxyLocalization.bundle)) {
                 dispatchCertificateAction(.addCustomCertificates)
             }
 
             Divider()
 
-            Menu(String(localized: "Export")) {
+            Menu(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
                 ForEach(CertificateExportFormat.allCases, id: \.self) { format in
                     Button(format.menuTitle) {
                         dispatchCertificateAction(.export(format))
@@ -1304,15 +1307,15 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Reset all Rockxy Certificates")) {
+            Button(String(localized: "Reset all Rockxy Certificates", bundle: RockxyLocalization.bundle)) {
                 dispatchCertificateAction(.resetAll)
             }
         }
     }
 
     private var setupMenu: some Commands {
-        CommandMenu(String(localized: "Setup")) {
-            Button(String(localized: "Automatic Setup...")) {
+        CommandMenu(String(localized: "Setup", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Automatic Setup...", bundle: RockxyLocalization.bundle)) {
                 _ = DeveloperSetupRouteStore.shared
                     .requestAutomatic(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "automaticSetup")
@@ -1320,7 +1323,7 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Manual Setup...")) {
+            Button(String(localized: "Manual Setup...", bundle: RockxyLocalization.bundle)) {
                 DeveloperSetupRouteStore.shared
                     .requestManual(targetID: DeveloperSetupRouteStore.defaultRuntimeTargetID)
                 openWindow(id: "manualSetup")
@@ -1330,24 +1333,24 @@ struct RockxyMenuCommands: Commands {
 
     private var helpMenu: some Commands {
         CommandGroup(replacing: .help) {
-            Button(String(localized: "Getting Started…")) {
+            Button(String(localized: "Getting Started…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "main")
                 lifecycleState.showWelcome = true
             }
 
-            Button(String(localized: "Keyboard Shortcuts")) {
+            Button(String(localized: "Keyboard Shortcuts", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "main")
                 lifecycleState.showKeyboardShortcuts = true
             }
             .keyboardShortcut("/", modifiers: [.command, .shift])
 
-            Button(String(localized: "Debug My App…")) {
+            Button(String(localized: "Debug My App…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "developerSetupHub")
             }
 
             Divider()
 
-            Button(String(localized: "Force Reset Rockxy Helper…")) {
+            Button(String(localized: "Force Reset Rockxy Helper…", bundle: RockxyLocalization.bundle)) {
                 let commandActions = actions
                 HelperRecoveryPresenter.presentForceReset {
                     commandActions?.stopProxy()
@@ -1356,25 +1359,25 @@ struct RockxyMenuCommands: Commands {
 
             Divider()
 
-            Button(String(localized: "Homepage…")) {
+            Button(String(localized: "Homepage…", bundle: RockxyLocalization.bundle)) {
                 openURL(ProjectLinks.homepage)
             }
 
-            Button(String(localized: "Github…")) {
+            Button(String(localized: "Github…", bundle: RockxyLocalization.bundle)) {
                 openURL(ProjectLinks.repository)
             }
 
-            Button(String(localized: "Technical Documents…")) {
+            Button(String(localized: "Technical Documents…", bundle: RockxyLocalization.bundle)) {
                 openURL(ProjectLinks.wiki)
             }
 
             Divider()
 
-            Button(String(localized: "Report Bug…")) {
+            Button(String(localized: "Report Bug…", bundle: RockxyLocalization.bundle)) {
                 openURL(ProjectLinks.issues)
             }
 
-            Button(String(localized: "Copy Debug Info…")) {
+            Button(String(localized: "Copy Debug Info…", bundle: RockxyLocalization.bundle)) {
                 copyDebugInfo()
             }
         }
@@ -1423,12 +1426,13 @@ struct RockxyMenuCommands: Commands {
     private func confirmAndResetCertificates() {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = String(localized: "Reset all Rockxy Certificates?")
+        alert.messageText = String(localized: "Reset all Rockxy Certificates?", bundle: RockxyLocalization.bundle)
         alert.informativeText = String(
-            localized: "This removes Rockxy's generated root CA, trust settings, cached host certificates, and custom certificate records."
+            localized: "This removes Rockxy's generated root CA, trust settings, cached host certificates, and custom certificate records.",
+            bundle: RockxyLocalization.bundle
         )
-        alert.addButton(withTitle: String(localized: "Reset"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.addButton(withTitle: String(localized: "Reset", bundle: RockxyLocalization.bundle))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
@@ -1451,9 +1455,9 @@ struct RockxyMenuCommands: Commands {
     private func showCertificateError(_ message: String) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = String(localized: "Certificate Action Failed")
+        alert.messageText = String(localized: "Certificate Action Failed", bundle: RockxyLocalization.bundle)
         alert.informativeText = message
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 
@@ -1469,11 +1473,11 @@ struct RockxyMenuCommands: Commands {
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
         let homepage = ProjectLinks.repositoryURL
         let credits = NSMutableAttributedString(
-            string: String(localized: "The Rockxy Community source edition is licensed under AGPL-3.0-or-later.\n")
+            string: String(localized: "The Rockxy Community source edition is licensed under AGPL-3.0-or-later.\n", bundle: RockxyLocalization.bundle)
         )
 
         if let homepage {
-            let linkText = String(localized: "View the public source and license on GitHub")
+            let linkText = String(localized: "View the public source and license on GitHub", bundle: RockxyLocalization.bundle)
             let link = NSMutableAttributedString(string: linkText)
             link.addAttribute(.link, value: homepage, range: NSRange(location: 0, length: link.length))
             credits.append(link)
@@ -1482,7 +1486,7 @@ struct RockxyMenuCommands: Commands {
             ?? Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "txt", subdirectory: "Legal")
         if let noticesURL {
             credits.append(NSAttributedString(string: "\n"))
-            let notices = NSMutableAttributedString(string: String(localized: "Third-Party Software Notices"))
+            let notices = NSMutableAttributedString(string: String(localized: "Third-Party Software Notices", bundle: RockxyLocalization.bundle))
             notices.addAttribute(.link, value: noticesURL, range: NSRange(location: 0, length: notices.length))
             credits.append(notices)
         }
@@ -1490,7 +1494,7 @@ struct RockxyMenuCommands: Commands {
         var options: [NSApplication.AboutPanelOptionKey: Any] = [
             .applicationName: RockxyIdentity.current.displayName,
             .applicationVersion: version,
-            .version: String(localized: "Build \(build)"),
+            .version: String(localized: "Build \(build)", bundle: RockxyLocalization.bundle),
             .credits: credits,
         ]
 

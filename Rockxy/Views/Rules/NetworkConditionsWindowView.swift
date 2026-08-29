@@ -32,7 +32,7 @@ struct NetworkConditionProfileMetadata: Equatable {
     }
 
     static func title(for preset: NetworkConditionPreset) -> String {
-        preset == .custom ? String(localized: "Custom Latency") : preset.displayName
+        preset == .custom ? String(localized: "Custom Latency", bundle: RockxyLocalization.bundle) : preset.displayName
     }
 }
 
@@ -241,7 +241,7 @@ final class NetworkConditionsWindowViewModel {
             return
         }
         let copy = ProxyRule(
-            name: String(localized: "Copy of \(selectedRule.name)"),
+            name: String(localized: "Copy of \(selectedRule.name)", bundle: RockxyLocalization.bundle),
             isEnabled: false,
             matchCondition: selectedRule.matchCondition,
             action: selectedRule.action,
@@ -281,36 +281,37 @@ final class NetworkConditionsWindowViewModel {
         guard let pattern = rule.matchCondition.urlPattern,
               !pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else
         {
-            return String(localized: "System-wide")
+            return String(localized: "System-wide", bundle: RockxyLocalization.bundle)
         }
         return Self.readableHost(from: pattern)
     }
 
     func statusLabel(for rule: ProxyRule) -> (String, Color) {
         guard isToolEnabled else {
-            return (String(localized: "Paused"), .secondary)
+            return (String(localized: "Paused", bundle: RockxyLocalization.bundle), .secondary)
         }
         guard rule.isEnabled else {
-            return (String(localized: "Inactive"), .secondary)
+            return (String(localized: "Inactive", bundle: RockxyLocalization.bundle), .secondary)
         }
         if hasMultipleActive {
-            return (String(localized: "Conflict"), .orange)
+            return (String(localized: "Conflict", bundle: RockxyLocalization.bundle), .orange)
         }
-        return (String(localized: "Enabled"), .green)
+        return (String(localized: "Enabled", bundle: RockxyLocalization.bundle), .green)
     }
 
     // MARK: Private
-
-    private let commitChanges: Bool
 
     private static let toolEnabledKey = "networkConditionsToolEnabled"
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "NetworkConditionsWindowViewModel"
     )
+
     private static var defaultToolEnabled: Bool {
         UserDefaults.standard.object(forKey: toolEnabledKey) as? Bool ?? true
     }
+
+    private let commitChanges: Bool
 
     private static func readableHost(from pattern: String) -> String {
         let formattedHost = NetworkConditionsPatternFormatter.hostText(from: pattern)
@@ -342,10 +343,10 @@ final class NetworkConditionsWindowViewModel {
     }
 }
 
-// MARK: - NetworkConditionsWindowView
+// MARK: - NetworkConditionsPatternFormatter
 
 enum NetworkConditionsPatternFormatter {
-    private static let supportedURLSchemes = Set(["http", "https"])
+    // MARK: Internal
 
     static func hostScopedPattern(from hostText: String) -> String {
         let host = normalizedHostAndPort(from: hostText)
@@ -379,16 +380,21 @@ enum NetworkConditionsPatternFormatter {
     static func hostValidationMessage(for hostText: String) -> String? {
         let trimmed = hostText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return String(localized: "Enter a host or choose All proxied traffic.")
+            return String(localized: "Enter a host or choose All proxied traffic.", bundle: RockxyLocalization.bundle)
         }
         guard normalizedHostAndPortIfValid(from: trimmed) != nil else {
             return String(
                 localized:
-                "Enter a valid hostname, IPv4 address, or IPv6 address with an optional port from 1 to 65535."
+                "Enter a valid hostname, IPv4 address, or IPv6 address with an optional port from 1 to 65535.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return nil
     }
+
+    // MARK: Private
+
+    private static let supportedURLSchemes = Set(["http", "https"])
 
     private static func normalizedHostAndPort(from hostText: String) -> String {
         normalizedHostAndPortIfValid(from: hostText)
@@ -438,8 +444,7 @@ enum NetworkConditionsPatternFormatter {
             }
             let bracketedHost = String(value[...closingBracket])
             let innerHost = String(value[value.index(after: value.startIndex) ..< closingBracket])
-            guard isValidIPv6(innerHost) else
-            {
+            guard isValidIPv6(innerHost) else {
                 return nil
             }
             let remainder = String(value[value.index(after: closingBracket)...])
@@ -527,6 +532,8 @@ enum NetworkConditionsPatternFormatter {
 // MARK: - NetworkConditionsRuleForm
 
 enum NetworkConditionsRuleForm {
+    // MARK: Internal
+
     static let defaultName = "Untitled"
     static let defaultPreset = NetworkConditionPreset.threeG
     static let defaultCustomLatencyMs = 500
@@ -619,13 +626,12 @@ enum NetworkConditionsRuleForm {
             applySystemWide: applySystemWide
         )
 
-        let updatedPattern: String?
-        if scopeIsUnchanged {
-            updatedPattern = originalPattern
+        let updatedPattern: String? = if scopeIsUnchanged {
+            originalPattern
         } else if applySystemWide || trimmedHost.isEmpty {
-            updatedPattern = nil
+            nil
         } else {
-            updatedPattern = NetworkConditionsPatternFormatter.hostScopedPattern(from: trimmedHost)
+            NetworkConditionsPatternFormatter.hostScopedPattern(from: trimmedHost)
         }
 
         let condition = RuleMatchCondition(
@@ -651,6 +657,8 @@ enum NetworkConditionsRuleForm {
         )
     }
 
+    // MARK: Private
+
     private static func scopeIsUnchanged(
         original: ProxyRule?,
         hostText: String,
@@ -673,16 +681,19 @@ enum NetworkConditionsRuleForm {
     }
 }
 
+// MARK: - NetworkConditionsEditorSession
+
 private struct NetworkConditionsEditorSession: Identifiable {
     let id = UUID()
     let existingRule: ProxyRule?
     let draft: NetworkConditionsDraft?
 }
 
+// MARK: - NetworkConditionsWindowView
+
 struct NetworkConditionsWindowView: View {
     // MARK: Internal
 
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
     @State var viewModel = NetworkConditionsWindowViewModel()
 
     var body: some View {
@@ -726,8 +737,82 @@ struct NetworkConditionsWindowView: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
     @FocusState private var isSearchFocused: Bool
     @State private var editorSession: NetworkConditionsEditorSession?
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var enableDisableLabel: String {
+        guard let selectedRule = viewModel.selectedRule else {
+            return String(localized: "Toggle", bundle: RockxyLocalization.bundle)
+        }
+        return selectedRule.isEnabled ? String(localized: "Disable", bundle: RockxyLocalization.bundle) : String(
+            localized: "Enable",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
+    private var isSearching: Bool {
+        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var footerHint: String {
+        let countText = isSearching
+            ? String(
+                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
+    }
+
+    private var infoBannerText: String {
+        if viewModel.hasMultipleActive {
+            return String(
+                localized:
+                "Multiple profiles are enabled in stored rules. Choose one profile to restore exclusive behavior.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(
+            localized:
+            """
+            Only one profile can be enabled. It follows Rockxy's global first-match rule order and applies to \
+            intercepted HTTP and HTTPS traffic.
+            """, bundle: RockxyLocalization.bundle
+        )
+    }
+
+    private var statusCapsuleText: String {
+        if !viewModel.isToolEnabled {
+            return String(localized: "CONDITIONS OFF", bundle: RockxyLocalization.bundle)
+        }
+        if viewModel.hasMultipleActive {
+            return String(localized: "MULTIPLE ENABLED", bundle: RockxyLocalization.bundle)
+        }
+        if viewModel.activeCount == 0 {
+            return String(localized: "NO PROFILE ENABLED", bundle: RockxyLocalization.bundle)
+        }
+        return String(localized: "1 ENABLED", bundle: RockxyLocalization.bundle)
+    }
+
+    private var statusCapsuleIsActive: Bool {
+        viewModel.isToolEnabled && (viewModel.hasMultipleActive || viewModel.activeCount == 1)
+    }
+
+    private var statusCapsuleTint: Color {
+        if viewModel.hasMultipleActive, viewModel.isToolEnabled {
+            return .orange
+        }
+        if viewModel.activeCount == 1, viewModel.isToolEnabled {
+            return .green
+        }
+        return .secondary
+    }
 
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
@@ -736,25 +821,31 @@ struct NetworkConditionsWindowView: View {
                     get: { viewModel.isToolEnabled },
                     set: { viewModel.setToolEnabled($0) }
                 )) {
-                    Text(String(localized: "Enable Network Conditions"))
+                    Text(String(localized: "Enable Network Conditions", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .medium))
                 }
                 .toggleStyle(.checkbox)
 
-                Text(String(localized: "Simulate latency and bandwidth limits for matching HTTP and HTTPS traffic."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Simulate latency and bandwidth limits for matching HTTP and HTTPS traffic.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
                 .focused($isSearchFocused)
-                .accessibilityLabel(String(localized: "Search Network Conditions rules"))
+                .accessibilityLabel(String(
+                    localized: "Search Network Conditions rules",
+                    bundle: RockxyLocalization.bundle
+                ))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -781,7 +872,7 @@ struct NetworkConditionsWindowView: View {
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleID) {
-            TableColumn(String(localized: "Enabled")) { rule in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
                 Toggle("", isOn: Binding(
                     get: { rule.isEnabled },
                     set: { _ in viewModel.toggleRule(id: rule.id) }
@@ -789,13 +880,16 @@ struct NetworkConditionsWindowView: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .accessibilityLabel(
-                    String(localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)")
+                    String(
+                        localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
             .width(62)
 
-            TableColumn(String(localized: "Name")) { rule in
-                Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
+            TableColumn(String(localized: "Name", bundle: RockxyLocalization.bundle)) { rule in
+                Text(rule.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : rule.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .help(rule.name)
@@ -803,16 +897,19 @@ struct NetworkConditionsWindowView: View {
             }
             .width(min: 150, ideal: 200)
 
-            TableColumn(String(localized: "Scope")) { rule in
+            TableColumn(String(localized: "Scope", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.hostLabel(for: rule))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .help(rule.matchCondition.urlPattern ?? String(localized: "System-wide"))
+                    .help(rule.matchCondition.urlPattern ?? String(
+                        localized: "System-wide",
+                        bundle: RockxyLocalization.bundle
+                    ))
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
             .width(min: 180, ideal: 260)
 
-            TableColumn(String(localized: "Profile")) { rule in
+            TableColumn(String(localized: "Profile", bundle: RockxyLocalization.bundle)) { rule in
                 let profile = viewModel.networkProfile(for: rule)
                 Text(profile.name)
                     .lineLimit(1)
@@ -820,21 +917,21 @@ struct NetworkConditionsWindowView: View {
             }
             .width(min: 110, ideal: 145)
 
-            TableColumn(String(localized: "Latency")) { rule in
+            TableColumn(String(localized: "Latency", bundle: RockxyLocalization.bundle)) { rule in
                 Text("\(viewModel.networkProfile(for: rule).latencyMs) ms")
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
             .width(84)
 
-            TableColumn(String(localized: "Download")) { rule in
+            TableColumn(String(localized: "Download", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.networkProfile(for: rule).downloadBandwidth)
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
             .width(min: 105, ideal: 125)
 
-            TableColumn(String(localized: "Upload")) { rule in
+            TableColumn(String(localized: "Upload", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.networkProfile(for: rule).uploadBandwidth)
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
@@ -855,13 +952,19 @@ struct NetworkConditionsWindowView: View {
             if viewModel.filteredRules.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No matching rules")
-                        : String(localized: "No Network Conditions rules"),
+                        ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Network Conditions rules", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "speedometer",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different name, scope, or profile.")
-                            : String(localized: "Click \"+\" or press ⌘N to create a profile.")
+                            ? String(
+                                localized: "Try a different name, scope, or profile.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Click \"+\" or press ⌘N to create a profile.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -912,7 +1015,7 @@ struct NetworkConditionsWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -930,7 +1033,7 @@ struct NetworkConditionsWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
-            .help(String(localized: "Delete Rule"))
+            .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -943,18 +1046,18 @@ struct NetworkConditionsWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New Rule")) {
+            Button(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) {
                 openNewEditor()
             }
             .keyboardShortcut("n", modifiers: .command)
 
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 openEditorForSelection()
             }
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRule == nil)
 
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.duplicateSelectedRule()
             }
             .keyboardShortcut("d", modifiers: .command)
@@ -969,26 +1072,26 @@ struct NetworkConditionsWindowView: View {
 
             Divider()
 
-            Button(String(localized: "Focus Search")) {
+            Button(String(localized: "Focus Search", bundle: RockxyLocalization.bundle)) {
                 isSearchFocused = true
             }
             .keyboardShortcut("f", modifiers: .command)
 
-            Button(String(localized: "Disable All")) {
+            Button(String(localized: "Disable All", bundle: RockxyLocalization.bundle)) {
                 viewModel.disableAll()
             }
             .disabled(viewModel.activeCount == 0)
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelectedRule()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -998,80 +1101,15 @@ struct NetworkConditionsWindowView: View {
         .fixedSize()
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
-    private var enableDisableLabel: String {
-        guard let selectedRule = viewModel.selectedRule else {
-            return String(localized: "Toggle")
-        }
-        return selectedRule.isEnabled ? String(localized: "Disable") : String(localized: "Enable")
-    }
-
-    private var isSearching: Bool {
-        !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var footerHint: String {
-        let countText = isSearching
-            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
-            : String(localized: "\(viewModel.ruleCount) rules")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
-    }
-
-    private var infoBannerText: String {
-        if viewModel.hasMultipleActive {
-            return String(
-                localized:
-                "Multiple profiles are enabled in stored rules. Choose one profile to restore exclusive behavior."
-            )
-        }
-        return String(
-            localized:
-            """
-            Only one profile can be enabled. It follows Rockxy's global first-match rule order and applies to \
-            intercepted HTTP and HTTPS traffic.
-            """
-        )
-    }
-
-    private var statusCapsuleText: String {
-        if !viewModel.isToolEnabled {
-            return String(localized: "CONDITIONS OFF")
-        }
-        if viewModel.hasMultipleActive {
-            return String(localized: "MULTIPLE ENABLED")
-        }
-        if viewModel.activeCount == 0 {
-            return String(localized: "NO PROFILE ENABLED")
-        }
-        return String(localized: "1 ENABLED")
-    }
-
-    private var statusCapsuleIsActive: Bool {
-        viewModel.isToolEnabled && (viewModel.hasMultipleActive || viewModel.activeCount == 1)
-    }
-
-    private var statusCapsuleTint: Color {
-        if viewModel.hasMultipleActive, viewModel.isToolEnabled {
-            return .orange
-        }
-        if viewModel.activeCount == 1, viewModel.isToolEnabled {
-            return .green
-        }
-        return .secondary
-    }
-
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first {
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.allRules.first(where: { $0.id == id }) {
                     openEditor(for: rule)
                 }
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRuleID = id
                 viewModel.duplicateSelectedRule()
             }
@@ -1079,7 +1117,7 @@ struct NetworkConditionsWindowView: View {
                 viewModel.toggleRule(id: id)
             }
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeRule(id: id)
             }
         }
@@ -1087,9 +1125,12 @@ struct NetworkConditionsWindowView: View {
 
     private func enableDisableContextLabel(for id: UUID) -> String {
         guard let rule = viewModel.allRules.first(where: { $0.id == id }) else {
-            return String(localized: "Toggle")
+            return String(localized: "Toggle", bundle: RockxyLocalization.bundle)
         }
-        return rule.isEnabled ? String(localized: "Disable") : String(localized: "Enable")
+        return rule.isEnabled ? String(localized: "Disable", bundle: RockxyLocalization.bundle) : String(
+            localized: "Enable",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func openNewEditor() {
@@ -1172,7 +1213,8 @@ private struct NetworkConditionsEditSheet: View {
                         Label(
                             String(
                                 localized:
-                                "Adding this enabled profile will disable the profile that is currently enabled."
+                                "Adding this enabled profile will disable the profile that is currently enabled.",
+                                bundle: RockxyLocalization.bundle
                             ),
                             systemImage: "arrow.triangle.2.circlepath"
                         )
@@ -1197,7 +1239,7 @@ private struct NetworkConditionsEditSheet: View {
                     Button {
                         dismiss()
                     } label: {
-                        footerButtonLabel(String(localized: "Cancel"))
+                        footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                     }
                     .keyboardShortcut(.cancelAction)
                     .disabled(isSaving)
@@ -1207,8 +1249,11 @@ private struct NetworkConditionsEditSheet: View {
                     } label: {
                         footerButtonLabel(
                             isSaving
-                                ? String(localized: "Saving…")
-                                : isEditing ? String(localized: "Save") : String(localized: "Add")
+                                ? String(localized: "Saving…", bundle: RockxyLocalization.bundle)
+                                : isEditing ? String(localized: "Save", bundle: RockxyLocalization.bundle) : String(
+                                    localized: "Add",
+                                    bundle: RockxyLocalization.bundle
+                                )
                         )
                     }
                     .keyboardShortcut(.defaultAction)
@@ -1264,8 +1309,8 @@ private struct NetworkConditionsEditSheet: View {
 
     private var editorTitle: String {
         isEditing
-            ? String(localized: "Edit Network Conditions Rule")
-            : String(localized: "New Network Conditions Rule")
+            ? String(localized: "Edit Network Conditions Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "New Network Conditions Rule", bundle: RockxyLocalization.bundle)
     }
 
     private var quickCreateProvenance: String? {
@@ -1275,41 +1320,81 @@ private struct NetworkConditionsEditSheet: View {
         if let sourceURL = draft.sourceURL {
             let method = draft.sourceMethod ?? "ANY"
             let path = sourceURL.path.isEmpty ? "/" : sourceURL.path
-            return String(localized: "Created from \(method) \(draft.sourceHost)\(path)")
+            return String(
+                localized: "Created from \(method) \(draft.sourceHost)\(path)",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Created from domain \(draft.sourceHost)")
+        return String(localized: "Created from domain \(draft.sourceHost)", bundle: RockxyLocalization.bundle)
+    }
+
+    private var scopeHelpText: String {
+        if applySystemWide {
+            return String(
+                localized:
+                """
+                This profile is eligible for intercepted HTTP and HTTPS traffic that reaches it in Rockxy's \
+                global first-match rule order.
+                """, bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(
+            localized:
+            """
+            Enter a host with an optional port, or paste an HTTP or HTTPS URL. URL paths and queries are ignored. \
+            Wildcards and raw regular expressions are not added from this editor.
+            """, bundle: RockxyLocalization.bundle
+        )
+    }
+
+    private var hostValidationMessage: String? {
+        guard !applySystemWide else {
+            return nil
+        }
+        return NetworkConditionsRuleForm.hostValidationMessage(
+            original: existingRule,
+            hostText: hostText,
+            applySystemWide: applySystemWide
+        )
+    }
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                    fieldGroup(String(localized: "Name")) {
-                        TextField(String(localized: "Untitled"), text: $name)
+                    fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                        TextField(String(localized: "Untitled", bundle: RockxyLocalization.bundle), text: $name)
                             .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel(String(localized: "Rule name"))
+                            .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
                     }
                     .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-                    fieldGroup(String(localized: "Scope")) {
+                    fieldGroup(String(localized: "Scope", bundle: RockxyLocalization.bundle)) {
                         scopeMenu
                     }
                     .frame(width: toolMetrics.menuWidth(190))
 
-                    fieldGroup(String(localized: "Host")) {
+                    fieldGroup(String(localized: "Host", bundle: RockxyLocalization.bundle)) {
                         TextField("api.example.com", text: $hostText)
                             .textFieldStyle(.roundedBorder)
                             .disabled(applySystemWide)
-                            .accessibilityLabel(String(localized: "Network Conditions host"))
+                            .accessibilityLabel(String(
+                                localized: "Network Conditions host",
+                                bundle: RockxyLocalization.bundle
+                            ))
                     }
                     .frame(maxWidth: .infinity)
                 }
 
                 if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    validationLabel(String(localized: "Enter a rule name."))
+                    validationLabel(String(localized: "Enter a rule name.", bundle: RockxyLocalization.bundle))
                 }
                 if let hostValidationMessage {
                     validationLabel(hostValidationMessage)
@@ -1334,24 +1419,27 @@ private struct NetworkConditionsEditSheet: View {
     private var networkProfileSection: some View {
         let metadata = NetworkConditionProfileMetadata.from(preset: selectedPreset, latencyMs: effectiveLatencyMs)
         return VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Network Profile"))
+            Text(String(localized: "Network Profile", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                    fieldGroup(String(localized: "Preset")) {
+                    fieldGroup(String(localized: "Preset", bundle: RockxyLocalization.bundle)) {
                         presetMenu
                     }
                     .frame(width: toolMetrics.menuWidth(190))
 
                     if selectedPreset == .custom {
-                        fieldGroup(String(localized: "Latency")) {
+                        fieldGroup(String(localized: "Latency", bundle: RockxyLocalization.bundle)) {
                             HStack(spacing: 6) {
                                 TextField("", value: $customLatencyMs, format: .number)
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: toolMetrics.fieldWidth(90))
-                                    .accessibilityLabel(String(localized: "Custom latency"))
-                                Text(String(localized: "ms"))
+                                    .accessibilityLabel(String(
+                                        localized: "Custom latency",
+                                        bundle: RockxyLocalization.bundle
+                                    ))
+                                Text(String(localized: "ms", bundle: RockxyLocalization.bundle))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -1360,22 +1448,25 @@ private struct NetworkConditionsEditSheet: View {
                 }
 
                 if selectedPreset == .custom, customLatencyMs <= 0 {
-                    validationLabel(String(localized: "Custom latency must be greater than 0 ms."))
+                    validationLabel(String(
+                        localized: "Custom latency must be greater than 0 ms.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
 
                 HStack(spacing: toolMetrics.controlSpacing) {
                     profileMetric(
-                        title: String(localized: "Latency"),
+                        title: String(localized: "Latency", bundle: RockxyLocalization.bundle),
                         value: "\(metadata.latencyMs) ms",
                         systemImage: "timer"
                     )
                     profileMetric(
-                        title: String(localized: "Download"),
+                        title: String(localized: "Download", bundle: RockxyLocalization.bundle),
                         value: metadata.downloadBandwidth,
                         systemImage: "arrow.down"
                     )
                     profileMetric(
-                        title: String(localized: "Upload"),
+                        title: String(localized: "Upload", bundle: RockxyLocalization.bundle),
                         value: metadata.uploadBandwidth,
                         systemImage: "arrow.up"
                     )
@@ -1387,7 +1478,7 @@ private struct NetworkConditionsEditSheet: View {
                         """
                         Presets add connection latency and pace request and response bodies at the displayed limits. \
                         Custom Latency leaves upload and download bandwidth unlimited.
-                        """
+                        """, bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -1411,7 +1502,7 @@ private struct NetworkConditionsEditSheet: View {
                 applySystemWide = false
             } label: {
                 menuCheckmarkLabel(
-                    String(localized: "Specific host"),
+                    String(localized: "Specific host", bundle: RockxyLocalization.bundle),
                     isSelected: !applySystemWide
                 )
             }
@@ -1419,21 +1510,21 @@ private struct NetworkConditionsEditSheet: View {
                 applySystemWide = true
             } label: {
                 menuCheckmarkLabel(
-                    String(localized: "All proxied traffic"),
+                    String(localized: "All proxied traffic", bundle: RockxyLocalization.bundle),
                     isSelected: applySystemWide
                 )
             }
         } label: {
             dataEntryMenuLabel(
                 applySystemWide
-                    ? String(localized: "All proxied traffic")
-                    : String(localized: "Specific host"),
+                    ? String(localized: "All proxied traffic", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Specific host", bundle: RockxyLocalization.bundle),
                 width: toolMetrics.menuWidth(190)
             )
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Traffic scope"))
+        .accessibilityLabel(String(localized: "Traffic scope", bundle: RockxyLocalization.bundle))
     }
 
     private var presetMenu: some View {
@@ -1450,37 +1541,7 @@ private struct NetworkConditionsEditSheet: View {
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Network profile"))
-    }
-
-    private var scopeHelpText: String {
-        if applySystemWide {
-            return String(
-                localized:
-                """
-                This profile is eligible for intercepted HTTP and HTTPS traffic that reaches it in Rockxy's \
-                global first-match rule order.
-                """
-            )
-        }
-        return String(
-            localized:
-            """
-            Enter a host with an optional port, or paste an HTTP or HTTPS URL. URL paths and queries are ignored. \
-            Wildcards and raw regular expressions are not added from this editor.
-            """
-        )
-    }
-
-    private var hostValidationMessage: String? {
-        guard !applySystemWide else {
-            return nil
-        }
-        return NetworkConditionsRuleForm.hostValidationMessage(
-            original: existingRule,
-            hostText: hostText,
-            applySystemWide: applySystemWide
-        )
+        .accessibilityLabel(String(localized: "Network profile", bundle: RockxyLocalization.bundle))
     }
 
     private func profileMetric(title: String, value: String, systemImage: String) -> some View {
@@ -1507,14 +1568,6 @@ private struct NetworkConditionsEditSheet: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
-    private func profileTitle(for preset: NetworkConditionPreset) -> String {
-        NetworkConditionProfileMetadata.title(for: preset)
     }
 
     private func fieldGroup(
@@ -1601,6 +1654,10 @@ private struct NetworkConditionsEditSheet: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    private func profileTitle(for preset: NetworkConditionPreset) -> String {
+        NetworkConditionProfileMetadata.title(for: preset)
+    }
+
     @MainActor
     private func saveRule() async {
         guard !isSaving else {
@@ -1622,7 +1679,8 @@ private struct NetworkConditionsEditSheet: View {
         guard accepted else {
             saveError = String(
                 localized:
-                "This rule could not be saved. Disable another Network Conditions rule and try again."
+                "This rule could not be saved. Disable another Network Conditions rule and try again.",
+                bundle: RockxyLocalization.bundle
             )
             return
         }

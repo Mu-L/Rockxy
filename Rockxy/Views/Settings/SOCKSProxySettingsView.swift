@@ -10,12 +10,15 @@ struct SOCKSProxySettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "SOCKS5 Proxy"))
+                Text(String(localized: "SOCKS5 Proxy", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "SOCKS5 now uses the shared External Proxy workflow."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "SOCKS5 now uses the shared External Proxy workflow.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
             .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -30,7 +33,8 @@ struct SOCKSProxySettingsView: View {
                     Text(
                         String(
                             localized:
-                            "Manage Automatic, HTTP, HTTPS, and SOCKS5 upstream options in one shared settings window."
+                            "Manage Automatic, HTTP, HTTPS, and SOCKS5 upstream options in one shared settings window.",
+                            bundle: RockxyLocalization.bundle
                         )
                     )
                     .font(toolMetrics.secondaryFont())
@@ -48,13 +52,13 @@ struct SOCKSProxySettingsView: View {
             HStack(spacing: toolMetrics.controlSpacing) {
                 Spacer()
 
-                Button(String(localized: "Close")) {
+                Button(String(localized: "Close", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
                 .frame(width: toolMetrics.footerButtonWidth)
                 .keyboardShortcut(.cancelAction)
 
-                Button(String(localized: "Open External Proxy Settings")) {
+                Button(String(localized: "Open External Proxy Settings", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "externalProxySettings")
                     dismiss()
                 }

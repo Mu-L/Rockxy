@@ -1,6 +1,8 @@
 import Foundation
 import os
 
+// MARK: - BreakpointTemplateStore
+
 // Persists and coordinates breakpoint request/response templates.
 
 @MainActor @Observable
@@ -23,6 +25,8 @@ final class BreakpointTemplateStore {
 
     static let shared = BreakpointTemplateStore()
 
+    private(set) var templates: [BreakpointTemplate] = []
+
     var selectedKind: BreakpointTemplateKind = .request {
         didSet {
             guard !isSynchronizingSelection, selectedKind != oldValue else {
@@ -40,8 +44,8 @@ final class BreakpointTemplateStore {
                   selectedTemplateID != oldValue,
                   let selectedTemplateID,
                   let kind = templates.first(where: { $0.id == selectedTemplateID })?.kind,
-                  kind != selectedKind
-            else {
+                  kind != selectedKind else
+            {
                 return
             }
             isSynchronizingSelection = true
@@ -49,7 +53,6 @@ final class BreakpointTemplateStore {
             isSynchronizingSelection = false
         }
     }
-    private(set) var templates: [BreakpointTemplate] = []
 
     var requestTemplates: [BreakpointTemplate] {
         templates(for: .request)
@@ -71,7 +74,10 @@ final class BreakpointTemplateStore {
     }
 
     var selectedValidation: BreakpointTemplateValidation {
-        selectedTemplate?.validation ?? .invalid(message: String(localized: "No template selected."))
+        selectedTemplate?.validation ?? .invalid(message: String(
+            localized: "No template selected.",
+            bundle: RockxyLocalization.bundle
+        ))
     }
 
     @discardableResult
@@ -144,7 +150,7 @@ final class BreakpointTemplateStore {
         }
         var duplicate = BreakpointTemplate(
             kind: selectedTemplate.kind,
-            name: String(localized: "Copy of \(selectedTemplate.name)"),
+            name: String(localized: "Copy of \(selectedTemplate.name)", bundle: RockxyLocalization.bundle),
             rawMessage: selectedTemplate.rawMessage
         )
         duplicate.updatedAt = Date()
@@ -164,7 +170,7 @@ final class BreakpointTemplateStore {
 
     func validation(for templateID: UUID) -> BreakpointTemplateValidation {
         templates.first { $0.id == templateID }?.validation
-            ?? .invalid(message: String(localized: "Template is missing."))
+            ?? .invalid(message: String(localized: "Template is missing.", bundle: RockxyLocalization.bundle))
     }
 
     func applicationPayload(for templateID: UUID) -> BreakpointTemplateApplication? {
@@ -208,12 +214,16 @@ final class BreakpointTemplateStore {
 
     // MARK: Private
 
-    private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "BreakpointTemplateStore")
+    private static let logger = Logger(
+        subsystem: RockxyIdentity.current.logSubsystem,
+        category: "BreakpointTemplateStore"
+    )
 
     private let defaults: UserDefaults
     private let storageKey: String
     private let seedDefaults: Bool
     private var isSynchronizingSelection = false
+
     private var seedMarkerKey: String {
         "\(storageKey).seeded"
     }

@@ -14,17 +14,17 @@ struct DeveloperSetupAutomaticWindowView: View {
 
     var body: some View {
         setupLayout
-        .frame(minWidth: 620, minHeight: 440)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .font(setupMetrics.font())
-        .centerOverRockxyMainWindowOnAppear()
-        .task {
-            viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
-            viewModel.refresh()
-        }
-        .onChange(of: routeStore.automaticRoute) { _, _ in
-            viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
-        }
+            .frame(minWidth: 620, minHeight: 440)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .font(setupMetrics.font())
+            .centerOverRockxyMainWindowOnAppear()
+            .task {
+                viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
+                viewModel.refresh()
+            }
+            .onChange(of: routeStore.automaticRoute) { _, _ in
+                viewModel.applyRoute(routeStore.consumeAutomaticRoute(), destination: .automatic)
+            }
     }
 
     // MARK: Private
@@ -39,8 +39,8 @@ struct DeveloperSetupAutomaticWindowView: View {
 
     private var openTerminalTitle: String {
         viewModel.selectedTerminalApp == .custom
-            ? String(localized: "Copy Setup Command")
-            : String(localized: "Open Prepared Terminal…")
+            ? String(localized: "Copy Setup Command", bundle: RockxyLocalization.bundle)
+            : String(localized: "Open Prepared Terminal…", bundle: RockxyLocalization.bundle)
     }
 
     @ViewBuilder private var setupLayout: some View {
@@ -94,7 +94,7 @@ struct DeveloperSetupAutomaticWindowView: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(String(localized: "Automatic Setup"))
+                    Text(String(localized: "Automatic Setup", bundle: RockxyLocalization.bundle))
                         .font(setupMetrics.font(size: setupMetrics.titleFontSize, weight: .semibold))
                     Text(viewModel.target.title)
                         .font(setupMetrics.secondaryFont())
@@ -105,7 +105,8 @@ struct DeveloperSetupAutomaticWindowView: View {
             if viewModel.isRuntimeTerminalTarget {
                 Text(
                     String(
-                        localized: "Rockxy prepares a scoped shell for \(viewModel.target.title) pointed at the local proxy."
+                        localized: "Rockxy prepares a scoped shell for \(viewModel.target.title) pointed at the local proxy.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(setupMetrics.font())
@@ -117,13 +118,14 @@ struct DeveloperSetupAutomaticWindowView: View {
 
     private var terminalSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "\(viewModel.target.title) terminal session"))
+            Text(String(localized: "\(viewModel.target.title) terminal session", bundle: RockxyLocalization.bundle))
                 .font(setupMetrics.font(size: setupMetrics.sectionTitleFontSize, weight: .semibold))
 
             VStack(alignment: .leading, spacing: 10) {
                 Text(
                     String(
-                        localized: "Open a prepared terminal that points \(viewModel.target.title) at Rockxy before you run your app or script."
+                        localized: "Open a prepared terminal that points \(viewModel.target.title) at Rockxy before you run your app or script.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(setupMetrics.font())
@@ -134,7 +136,7 @@ struct DeveloperSetupAutomaticWindowView: View {
 
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {
-                        Text(String(localized: "Use"))
+                        Text(String(localized: "Use", bundle: RockxyLocalization.bundle))
                             .foregroundStyle(.secondary)
                         terminalPicker
                         terminalActionButton
@@ -155,13 +157,16 @@ struct DeveloperSetupAutomaticWindowView: View {
     }
 
     private var terminalPicker: some View {
-        Picker(String(localized: "Terminal app"), selection: $viewModel.selectedTerminalApp) {
+        Picker(
+            String(localized: "Terminal app", bundle: RockxyLocalization.bundle),
+            selection: $viewModel.selectedTerminalApp
+        ) {
             ForEach(SetupTerminalApp.allCases) { terminalApp in
                 Text(terminalApp.title).tag(terminalApp)
             }
         }
         .pickerStyle(.menu)
-        .accessibilityLabel(String(localized: "Terminal app"))
+        .accessibilityLabel(String(localized: "Terminal app", bundle: RockxyLocalization.bundle))
     }
 
     private var terminalActionButton: some View {
@@ -175,14 +180,20 @@ struct DeveloperSetupAutomaticWindowView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(viewModel
-                .statusMessage ?? String(localized: "Rockxy generates a scoped setup script before launching."))
+                .statusMessage ?? String(
+                    localized: "Rockxy generates a scoped setup script before launching.",
+                    bundle: RockxyLocalization.bundle
+                ))
                 .font(setupMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(String(localized: "Proxy: \(viewModel.proxyEndpointText). \(viewModel.certificateStatusText)"))
-                .font(setupMetrics.font(size: setupMetrics.metadataFontSize))
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(
+                localized: "Proxy: \(viewModel.proxyEndpointText). \(viewModel.certificateStatusText)",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(setupMetrics.font(size: setupMetrics.metadataFontSize))
+            .foregroundStyle(.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

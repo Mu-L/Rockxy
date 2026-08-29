@@ -3,7 +3,7 @@ import Foundation
 // MARK: - JSONPathDocument
 
 struct JSONPathDocument: Sendable, Equatable {
-    let root: JSONPathNode
+    // MARK: Lifecycle
 
     init(data: Data, limits: JSONPathEvaluationLimits = .default) throws {
         let object = try JSONSerialization.jsonObject(with: data)
@@ -23,6 +23,10 @@ struct JSONPathDocument: Sendable, Equatable {
         self.root = root
     }
 
+    // MARK: Internal
+
+    let root: JSONPathNode
+
     var flattenedNodes: [JSONPathNode] {
         root.flattened()
     }
@@ -31,11 +35,7 @@ struct JSONPathDocument: Sendable, Equatable {
 // MARK: - JSONPathNode
 
 struct JSONPathNode: Identifiable, Sendable, Equatable {
-    let id: String
-    let key: String?
-    let path: String
-    let keyPath: String
-    let value: JSONPathValue
+    // MARK: Lifecycle
 
     init(
         object: Any,
@@ -45,13 +45,21 @@ struct JSONPathNode: Identifiable, Sendable, Equatable {
         depth: Int,
         counter: inout Int,
         limits: JSONPathEvaluationLimits
-    ) throws {
+    )
+        throws
+    {
         counter += 1
         guard counter <= limits.maxVisitedNodes else {
-            throw JSONPathError.limitExceeded(String(localized: "JSON contains too many nodes."))
+            throw JSONPathError.limitExceeded(String(
+                localized: "JSON contains too many nodes.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
         guard depth <= limits.maxTreeDepth else {
-            throw JSONPathError.limitExceeded(String(localized: "JSON is nested too deeply."))
+            throw JSONPathError.limitExceeded(String(
+                localized: "JSON is nested too deeply.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         self.id = path
@@ -67,6 +75,14 @@ struct JSONPathNode: Identifiable, Sendable, Equatable {
             limits: limits
         )
     }
+
+    // MARK: Internal
+
+    let id: String
+    let key: String?
+    let path: String
+    let keyPath: String
+    let value: JSONPathValue
 
     var childCount: Int {
         children.count
@@ -137,6 +153,8 @@ indirect enum JSONPathValue: Sendable, Equatable {
     case array([JSONPathNode])
     case object([(key: String, value: JSONPathNode)])
 
+    // MARK: Lifecycle
+
     init(
         object: Any,
         path: String,
@@ -144,7 +162,9 @@ indirect enum JSONPathValue: Sendable, Equatable {
         depth: Int,
         counter: inout Int,
         limits: JSONPathEvaluationLimits
-    ) throws {
+    )
+        throws
+    {
         switch object {
         case let dict as [String: Any]:
             let pairs = try dict.keys.sorted().map { key -> (key: String, value: JSONPathNode) in
@@ -191,6 +211,8 @@ indirect enum JSONPathValue: Sendable, Equatable {
             throw JSONPathError.unsupportedValue
         }
     }
+
+    // MARK: Internal
 
     var doubleValue: Double? {
         switch self {
@@ -241,18 +263,6 @@ indirect enum JSONPathValue: Sendable, Equatable {
         }
     }
 
-    private static func escapedPathKey(_ key: String) -> String {
-        key
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-    }
-
-    private static func keyPathComponent(_ key: String) -> String {
-        key.range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) == nil
-            ? "['\(Self.escapedPathKey(key))']"
-            : key
-    }
-
     static func == (lhs: JSONPathValue, rhs: JSONPathValue) -> Bool {
         switch (lhs, rhs) {
         case let (.string(left), .string(right)):
@@ -271,6 +281,20 @@ indirect enum JSONPathValue: Sendable, Equatable {
             false
         }
     }
+
+    // MARK: Private
+
+    private static func escapedPathKey(_ key: String) -> String {
+        key
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+    }
+
+    private static func keyPathComponent(_ key: String) -> String {
+        key.range(of: #"^[A-Za-z_][A-Za-z0-9_]*$"#, options: .regularExpression) == nil
+            ? "['\(escapedPathKey(key))']"
+            : key
+    }
 }
 
 // MARK: - JSONPathError
@@ -281,6 +305,8 @@ enum JSONPathError: LocalizedError, Equatable, Sendable {
     case limitExceeded(String)
     case unsupportedValue
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case let .invalidQuery(message),
@@ -288,7 +314,7 @@ enum JSONPathError: LocalizedError, Equatable, Sendable {
              let .limitExceeded(message):
             message
         case .unsupportedValue:
-            String(localized: "JSON contains an unsupported value.")
+            String(localized: "JSON contains an unsupported value.", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -296,14 +322,6 @@ enum JSONPathError: LocalizedError, Equatable, Sendable {
 // MARK: - JSONPathEvaluationLimits
 
 struct JSONPathEvaluationLimits: Sendable, Equatable {
-    let maxQueryLength: Int
-    let maxLiveFilterBodyBytes: Int
-    let maxVisitedNodes: Int
-    let maxResultNodes: Int
-    let maxTreeDepth: Int
-    let maxASTDepth: Int
-    let maxRegexPatternLength: Int
-
     static let `default` = JSONPathEvaluationLimits(
         maxQueryLength: 2 * 1_024,
         maxLiveFilterBodyBytes: 10 * 1_024 * 1_024,
@@ -313,17 +331,19 @@ struct JSONPathEvaluationLimits: Sendable, Equatable {
         maxASTDepth: 128,
         maxRegexPatternLength: 512
     )
+
+    let maxQueryLength: Int
+    let maxLiveFilterBodyBytes: Int
+    let maxVisitedNodes: Int
+    let maxResultNodes: Int
+    let maxTreeDepth: Int
+    let maxASTDepth: Int
+    let maxRegexPatternLength: Int
 }
 
 // MARK: - JSONPathQueryResult
 
 struct JSONPathQueryResult: Sendable, Equatable {
-    let matches: [JSONPathNode]
-    let includedPaths: Set<String>
-    let selectedIndex: Int
-    let diagnostic: String?
-    let isTruncated: Bool
-
     static let empty = JSONPathQueryResult(
         matches: [],
         includedPaths: [],
@@ -331,4 +351,10 @@ struct JSONPathQueryResult: Sendable, Equatable {
         diagnostic: nil,
         isTruncated: false
     )
+
+    let matches: [JSONPathNode]
+    let includedPaths: Set<String>
+    let selectedIndex: Int
+    let diagnostic: String?
+    let isTruncated: Bool
 }

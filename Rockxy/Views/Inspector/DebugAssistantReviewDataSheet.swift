@@ -25,7 +25,7 @@ struct DebugAssistantReviewDataSheet: View {
         .frame(width: sheetWidth, height: sheetHeight)
         .background(Color(nsColor: .windowBackgroundColor))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "AI Assistant Review Data"))
+        .accessibilityLabel(String(localized: "AI Assistant Review Data", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -100,29 +100,50 @@ struct DebugAssistantReviewDataSheet: View {
 
     private var headerSubtitle: String {
         if isLocalExecution {
-            return String(localized: "Confirm the redacted traffic and conversation before local inference begins.")
+            return String(
+                localized: "Confirm the redacted traffic and conversation before local inference begins.",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Confirm the exact redacted traffic before it leaves this Mac.")
+        return String(
+            localized: "Confirm the exact redacted traffic before it leaves this Mac.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var primaryActionTitle: String {
-        isLocalExecution ? String(localized: "Run Locally") : String(localized: "Send Redacted Data")
+        isLocalExecution ? String(localized: "Run Locally", bundle: RockxyLocalization.bundle) : String(
+            localized: "Send Redacted Data",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var footerStatus: String {
         if isPreparingOverride {
-            return String(localized: "Rebuilding the reviewed context with the excluded traffic")
+            return String(
+                localized: "Rebuilding the reviewed context with the excluded traffic",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if !modelAccessEnabled {
-            return String(localized: "Model access is disabled in AI Assistant Settings")
+            return String(
+                localized: "Model access is disabled in AI Assistant Settings",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if configuration?.isComplete != true {
-            return String(localized: "Configure a provider and model in AI Assistant Settings")
+            return String(
+                localized: "Configure a provider and model in AI Assistant Settings",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if isLocalExecution {
-            return String(localized: "Inference uses the configured local endpoint")
+            return String(localized: "Inference uses the configured local endpoint", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Only reviewed content and required provider metadata will be sent")
+        return String(
+            localized: "Only reviewed content and required provider metadata will be sent",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var header: some View {
@@ -133,7 +154,7 @@ struct DebugAssistantReviewDataSheet: View {
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(String(localized: "Review Data"))
+                Text(String(localized: "Review Data", bundle: RockxyLocalization.bundle))
                     .font(.system(size: max(15, toolMetrics.bodyFontSize + 2), weight: .semibold))
                 Text(headerSubtitle)
                     .font(toolMetrics.secondaryFont())
@@ -176,7 +197,7 @@ struct DebugAssistantReviewDataSheet: View {
 
             Spacer(minLength: 12)
 
-            Button(String(localized: "Cancel"), action: onDismiss)
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), action: onDismiss)
                 .keyboardShortcut(.cancelAction)
 
             Button(primaryActionTitle, action: onSend)
@@ -191,18 +212,18 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private var scopeSummarySection: some View {
-        reviewSection(String(localized: "Related Traffic Scope")) {
+        reviewSection(String(localized: "Related Traffic Scope", bundle: RockxyLocalization.bundle)) {
             VStack(alignment: .leading, spacing: 10) {
                 Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 9) {
                     GridRow {
                         manifestRow(
-                            String(localized: "Related found"),
+                            String(localized: "Related found", bundle: RockxyLocalization.bundle),
                             value: reviewSummary.rawRelatedFound,
                             systemImage: "magnifyingglass",
                             color: .secondary
                         )
                         manifestRow(
-                            String(localized: "Included in review"),
+                            String(localized: "Included in review", bundle: RockxyLocalization.bundle),
                             value: reviewSummary.relatedIncluded,
                             systemImage: "checkmark.circle.fill",
                             color: .green
@@ -210,7 +231,7 @@ struct DebugAssistantReviewDataSheet: View {
                     }
                     GridRow {
                         manifestRow(
-                            String(localized: "Normally excluded by Focus / Noise"),
+                            String(localized: "Normally excluded by Focus / Noise", bundle: RockxyLocalization.bundle),
                             value: reviewSummary.focusNoiseExcluded,
                             systemImage: "eye.slash",
                             color: reviewSummary.focusNoiseExcluded == 0 ? .secondary : .orange
@@ -221,7 +242,10 @@ struct DebugAssistantReviewDataSheet: View {
 
                 if reviewSummary.overrideApplied {
                     Label(
-                        String(localized: "Focus and Noise were ignored once for this review."),
+                        String(
+                            localized: "Focus and Noise were ignored once for this review.",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         systemImage: "checkmark.circle"
                     )
                     .font(toolMetrics.secondaryFont())
@@ -239,20 +263,30 @@ struct DebugAssistantReviewDataSheet: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text(String(localized: "Including excluded traffic…"))
+                    Text(String(localized: "Including excluded traffic…", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Button(String(localized: "Include Excluded Traffic Once"), action: onOverride)
-                    .rockxyGlassButtonStyle()
-                    .controlSize(.small)
-                    .accessibilityLabel(String(localized: "Include Excluded Traffic Once"))
-                    .help(String(localized: "Focus and Noise settings will not change."))
+                Button(
+                    String(localized: "Include Excluded Traffic Once", bundle: RockxyLocalization.bundle),
+                    action: onOverride
+                )
+                .rockxyGlassButtonStyle()
+                .controlSize(.small)
+                .accessibilityLabel(String(
+                    localized: "Include Excluded Traffic Once",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .help(String(
+                    localized: "Focus and Noise settings will not change.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
             Text(
                 String(
-                    localized: "Adds the \(reviewSummary.focusNoiseExcluded) request(s) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change."
+                    localized: "Adds the \(reviewSummary.focusNoiseExcluded) request(s) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.metadataFont())
@@ -262,7 +296,7 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private func destinationSection(_ pack: InvestigationContextPack) -> some View {
-        reviewSection(String(localized: "Request Summary")) {
+        reviewSection(String(localized: "Request Summary", bundle: RockxyLocalization.bundle)) {
             LazyVGrid(
                 columns: [
                     GridItem(.adaptive(minimum: 150), alignment: .topLeading),
@@ -287,17 +321,17 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private func redactionSection(_ pack: InvestigationContextPack) -> some View {
-        reviewSection(String(localized: "Redaction Manifest")) {
+        reviewSection(String(localized: "Redaction Manifest", bundle: RockxyLocalization.bundle)) {
             Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 9) {
                 GridRow {
                     manifestRow(
-                        String(localized: "Sensitive fields redacted"),
+                        String(localized: "Sensitive fields redacted", bundle: RockxyLocalization.bundle),
                         value: pack.manifest.redactedFieldCount,
                         systemImage: "checkmark.shield.fill",
                         color: .green
                     )
                     manifestRow(
-                        String(localized: "Payloads truncated"),
+                        String(localized: "Payloads truncated", bundle: RockxyLocalization.bundle),
                         value: pack.manifest.truncatedBodyCount,
                         systemImage: "scissors",
                         color: pack.manifest.truncatedBodyCount == 0 ? .secondary : .orange
@@ -305,13 +339,13 @@ struct DebugAssistantReviewDataSheet: View {
                 }
                 GridRow {
                     manifestRow(
-                        String(localized: "Binary payloads omitted"),
+                        String(localized: "Binary payloads omitted", bundle: RockxyLocalization.bundle),
                         value: pack.manifest.omittedBinaryBodyCount,
                         systemImage: "nosign",
                         color: pack.manifest.omittedBinaryBodyCount == 0 ? .secondary : .orange
                     )
                     manifestRow(
-                        String(localized: "Requests outside the bound"),
+                        String(localized: "Requests outside the bound", bundle: RockxyLocalization.bundle),
                         value: pack.manifest.omittedTransactionCount,
                         systemImage: "square.stack.3d.down.right",
                         color: pack.manifest.omittedTransactionCount == 0 ? .secondary : .orange
@@ -324,14 +358,17 @@ struct DebugAssistantReviewDataSheet: View {
     private func previewSection(_ pack: InvestigationContextPack) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text(String(localized: "Exact Reviewed Content"))
+                Text(String(localized: "Exact Reviewed Content", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .semibold))
                 Spacer()
                 let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
                 Text(
                     pack.manifest.omittedTransactionCount == 0
-                        ? String(localized: "\(pack.manifest.requestCount) requests")
-                        : String(localized: "\(pack.manifest.requestCount) of \(totalRequestCount) requests")
+                        ? String(localized: "\(pack.manifest.requestCount) requests", bundle: RockxyLocalization.bundle)
+                        : String(
+                            localized: "\(pack.manifest.requestCount) of \(totalRequestCount) requests",
+                            bundle: RockxyLocalization.bundle
+                        )
                 )
                 .font(toolMetrics.metadataFont())
                 .foregroundStyle(.secondary)
@@ -403,45 +440,57 @@ struct DebugAssistantReviewDataSheet: View {
         let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
         let countDescription = pack.manifest.omittedTransactionCount == 0
             ? pack.manifest.requestCount.formatted()
-            : String(localized: "\(pack.manifest.requestCount) of \(totalRequestCount)")
+            : String(
+                localized: "\(pack.manifest.requestCount) of \(totalRequestCount)",
+                bundle: RockxyLocalization.bundle
+            )
         return switch trafficScope {
         case .selectedOnly:
-            String(localized: "\(countDescription) selected request(s)")
+            String(localized: "\(countDescription) selected request(s)", bundle: RockxyLocalization.bundle)
         case .selectedAndRelated:
-            String(localized: "\(countDescription) selected and opted-in related request(s)")
+            String(
+                localized: "\(countDescription) selected and opted-in related request(s)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
     private func reviewDetails(_ pack: InvestigationContextPack) -> [ReviewDetail] {
         var details = [
             ReviewDetail(
-                title: String(localized: "Provider"),
-                value: configuration?.kind.title ?? String(localized: "Not configured")
+                title: String(localized: "Provider", bundle: RockxyLocalization.bundle),
+                value: configuration?.kind.title ?? String(
+                    localized: "Not configured",
+                    bundle: RockxyLocalization.bundle
+                )
             ),
             ReviewDetail(
-                title: String(localized: "Model"),
+                title: String(localized: "Model", bundle: RockxyLocalization.bundle),
                 value: configuration?.model ?? "—"
             ),
             ReviewDetail(
-                title: String(localized: "Destination"),
-                value: configuration?.baseURL ?? String(localized: "No outbound request")
+                title: String(localized: "Destination", bundle: RockxyLocalization.bundle),
+                value: configuration?.baseURL ?? String(
+                    localized: "No outbound request",
+                    bundle: RockxyLocalization.bundle
+                )
             ),
             ReviewDetail(
-                title: String(localized: "Scope"),
+                title: String(localized: "Scope", bundle: RockxyLocalization.bundle),
                 value: scopeDescription(pack)
             ),
             ReviewDetail(
-                title: String(localized: "Redaction"),
+                title: String(localized: "Redaction", bundle: RockxyLocalization.bundle),
                 value: configuration?.redactSensitiveData == true
-                    ? String(localized: "Enabled")
-                    : String(localized: "Unavailable")
+                    ? String(localized: "Enabled", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
             ),
             ReviewDetail(
-                title: String(localized: "Access"),
-                value: String(localized: "Read-only analysis")
+                title: String(localized: "Access", bundle: RockxyLocalization.bundle),
+                value: String(localized: "Read-only analysis", bundle: RockxyLocalization.bundle)
             ),
             ReviewDetail(
-                title: String(localized: "Reviewed Content Size"),
+                title: String(localized: "Reviewed Content Size", bundle: RockxyLocalization.bundle),
                 value: ByteCountFormatter.string(
                     fromByteCount: Int64(request?.reviewedContentBytes ?? pack.manifest.outboundBytes),
                     countStyle: .file
@@ -450,27 +499,27 @@ struct DebugAssistantReviewDataSheet: View {
         ]
         if let contextWindow = contextPlan?.contextWindowTokens {
             details.append(ReviewDetail(
-                title: String(localized: "Context Window"),
-                value: String(localized: "\(contextWindow.formatted()) tokens")
+                title: String(localized: "Context Window", bundle: RockxyLocalization.bundle),
+                value: String(localized: "\(contextWindow.formatted()) tokens", bundle: RockxyLocalization.bundle)
             ))
         }
         if let outputLimit = contextPlan?.maxOutputTokens {
             details.append(ReviewDetail(
-                title: String(localized: "Output Limit"),
-                value: String(localized: "\(outputLimit.formatted()) tokens")
+                title: String(localized: "Output Limit", bundle: RockxyLocalization.bundle),
+                value: String(localized: "\(outputLimit.formatted()) tokens", bundle: RockxyLocalization.bundle)
             ))
         }
         if !isLocalExecution {
             details.append(ReviewDetail(
-                title: String(localized: "Provider Storage"),
+                title: String(localized: "Provider Storage", bundle: RockxyLocalization.bundle),
                 value: configuration?.storeResponses == true
-                    ? String(localized: "Allowed")
-                    : String(localized: "Disabled where supported")
+                    ? String(localized: "Allowed", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Disabled where supported", bundle: RockxyLocalization.bundle)
             ))
         }
         if let region = configuration?.region, !region.isEmpty {
             details.append(ReviewDetail(
-                title: String(localized: "Platform / Region"),
+                title: String(localized: "Platform / Region", bundle: RockxyLocalization.bundle),
                 value: region
             ))
         }

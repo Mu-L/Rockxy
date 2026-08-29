@@ -16,7 +16,8 @@ enum MapLocalDraftBuilder {
                 $0.name.lowercased() == "content-type"
             }?.value,
             inferredExtension: MimeTypeResolver.inferExtension(from: transaction),
-            responseStatusCode: transaction.response?.statusCode
+            responseStatusCode: transaction.response?.statusCode,
+            responseHeaders: transaction.response?.headers ?? []
         )
     }
 

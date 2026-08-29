@@ -79,7 +79,7 @@ final class ScriptFolderStore {
 
     /// Create a new folder; appends it to root order at the end. Returns the new folder's id.
     @discardableResult
-    func createFolder(name: String = String(localized: "Untitled")) -> UUID {
+    func createFolder(name: String = String(localized: "Untitled", bundle: RockxyLocalization.bundle)) -> UUID {
         var next = index
         let folder = ScriptFolder(name: name)
         next.folders.append(folder)

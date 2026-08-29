@@ -35,14 +35,16 @@ final class DiffViewModel {
         case captured
         case text
 
+        // MARK: Internal
+
         var id: String {
             rawValue
         }
 
         var title: String {
             switch self {
-            case .captured: String(localized: "Captured")
-            case .text: String(localized: "Text")
+            case .captured: String(localized: "Captured", bundle: RockxyLocalization.bundle)
+            case .text: String(localized: "Text", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -52,14 +54,19 @@ final class DiffViewModel {
     var candidates: [HTTPTransaction] = []
     var leftTransaction: HTTPTransaction?
     var rightTransaction: HTTPTransaction?
+    var presentationMode: PresentationMode = .sideBySide
+    var textA: String = ""
+    var textB: String = ""
+    private(set) var isPresentingTextDiff = false
+    private(set) var activeDiffResult: DiffResult = .empty
+    private(set) var isComparing = false
+
     var compareTarget: CompareTarget = .request {
         didSet {
             scheduleComparison()
         }
     }
-    var presentationMode: PresentationMode = .sideBySide
-    var textA: String = ""
-    var textB: String = ""
+
     var workspaceMode: WorkspaceMode = .text {
         didSet {
             if workspaceMode == .text {
@@ -68,9 +75,6 @@ final class DiffViewModel {
             scheduleComparison()
         }
     }
-    private(set) var isPresentingTextDiff = false
-    private(set) var activeDiffResult: DiffResult = .empty
-    private(set) var isComparing = false
 
     var diffResult: DiffResult {
         workspaceMode == .captured ? activeDiffResult : .empty
@@ -248,8 +252,8 @@ final class DiffViewModel {
 
             guard let self,
                   !Task.isCancelled,
-                  comparisonGeneration == generation
-            else {
+                  comparisonGeneration == generation else
+            {
                 return
             }
             activeDiffResult = result
@@ -268,6 +272,8 @@ private enum DiffComparisonInput: Sendable {
     )
     case text(left: String, right: String)
 
+    // MARK: Internal
+
     func result() -> DiffResult {
         switch self {
         case let .transactions(left, right, target):
@@ -277,7 +283,7 @@ private enum DiffComparisonInput: Sendable {
             return DiffResult(
                 sections: [
                     DiffSection(
-                        title: String(localized: "Text"),
+                        title: String(localized: "Text", bundle: RockxyLocalization.bundle),
                         lines: lines
                     ),
                 ]

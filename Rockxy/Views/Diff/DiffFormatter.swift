@@ -10,11 +10,13 @@ enum CompareTarget: String, CaseIterable, Sendable {
     case response = "Response"
     case timing = "Timing"
 
+    // MARK: Internal
+
     var title: String {
         switch self {
-        case .request: String(localized: "Request")
-        case .response: String(localized: "Response")
-        case .timing: String(localized: "Timing")
+        case .request: String(localized: "Request", bundle: RockxyLocalization.bundle)
+        case .response: String(localized: "Response", bundle: RockxyLocalization.bundle)
+        case .timing: String(localized: "Timing", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -25,10 +27,12 @@ enum PresentationMode: String, CaseIterable, Sendable {
     case sideBySide = "Side by Side"
     case unified = "Unified"
 
+    // MARK: Internal
+
     var title: String {
         switch self {
-        case .sideBySide: String(localized: "Side by Side")
-        case .unified: String(localized: "Unified")
+        case .sideBySide: String(localized: "Side by Side", bundle: RockxyLocalization.bundle)
+        case .unified: String(localized: "Unified", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -36,10 +40,7 @@ enum PresentationMode: String, CaseIterable, Sendable {
 // MARK: - DiffTransactionSnapshot
 
 struct DiffTransactionSnapshot: Sendable {
-    let request: HTTPRequestData
-    let response: HTTPResponseData?
-    let timingInfo: TimingInfo?
-    let measuredDuration: TimeInterval?
+    // MARK: Lifecycle
 
     init(transaction: HTTPTransaction) {
         request = transaction.request
@@ -47,6 +48,13 @@ struct DiffTransactionSnapshot: Sendable {
         timingInfo = transaction.timingInfo
         measuredDuration = transaction.measuredDuration
     }
+
+    // MARK: Internal
+
+    let request: HTTPRequestData
+    let response: HTTPResponseData?
+    let timingInfo: TimingInfo?
+    let measuredDuration: TimeInterval?
 }
 
 // MARK: - DiffFormatter
@@ -111,6 +119,14 @@ enum DiffFormatter {
 
     // MARK: Private
 
+    // MARK: - Body Formatting
+
+    private static var captureTruncationNotice: String {
+        String(
+            localized: "Capture truncated — comparison covers captured bytes only.", bundle: RockxyLocalization.bundle
+        )
+    }
+
     // MARK: - Request Formatting
 
     private static func formatRequest(_ transaction: DiffTransactionSnapshot) -> [(String, String)] {
@@ -118,13 +134,13 @@ enum DiffFormatter {
 
         // Request line
         sections.append((
-            String(localized: "Request Line"),
+            String(localized: "Request Line", bundle: RockxyLocalization.bundle),
             "\(transaction.request.method) \(transaction.request.url.path) \(normalizeHTTPVersion(transaction.request.httpVersion))"
         ))
 
         // Host
         sections.append((
-            String(localized: "Host"),
+            String(localized: "Host", bundle: RockxyLocalization.bundle),
             transaction.request.url.host ?? "—"
         ))
 
@@ -133,11 +149,11 @@ enum DiffFormatter {
             .queryItems ?? []
         if !queryItems.isEmpty {
             let queryText = queryItems.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "\n")
-            sections.append((String(localized: "Query"), queryText))
+            sections.append((String(localized: "Query", bundle: RockxyLocalization.bundle), queryText))
         } else {
             sections.append((
-                String(localized: "Query"),
-                String(localized: "(no query parameters)")
+                String(localized: "Query", bundle: RockxyLocalization.bundle),
+                String(localized: "(no query parameters)", bundle: RockxyLocalization.bundle)
             ))
         }
 
@@ -146,20 +162,20 @@ enum DiffFormatter {
             .map { "\($0.name): \($0.value)" }
             .joined(separator: "\n")
         sections.append((
-            String(localized: "Headers"),
-            headersText.isEmpty ? String(localized: "(no headers)") : headersText
+            String(localized: "Headers", bundle: RockxyLocalization.bundle),
+            headersText.isEmpty ? String(localized: "(no headers)", bundle: RockxyLocalization.bundle) : headersText
         ))
 
         // Request body
         if let body = transaction.request.body {
             sections.append((
-                String(localized: "Body"),
+                String(localized: "Body", bundle: RockxyLocalization.bundle),
                 formatBody(body, contentType: transaction.request.contentType?.rawValue)
             ))
         } else {
             sections.append((
-                String(localized: "Body"),
-                String(localized: "No request body")
+                String(localized: "Body", bundle: RockxyLocalization.bundle),
+                String(localized: "No request body", bundle: RockxyLocalization.bundle)
             ))
         }
 
@@ -173,15 +189,24 @@ enum DiffFormatter {
 
         guard let response = transaction.response else {
             return [
-                (String(localized: "Status Line"), String(localized: "No response")),
-                (String(localized: "Headers"), String(localized: "(no headers)")),
-                (String(localized: "Body"), String(localized: "No response body")),
+                (
+                    String(localized: "Status Line", bundle: RockxyLocalization.bundle),
+                    String(localized: "No response", bundle: RockxyLocalization.bundle)
+                ),
+                (
+                    String(localized: "Headers", bundle: RockxyLocalization.bundle),
+                    String(localized: "(no headers)", bundle: RockxyLocalization.bundle)
+                ),
+                (
+                    String(localized: "Body", bundle: RockxyLocalization.bundle),
+                    String(localized: "No response body", bundle: RockxyLocalization.bundle)
+                ),
             ]
         }
 
         // Status line
         sections.append((
-            String(localized: "Status Line"),
+            String(localized: "Status Line", bundle: RockxyLocalization.bundle),
             "HTTP/1.1 \(response.statusCode) \(response.statusMessage)"
         ))
 
@@ -190,15 +215,15 @@ enum DiffFormatter {
             .map { "\($0.name): \($0.value)" }
             .joined(separator: "\n")
         sections.append((
-            String(localized: "Headers"),
-            headersText.isEmpty ? String(localized: "(no headers)") : headersText
+            String(localized: "Headers", bundle: RockxyLocalization.bundle),
+            headersText.isEmpty ? String(localized: "(no headers)", bundle: RockxyLocalization.bundle) : headersText
         ))
 
         // Response body
         if let body = response.body {
             let contentType = response.headers.first { $0.name.lowercased() == "content-type" }?.value
             sections.append((
-                String(localized: "Body"),
+                String(localized: "Body", bundle: RockxyLocalization.bundle),
                 formatBody(
                     body,
                     contentType: contentType,
@@ -207,9 +232,9 @@ enum DiffFormatter {
             ))
         } else {
             let bodyText = response.bodyTruncated
-                ? "\(String(localized: "No response body"))\n\(captureTruncationNotice)"
-                : String(localized: "No response body")
-            sections.append((String(localized: "Body"), bodyText))
+                ? "\(String(localized: "No response body", bundle: RockxyLocalization.bundle))\n\(captureTruncationNotice)"
+                : String(localized: "No response body", bundle: RockxyLocalization.bundle)
+            sections.append((String(localized: "Body", bundle: RockxyLocalization.bundle), bodyText))
         }
 
         return sections
@@ -221,40 +246,39 @@ enum DiffFormatter {
         guard let timing = transaction.timingInfo else {
             if let measuredDuration = transaction.measuredDuration {
                 return [(
-                    String(localized: "Timing"),
-                    "\(String(localized: "Total measured duration")): \(formatMs(measuredDuration))\n"
-                        + String(localized: "Detailed phase timing unavailable")
+                    String(localized: "Timing", bundle: RockxyLocalization.bundle),
+                    "\(String(localized: "Total measured duration", bundle: RockxyLocalization.bundle)): \(formatMs(measuredDuration))\n"
+                        + String(localized: "Detailed phase timing unavailable", bundle: RockxyLocalization.bundle)
                 )]
             }
             return [(
-                String(localized: "Timing"),
-                String(localized: "No timing data")
+                String(localized: "Timing", bundle: RockxyLocalization.bundle),
+                String(localized: "No timing data", bundle: RockxyLocalization.bundle)
             )]
         }
 
         let content = """
-        \(String(localized: "DNS Lookup")): \(formatMs(timing.dnsLookup))
-        \(String(localized: "TCP Connection")): \(formatMs(timing.tcpConnection))
-        \(String(localized: "TLS Handshake")): \(formatMs(timing.tlsHandshake))
-        \(String(localized: "Time to First Byte")): \(formatMs(timing.timeToFirstByte))
-        \(String(localized: "Content Transfer")): \(formatMs(timing.contentTransfer))
-        \(String(localized: "Total")): \(formatMs(timing.totalDuration))
+        \(String(localized: "DNS Lookup", bundle: RockxyLocalization.bundle)): \(formatMs(timing.dnsLookup))
+        \(String(localized: "TCP Connection", bundle: RockxyLocalization.bundle)): \(formatMs(timing.tcpConnection))
+        \(String(localized: "TLS Handshake", bundle: RockxyLocalization.bundle)): \(formatMs(timing.tlsHandshake))
+        \(String(
+            localized: "Time to First Byte",
+            bundle: RockxyLocalization.bundle
+        )): \(formatMs(timing.timeToFirstByte))
+        \(String(localized: "Content Transfer", bundle: RockxyLocalization.bundle)): \(formatMs(timing.contentTransfer))
+        \(String(localized: "Total", bundle: RockxyLocalization.bundle)): \(formatMs(timing.totalDuration))
         """
 
-        return [(String(localized: "Timing"), content)]
+        return [(String(localized: "Timing", bundle: RockxyLocalization.bundle), content)]
     }
-
-    // MARK: - Body Formatting
-
-    private static let captureTruncationNotice = String(
-        localized: "Capture truncated — comparison covers captured bytes only."
-    )
 
     private static func formatBody(
         _ data: Data,
         contentType: String?,
         captureWasTruncated: Bool = false
-    ) -> String {
+    )
+        -> String
+    {
         let bodyIsLimited = data.count > maximumBodyPreviewBytes
         let previewData = validUTF8Prefix(of: data, limit: maximumBodyPreviewBytes)
         let shouldTreatAsBinary = isBinaryContentType(contentType)
@@ -278,18 +302,17 @@ enum DiffFormatter {
         }
 
         // Try JSON pretty-print
-        let renderedText: String
-        if !bodyIsLimited,
-           let jsonObject = try? JSONSerialization.jsonObject(with: previewData),
-           let prettyData = try? JSONSerialization.data(
-               withJSONObject: jsonObject,
-               options: [.prettyPrinted, .sortedKeys]
-           ),
-           let prettyText = String(data: prettyData, encoding: .utf8)
+        let renderedText: String = if !bodyIsLimited,
+                                      let jsonObject = try? JSONSerialization.jsonObject(with: previewData),
+                                      let prettyData = try? JSONSerialization.data(
+                                          withJSONObject: jsonObject,
+                                          options: [.prettyPrinted, .sortedKeys]
+                                      ),
+                                      let prettyText = String(data: prettyData, encoding: .utf8)
         {
-            renderedText = prettyText
+            prettyText
         } else {
-            renderedText = text
+            text
         }
 
         var lines = [renderedText]
@@ -297,11 +320,12 @@ enum DiffFormatter {
             lines.append(
                 String(
                     localized:
-                    "Body preview limited to \(previewData.count) of \(data.count) captured bytes."
+                    "Body preview limited to \(previewData.count) of \(data.count) captured bytes.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             lines.append(
-                "\(String(localized: "SHA-256 (all captured bytes)")): \(sha256(data))"
+                "\(String(localized: "SHA-256 (all captured bytes)", bundle: RockxyLocalization.bundle)): \(sha256(data))"
             )
         }
         if captureWasTruncated {
@@ -340,12 +364,14 @@ enum DiffFormatter {
         _ data: Data,
         contentType: String?,
         captureWasTruncated: Bool
-    ) -> String {
+    )
+        -> String
+    {
         var lines = [
-            String(localized: "Binary body"),
-            "\(String(localized: "Size")): \(data.count) \(String(localized: "bytes"))",
-            "\(String(localized: "Content-Type")): \(contentType ?? String(localized: "unknown"))",
-            "\(String(localized: "SHA-256 (captured bytes)")): \(sha256(data))",
+            String(localized: "Binary body", bundle: RockxyLocalization.bundle),
+            "\(String(localized: "Size", bundle: RockxyLocalization.bundle)): \(data.count) \(String(localized: "bytes", bundle: RockxyLocalization.bundle))",
+            "\(String(localized: "Content-Type", bundle: RockxyLocalization.bundle)): \(contentType ?? String(localized: "unknown", bundle: RockxyLocalization.bundle))",
+            "\(String(localized: "SHA-256 (captured bytes)", bundle: RockxyLocalization.bundle)): \(sha256(data))",
         ]
         if captureWasTruncated {
             lines.append(captureTruncationNotice)

@@ -11,19 +11,19 @@ struct MCPSettingsTab: View {
 
     var body: some View {
         SettingsPane {
-            SettingsSection(String(localized: "MCP Server")) {
+            SettingsSection(String(localized: "MCP Server", bundle: RockxyLocalization.bundle)) {
                 mcpServerSection
             }
 
-            SettingsSection(String(localized: "Client Configuration")) {
+            SettingsSection(String(localized: "Client Configuration", bundle: RockxyLocalization.bundle)) {
                 mcpConfigurationSection
             }
 
-            SettingsSection(String(localized: "Privacy")) {
+            SettingsSection(String(localized: "Privacy", bundle: RockxyLocalization.bundle)) {
                 privacySection
             }
 
-            SettingsSection(String(localized: "About MCP")) {
+            SettingsSection(String(localized: "About MCP", bundle: RockxyLocalization.bundle)) {
                 aboutSection
             }
         }
@@ -98,14 +98,15 @@ struct MCPSettingsTab: View {
     private var mcpServerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(
-                String(localized: "Enable MCP Server"),
+                String(localized: "Enable MCP Server", bundle: RockxyLocalization.bundle),
                 isOn: $mcpEnabled
             )
             .toggleStyle(.checkbox)
 
             Text(
                 String(
-                    localized: "Start a local HTTP server for Model Context Protocol (MCP) communication with compatible tools."
+                    localized: "Start a local HTTP server for Model Context Protocol (MCP) communication with compatible tools.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(settingsMetrics.secondaryFont())
@@ -117,7 +118,7 @@ struct MCPSettingsTab: View {
                     Circle()
                         .fill(.green)
                         .frame(width: 10, height: 10)
-                    Text(String(localized: "Running on port \(port)"))
+                    Text(String(localized: "Running on port \(port)", bundle: RockxyLocalization.bundle))
                         .font(settingsMetrics.secondaryFont(weight: .medium))
                         .foregroundStyle(.green)
                 }
@@ -144,10 +145,13 @@ struct MCPSettingsTab: View {
     private var mcpConfigurationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(String(localized: "Copy this JSON into a compatible client's MCP configuration."))
-                    .font(settingsMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Copy this JSON into a compatible client's MCP configuration.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(settingsMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button {
                     copyConfigToClipboard()
@@ -155,7 +159,7 @@ struct MCPSettingsTab: View {
                     HStack(spacing: 6) {
                         Image(systemName: "doc.on.doc")
                             .font(settingsMetrics.metadataFont())
-                        Text(String(localized: "Copy"))
+                        Text(String(localized: "Copy", bundle: RockxyLocalization.bundle))
                             .font(settingsMetrics.secondaryFont(weight: .medium))
                     }
                 }
@@ -184,14 +188,15 @@ struct MCPSettingsTab: View {
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle(
-                String(localized: "Redact Sensitive Data Before Sending to AI"),
+                String(localized: "Redact Sensitive Data Before Sending to AI", bundle: RockxyLocalization.bundle),
                 isOn: $mcpRedactSensitiveData
             )
             .toggleStyle(.checkbox)
 
             Text(
                 String(
-                    localized: "Automatically redact sensitive information before sending to MCP clients."
+                    localized: "Automatically redact sensitive information before sending to MCP clients.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(settingsMetrics.secondaryFont())
@@ -210,7 +215,7 @@ struct MCPSettingsTab: View {
                     MCP (Model Context Protocol) allows compatible tools to interact with \
                     Rockxy. The AI can read captured HTTP traffic, inspect request and \
                     response details, export requests as cURL, and view proxy rules and status.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(settingsMetrics.secondaryFont())

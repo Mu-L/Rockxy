@@ -138,6 +138,23 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     private var requestCaptureContext: TrafficCaptureContext?
     private var requestBodyLimitState = RequestBodyLimitState()
 
+    /// Builds an `HTTPResponseData` from a resolved Map Local payload, deriving the standard
+    /// reason phrase when the payload did not carry one. Shared with the single-file and
+    /// directory serving paths so HTTP and HTTPS stay structurally identical.
+    nonisolated private static func mapLocalResponse(
+        from payload: MapLocalResponseResolver.Payload
+    )
+        -> HTTPResponseData
+    {
+        let message = payload.statusMessage ?? HTTPResponseStatus(statusCode: payload.statusCode).reasonPhrase
+        return HTTPResponseData(
+            statusCode: payload.statusCode,
+            statusMessage: message,
+            headers: payload.headers,
+            body: payload.body
+        )
+    }
+
     nonisolated private func makeTransactionCallback(
         for matchedRule: ProxyRule?
     )
@@ -206,7 +223,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                     graphQLInfo: graphQLInfo,
                     startTime: startTime,
                     callback: self.makeTransactionCallback(for: breakpointRule),
-                    urlPattern: breakpointRule.matchCondition.urlPattern
+                    matchContext: MapLocalMatchContext(matchCondition: breakpointRule.matchCondition)
                 )
                 return
             }
@@ -220,7 +237,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                     graphQLInfo: graphQLInfo,
                     startTime: startTime,
                     callback: matchedRuleCallback,
-                    urlPattern: matchedRule.matchCondition.urlPattern
+                    matchContext: MapLocalMatchContext(matchCondition: matchedRule.matchCondition)
                 )
                 return
             }
@@ -468,7 +485,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         graphQLInfo: GraphQLInfo?,
         startTime: DispatchTime,
         callback: @escaping @Sendable (HTTPTransaction) -> Void,
-        urlPattern: String? = nil
+        matchContext: MapLocalMatchContext? = nil
     ) {
         switch action {
         case let .block(statusCode):
@@ -479,7 +496,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 callback: callback
             )
 
-        case let .mapLocal(filePath, statusCode, isDirectory, delayMs):
+        case let .mapLocal(filePath, statusCode, isDirectory, delayMs, responseHeaders):
             let performMapLocal = { [weak self] in
                 guard let self else {
                     return
@@ -487,18 +504,26 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 if isDirectory {
                     self.handleMapLocalDirectory(
                         context: context,
+                        head: head,
                         directoryPath: filePath,
                         statusCode: statusCode,
+                        responseHeaders: responseHeaders,
                         requestData: requestData,
+                        graphQLInfo: graphQLInfo,
+                        startTime: startTime,
                         callback: callback,
-                        urlPattern: urlPattern ?? ""
+                        matchContext: matchContext ?? MapLocalMatchContext(matchCondition: RuleMatchCondition())
                     )
                 } else {
                     self.handleMapLocal(
                         context: context,
+                        head: head,
                         filePath: filePath,
                         statusCode: statusCode,
+                        responseHeaders: responseHeaders,
                         requestData: requestData,
+                        graphQLInfo: graphQLInfo,
+                        startTime: startTime,
                         callback: callback
                     )
                 }
@@ -638,65 +663,113 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
 
     nonisolated private func handleMapLocal(
         context: ChannelHandlerContext,
+        head: HTTPRequestHead,
         filePath: String,
         statusCode: Int,
+        responseHeaders: [HTTPHeader],
         requestData: HTTPRequestData,
+        graphQLInfo: GraphQLInfo?,
+        startTime: DispatchTime,
         callback: @escaping @Sendable (HTTPTransaction) -> Void
     ) {
         guard let data = MapLocalFileValidator.loadFileData(at: filePath) else {
-            httpsRelayLogger.error("Map local file rejected or not found: \(filePath)")
-            sendBlockResponse(context: context, status: 404, requestData: requestData, callback: callback)
+            // Missing / unreadable / oversized target — serve the origin instead of a
+            // synthesized 404 so a broken mapping degrades to normal traffic.
+            httpsRelayLogger.info("Map local file unavailable, falling back to origin")
+            connectToUpstream(
+                context: context,
+                head: head,
+                requestData: requestData,
+                graphQLInfo: graphQLInfo,
+                startTime: startTime,
+                callback: callback
+            )
             return
         }
 
-        let status = HTTPResponseStatus(statusCode: statusCode)
-        let mimeType = MimeTypeResolver.mimeType(for: filePath)
-        let responseData = HTTPResponseData(
-            statusCode: statusCode,
-            statusMessage: status.reasonPhrase,
-            headers: [
-                HTTPHeader(name: "Content-Length", value: "\(data.count)"),
-                HTTPHeader(name: "Content-Type", value: mimeType),
-            ],
-            body: data
+        let outcome = MapLocalResponseResolver.resolve(
+            fileData: data,
+            actionStatusCode: statusCode,
+            configuredHeaders: responseHeaders,
+            inferredContentType: MimeTypeResolver.mimeType(for: filePath)
         )
-        sendMappedResponse(context: context, responseData: responseData, requestData: requestData, callback: callback)
+        switch outcome {
+        case let .serve(payload):
+            sendMappedResponse(
+                context: context,
+                responseData: Self.mapLocalResponse(from: payload),
+                requestData: requestData,
+                callback: callback
+            )
+        case .fallbackToOrigin:
+            // Invalid status or a malformed HTTP-message-looking file — forward the origin.
+            httpsRelayLogger.info("Map local response invalid, falling back to origin")
+            connectToUpstream(
+                context: context,
+                head: head,
+                requestData: requestData,
+                graphQLInfo: graphQLInfo,
+                startTime: startTime,
+                callback: callback
+            )
+        }
     }
 
     nonisolated private func handleMapLocalDirectory(
         context: ChannelHandlerContext,
+        head: HTTPRequestHead,
         directoryPath: String,
         statusCode: Int,
+        responseHeaders: [HTTPHeader],
         requestData: HTTPRequestData,
+        graphQLInfo: GraphQLInfo?,
+        startTime: DispatchTime,
         callback: @escaping @Sendable (HTTPTransaction) -> Void,
-        urlPattern: String
+        matchContext: MapLocalMatchContext
     ) {
-        let requestPath = requestData.url.path
         let result = MapLocalDirectoryResolver.resolve(
-            requestPath: requestPath,
-            urlPattern: urlPattern,
+            requestURL: requestData.url.absoluteString,
+            matchContext: matchContext,
             directoryPath: directoryPath
         )
         switch result {
         case let .success(file):
-            let status = HTTPResponseStatus(statusCode: statusCode)
-            let responseData = HTTPResponseData(
-                statusCode: statusCode,
-                statusMessage: status.reasonPhrase,
-                headers: [
-                    HTTPHeader(name: "Content-Length", value: "\(file.data.count)"),
-                    HTTPHeader(name: "Content-Type", value: file.mimeType),
-                ],
-                body: file.data
+            let outcome = MapLocalResponseResolver.resolve(
+                fileData: file.data,
+                actionStatusCode: statusCode,
+                configuredHeaders: responseHeaders,
+                inferredContentType: file.mimeType
             )
-            sendMappedResponse(
+            switch outcome {
+            case let .serve(payload):
+                sendMappedResponse(
+                    context: context,
+                    responseData: Self.mapLocalResponse(from: payload),
+                    requestData: requestData,
+                    callback: callback
+                )
+            case .fallbackToOrigin:
+                httpsRelayLogger.info("Map local directory response invalid, falling back to origin")
+                connectToUpstream(
+                    context: context,
+                    head: head,
+                    requestData: requestData,
+                    graphQLInfo: graphQLInfo,
+                    startTime: startTime,
+                    callback: callback
+                )
+            }
+        case .failure:
+            // Unresolved / invalid target — fall back to the origin request.
+            httpsRelayLogger.info("Map local directory unresolved, falling back to origin")
+            connectToUpstream(
                 context: context,
-                responseData: responseData,
+                head: head,
                 requestData: requestData,
+                graphQLInfo: graphQLInfo,
+                startTime: startTime,
                 callback: callback
             )
-        case .failure:
-            sendBlockResponse(context: context, status: 404, requestData: requestData, callback: callback)
         }
     }
 

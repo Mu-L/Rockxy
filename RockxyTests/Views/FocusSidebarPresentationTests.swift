@@ -11,11 +11,43 @@ struct FocusSidebarPresentationTests {
     func focusSectionActionsUseVisibleNativeButtons() throws {
         let source = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")
 
-        #expect(source.contains("actionLabel: String(localized: \"Create Focus Set\")"))
-        #expect(source.contains("actionLabel: String(localized: \"Configure Noise Control\")"))
+        #expect(source
+            .contains("actionLabel: String(localized: \"Create Focus Set\", bundle: RockxyLocalization.bundle)"))
+        #expect(source
+            .contains("actionLabel: String(localized: \"Configure Noise Control\", bundle: RockxyLocalization.bundle)"))
         #expect(source.contains(".rockxyGlassButtonStyle()"))
         #expect(source.contains(".controlSize(.small)"))
         #expect(source.contains(".accessibilityLabel(actionLabel)"))
+    }
+
+    @Test("Focus and Noise sheets use Rockxy's native glass hierarchy")
+    func focusSheetsUseNativeGlassHierarchy() throws {
+        let focus = try readProjectFile("Rockxy/Views/Sidebar/FocusSetEditorSheet.swift")
+        let noise = try readProjectFile("Rockxy/Views/Sidebar/NoiseControlManagerSheet.swift")
+
+        #expect(focus.components(separatedBy: ".rockxyFunctionalBar()").count == 3)
+        #expect(noise.components(separatedBy: ".rockxyFunctionalBar()").count == 3)
+        #expect(focus.contains(".rockxyGlassButtonStyle(prominent: true)"))
+        #expect(noise.contains(".rockxyGlassButtonStyle(prominent: true)"))
+        #expect(noise.contains("Table(filteredSources)"))
+        #expect(noise.contains("Color(nsColor: .textBackgroundColor)"))
+        #expect(!focus.contains("controlBackgroundColor).opacity(0.55)"))
+        #expect(!noise.contains("controlBackgroundColor).opacity(0.55)"))
+        #expect(!focus.contains("Image(systemName: \"scope\")"))
+        #expect(!noise.contains("Image(systemName: \"eye.slash\")\n                .font(.title2)"))
+    }
+
+    @Test("Focus and Noise sheet copy matches Project and Traffic Tab ownership")
+    func focusSheetsUseCurrentProductTerminology() throws {
+        let focus = try readProjectFile("Rockxy/Views/Sidebar/FocusSetEditorSheet.swift")
+        let noise = try readProjectFile("Rockxy/Views/Sidebar/NoiseControlManagerSheet.swift")
+
+        #expect(focus.contains("Focus Sets are available in every Project"))
+        #expect(focus.contains("current Traffic Tab"))
+        #expect(noise.contains("current Traffic Tab"))
+        #expect(noise.contains("no requests are deleted"))
+        #expect(noise.contains("regardless of the active Focus Set"))
+        #expect(!noise.contains("this workspace"))
     }
 
     @Test("Browse reveals captured apps and domains without extra disclosure clicks")
@@ -44,7 +76,10 @@ struct FocusSidebarPresentationTests {
         #expect(source.contains("NSSearchField()"))
         #expect(source.contains("searchField.sendsSearchStringImmediately = true"))
         #expect(source.contains("func controlTextDidChange"))
-        #expect(source.contains("searchField.placeholderString = String(localized: \"Filter\")"))
+        #expect(source
+            .contains(
+                "searchField.placeholderString = String(localized: \"Filter\", bundle: RockxyLocalization.bundle)"
+            ))
         #expect(source.contains("systemSymbolName: \"line.3.horizontal.decrease.circle\""))
         #expect(source.contains(".frame(maxWidth: .infinity, minHeight: 28)"))
         #expect(!source.contains("TextField("))

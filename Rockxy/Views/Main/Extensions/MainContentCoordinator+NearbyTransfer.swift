@@ -18,7 +18,8 @@ extension MainContentCoordinator {
         let workspaceTitle = String(session.metadata.title.prefix(80))
         let destinationWorkspace: WorkspaceState = if workspaceStore.canCreateWorkspace {
             workspaceStore.createWorkspace(
-                title: workspaceTitle.isEmpty ? String(localized: "Rockxy iOS") : workspaceTitle
+                title: workspaceTitle
+                    .isEmpty ? String(localized: "Rockxy iOS", bundle: RockxyLocalization.bundle) : workspaceTitle
             )
         } else {
             activeWorkspace
@@ -60,7 +61,10 @@ extension MainContentCoordinator {
         sessionProvenanceByProjectID[projectStore.activeProjectID] = sessionProvenance
         activeToast = ToastMessage(
             style: .success,
-            text: String(localized: "Added \(importedTransactions.count) iOS requests from \(safeDeviceName)")
+            text: String(
+                localized: "Added \(importedTransactions.count) iOS requests from \(safeDeviceName)",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 

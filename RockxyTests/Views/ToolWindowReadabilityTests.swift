@@ -124,7 +124,8 @@ struct ToolWindowReadabilityTests {
         let sceneSource = try readProjectFile("Rockxy/Views/Settings/SettingsWindowScene.swift")
         #expect(appSource.contains("SettingsWindowScene()"))
         #expect(sceneSource.contains("struct SettingsWindowScene: Scene"))
-        #expect(sceneSource.contains("Window(String(localized: \"Settings\"), id: \"settings\")"))
+        #expect(sceneSource
+            .contains("Window(String(localized: \"Settings\", bundle: RockxyLocalization.bundle), id: \"settings\")"))
         #expect(
             sceneSource.contains("AppUIDisplayMetricsProvider {\n                SettingsView()"),
             "Settings window must inherit Appearance display metrics"
@@ -178,11 +179,16 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("ContentUnavailableView"))
         #expect(source.contains("InvestigationReportView("))
         #expect(source.contains("Image(systemName: \"arrow.up\")"))
-        #expect(source.contains("accessibilityLabel(String(localized: \"Conversation History\"))"))
-        #expect(source.contains("accessibilityLabel(String(localized: \"New Conversation\"))"))
-        #expect(source.contains("accessibilityLabel(String(localized: \"Send Message\"))"))
-        #expect(components.contains("String(localized: \"Copy\")"))
-        #expect(components.contains("String(localized: \"Review & Retry\")"))
+        #expect(source
+            .contains(
+                "accessibilityLabel(String(localized: \"Conversation History\", bundle: RockxyLocalization.bundle))"
+            ))
+        #expect(source
+            .contains("accessibilityLabel(String(localized: \"New Conversation\", bundle: RockxyLocalization.bundle))"))
+        #expect(source
+            .contains("accessibilityLabel(String(localized: \"Send Message\", bundle: RockxyLocalization.bundle))"))
+        #expect(components.contains("String(localized: \"Copy\", bundle: RockxyLocalization.bundle)"))
+        #expect(components.contains("String(localized: \"Review & Retry\", bundle: RockxyLocalization.bundle)"))
         // The generic response footer is two quiet affordances only: a Copy control and one ellipsis
         // overflow menu. Controls keep accessibility labels/help. Card/identity chrome removal and the
         // plain right-aligned user bubble are asserted in detail by ContextDockPresentationTests.
@@ -201,7 +207,7 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains("Waiting for traffic context"))
         #expect(!source.contains("Searches conversation titles and message text"))
         #expect(!source.contains("Local review before send"))
-        #expect(!source.contains("Text(String(localized: \"Rockxy AI Assistant\"))"))
+        #expect(!source.contains("Text(String(localized: \"Rockxy AI Assistant\", bundle: RockxyLocalization.bundle))"))
     }
 
     @Test("Assistant Review Data uses shared tool-window typography and a native preview editor")
@@ -234,8 +240,9 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("Download & Use"))
         #expect(source.contains("Global Default"))
         #expect(source.contains("Image(systemName: \"arrow.clockwise\")"))
-        #expect(source.contains("accessibilityLabel(String(localized: \"Refresh Available Models\"))"))
-        #expect(!source.contains("Button(String(localized: \"Fetch Models\"))"))
+        #expect(source.contains(".accessibilityLabel(String("))
+        #expect(source.contains("localized: \"Refresh Available Models\""))
+        #expect(!source.contains("Button(String(localized: \"Fetch Models\", bundle: RockxyLocalization.bundle))"))
         #expect(!source.contains("LazyVGrid("))
         #expect(components.contains("SettingsDisplayMetrics"))
         // Settings sections share Developer Setup's flat hierarchy and rows
@@ -257,8 +264,8 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("NSPathControl"))
         #expect(source.contains("fontSize: settingsMetrics.bodyFontSize"))
         #expect(source.contains("control.font = .systemFont(ofSize: fontSize)"))
-        #expect(source.contains("Text(String(localized: \"Install Ollama\"))"))
-        #expect(source.contains("Button(String(localized: \"Install\"))"))
+        #expect(source.contains("Text(String(localized: \"Install Ollama\", bundle: RockxyLocalization.bundle))"))
+        #expect(source.contains("Button(String(localized: \"Install\", bundle: RockxyLocalization.bundle))"))
         #expect(source.contains(".keyboardShortcut(.cancelAction)"))
         #expect(source.contains("The developer signature and Gatekeeper approval are checked before installation."))
         #expect(!source.contains("Set Up Ollama on This Mac"))
@@ -302,8 +309,8 @@ struct ToolWindowReadabilityTests {
         ]
 
         for id in windowIDs {
-            #expect(source.contains(#"id: "\#(id)") {"#), "Missing window id \(id)")
-            let idRange = try #require(source.range(of: #"id: "\#(id)") {"#))
+            #expect(source.contains(#"id: "\#(id)""#), "Missing window id \(id)")
+            let idRange = try #require(source.range(of: #"id: "\#(id)""#))
             let remaining = source[idRange.upperBound...]
             let providerRange = remaining.range(of: "ToolWindowDisplayMetricsProvider")
             #expect(providerRange != nil, "Window \(id) must use ToolWindowDisplayMetricsProvider")
@@ -323,11 +330,14 @@ struct ToolWindowReadabilityTests {
         let contextSource = try readProjectFile("Rockxy/Views/Inspector/ContextDetailsView.swift")
 
         let diffSceneStart = try #require(
-            appSource.range(of: "Window(String(localized: \"Diff\"), id: \"diff\")")
+            appSource.range(of: "Window(String(localized: \"Diff\", bundle: RockxyLocalization.bundle), id: \"diff\")")
         )
         let scenesAfterDiff = appSource[diffSceneStart.lowerBound...]
         let nextSceneStart = try #require(
-            scenesAfterDiff.range(of: "Window(String(localized: \"Scripting\"), id: \"scriptingList\")")
+            scenesAfterDiff
+                .range(
+                    of: "Window(String(localized: \"Scripting\", bundle: RockxyLocalization.bundle), id: \"scriptingList\")"
+                )
         )
         let diffSceneSource = scenesAfterDiff[..<nextSceneStart.lowerBound]
         #expect(diffSceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
@@ -358,6 +368,10 @@ struct ToolWindowReadabilityTests {
 
         #expect(viewerSource.contains("GeometryReader"))
         #expect(viewerSource.contains("ScrollView([.horizontal, .vertical])"))
+        #expect(viewerSource.contains("ScrollView(.vertical)"))
+        #expect(viewerSource.contains(".fixedSize(horizontal: false, vertical: true)"))
+        #expect(viewerSource.contains(".frame(width: paneWidth, alignment: .leading)"))
+        #expect(viewerSource.contains(".fixedSize(horizontal: allowsHorizontalOverflow, vertical: false)"))
         #expect(viewerSource.contains("case .textReady"))
         #expect(viewerSource.contains("comparisonContent(showsIdentity: false)"))
         #expect(viewerSource.contains("Left text"))
@@ -398,7 +412,8 @@ struct ToolWindowReadabilityTests {
         #expect(windowSource.contains(#".keyboardShortcut(".", modifiers: .command)"#))
         #expect(windowSource.contains("viewModel.url.isEmpty || viewModel.isUnsupportedForReplay"))
         #expect(windowSource.contains(".disabled(isSending)"))
-        #expect(windowSource.contains(#"isSending ? String(localized: "⌘. Cancel")"#))
+        #expect(windowSource
+            .contains(#"isSending ? String(localized: "⌘. Cancel", bundle: RockxyLocalization.bundle)"#))
         #expect(!windowSource.contains(#""TRACE", "CONNECT""#))
 
         // Preserved shortcuts: Send, Cancel, Template, History, Focus URL, Reset.
@@ -686,7 +701,7 @@ struct ToolWindowReadabilityTests {
         #expect(appSource.contains(#"id: "socksProxySettings""#))
 
         let proxyMenuStart = try #require(
-            appSource.range(of: #"Menu(String(localized: "Proxy Settings"))"#)
+            appSource.range(of: #"Menu(String(localized: "Proxy Settings", bundle: RockxyLocalization.bundle))"#)
         )
         let appAfterProxyMenu = appSource[proxyMenuStart.lowerBound...]
         let proxyMenuEnd = try #require(
@@ -707,8 +722,10 @@ struct ToolWindowReadabilityTests {
         #expect(externalSource.contains("Rockxy connects to those destinations directly"))
         #expect(externalSource.contains("private var footerActions: some View"))
         #expect(externalSource.contains("HStack(spacing: Theme.Layout.controlSpacing)"))
-        #expect(externalSource.contains("footerButtonLabel(String(localized: \"Cancel\"))"))
-        #expect(externalSource.contains("footerButtonLabel(String(localized: \"Apply\"))"))
+        #expect(externalSource
+            .contains("footerButtonLabel(String(localized: \"Cancel\", bundle: RockxyLocalization.bundle))"))
+        #expect(externalSource
+            .contains("footerButtonLabel(String(localized: \"Apply\", bundle: RockxyLocalization.bundle))"))
         #expect(!externalSource.contains("saveDraft()"))
         #expect(!externalSource.contains("Rockxy Pro"))
         #expect(!externalSource.contains("has not supported Authentication"))
@@ -836,11 +853,12 @@ struct ToolWindowReadabilityTests {
         let windowSource = try readProjectFile("Rockxy/Views/Rules/MapRemoteWindowView.swift")
         let editorSource = try readProjectFile("Rockxy/Views/Rules/MapRemoteEditorViewModel.swift")
 
-        #expect(windowSource.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(windowSource
+            .contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
         #expect(windowSource.contains("minWidth: max(900, toolMetrics.bodyFontSize * 30 + 520)"))
         #expect(windowSource.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
-        #expect(windowSource.contains(#"String(localized: "Remote Destination")"#))
-        #expect(windowSource.contains(#"String(localized: "Rule Details")"#))
+        #expect(windowSource.contains(#"String(localized: "Remote Destination", bundle: RockxyLocalization.bundle)"#))
+        #expect(windowSource.contains(#"String(localized: "Rule Details", bundle: RockxyLocalization.bundle)"#))
         #expect(windowSource.contains("ContentUnavailableView"))
         #expect(windowSource.contains("width: toolMetrics.menuWidth(150)"))
         #expect(windowSource.contains("dataEntryMenuLabel"))
@@ -876,11 +894,11 @@ struct ToolWindowReadabilityTests {
     func mapLocalUsesApprovedNativeStructure() throws {
         let source = try readProjectFile("Rockxy/Views/Rules/MapLocalWindowView.swift")
 
-        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(source.contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))
         #expect(source.contains("minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)"))
-        #expect(source.contains(#"String(localized: "Rule Details")"#))
-        #expect(source.contains(#"String(localized: "Response Source")"#))
+        #expect(source.contains(#"String(localized: "Rule Details", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "Response Source", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("responseStatusRow"))
         #expect(source.contains("urlValidationMessage"))
         #expect(source.contains(".frame(height: max(680, toolMetrics.bodyFontSize * 20 + 420))"))
@@ -908,7 +926,8 @@ struct ToolWindowReadabilityTests {
         let windowSource = try readProjectFile("Rockxy/Views/Rules/AllowListWindowView.swift")
         let editorSource = try readProjectFile("Rockxy/Views/Rules/AddAllowListRuleSheet.swift")
 
-        #expect(windowSource.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(windowSource
+            .contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
         #expect(windowSource.contains("RoundedRectangle(cornerRadius: 6)"))
         #expect(windowSource.contains("ALLOW LIST OFF"))
         #expect(windowSource.contains("Migrate from Another Proxy"))
@@ -922,8 +941,8 @@ struct ToolWindowReadabilityTests {
         #expect(!windowSource.contains("AllowListFilterBar"))
         #expect(!windowSource.contains("isFilterBarVisible"))
 
-        #expect(editorSource.contains(#"String(localized: "Rule Details")"#))
-        #expect(editorSource.contains(#"String(localized: "Capture Effect")"#))
+        #expect(editorSource.contains(#"String(localized: "Rule Details", bundle: RockxyLocalization.bundle)"#))
+        #expect(editorSource.contains(#"String(localized: "Capture Effect", bundle: RockxyLocalization.bundle)"#))
         #expect(editorSource.contains("dataEntryMenuLabel"))
         #expect(editorSource.contains("chevron.up.chevron.down"))
         #expect(editorSource.contains("footerButtonLabel"))
@@ -934,7 +953,7 @@ struct ToolWindowReadabilityTests {
         let source = try readProjectFile("Rockxy/Views/Rules/NetworkConditionsWindowView.swift")
 
         // Always-visible search field, mirroring the approved Map Remote window.
-        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(source.contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
 
         // Adaptive min window sizing consistent with Map Remote (shared minHeight formula).
         #expect(source.contains("minWidth: max("))
@@ -951,8 +970,8 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
 
         // Approved editor sections.
-        #expect(source.contains(#"String(localized: "Rule Details")"#))
-        #expect(source.contains(#"String(localized: "Network Profile")"#))
+        #expect(source.contains(#"String(localized: "Rule Details", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "Network Profile", bundle: RockxyLocalization.bundle)"#))
 
         // Shared footer button label and native footer shortcuts.
         #expect(source.contains("footerButtonLabel"))
@@ -999,9 +1018,9 @@ struct ToolWindowReadabilityTests {
         let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRulesWindowView.swift")
 
         // Fixed search field, native Table, and a separate Enabled column.
-        #expect(source.contains(#"TextField(String(localized: "Search rules")"#))
+        #expect(source.contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("Table(viewModel.filteredBreakpointRules"))
-        #expect(source.contains(#"TableColumn(String(localized: "Enabled"))"#))
+        #expect(source.contains(#"TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle))"#))
 
         // Info banner + status capsule + native empty state.
         #expect(source.contains(#"Image(systemName: "pause.circle")"#))
@@ -1030,8 +1049,8 @@ struct ToolWindowReadabilityTests {
         let source = try readProjectFile("Rockxy/Views/Breakpoint/BreakpointRuleEditorWindowView.swift")
 
         // Approved editor sections and semantic card surfaces.
-        #expect(source.contains(#"String(localized: "Rule Details")"#))
-        #expect(source.contains(#"String(localized: "Pause Phases")"#))
+        #expect(source.contains(#"String(localized: "Rule Details", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "Pause Phases", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("Color(nsColor: .textBackgroundColor)"))
         #expect(source.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
 
@@ -1104,29 +1123,30 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("VSplitView"))
         #expect(source.contains("List(selection: queueSelection)"))
         #expect(source.contains("ContentUnavailableView"))
-        #expect(source.contains(#"String(localized: "No Paused Traffic")"#))
+        #expect(source.contains(#"String(localized: "No Paused Traffic", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("ToolWindowDisplayMetrics"))
         #expect(source.contains("minWidth: max(1_060, toolMetrics.bodyFontSize * 34 + 618)"))
         #expect(source.contains("minHeight: max(640, toolMetrics.bodyFontSize * 18 + 406)"))
         #expect(appSource.contains(".defaultSize(width: 1_120, height: 720)"))
 
-        #expect(source.contains(#"String(localized: "Continue Original")"#))
-        #expect(source.contains(#"String(localized: "Abort with 503")"#))
-        #expect(source.contains(#"String(localized: "Apply Changes & Continue")"#))
+        #expect(source.contains(#"String(localized: "Continue Original", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "Abort with 503", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "Apply Changes & Continue", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains(#".keyboardShortcut(".", modifiers: .command)"#))
-        #expect(!source.contains(#"String(localized: "Skip Once")"#))
-        #expect(!source.contains(#"String(localized: "Execute All")"#))
+        #expect(!source.contains(#"String(localized: "Skip Once", bundle: RockxyLocalization.bundle)"#))
+        #expect(!source.contains(#"String(localized: "Execute All", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains(".confirmationDialog("))
 
         #expect(editorSource.contains("ContentUnavailableView"))
         #expect(editorSource.contains("Color(nsColor: .textBackgroundColor)"))
         #expect(editorSource.contains("RoundedRectangle(cornerRadius: 6)"))
         #expect(editorSource.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
-        #expect(editorSource.contains(#"String(localized: "Path and query")"#))
+        #expect(editorSource.contains(#"String(localized: "Path and query", bundle: RockxyLocalization.bundle)"#))
         #expect(editorSource.contains("canApplySelectedChanges = validation.isValid"))
         #expect(editorSource.contains("syncRawMessageFromDraft(itemId: selectedItemId, force: true)"))
         #expect(source.contains("item.editableDraft.isBodyEditable"))
-        #expect(editorSource.contains(#"String(localized: "Original payload protected")"#))
+        #expect(editorSource
+            .contains(#"String(localized: "Original payload protected", bundle: RockxyLocalization.bundle)"#))
         #expect(editorSource.contains("draftFor(itemId)?.isBodyEditable == false"))
         #expect(editorSource.contains("canApplySelectedChanges = true"))
     }
@@ -1140,9 +1160,10 @@ struct ToolWindowReadabilityTests {
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
 
         #expect(sslSource.contains("Table(viewModel.filteredRules"))
-        #expect(sslSource.contains(#"TableColumn(String(localized: "Behavior"))"#))
-        #expect(sslViewModelSource.contains(#"String(localized: "Decrypt HTTPS")"#))
-        #expect(sslViewModelSource.contains(#"String(localized: "Tunnel Without Decryption")"#))
+        #expect(sslSource.contains(#"TableColumn(String(localized: "Behavior", bundle: RockxyLocalization.bundle))"#))
+        #expect(sslViewModelSource.contains(#"String(localized: "Decrypt HTTPS", bundle: RockxyLocalization.bundle)"#))
+        #expect(sslViewModelSource
+            .contains(#"String(localized: "Tunnel Without Decryption", bundle: RockxyLocalization.bundle)"#))
         #expect(sslSource.contains("Tunnel rules take priority on overlaps"))
         #expect(sslSource.contains("row order does not affect matching"))
         #expect(sslSource.contains("PASSTHROUGH ACTIVE"))
@@ -1159,8 +1180,14 @@ struct ToolWindowReadabilityTests {
 
         #expect(tlsExceptionsSource.contains("TLS Passthrough Exceptions"))
         #expect(tlsExceptionsSource.contains("They do not bypass the proxy"))
-        #expect(appSource.contains(#"Window(String(localized: "HTTPS Decryption"), id: "sslProxyingList")"#))
-        #expect(appSource.contains(#"Window(String(localized: "Full Proxy Bypass"), id: "bypassProxyList")"#))
+        #expect(appSource
+            .contains(
+                #"Window(String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle), id: "sslProxyingList")"#
+            ))
+        #expect(appSource
+            .contains(
+                #"Window(String(localized: "Full Proxy Bypass", bundle: RockxyLocalization.bundle), id: "bypassProxyList")"#
+            ))
     }
 
     @Test("Scripting List uses the approved native window and honest action routing")
@@ -1174,8 +1201,9 @@ struct ToolWindowReadabilityTests {
         #expect(!source.contains(".frame(width: 1_200, height: 672)"))
 
         // Header: real master toggle + always-visible search + filter selector.
-        #expect(source.contains(#"String(localized: "Enable Scripting")"#))
-        #expect(source.contains(#"TextField(String(localized: "Search scripts")"#))
+        #expect(source.contains(#"String(localized: "Enable Scripting", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains("TextField("))
+        #expect(source.contains("localized: \"Search scripts\""))
         #expect(source.contains("ScriptListFilterColumn.allCases"))
 
         // Native Table with an explicit optional-ID single selection
@@ -1191,8 +1219,8 @@ struct ToolWindowReadabilityTests {
 
         // Empty state distinguishes no scripts from no search results.
         #expect(source.contains("ContentUnavailableView"))
-        #expect(source.contains(#"String(localized: "No Scripts")"#))
-        #expect(source.contains(#"String(localized: "No Matching Scripts")"#))
+        #expect(source.contains(#"String(localized: "No Scripts", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#"String(localized: "No Matching Scripts", bundle: RockxyLocalization.bundle)"#))
 
         // Info banner is truthful for all three modes (never always "stops").
         #expect(source.contains("Scripting is off."))
@@ -1237,7 +1265,7 @@ struct ToolWindowReadabilityTests {
 
         // One dynamic enable/disable label, no duplicate "Enable Rule" items.
         #expect(source.contains("enableDisableLabel"))
-        #expect(source.contains(#"String(localized: "Disable Script")"#))
+        #expect(source.contains(#"String(localized: "Disable Script", bundle: RockxyLocalization.bundle)"#))
         #expect(!source.contains("Enable Rule"))
         #expect(!source.contains(#"runtimeStatus == "Active""#))
 
@@ -1250,11 +1278,17 @@ struct ToolWindowReadabilityTests {
 
         // Scene is resizable native chrome, not a contentSize-only 1200x672 shell.
         let sceneStart = try #require(
-            appSource.range(of: "Window(String(localized: \"Scripting\"), id: \"scriptingList\")")
+            appSource
+                .range(
+                    of: "Window(String(localized: \"Scripting\", bundle: RockxyLocalization.bundle), id: \"scriptingList\")"
+                )
         )
         let scenesAfter = appSource[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Script Editor\"), id: \"scriptEditor\")")
+            scenesAfter
+                .range(
+                    of: "Window(String(localized: \"Script Editor\", bundle: RockxyLocalization.bundle), id: \"scriptEditor\")"
+                )
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
         #expect(sceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
@@ -1327,11 +1361,17 @@ extension ToolWindowReadabilityTests {
         // The scene injects the live coordinator and uses the standard tool-window shell.
         #expect(appSource.contains("AdvancedProxySettingsView(coordinator: mainCoordinator)"))
         let sceneStart = try #require(
-            appSource.range(of: "Window(String(localized: \"Advanced Proxy Settings\"), id: \"advancedProxySettings\")")
+            appSource
+                .range(
+                    of: "String(localized: \"Advanced Proxy Settings\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let scenesAfter = appSource[sceneStart.lowerBound...]
         let nextScene = try #require(
-            scenesAfter.range(of: "Window(String(localized: \"Babylon Pairing\"), id: \"babylonPairing\")")
+            scenesAfter
+                .range(
+                    of: "String(localized: \"Babylon Pairing\", bundle: RockxyLocalization.bundle)"
+                )
         )
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
         #expect(sceneSource.contains(".windowResizability(.contentSize)"))
@@ -1392,7 +1432,10 @@ extension ToolWindowReadabilityTests {
         // Cancel restores the draft and dismisses; accessibility is provided for the port.
         #expect(viewSource.contains("@Environment(\\.dismiss) private var dismiss"))
         #expect(viewSource.contains("dismiss()"))
-        #expect(viewSource.contains(".accessibilityLabel(String(localized: \"Listener port number\"))"))
+        #expect(viewSource
+            .contains(
+                ".accessibilityLabel(String(localized: \"Listener port number\", bundle: RockxyLocalization.bundle))"
+            ))
 
         // Footer and helper actions adapt to large fonts instead of overflowing one row.
         #expect(viewSource.contains("ViewThatFits(in: .horizontal)"))

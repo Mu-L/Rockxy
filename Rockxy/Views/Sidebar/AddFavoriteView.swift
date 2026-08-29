@@ -14,7 +14,7 @@ struct AddFavoriteView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(String(localized: "Add favorite app or domain"))
+            Text(String(localized: "Add favorite app or domain", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.sidebarNavigationFontSize, weight: .medium))
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -31,7 +31,7 @@ struct AddFavoriteView: View {
 
             Divider()
 
-            Text(String(localized: "Launch your app/domain to see it in the list"))
+            Text(String(localized: "Launch your app/domain to see it in the list", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.sidebarSecondaryFontSize))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
@@ -89,7 +89,7 @@ struct AddFavoriteView: View {
                 .font(.system(size: metrics.sidebarSecondaryFontSize))
                 .foregroundStyle(.secondary)
             TextField(
-                String(localized: "Search app or domain (\u{2318}\u{21E7}F)"),
+                String(localized: "Search app or domain (\u{2318}\u{21E7}F)", bundle: RockxyLocalization.bundle),
                 text: $searchText
             )
             .textFieldStyle(.plain)
@@ -127,7 +127,7 @@ struct AddFavoriteView: View {
     private var appsDisclosure: some View {
         VStack(alignment: .leading, spacing: 0) {
             disclosureHeader(
-                label: String(localized: "Apps"),
+                label: String(localized: "Apps", bundle: RockxyLocalization.bundle),
                 icon: "square.stack.3d.up.fill",
                 count: filteredApps.count,
                 isExpanded: $isAppsExpanded
@@ -144,7 +144,7 @@ struct AddFavoriteView: View {
     private var domainsDisclosure: some View {
         VStack(alignment: .leading, spacing: 0) {
             disclosureHeader(
-                label: String(localized: "Domains"),
+                label: String(localized: "Domains", bundle: RockxyLocalization.bundle),
                 icon: "globe",
                 count: filteredDomains.count,
                 isExpanded: $isDomainsExpanded
@@ -160,7 +160,7 @@ struct AddFavoriteView: View {
 
     private var bottomButtons: some View {
         HStack {
-            Button(String(localized: "Cancel")) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                 isPresented = false
             }
             .keyboardShortcut(.cancelAction)
@@ -168,15 +168,15 @@ struct AddFavoriteView: View {
             Spacer()
 
             Menu {
-                Button(String(localized: "Select All")) {
+                Button(String(localized: "Select All", bundle: RockxyLocalization.bundle)) {
                     // Future: select all items
                 }
-                Button(String(localized: "Deselect All")) {
+                Button(String(localized: "Deselect All", bundle: RockxyLocalization.bundle)) {
                     selectedItem = nil
                 }
             } label: {
                 HStack(spacing: 4) {
-                    Text(String(localized: "Select"))
+                    Text(String(localized: "Select", bundle: RockxyLocalization.bundle))
                     Image(systemName: "chevron.down")
                         .font(.system(size: metrics.sidebarSectionHeaderFontSize))
                 }
@@ -184,7 +184,7 @@ struct AddFavoriteView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            Button(String(localized: "Add")) {
+            Button(String(localized: "Add", bundle: RockxyLocalization.bundle)) {
                 addSelectedFavorite()
                 isPresented = false
             }
@@ -303,7 +303,7 @@ struct AddFavoriteView: View {
     private func buildAppCandidates() -> [AppCandidate] {
         var appNames: Set<String> = []
         for transaction in coordinator.transactions {
-            let name = transaction.clientApp ?? String(localized: "Unknown")
+            let name = transaction.clientApp ?? String(localized: "Unknown", bundle: RockxyLocalization.bundle)
             appNames.insert(name)
         }
         return appNames.sorted().map { AppCandidate(name: $0) }

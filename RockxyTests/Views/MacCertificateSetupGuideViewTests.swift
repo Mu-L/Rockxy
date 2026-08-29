@@ -18,13 +18,14 @@ struct MacCertificateSetupGuideViewTests {
         let nextScene = try #require(scenesAfter.range(of: "// MARK: - DeveloperSetupWindowScene"))
         let sceneSource = scenesAfter[..<nextScene.lowerBound]
 
-        #expect(sceneSource.contains("Window(String(localized: \"Mac Setup Guide\"), id: \"certificateSetup\")"))
+        #expect(sceneSource.contains("String(localized: \"Mac Setup Guide\", bundle: RockxyLocalization.bundle)"))
+        #expect(sceneSource.contains("id: \"certificateSetup\""))
         #expect(sceneSource.contains(".windowToolbarStyle(.unifiedCompact)"))
         #expect(sceneSource.contains(".windowResizability(.contentMinSize)"))
         #expect(sceneSource.contains("restorationBehavior(.disabled)"))
         #expect(source.contains("@Environment(\\.appUIDisplayMetrics)"))
         #expect(source.contains("ToolWindowDisplayMetrics(appMetrics: appMetrics)"))
-        #expect(!source.contains("Text(String(localized: \"Mac Setup Guide\"))"))
+        #expect(!source.contains("Text(String(localized: \"Mac Setup Guide\", bundle: RockxyLocalization.bundle))"))
         #expect(!source.contains(".font(.title3"))
         #expect(!source.contains(".font(.callout"))
         #expect(!source.contains(".font(.system(size: 28"))
@@ -36,10 +37,10 @@ struct MacCertificateSetupGuideViewTests {
         #expect(source.contains("NSApplication.didBecomeActiveNotification"))
 
         for label in ["Certificate Readiness", "Certificate Details", "Current Status"] {
-            #expect(source.contains("Label(String(localized: \"\(label)\")"))
+            #expect(source.contains("localized: \"\(label)\""))
         }
         for label in ["Keychain Access", "Terminal"] {
-            #expect(source.contains("Label(String(localized: \"\(label)\"), systemImage:"))
+            #expect(source.contains("String(localized: \"\(label)\", bundle: RockxyLocalization.bundle)"))
         }
     }
 
@@ -60,10 +61,10 @@ struct MacCertificateSetupGuideViewTests {
             #expect(source.contains(field))
         }
         for copy in ["Generate, Install & Trust", "Repair Trust", "Checking Certificate"] {
-            #expect(source.contains("String(localized: \"\(copy)\")"))
+            #expect(source.contains("localized: \"\(copy)\""))
         }
         for action in ["Export PEM", "Generate Certificate", "Open Keychain Access"] {
-            #expect(source.contains("Label(String(localized: \"\(action)\")"))
+            #expect(source.contains("localized: \"\(action)\""))
         }
 
         #expect(source.contains("withBundleIdentifier: \"com.apple.keychainaccess\""))

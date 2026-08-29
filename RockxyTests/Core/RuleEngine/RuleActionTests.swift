@@ -47,7 +47,7 @@ struct RuleActionTests {
         let url = try #require(URL(string: "https://api.test/data"))
         let result = await engine.evaluate(method: "GET", url: url, headers: [])
 
-        if case let .mapLocal(filePath, statusCode, isDirectory, delayMs) = result {
+        if case let .mapLocal(filePath, statusCode, isDirectory, delayMs, _) = result {
             #expect(filePath == "/tmp/mock.json")
             #expect(statusCode == 200)
             #expect(isDirectory == false)
@@ -257,7 +257,7 @@ struct RuleActionTests {
             switch (action, decoded) {
             case let (.block(a), .block(b)):
                 #expect(a == b)
-            case let (.mapLocal(aPath, aStatus, aIsDir, aDelay), .mapLocal(bPath, bStatus, bIsDir, bDelay)):
+            case let (.mapLocal(aPath, aStatus, aIsDir, aDelay, _), .mapLocal(bPath, bStatus, bIsDir, bDelay, _)):
                 #expect(aPath == bPath)
                 #expect(aStatus == bStatus)
                 #expect(aIsDir == bIsDir)
@@ -284,11 +284,11 @@ struct RuleActionTests {
 
     @Test("MapLocal decodes without statusCode field (backward compat)")
     func mapLocalBackwardCompat() throws {
-        let json = """
+        let json = Data("""
         {"type":"mapLocal","filePath":"/tmp/old.json"}
-        """.data(using: .utf8)!
+        """.utf8)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: json)
-        if case let .mapLocal(path, code, isDir, delayMs) = decoded {
+        if case let .mapLocal(path, code, isDir, delayMs, _) = decoded {
             #expect(path == "/tmp/old.json")
             #expect(code == 200)
             #expect(isDir == false)
@@ -303,7 +303,7 @@ struct RuleActionTests {
         let action = RuleAction.mapLocal(filePath: "/tmp/test.json", statusCode: 404)
         let data = try JSONEncoder().encode(action)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
-        if case let .mapLocal(path, code, _, _) = decoded {
+        if case let .mapLocal(path, code, _, _, _) = decoded {
             #expect(path == "/tmp/test.json")
             #expect(code == 404)
         } else {
@@ -314,7 +314,7 @@ struct RuleActionTests {
     @Test("MapLocal default statusCode is 200")
     func mapLocalDefaultStatusCode() {
         let action = RuleAction.mapLocal(filePath: "/tmp/test.json")
-        if case let .mapLocal(_, code, _, _) = action {
+        if case let .mapLocal(_, code, _, _, _) = action {
             #expect(code == 200)
         } else {
             Issue.record("Expected .mapLocal")
@@ -324,7 +324,7 @@ struct RuleActionTests {
     @Test("MapLocal directory flag defaults to false")
     func mapLocalDefaultIsDirectory() {
         let action = RuleAction.mapLocal(filePath: "/tmp/dir")
-        if case let .mapLocal(_, _, isDir, _) = action {
+        if case let .mapLocal(_, _, isDir, _, _) = action {
             #expect(isDir == false)
         } else {
             Issue.record("Expected .mapLocal")
@@ -336,7 +336,7 @@ struct RuleActionTests {
         let action = RuleAction.mapLocal(filePath: "/tmp/webroot", statusCode: 200, isDirectory: true)
         let data = try JSONEncoder().encode(action)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
-        if case let .mapLocal(path, code, isDir, _) = decoded {
+        if case let .mapLocal(path, code, isDir, _, _) = decoded {
             #expect(path == "/tmp/webroot")
             #expect(code == 200)
             #expect(isDir == true)
@@ -347,11 +347,11 @@ struct RuleActionTests {
 
     @Test("MapLocal backward compat: missing isDirectory defaults to false")
     func mapLocalBackwardCompatIsDirectory() throws {
-        let json = """
+        let json = Data("""
         {"type":"mapLocal","filePath":"/tmp/old.json","statusCode":200}
-        """.data(using: .utf8)!
+        """.utf8)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: json)
-        if case let .mapLocal(_, _, isDir, delayMs) = decoded {
+        if case let .mapLocal(_, _, isDir, delayMs, _) = decoded {
             #expect(isDir == false)
             #expect(delayMs == 0)
         } else {
@@ -364,7 +364,7 @@ struct RuleActionTests {
         let action = RuleAction.mapLocal(filePath: "/tmp/delayed.json", statusCode: 202, delayMs: 5_000)
         let data = try JSONEncoder().encode(action)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
-        if case let .mapLocal(path, code, isDir, delayMs) = decoded {
+        if case let .mapLocal(path, code, isDir, delayMs, _) = decoded {
             #expect(path == "/tmp/delayed.json")
             #expect(code == 202)
             #expect(isDir == false)
@@ -379,12 +379,54 @@ struct RuleActionTests {
         let action = RuleAction.mapLocal(filePath: "/tmp/random.json", statusCode: 200, delayMs: -1)
         let data = try JSONEncoder().encode(action)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
-        if case let .mapLocal(path, _, _, delayMs) = decoded {
+        if case let .mapLocal(path, _, _, delayMs, _) = decoded {
             #expect(path == "/tmp/random.json")
             #expect(delayMs == -1)
         } else {
             Issue.record("Expected .mapLocal")
         }
+    }
+
+    @Test("MapLocal response headers round-trip through Codable")
+    func mapLocalResponseHeadersRoundtrip() throws {
+        let action = RuleAction.mapLocal(
+            filePath: "/tmp/mock.json",
+            statusCode: 200,
+            responseHeaders: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "X-Custom", value: "abc"),
+            ]
+        )
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(RuleAction.self, from: data)
+        if case let .mapLocal(_, _, _, _, headers) = decoded {
+            #expect(headers.count == 2)
+            #expect(headers[0].name == "Content-Type")
+            #expect(headers[1].value == "abc")
+        } else {
+            Issue.record("Expected .mapLocal")
+        }
+    }
+
+    @Test("MapLocal backward compat: missing responseHeaders decodes to empty list")
+    func mapLocalBackwardCompatResponseHeaders() throws {
+        let json = Data("""
+        {"type":"mapLocal","filePath":"/tmp/old.json","statusCode":200}
+        """.utf8)
+        let decoded = try JSONDecoder().decode(RuleAction.self, from: json)
+        if case let .mapLocal(_, _, _, _, headers) = decoded {
+            #expect(headers.isEmpty)
+        } else {
+            Issue.record("Expected .mapLocal")
+        }
+    }
+
+    @Test("MapLocal without response headers omits the key on encode")
+    func mapLocalOmitsEmptyResponseHeaders() throws {
+        let action = RuleAction.mapLocal(filePath: "/tmp/mock.json")
+        let data = try JSONEncoder().encode(action)
+        let json = try #require(String(data: data, encoding: .utf8))
+        #expect(!json.contains("responseHeaders"))
     }
 
     // MARK: - Header Modify: Multi-Operation + Phase Tests
@@ -416,9 +458,9 @@ struct RuleActionTests {
 
     @Test("Backward compat: single operation JSON decodes into 1-element array with request phase")
     func backwardCompatSingleOperation() throws {
-        let json = """
+        let json = Data("""
         {"type":"modifyHeader","operation":{"type":"add","headerName":"X-Test","headerValue":"1"}}
-        """.data(using: .utf8)!
+        """.utf8)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: json)
 
         if case let .modifyHeader(ops) = decoded {
@@ -434,9 +476,9 @@ struct RuleActionTests {
 
     @Test("Backward compat: HeaderOperation without phase defaults to request")
     func backwardCompatMissingPhase() throws {
-        let json = """
+        let json = Data("""
         {"type":"modifyHeader","operations":[{"type":"remove","headerName":"Authorization"}]}
-        """.data(using: .utf8)!
+        """.utf8)
         let decoded = try JSONDecoder().decode(RuleAction.self, from: json)
 
         if case let .modifyHeader(ops) = decoded {

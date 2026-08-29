@@ -70,7 +70,10 @@ struct AdvancedFilterBar: View {
                 _ = presetStore.saveGeneratedPreset(rules: rules)
                 onSave()
             } label: {
-                Label(String(localized: "Save Current Filter"), systemImage: "square.and.arrow.down")
+                Label(
+                    String(localized: "Save Current Filter", bundle: RockxyLocalization.bundle),
+                    systemImage: "square.and.arrow.down"
+                )
             }
             .disabled(FilterRuleEvaluator.activeRules(in: rules, isFilterBarVisible: true).isEmpty)
 
@@ -85,7 +88,7 @@ struct AdvancedFilterBar: View {
                 }
 
                 Divider()
-                Menu(String(localized: "Delete Preset")) {
+                Menu(String(localized: "Delete Preset", bundle: RockxyLocalization.bundle)) {
                     ForEach(presetStore.presets) { preset in
                         Button(role: .destructive) {
                             presetStore.deletePreset(id: preset.id)
@@ -96,7 +99,7 @@ struct AdvancedFilterBar: View {
                 }
             }
         } label: {
-            Label(String(localized: "Presets"), systemImage: "chevron.down")
+            Label(String(localized: "Presets", bundle: RockxyLocalization.bundle), systemImage: "chevron.down")
                 .labelStyle(.titleAndIcon)
         }
         .menuStyle(.borderlessButton)
@@ -140,7 +143,7 @@ struct AdvancedFilterBar: View {
             }
             .frame(width: 120)
 
-            TextField(String(localized: "Text"), text: $rules[index].value)
+            TextField(String(localized: "Text", bundle: RockxyLocalization.bundle), text: $rules[index].value)
                 .textFieldStyle(.roundedBorder)
                 .font(metrics.swiftUIFont())
 

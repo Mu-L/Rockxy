@@ -55,17 +55,18 @@ struct BabylonRuntimeView: View {
                 .accessibilityHidden(true)
         }
         .confirmationDialog(
-            String(localized: "Clear Runtime Events?"),
+            String(localized: "Clear Runtime Events?", bundle: RockxyLocalization.bundle),
             isPresented: $showsClearConfirmation
         ) {
-            Button(String(localized: "Clear Events"), role: .destructive) {
+            Button(String(localized: "Clear Events", bundle: RockxyLocalization.bundle), role: .destructive) {
                 clearEvents()
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
                 String(
-                    localized: "This removes every captured runtime event from memory. HTTP traffic and Babylon pairing are not affected."
+                    localized: "This removes every captured runtime event from memory. HTTP traffic and Babylon pairing are not affected.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -175,17 +176,35 @@ struct BabylonRuntimeView: View {
     private var readinessMessage: String {
         switch availability {
         case .ready:
-            String(localized: "Listener ready. Paired Babylon clients can stream runtime events to this Mac.")
+            String(
+                localized: "Listener ready. Paired Babylon clients can stream runtime events to this Mac.",
+                bundle: RockxyLocalization.bundle
+            )
         case .starting:
-            String(localized: "Waiting for the local Babylon listener to come online.")
+            String(
+                localized: "Waiting for the local Babylon listener to come online.",
+                bundle: RockxyLocalization.bundle
+            )
         case .stopped:
-            String(localized: "Babylon capture is not running. Runtime events won't arrive until it starts.")
+            String(
+                localized: "Babylon capture is not running. Runtime events won't arrive until it starts.",
+                bundle: RockxyLocalization.bundle
+            )
         case .waiting:
-            String(localized: "The listener is waiting for a viable network. Runtime events will resume automatically.")
+            String(
+                localized: "The listener is waiting for a viable network. Runtime events will resume automatically.",
+                bundle: RockxyLocalization.bundle
+            )
         case .tokenMissing:
-            String(localized: "No pairing token. Generate one in Pairing before clients can stream runtime events.")
+            String(
+                localized: "No pairing token. Generate one in Pairing before clients can stream runtime events.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unavailable:
-            String(localized: "The Babylon listener isn't running. Open Pairing to review and retry.")
+            String(
+                localized: "The Babylon listener isn't running. Open Pairing to review and retry.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -193,12 +212,12 @@ struct BabylonRuntimeView: View {
         let total = store.events.count
         let shown = filteredEvents.count
         let base = filter.isActive
-            ? String(localized: "\(shown) of \(total) events")
-            : String(localized: "\(total) events")
+            ? String(localized: "\(shown) of \(total) events", bundle: RockxyLocalization.bundle)
+            : String(localized: "\(total) events", bundle: RockxyLocalization.bundle)
         guard store.evictedEventCount > 0 else {
             return base
         }
-        return base + String(localized: "  •  \(store.evictedEventCount) evicted")
+        return base + String(localized: "  •  \(store.evictedEventCount) evicted", bundle: RockxyLocalization.bundle)
     }
 
     // MARK: - Header
@@ -206,12 +225,15 @@ struct BabylonRuntimeView: View {
     private var header: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(localized: "Runtime Events"))
+                Text(String(localized: "Runtime Events", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
-                Text(String(localized: "Live trace, step, and mark events streamed from paired Babylon clients."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(
+                    localized: "Live trace, step, and mark events streamed from paired Babylon clients.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
             searchField
@@ -223,12 +245,12 @@ struct BabylonRuntimeView: View {
     }
 
     private var searchField: some View {
-        TextField(String(localized: "Search names, IDs, errors"), text: $searchText)
+        TextField(String(localized: "Search names, IDs, errors", bundle: RockxyLocalization.bundle), text: $searchText)
             .textFieldStyle(.roundedBorder)
             .font(toolMetrics.font())
             .frame(width: 240, height: toolMetrics.formControlHeight)
             .focused($searchIsFocused)
-            .accessibilityLabel(String(localized: "Search runtime events"))
+            .accessibilityLabel(String(localized: "Search runtime events", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: - Readiness banner
@@ -244,7 +266,7 @@ struct BabylonRuntimeView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(String(localized: "Open Pairing")) {
+            Button(String(localized: "Open Pairing", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "babylonPairing")
             }
             .controlSize(.small)
@@ -258,8 +280,9 @@ struct BabylonRuntimeView: View {
 
     private var filterBar: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            Picker(String(localized: "Kind"), selection: $selectedKind) {
-                Text(String(localized: "All Kinds")).tag(BabylonRuntimePackageDTO.Kind?.none)
+            Picker(String(localized: "Kind", bundle: RockxyLocalization.bundle), selection: $selectedKind) {
+                Text(String(localized: "All Kinds", bundle: RockxyLocalization.bundle))
+                    .tag(BabylonRuntimePackageDTO.Kind?.none)
                 ForEach(BabylonRuntimePackageDTO.Kind.displayOrder, id: \.self) { kind in
                     Text(kind.displayTitle).tag(BabylonRuntimePackageDTO.Kind?.some(kind))
                 }
@@ -269,8 +292,8 @@ struct BabylonRuntimeView: View {
             .frame(width: 170)
             .frame(minHeight: toolMetrics.formControlHeight)
 
-            Picker(String(localized: "Source"), selection: $selectedSourceClientID) {
-                Text(String(localized: "All Sources")).tag(String?.none)
+            Picker(String(localized: "Source", bundle: RockxyLocalization.bundle), selection: $selectedSourceClientID) {
+                Text(String(localized: "All Sources", bundle: RockxyLocalization.bundle)).tag(String?.none)
                 ForEach(availableSources) { source in
                     Text(source.name).tag(String?.some(source.clientID))
                 }
@@ -282,7 +305,7 @@ struct BabylonRuntimeView: View {
             .disabled(availableSources.isEmpty)
 
             if filter.isActive {
-                Button(String(localized: "Reset Filters")) {
+                Button(String(localized: "Reset Filters", bundle: RockxyLocalization.bundle)) {
                     selectedKind = nil
                     selectedSourceClientID = nil
                     searchText = ""
@@ -301,7 +324,7 @@ struct BabylonRuntimeView: View {
     private var tableContent: some View {
         Table(filteredEvents, selection: $selection) {
             TableColumn(
-                Text(String(localized: "Kind"))
+                Text(String(localized: "Kind", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
                 kindCell(for: event)
@@ -309,10 +332,10 @@ struct BabylonRuntimeView: View {
             .width(min: max(120, toolMetrics.bodyFontSize * 6), ideal: max(150, toolMetrics.bodyFontSize * 8))
 
             TableColumn(
-                Text(String(localized: "Name"))
+                Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
-                Text(event.name.isEmpty ? String(localized: "Untitled") : event.name)
+                Text(event.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : event.name)
                     .font(toolMetrics.font())
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -321,7 +344,7 @@ struct BabylonRuntimeView: View {
             .width(min: max(180, toolMetrics.bodyFontSize * 9), ideal: max(280, toolMetrics.bodyFontSize * 13))
 
             TableColumn(
-                Text(String(localized: "Source"))
+                Text(String(localized: "Source", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
                 Text(event.source.displayName)
@@ -334,21 +357,21 @@ struct BabylonRuntimeView: View {
             .width(min: max(140, toolMetrics.bodyFontSize * 7), ideal: max(200, toolMetrics.bodyFontSize * 10))
 
             TableColumn(
-                Text(String(localized: "Received"))
+                Text(String(localized: "Received", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
                 Text(
                     event.receivedAt,
                     format: .dateTime.month(.abbreviated).day().hour().minute().second()
                 )
-                    .font(toolMetrics.font(monospaced: true))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                .font(toolMetrics.font(monospaced: true))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
             .width(max(150, toolMetrics.bodyFontSize * 7))
 
             TableColumn(
-                Text(String(localized: "Duration"))
+                Text(String(localized: "Duration", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
                 Text(durationText(for: event))
@@ -359,7 +382,7 @@ struct BabylonRuntimeView: View {
             .width(max(88, toolMetrics.bodyFontSize * 4.6))
 
             TableColumn(
-                Text(String(localized: "Outcome"))
+                Text(String(localized: "Outcome", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
             ) { event in
                 outcomeCell(for: event)
@@ -385,14 +408,20 @@ struct BabylonRuntimeView: View {
     private var emptyState: some View {
         ContentUnavailableView(
             filter.isActive
-                ? String(localized: "No Matching Events")
-                : String(localized: "No Runtime Events"),
+                ? String(localized: "No Matching Events", bundle: RockxyLocalization.bundle)
+                : String(localized: "No Runtime Events", bundle: RockxyLocalization.bundle),
             systemImage: filter
                 .isActive ? "line.3.horizontal.decrease.circle" : "point.3.connected.trianglepath.dotted",
             description: Text(
                 filter.isActive
-                    ? String(localized: "Try a different kind, source, or search term.")
-                    : String(localized: "Start a Babylon trace on a paired client to see runtime events here.")
+                    ? String(
+                        localized: "Try a different kind, source, or search term.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(
+                        localized: "Start a Babylon trace on a paired client to see runtime events here.",
+                        bundle: RockxyLocalization.bundle
+                    )
             )
         )
     }
@@ -408,32 +437,83 @@ struct BabylonRuntimeView: View {
                             truncationNotice(for: event)
                         }
 
-                        detailSection(String(localized: "Overview")) {
-                            detailRow(String(localized: "Kind"), event.kind.displayTitle)
-                            detailRow(String(localized: "Name"), event.name.isEmpty ? "—" : event.name)
-                            detailRow(String(localized: "Outcome"), event.outcome.title)
-                            detailRow(String(localized: "Source"), event.source.displayName)
-                            detailRow(String(localized: "Package ID"), event.packageID, monospaced: true)
-                            detailRow(String(localized: "Source Client"), event.source.clientID, monospaced: true)
+                        detailSection(String(localized: "Overview", bundle: RockxyLocalization.bundle)) {
+                            detailRow(
+                                String(localized: "Kind", bundle: RockxyLocalization.bundle),
+                                event.kind.displayTitle
+                            )
+                            detailRow(
+                                String(localized: "Name", bundle: RockxyLocalization.bundle),
+                                event.name.isEmpty ? "—" : event.name
+                            )
+                            detailRow(
+                                String(localized: "Outcome", bundle: RockxyLocalization.bundle),
+                                event.outcome.title
+                            )
+                            detailRow(
+                                String(localized: "Source", bundle: RockxyLocalization.bundle),
+                                event.source.displayName
+                            )
+                            detailRow(
+                                String(localized: "Package ID", bundle: RockxyLocalization.bundle),
+                                event.packageID,
+                                monospaced: true
+                            )
+                            detailRow(
+                                String(localized: "Source Client", bundle: RockxyLocalization.bundle),
+                                event.source.clientID,
+                                monospaced: true
+                            )
                         }
 
-                        detailSection(String(localized: "Identifiers")) {
-                            detailRow(String(localized: "Runtime Session"), event.sessionID, monospaced: true)
-                            detailRow(String(localized: "Trace"), event.traceID ?? "—", monospaced: true)
-                            detailRow(String(localized: "Step"), event.stepID ?? "—", monospaced: true)
-                            detailRow(String(localized: "Parent Step"), event.parentStepID ?? "—", monospaced: true)
+                        detailSection(String(localized: "Identifiers", bundle: RockxyLocalization.bundle)) {
+                            detailRow(
+                                String(localized: "Runtime Session", bundle: RockxyLocalization.bundle),
+                                event.sessionID,
+                                monospaced: true
+                            )
+                            detailRow(
+                                String(localized: "Trace", bundle: RockxyLocalization.bundle),
+                                event.traceID ?? "—",
+                                monospaced: true
+                            )
+                            detailRow(
+                                String(localized: "Step", bundle: RockxyLocalization.bundle),
+                                event.stepID ?? "—",
+                                monospaced: true
+                            )
+                            detailRow(
+                                String(localized: "Parent Step", bundle: RockxyLocalization.bundle),
+                                event.parentStepID ?? "—",
+                                monospaced: true
+                            )
                         }
 
-                        detailSection(String(localized: "Timing")) {
-                            detailRow(String(localized: "Received"), timestampText(event.receivedAt))
-                            detailRow(String(localized: "Event Time"), timestampText(event.createdAt))
-                            detailRow(String(localized: "Started"), event.startedAt.map(timestampText) ?? "—")
-                            detailRow(String(localized: "Ended"), event.endedAt.map(timestampText) ?? "—")
-                            detailRow(String(localized: "Duration"), durationText(for: event))
+                        detailSection(String(localized: "Timing", bundle: RockxyLocalization.bundle)) {
+                            detailRow(
+                                String(localized: "Received", bundle: RockxyLocalization.bundle),
+                                timestampText(event.receivedAt)
+                            )
+                            detailRow(
+                                String(localized: "Event Time", bundle: RockxyLocalization.bundle),
+                                timestampText(event.createdAt)
+                            )
+                            detailRow(
+                                String(localized: "Started", bundle: RockxyLocalization.bundle),
+                                event.startedAt.map(timestampText) ?? "—"
+                            )
+                            detailRow(
+                                String(localized: "Ended", bundle: RockxyLocalization.bundle),
+                                event.endedAt.map(timestampText) ?? "—"
+                            )
+                            detailRow(
+                                String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                                durationText(for: event)
+                            )
                         }
 
                         if let errorMessage = event.errorMessage {
-                            detailSection(String(localized: "Error")) {
+                            detailSection(String(localized: "Error", bundle: RockxyLocalization.bundle)) {
                                 Text(errorMessage)
                                     .font(toolMetrics.font(monospaced: true))
                                     .foregroundStyle(.red)
@@ -444,7 +524,7 @@ struct BabylonRuntimeView: View {
                         }
 
                         if !event.metadata.isEmpty {
-                            detailSection(String(localized: "Metadata")) {
+                            detailSection(String(localized: "Metadata", bundle: RockxyLocalization.bundle)) {
                                 metadataGrid(for: event)
                             }
                         }
@@ -455,10 +535,13 @@ struct BabylonRuntimeView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    String(localized: "No Event Selected"),
+                    String(localized: "No Event Selected", bundle: RockxyLocalization.bundle),
                     systemImage: "sidebar.right",
                     description: Text(
-                        String(localized: "Select a runtime event to inspect its identifiers, timing, and metadata.")
+                        String(
+                            localized: "Select a runtime event to inspect its identifiers, timing, and metadata.",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 )
             }
@@ -479,7 +562,7 @@ struct BabylonRuntimeView: View {
             Button(role: .destructive) {
                 showsClearConfirmation = true
             } label: {
-                Text(String(localized: "Clear Events"))
+                Text(String(localized: "Clear Events", bundle: RockxyLocalization.bundle))
                     .frame(minWidth: toolMetrics.footerButtonWidth, minHeight: toolMetrics.footerControlHeight - 8)
             }
             .disabled(store.events.isEmpty)
@@ -568,7 +651,7 @@ struct BabylonRuntimeView: View {
             .joined(separator: ", ")
         return Label(
             String(
-                localized: "\(fields) shortened to Rockxy's in-memory safety limits."
+                localized: "\(fields) shortened to Rockxy's in-memory safety limits.", bundle: RockxyLocalization.bundle
             ),
             systemImage: "ellipsis.circle"
         )

@@ -29,13 +29,16 @@ struct ScriptConsolePanel: View {
         switch viewModel.consoleEmptyState {
         case .empty:
             emptyState(
-                title: String(localized: "Empty Console"),
-                message: String(localized: "Use console.log() to log events")
+                title: String(localized: "Empty Console", bundle: RockxyLocalization.bundle),
+                message: String(localized: "Use console.log() to log events", bundle: RockxyLocalization.bundle)
             )
         case .filtered:
             emptyState(
-                title: String(localized: "No Matching Output"),
-                message: String(localized: "Console entries exist, but the active level filter hides them all.")
+                title: String(localized: "No Matching Output", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Console entries exist, but the active level filter hides them all.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         case .populated:
             ScrollViewReader { proxy in

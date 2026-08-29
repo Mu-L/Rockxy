@@ -27,10 +27,13 @@ struct SSLProxyingListViewModelTests {
 
     @Test("behaviorLabel maps list type to reader-facing text")
     func behaviorLabelMapping() {
-        #expect(SSLProxyingListViewModel.behaviorLabel(for: .include) == String(localized: "Decrypt HTTPS"))
+        #expect(SSLProxyingListViewModel.behaviorLabel(for: .include) == String(
+            localized: "Decrypt HTTPS",
+            bundle: RockxyLocalization.bundle
+        ))
         #expect(
             SSLProxyingListViewModel.behaviorLabel(for: .exclude)
-                == String(localized: "Tunnel Without Decryption")
+                == String(localized: "Tunnel Without Decryption", bundle: RockxyLocalization.bundle)
         )
     }
 
@@ -311,16 +314,16 @@ struct SSLProxyingListViewModelTests {
         defer { try? FileManager.default.removeItem(at: tempURL) }
         vm.addRule(domain: "test.com", listType: .include)
         let id = vm.manager.rules[0].id
-        #expect(vm.toggleLabel(for: id) == String(localized: "Disable Rule"))
+        #expect(vm.toggleLabel(for: id) == String(localized: "Disable Rule", bundle: RockxyLocalization.bundle))
         vm.toggleRule(id: id)
-        #expect(vm.toggleLabel(for: id) == String(localized: "Enable Rule"))
+        #expect(vm.toggleLabel(for: id) == String(localized: "Enable Rule", bundle: RockxyLocalization.bundle))
     }
 
     @Test("toggleLabel defaults for unknown id")
     func toggleLabelUnknown() {
         let (vm, tempURL) = makeViewModel()
         defer { try? FileManager.default.removeItem(at: tempURL) }
-        #expect(vm.toggleLabel(for: UUID()) == String(localized: "Enable Rule"))
+        #expect(vm.toggleLabel(for: UUID()) == String(localized: "Enable Rule", bundle: RockxyLocalization.bundle))
     }
 
     @Test("enableDisableLabel reflects the selection")
@@ -330,16 +333,16 @@ struct SSLProxyingListViewModelTests {
         vm.addRule(domain: "test.com", listType: .include)
         let id = vm.manager.rules[0].id
         vm.selectedRuleID = id
-        #expect(vm.enableDisableLabel == String(localized: "Disable Rule"))
+        #expect(vm.enableDisableLabel == String(localized: "Disable Rule", bundle: RockxyLocalization.bundle))
         vm.toggleRule(id: id)
-        #expect(vm.enableDisableLabel == String(localized: "Enable Rule"))
+        #expect(vm.enableDisableLabel == String(localized: "Enable Rule", bundle: RockxyLocalization.bundle))
     }
 
     @Test("enableDisableLabel defaults when no selection")
     func enableDisableLabelNoSelection() {
         let (vm, tempURL) = makeViewModel()
         defer { try? FileManager.default.removeItem(at: tempURL) }
-        #expect(vm.enableDisableLabel == String(localized: "Enable Rule"))
+        #expect(vm.enableDisableLabel == String(localized: "Enable Rule", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: - Selection Reconciliation

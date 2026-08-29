@@ -36,13 +36,13 @@ enum SetupTerminalApp: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .appleTerminal:
-            String(localized: "Apple Terminal")
+            String(localized: "Apple Terminal", bundle: RockxyLocalization.bundle)
         case .iTerm2:
-            String(localized: "iTerm2")
+            String(localized: "iTerm2", bundle: RockxyLocalization.bundle)
         case .ghostty:
-            String(localized: "Ghostty")
+            String(localized: "Ghostty", bundle: RockxyLocalization.bundle)
         case .custom:
-            String(localized: "My own Terminal...")
+            String(localized: "My own Terminal...", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -63,11 +63,11 @@ enum SetupBrowserApp: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .chromeNewProfile:
-            String(localized: "Google Chrome (New Profile)...")
+            String(localized: "Google Chrome (New Profile)...", bundle: RockxyLocalization.bundle)
         case .chromeCurrentProfile:
-            String(localized: "Google Chrome (Current Profile)...")
+            String(localized: "Google Chrome (Current Profile)...", bundle: RockxyLocalization.bundle)
         case .firefox:
-            String(localized: "Firefox...")
+            String(localized: "Firefox...", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -88,11 +88,14 @@ enum DeveloperSetupLaunchError: LocalizedError {
         switch self {
         case let .processFailed(command, status, message):
             if let message, !message.isEmpty {
-                return String(localized: "\(command) exited with status \(status): \(message)")
+                return String(
+                    localized: "\(command) exited with status \(status): \(message)",
+                    bundle: RockxyLocalization.bundle
+                )
             }
-            return String(localized: "\(command) exited with status \(status).")
+            return String(localized: "\(command) exited with status \(status).", bundle: RockxyLocalization.bundle)
         case let .browserUnavailable(name):
-            return String(localized: "\(name) is not available on this Mac.")
+            return String(localized: "\(name) is not available on this Mac.", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -403,6 +406,8 @@ final class DeveloperSetupSessionSetupViewModel {
     var statusMessage: String?
     var context: RockxySetupScriptContext
 
+    let scriptURL: URL
+
     var target: SetupTarget {
         SetupTarget.target(for: targetID) ?? .python
     }
@@ -434,8 +439,6 @@ final class DeveloperSetupSessionSetupViewModel {
         )
     }
 
-    let scriptURL: URL
-
     var manualSourceCommand: String {
         RockxySetupScriptBuilder.sourceCommand(scriptURL: scriptURL)
     }
@@ -446,9 +449,12 @@ final class DeveloperSetupSessionSetupViewModel {
 
     var certificateStatusText: String {
         if context.certificatePath != nil {
-            return String(localized: "Certificate environment hints are ready.")
+            return String(localized: "Certificate environment hints are ready.", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Export the Rockxy root certificate to add certificate environment hints.")
+        return String(
+            localized: "Export the Rockxy root certificate to add certificate environment hints.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     static func makeContext(coordinator: MainContentCoordinator, generatedAt: Date) -> RockxySetupScriptContext {
@@ -477,8 +483,8 @@ final class DeveloperSetupSessionSetupViewModel {
     ) {
         guard let route,
               route.destination == destination,
-              route.generation > lastAppliedRouteGeneration
-        else {
+              route.generation > lastAppliedRouteGeneration else
+        {
             return
         }
         lastAppliedRouteGeneration = route.generation
@@ -499,9 +505,12 @@ final class DeveloperSetupSessionSetupViewModel {
     func prepareScriptForDisplay() {
         do {
             try prepareScript()
-            statusMessage = String(localized: "Setup script is ready.")
+            statusMessage = String(localized: "Setup script is ready.", bundle: RockxyLocalization.bundle)
         } catch {
-            statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+            statusMessage = String(
+                localized: "Could not prepare the setup script: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -509,19 +518,25 @@ final class DeveloperSetupSessionSetupViewModel {
         do {
             try prepareScript()
             pasteboard.write(manualSourceCommand)
-            statusMessage = String(localized: "Setup command copied.")
+            statusMessage = String(localized: "Setup command copied.", bundle: RockxyLocalization.bundle)
         } catch {
-            statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+            statusMessage = String(
+                localized: "Could not prepare the setup script: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
     func copyTargetSnippet() {
         guard let snippet = targetSnippetText else {
-            statusMessage = String(localized: "No snippet is available for \(target.title).")
+            statusMessage = String(
+                localized: "No snippet is available for \(target.title).",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
         pasteboard.write(snippet)
-        statusMessage = String(localized: "\(target.title) snippet copied.")
+        statusMessage = String(localized: "\(target.title) snippet copied.", bundle: RockxyLocalization.bundle)
     }
 
     func openPreparedTerminal() async {
@@ -531,7 +546,10 @@ final class DeveloperSetupSessionSetupViewModel {
 
         if selectedTerminalApp == .custom {
             pasteboard.write(manualSourceCommand)
-            statusMessage = String(localized: "Setup command copied. Paste it into your terminal.")
+            statusMessage = String(
+                localized: "Setup command copied. Paste it into your terminal.",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
 
@@ -542,15 +560,24 @@ final class DeveloperSetupSessionSetupViewModel {
             try await Task.detached {
                 try RockxySetupSessionLauncher.openTerminal(app, sourceCommand: command, runner: runner)
             }.value
-            statusMessage = String(localized: "Prepared \(target.title) terminal session opened.")
+            statusMessage = String(
+                localized: "Prepared \(target.title) terminal session opened.",
+                bundle: RockxyLocalization.bundle
+            )
         } catch {
-            statusMessage = launchFailureMessage(error, action: String(localized: "open the prepared terminal"))
+            statusMessage = launchFailureMessage(
+                error,
+                action: String(localized: "open the prepared terminal", bundle: RockxyLocalization.bundle)
+            )
         }
     }
 
     func openPreparedBrowser() async {
         guard selectedBrowserApp.isEnabled else {
-            statusMessage = String(localized: "\(selectedBrowserApp.title) is not available.")
+            statusMessage = String(
+                localized: "\(selectedBrowserApp.title) is not available.",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
         guard prepareScriptForLaunch() else {
@@ -565,9 +592,15 @@ final class DeveloperSetupSessionSetupViewModel {
             try await Task.detached {
                 try RockxySetupSessionLauncher.openBrowser(app, proxyHost: host, proxyPort: port, runner: runner)
             }.value
-            statusMessage = String(localized: "Prepared \(app.title) profile opened.")
+            statusMessage = String(
+                localized: "Prepared \(app.title) profile opened.",
+                bundle: RockxyLocalization.bundle
+            )
         } catch {
-            statusMessage = launchFailureMessage(error, action: String(localized: "open the prepared browser"))
+            statusMessage = launchFailureMessage(
+                error,
+                action: String(localized: "open the prepared browser", bundle: RockxyLocalization.bundle)
+            )
         }
     }
 
@@ -584,7 +617,10 @@ final class DeveloperSetupSessionSetupViewModel {
             try prepareScript()
             return true
         } catch {
-            statusMessage = String(localized: "Could not prepare the setup script: \(error.localizedDescription)")
+            statusMessage = String(
+                localized: "Could not prepare the setup script: \(error.localizedDescription)",
+                bundle: RockxyLocalization.bundle
+            )
             return false
         }
     }
@@ -593,8 +629,11 @@ final class DeveloperSetupSessionSetupViewModel {
         if let launchError = error as? DeveloperSetupLaunchError,
            let description = launchError.errorDescription
         {
-            return String(localized: "Could not \(action): \(description)")
+            return String(localized: "Could not \(action): \(description)", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Could not \(action): \(error.localizedDescription)")
+        return String(
+            localized: "Could not \(action): \(error.localizedDescription)",
+            bundle: RockxyLocalization.bundle
+        )
     }
 }

@@ -11,12 +11,6 @@ import Foundation
 /// Supports all traffic classes that `HTTPTransaction` represents: plain HTTP, HTTPS,
 /// WebSocket, GraphQL, Web3 JSON-RPC, and TLS-failure transactions.
 struct RequestListRow: Identifiable {
-    enum SSLState: Int {
-        case insecure
-        case secureTunneled
-        case secureIntercepted
-    }
-
     // MARK: Lifecycle
 
     init(from transaction: HTTPTransaction, sslState: SSLState? = nil) {
@@ -77,6 +71,12 @@ struct RequestListRow: Identifiable {
 
     // MARK: Internal
 
+    enum SSLState: Int {
+        case insecure
+        case secureTunneled
+        case secureIntercepted
+    }
+
     let id: UUID
     let timestamp: Date
     let method: String
@@ -126,7 +126,8 @@ struct RequestListRow: Identifiable {
 
     var isSecureTransport: Bool {
         switch scheme.lowercased() {
-        case "https", "wss":
+        case "https",
+             "wss":
             true
         default:
             false
@@ -136,15 +137,15 @@ struct RequestListRow: Identifiable {
     var displayStatus: String {
         switch state {
         case .pending:
-            String(localized: "Pending")
+            String(localized: "Pending", bundle: RockxyLocalization.bundle)
         case .active:
-            String(localized: "Active")
+            String(localized: "Active", bundle: RockxyLocalization.bundle)
         case .completed:
-            String(localized: "Completed")
+            String(localized: "Completed", bundle: RockxyLocalization.bundle)
         case .failed:
-            String(localized: "Failed")
+            String(localized: "Failed", bundle: RockxyLocalization.bundle)
         case .blocked:
-            String(localized: "Blocked")
+            String(localized: "Blocked", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -348,7 +349,8 @@ extension RequestListRow {
 
     private static func defaultSSLState(forScheme scheme: String) -> SSLState {
         switch scheme.lowercased() {
-        case "https", "wss":
+        case "https",
+             "wss":
             .secureTunneled
         default:
             .insecure
@@ -361,8 +363,12 @@ extension RequestListRow {
         }
         let request = transaction.request
         let target = requestTarget(for: request.url)
-        let startLine = request.method.utf8.count + 1 + target.utf8.count + 1 + httpVersionLabel(for: request.httpVersion).utf8.count + 2
-        return startLine + headersByteCount(request.headers) + 2 + declaredOrCapturedBodyLength(headers: request.headers, body: request.body)
+        let startLine = request.method.utf8.count + 1 + target.utf8
+            .count + 1 + httpVersionLabel(for: request.httpVersion).utf8.count + 2
+        return startLine + headersByteCount(request.headers) + 2 + declaredOrCapturedBodyLength(
+            headers: request.headers,
+            body: request.body
+        )
     }
 
     private static func estimatedResponseSize(for transaction: HTTPTransaction) -> Int? {
@@ -372,12 +378,16 @@ extension RequestListRow {
             return nil
         }
         let statusLine = 8 + 3 + 1 + response.statusMessage.utf8.count + 2
-        return statusLine + headersByteCount(response.headers) + 2 + declaredOrCapturedBodyLength(headers: response.headers, body: response.body)
+        return statusLine + headersByteCount(response.headers) + 2 + declaredOrCapturedBodyLength(
+            headers: response.headers,
+            body: response.body
+        )
     }
 
     private static func requestTarget(for url: URL) -> String {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let path = (components?.percentEncodedPath ?? url.path).isEmpty ? "/" : (components?.percentEncodedPath ?? url.path)
+        let path = (components?.percentEncodedPath ?? url.path)
+            .isEmpty ? "/" : (components?.percentEncodedPath ?? url.path)
         if let query = components?.percentEncodedQuery, !query.isEmpty {
             return "\(path)?\(query)"
         }

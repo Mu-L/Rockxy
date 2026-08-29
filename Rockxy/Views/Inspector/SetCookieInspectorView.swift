@@ -13,7 +13,7 @@ struct SetCookieInspectorView: View {
             let cookies = response.setCookies
             if cookies.isEmpty {
                 InspectorEmptyStateView(
-                    String(localized: "No Set-Cookie Headers"),
+                    String(localized: "No Set-Cookie Headers", bundle: RockxyLocalization.bundle),
                     systemImage: "cup.and.saucer"
                 )
             } else {
@@ -29,13 +29,15 @@ struct SetCookieInspectorView: View {
             }
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Response"),
+                String(localized: "No Response", bundle: RockxyLocalization.bundle),
                 systemImage: "arrow.down.circle"
             )
         }
     }
 
     // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var metrics
 
     private func cookieRow(_ cookie: HTTPCookie) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -49,11 +51,11 @@ struct SetCookieInspectorView: View {
 
             HStack(spacing: 12) {
                 if let domain = Optional(cookie.domain), !domain.isEmpty {
-                    labelValue(String(localized: "Domain"), domain)
+                    labelValue(String(localized: "Domain", bundle: RockxyLocalization.bundle), domain)
                 }
-                labelValue(String(localized: "Path"), cookie.path)
+                labelValue(String(localized: "Path", bundle: RockxyLocalization.bundle), cookie.path)
                 if cookie.isSecure {
-                    Text(String(localized: "Secure"))
+                    Text(String(localized: "Secure", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.metadataFontSize))
                         .foregroundStyle(.green)
                 }
@@ -75,6 +77,4 @@ struct SetCookieInspectorView: View {
                 .font(.system(size: metrics.metadataFontSize, design: .monospaced))
         }
     }
-
-    @Environment(\.appUIDisplayMetrics) private var metrics
 }

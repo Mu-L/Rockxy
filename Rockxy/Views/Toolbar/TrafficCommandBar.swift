@@ -30,9 +30,12 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func clearSession(isEnabled: Bool = true) -> Self {
         .init(
             id: .clearSession,
-            title: String(localized: "Clear Session"),
+            title: String(localized: "Clear Session", bundle: RockxyLocalization.bundle),
             systemImage: "trash",
-            help: String(localized: "Clear captured requests and logs from this session across all tabs. ⌘K"),
+            help: String(
+                localized: "Clear captured requests and logs from this session across all tabs. ⌘K",
+                bundle: RockxyLocalization.bundle
+            ),
             isActive: false,
             isEnabled: isEnabled
         )
@@ -41,9 +44,9 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func jumpToFirstRequest(isEnabled: Bool) -> Self {
         .init(
             id: .jumpToFirstRequest,
-            title: String(localized: "Jump to First Request"),
+            title: String(localized: "Jump to First Request", bundle: RockxyLocalization.bundle),
             systemImage: "arrow.up.to.line",
-            help: String(localized: "Jump to the first visible request. ⌘↑"),
+            help: String(localized: "Jump to the first visible request. ⌘↑", bundle: RockxyLocalization.bundle),
             isActive: false,
             isEnabled: isEnabled
         )
@@ -52,11 +55,17 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func followLive(isActive: Bool) -> Self {
         .init(
             id: .followLive,
-            title: String(localized: "Follow Live"),
+            title: String(localized: "Follow Live", bundle: RockxyLocalization.bundle),
             systemImage: "dot.radiowaves.right",
             help: isActive
-                ? String(localized: "Follow Live is on for this tab. Scroll, select a row, or click again to stop. ⇧⌘L")
-                : String(localized: "Keep the newest request in this tab selected. ⇧⌘L"),
+                ? String(
+                    localized: "Follow Live is on for this tab. Scroll, select a row, or click again to stop. ⇧⌘L",
+                    bundle: RockxyLocalization.bundle
+                )
+                : String(
+                    localized: "Keep the newest request in this tab selected. ⇧⌘L",
+                    bundle: RockxyLocalization.bundle
+                ),
             isActive: isActive,
             isEnabled: true
         )
@@ -65,9 +74,12 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func jumpToLastRequest(isEnabled: Bool) -> Self {
         .init(
             id: .jumpToLastRequest,
-            title: String(localized: "Jump to Last Request"),
+            title: String(localized: "Jump to Last Request", bundle: RockxyLocalization.bundle),
             systemImage: "arrow.down.to.line",
-            help: String(localized: "Jump to the latest visible request without changing Follow Live. ⌘↓"),
+            help: String(
+                localized: "Jump to the latest visible request without changing Follow Live. ⌘↓",
+                bundle: RockxyLocalization.bundle
+            ),
             isActive: false,
             isEnabled: isEnabled
         )
@@ -76,9 +88,12 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func copyAsCURL(isEnabled: Bool) -> Self {
         .init(
             id: .copyAsCURL,
-            title: String(localized: "Copy as cURL"),
+            title: String(localized: "Copy as cURL", bundle: RockxyLocalization.bundle),
             systemImage: "terminal",
-            help: String(localized: "Copy the selected request as a cURL command. ⇧⌘C"),
+            help: String(
+                localized: "Copy the selected request as a cURL command. ⇧⌘C",
+                bundle: RockxyLocalization.bundle
+            ),
             isActive: false,
             isEnabled: isEnabled
         )
@@ -87,11 +102,20 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func togglePin(isPinned: Bool, isEnabled: Bool) -> Self {
         .init(
             id: .togglePin,
-            title: isPinned ? String(localized: "Unpin Request") : String(localized: "Pin Request"),
+            title: isPinned ? String(localized: "Unpin Request", bundle: RockxyLocalization.bundle) : String(
+                localized: "Pin Request",
+                bundle: RockxyLocalization.bundle
+            ),
             systemImage: isPinned ? "pin.fill" : "pin",
             help: isPinned
-                ? String(localized: "Unpin the selected request from the current session.")
-                : String(localized: "Keep the selected request pinned in the current session."),
+                ? String(
+                    localized: "Unpin the selected request from the current session.",
+                    bundle: RockxyLocalization.bundle
+                )
+                : String(
+                    localized: "Keep the selected request pinned in the current session.",
+                    bundle: RockxyLocalization.bundle
+                ),
             isActive: isPinned,
             isEnabled: isEnabled
         )
@@ -100,11 +124,14 @@ struct TrafficCommandDescriptor: Identifiable, Equatable {
     static func toggleSave(isSaved: Bool, isEnabled: Bool) -> Self {
         .init(
             id: .toggleSave,
-            title: isSaved ? String(localized: "Unsave Request") : String(localized: "Save Request"),
+            title: isSaved ? String(localized: "Unsave Request", bundle: RockxyLocalization.bundle) : String(
+                localized: "Save Request",
+                bundle: RockxyLocalization.bundle
+            ),
             systemImage: isSaved ? "tray.full.fill" : "tray.and.arrow.down",
             help: isSaved
-                ? String(localized: "Remove the selected request from the Library.")
-                : String(localized: "Save the selected request to the Library."),
+                ? String(localized: "Remove the selected request from the Library.", bundle: RockxyLocalization.bundle)
+                : String(localized: "Save the selected request to the Library.", bundle: RockxyLocalization.bundle),
             isActive: isSaved,
             isEnabled: isEnabled
         )
@@ -124,13 +151,22 @@ struct TrafficRecordingCommandPresentation: Equatable {
 
     static func make(isProxyRunning: Bool, isRecording: Bool) -> Self {
         .init(
-            title: isRecording ? String(localized: "Pause Recording") : String(localized: "Resume Recording"),
+            title: isRecording ? String(localized: "Pause Recording", bundle: RockxyLocalization.bundle) : String(
+                localized: "Resume Recording",
+                bundle: RockxyLocalization.bundle
+            ),
             systemImage: isRecording ? "pause.circle" : "record.circle",
             help: isProxyRunning
                 ? (isRecording
-                    ? String(localized: "Pause recording new traffic without stopping the proxy. ⌥⌘R")
-                    : String(localized: "Resume recording new traffic. ⌥⌘R"))
-                : String(localized: "Start the proxy before changing recording. ⌥⌘R"),
+                    ? String(
+                        localized: "Pause recording new traffic without stopping the proxy. ⌥⌘R",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(localized: "Resume recording new traffic. ⌥⌘R", bundle: RockxyLocalization.bundle))
+                : String(
+                    localized: "Start the proxy before changing recording. ⌥⌘R",
+                    bundle: RockxyLocalization.bundle
+                ),
             isEnabled: isProxyRunning
         )
     }
@@ -140,8 +176,14 @@ struct TrafficRecordingCommandPresentation: Equatable {
 
 enum TrafficActionsMenuPresentation {
     static let systemImage = "ellipsis.circle"
-    static let help = String(localized: "More traffic actions")
-    static let accessibilityLabel = String(localized: "More Traffic Actions")
+
+    static var help: String {
+        String(localized: "More traffic actions", bundle: RockxyLocalization.bundle)
+    }
+
+    static var accessibilityLabel: String {
+        String(localized: "More Traffic Actions", bundle: RockxyLocalization.bundle)
+    }
 }
 
 // MARK: - TrafficCommandBar
@@ -265,7 +307,10 @@ struct TrafficCommandBar: View {
         .help(presentation.help)
         .accessibilityLabel(presentation.title)
         .accessibilityValue(
-            coordinator.isRecording ? String(localized: "Recording") : String(localized: "Paused")
+            coordinator.isRecording ? String(localized: "Recording", bundle: RockxyLocalization.bundle) : String(
+                localized: "Paused",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 
@@ -317,7 +362,10 @@ struct TrafficCommandBar: View {
         }
         .help(descriptor.help)
         .accessibilityLabel(descriptor.title)
-        .accessibilityValue(descriptor.isActive ? String(localized: "On") : String(localized: "Off"))
+        .accessibilityValue(descriptor.isActive ? String(localized: "On", bundle: RockxyLocalization.bundle) : String(
+            localized: "Off",
+            bundle: RockxyLocalization.bundle
+        ))
     }
 
     private var moreActionsMenu: some View {
@@ -335,7 +383,7 @@ struct TrafficCommandBar: View {
 
             Divider()
 
-            Button(String(localized: "Compose…")) { actions.composeFreshRequest() }
+            Button(String(localized: "Compose…", bundle: RockxyLocalization.bundle)) { actions.composeFreshRequest() }
             sessionMenu
             exportMenu
         } label: {
@@ -362,7 +410,7 @@ struct TrafficCommandBar: View {
     /// Keeps the command-bar quick tools discoverable when the responsive strip collapses, and
     /// bridges into the shared customization editor through the stable trailing More menu.
     @ViewBuilder private var quickToolsMenu: some View {
-        Menu(String(localized: "Quick Tools")) {
+        Menu(String(localized: "Quick Tools", bundle: RockxyLocalization.bundle)) {
             ForEach(
                 FooterActionDescriptor.toolingActions(
                     isAllowListActive: allowListManager.isActive,
@@ -376,7 +424,7 @@ struct TrafficCommandBar: View {
                 }
             }
         }
-        Button(String(localized: "Customize Quick Tools…")) {
+        Button(String(localized: "Customize Quick Tools…", bundle: RockxyLocalization.bundle)) {
             // A macOS `Menu` tears down its transient window before the next presentation can
             // begin. Defer the popover state change to the next main-queue turn so the stable
             // command-bar anchor presents reliably after the menu has closed.
@@ -387,14 +435,18 @@ struct TrafficCommandBar: View {
     }
 
     @ViewBuilder private var navigationMenu: some View {
-        Button(String(localized: "Jump to First Request")) { actions.selectFirstTransaction() }
-            .disabled(coordinator.filteredTransactions.isEmpty)
-        Button(String(localized: "Jump to Last Request")) { actions.selectLastTransaction() }
-            .disabled(coordinator.filteredTransactions.isEmpty)
+        Button(String(localized: "Jump to First Request", bundle: RockxyLocalization.bundle)) {
+            actions.selectFirstTransaction()
+        }
+        .disabled(coordinator.filteredTransactions.isEmpty)
+        Button(String(localized: "Jump to Last Request", bundle: RockxyLocalization.bundle)) {
+            actions.selectLastTransaction()
+        }
+        .disabled(coordinator.filteredTransactions.isEmpty)
     }
 
     private var requestMenu: some View {
-        Menu(String(localized: "Selected Request")) {
+        Menu(String(localized: "Selected Request", bundle: RockxyLocalization.bundle)) {
             let copy = TrafficCommandDescriptor.copyAsCURL(isEnabled: canUseHTTPOnlySelection)
             Button(copy.title) { actions.copyAsCURL() }
                 .disabled(!copy.isEnabled)
@@ -423,46 +475,48 @@ struct TrafficCommandBar: View {
 
             Divider()
 
-            Button(String(localized: "Repeat")) { actions.replayRequest() }
+            Button(String(localized: "Repeat", bundle: RockxyLocalization.bundle)) { actions.replayRequest() }
                 .disabled(!canUseHTTPOnlySelection)
-            Button(String(localized: "Edit and Repeat…")) { actions.editAndRepeat() }
+            Button(String(localized: "Edit and Repeat…", bundle: RockxyLocalization.bundle)) { actions.editAndRepeat() }
                 .disabled(!canUseHTTPOnlySelection)
 
             Divider()
 
-            Button(String(localized: "Add Note…")) { actions.addComment() }
-            Menu(String(localized: "Highlight")) {
+            Button(String(localized: "Add Note…", bundle: RockxyLocalization.bundle)) { actions.addComment() }
+            Menu(String(localized: "Highlight", bundle: RockxyLocalization.bundle)) {
                 ForEach(HighlightColor.allCases, id: \.self) { color in
                     Button(color.rawValue.capitalized) { actions.setHighlight(color) }
                 }
                 Divider()
-                Button(String(localized: "Remove Highlight")) { actions.setHighlight(nil) }
+                Button(String(localized: "Remove Highlight", bundle: RockxyLocalization.bundle)) {
+                    actions.setHighlight(nil)
+                }
             }
         }
         .disabled(!hasSingleRequestSelection)
     }
 
     private var createRuleMenu: some View {
-        Menu(String(localized: "Create Rule from Request")) {
-            Button(String(localized: "Breakpoint…")) {
+        Menu(String(localized: "Create Rule from Request", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Breakpoint…", bundle: RockxyLocalization.bundle)) {
                 guard let selectedTransaction else {
                     return
                 }
                 coordinator.createBreakpointRule(for: selectedTransaction)
             }
-            Button(String(localized: "Map Local…")) {
+            Button(String(localized: "Map Local…", bundle: RockxyLocalization.bundle)) {
                 guard let selectedTransaction else {
                     return
                 }
                 coordinator.createMapLocalRule(for: selectedTransaction)
             }
-            Button(String(localized: "Map Remote…")) {
+            Button(String(localized: "Map Remote…", bundle: RockxyLocalization.bundle)) {
                 guard let selectedTransaction else {
                     return
                 }
                 coordinator.createMapRemoteRule(for: selectedTransaction)
             }
-            Button(String(localized: "Network Condition…")) {
+            Button(String(localized: "Network Condition…", bundle: RockxyLocalization.bundle)) {
                 guard let selectedTransaction else {
                     return
                 }
@@ -473,25 +527,33 @@ struct TrafficCommandBar: View {
     }
 
     private var sessionMenu: some View {
-        Menu(String(localized: "Session")) {
-            Button(String(localized: "Clear Session and Filters")) { actions.clearCaptureAndFilters() }
-                .disabled(!canClearSession)
-            Button(String(localized: "Save Session…")) { actions.saveSession() }
+        Menu(String(localized: "Session", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Clear Session and Filters", bundle: RockxyLocalization.bundle)) {
+                actions.clearCaptureAndFilters()
+            }
+            .disabled(!canClearSession)
+            Button(String(localized: "Save Session…", bundle: RockxyLocalization.bundle)) { actions.saveSession() }
                 .disabled(coordinator.transactions.isEmpty)
         }
     }
 
     private var exportMenu: some View {
-        Menu(String(localized: "Export")) {
-            Button(String(localized: "Export as HAR…")) { actions.exportHAR() }
+        Menu(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "Export as HAR…", bundle: RockxyLocalization.bundle)) { actions.exportHAR() }
                 .disabled(coordinator.transactions.isEmpty)
-            Button(String(localized: "Export as OpenAPI YAML…")) { actions.exportOpenAPIYAML() }
-                .disabled(!actions.canExportOpenAPI)
-            Button(String(localized: "Export as OpenAPI HTML…")) { actions.exportOpenAPIHTML() }
-                .disabled(!actions.canExportOpenAPI)
+            Button(String(localized: "Export as OpenAPI YAML…", bundle: RockxyLocalization.bundle)) {
+                actions.exportOpenAPIYAML()
+            }
+            .disabled(!actions.canExportOpenAPI)
+            Button(String(localized: "Export as OpenAPI HTML…", bundle: RockxyLocalization.bundle)) {
+                actions.exportOpenAPIHTML()
+            }
+            .disabled(!actions.canExportOpenAPI)
             Divider()
-            Button(String(localized: "Publish Selected to Gist…")) { actions.publishSelectedToGist() }
-                .disabled(!actions.canPublishGist)
+            Button(String(localized: "Publish Selected to Gist…", bundle: RockxyLocalization.bundle)) {
+                actions.publishSelectedToGist()
+            }
+            .disabled(!actions.canPublishGist)
         }
     }
 

@@ -63,7 +63,7 @@ struct SearchFilterBar: View {
             }
             .frame(width: pickerWidth)
 
-            TextField(String(localized: "Search..."), text: $searchText)
+            TextField(String(localized: "Search...", bundle: RockxyLocalization.bundle), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(metrics.swiftUIFont())
                 .focused($isSearchFocused)
@@ -77,7 +77,7 @@ struct SearchFilterBar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel(String(localized: "Clear search"))
+                .accessibilityLabel(String(localized: "Clear search", bundle: RockxyLocalization.bundle))
             }
 
             Divider()
@@ -85,15 +85,15 @@ struct SearchFilterBar: View {
 
             Button(action: onAddFilter) {
                 if showsAddFilterTitle {
-                    Label(String(localized: "Add Filter"), systemImage: "plus")
+                    Label(String(localized: "Add Filter", bundle: RockxyLocalization.bundle), systemImage: "plus")
                 } else {
                     Image(systemName: "plus")
                 }
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
-            .help(String(localized: "Add a compound filter rule"))
-            .accessibilityLabel(String(localized: "Add Filter"))
+            .help(String(localized: "Add a compound filter rule", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Add Filter", bundle: RockxyLocalization.bundle))
 
             Button(action: onToggleAdvancedFilters) {
                 HStack(spacing: 4) {
@@ -109,8 +109,8 @@ struct SearchFilterBar: View {
             .rockxyGlassButtonStyle()
             .controlSize(.small)
             .help(isAdvancedFilterVisible
-                ? String(localized: "Hide compound filters")
-                : String(localized: "Show compound filters"))
+                ? String(localized: "Hide compound filters", bundle: RockxyLocalization.bundle)
+                : String(localized: "Show compound filters", bundle: RockxyLocalization.bundle))
         }
     }
 }

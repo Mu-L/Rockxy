@@ -39,7 +39,7 @@ struct AssistantPromptBuilder {
             !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
         guard !meaningfulMessages.isEmpty else {
-            return String(localized: "No conversation text")
+            return String(localized: "No conversation text", bundle: RockxyLocalization.bundle)
         }
 
         var remainingCharacters = Self.maxConversationCharacters
@@ -60,8 +60,8 @@ struct AssistantPromptBuilder {
             let allowed = min(remainingCharacters, Self.maxCharactersPerTurn)
             let clipped = String(normalized.prefix(allowed))
             let role = message.role == .user
-                ? String(localized: "User")
-                : String(localized: "Assistant")
+                ? String(localized: "User", bundle: RockxyLocalization.bundle)
+                : String(localized: "Assistant", bundle: RockxyLocalization.bundle)
             turns.append("\(role): \(clipped)")
             remainingCharacters -= clipped.count
         }
@@ -126,7 +126,7 @@ struct AssistantPromptBuilder {
             message.role == .user
                 && !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         })?.text else {
-            return String(localized: "Explain the reviewed request.")
+            return String(localized: "Explain the reviewed request.", bundle: RockxyLocalization.bundle)
         }
         return normalized(request)
     }

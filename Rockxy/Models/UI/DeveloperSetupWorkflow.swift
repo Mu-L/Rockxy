@@ -55,13 +55,13 @@ enum SetupSnippetID: String, CaseIterable, Identifiable, Equatable {
         case .nodeAxios:
             "axios"
         case .nodeHTTPS:
-            String(localized: "Node core")
+            String(localized: "Node core", bundle: RockxyLocalization.bundle)
         case .nodeGot:
             "got"
         case .curlCommand:
-            String(localized: "Command")
+            String(localized: "Command", bundle: RockxyLocalization.bundle)
         case .curlEnvironment:
-            String(localized: "Env")
+            String(localized: "Env", bundle: RockxyLocalization.bundle)
         case .rubyNetHTTP:
             "net/http"
         case .rubyHTTP:
@@ -75,25 +75,25 @@ enum SetupSnippetID: String, CaseIterable, Identifiable, Equatable {
         case .rustReqwest:
             "reqwest"
         case .javaKeytool:
-            String(localized: "keytool")
+            String(localized: "keytool", bundle: RockxyLocalization.bundle)
         case .javaHttpClient:
             "HttpClient"
         case .firefoxConfig:
-            String(localized: "Settings")
+            String(localized: "Settings", bundle: RockxyLocalization.bundle)
         case .postmanConfig:
-            String(localized: "Settings")
+            String(localized: "Settings", bundle: RockxyLocalization.bundle)
         case .insomniaConfig:
-            String(localized: "Settings")
+            String(localized: "Settings", bundle: RockxyLocalization.bundle)
         case .pawConfig:
-            String(localized: "Settings")
+            String(localized: "Settings", bundle: RockxyLocalization.bundle)
         case .dockerRun:
             "docker run"
         case .electronCommand:
-            String(localized: "CLI flag")
+            String(localized: "CLI flag", bundle: RockxyLocalization.bundle)
         case .electronSession:
             "session.setProxy"
         case .nextJSRouteHandler:
-            String(localized: "Route handler")
+            String(localized: "Route handler", bundle: RockxyLocalization.bundle)
         case .flutterHttpClient:
             "HttpClient"
         case .flutterHTTPPackage:
@@ -101,13 +101,13 @@ enum SetupSnippetID: String, CaseIterable, Identifiable, Equatable {
         case .flutterDio5:
             "Dio 5"
         case .flutterAndroidNetworkSecurityConfig:
-            String(localized: "Android XML")
+            String(localized: "Android XML", bundle: RockxyLocalization.bundle)
         case .reactNativeFetchProbe:
             "fetch"
         case .reactNativeAndroidNetworkSecurityConfig:
-            String(localized: "Android XML")
+            String(localized: "Android XML", bundle: RockxyLocalization.bundle)
         case .reactNativeMetroChecklist:
-            String(localized: "Metro checklist")
+            String(localized: "Metro checklist", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -174,7 +174,7 @@ enum DeveloperSetupWorkflowCatalog {
             SetupWorkflow(
                 snippets: [
                     SetupSnippet(id: .nodeAxios, title: "axios"),
-                    SetupSnippet(id: .nodeHTTPS, title: String(localized: "Node core")),
+                    SetupSnippet(id: .nodeHTTPS, title: String(localized: "Node core", bundle: RockxyLocalization.bundle)),
                     SetupSnippet(id: .nodeGot, title: "got"),
                 ],
                 validation: validationSpec(for: .nodeJS, runtimeName: "Node.js", preferredSnippetID: .nodeAxios)
@@ -183,8 +183,8 @@ enum DeveloperSetupWorkflowCatalog {
         case .curl:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .curlCommand, title: String(localized: "Command")),
-                    SetupSnippet(id: .curlEnvironment, title: String(localized: "Env")),
+                    SetupSnippet(id: .curlCommand, title: String(localized: "Command", bundle: RockxyLocalization.bundle)),
+                    SetupSnippet(id: .curlEnvironment, title: String(localized: "Env", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .curl, runtimeName: "cURL", preferredSnippetID: .curlCommand)
             )
@@ -219,7 +219,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .javaVMs:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .javaKeytool, title: String(localized: "keytool")),
+                    SetupSnippet(id: .javaKeytool, title: String(localized: "keytool", bundle: RockxyLocalization.bundle)),
                     SetupSnippet(id: .javaHttpClient, title: "HttpClient"),
                 ],
                 validation: validationSpec(for: .javaVMs, runtimeName: "Java", preferredSnippetID: .javaHttpClient)
@@ -228,7 +228,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .firefox:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .firefoxConfig, title: String(localized: "Settings")),
+                    SetupSnippet(id: .firefoxConfig, title: String(localized: "Settings", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .firefox, runtimeName: "Firefox", preferredSnippetID: .curlCommand)
             )
@@ -236,7 +236,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .postman:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .postmanConfig, title: String(localized: "Settings")),
+                    SetupSnippet(id: .postmanConfig, title: String(localized: "Settings", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .postman, runtimeName: "Postman", preferredSnippetID: .curlCommand)
             )
@@ -244,7 +244,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .insomnia:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .insomniaConfig, title: String(localized: "Settings")),
+                    SetupSnippet(id: .insomniaConfig, title: String(localized: "Settings", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .insomnia, runtimeName: "Insomnia", preferredSnippetID: .curlCommand)
             )
@@ -252,7 +252,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .paw:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .pawConfig, title: String(localized: "Settings")),
+                    SetupSnippet(id: .pawConfig, title: String(localized: "Settings", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .paw, runtimeName: "Paw", preferredSnippetID: .curlCommand)
             )
@@ -268,7 +268,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .electronJS:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .electronCommand, title: String(localized: "CLI flag")),
+                    SetupSnippet(id: .electronCommand, title: String(localized: "CLI flag", bundle: RockxyLocalization.bundle)),
                     SetupSnippet(id: .electronSession, title: "session.setProxy"),
                 ],
                 validation: validationSpec(
@@ -281,7 +281,7 @@ enum DeveloperSetupWorkflowCatalog {
         case .nextJS:
             SetupWorkflow(
                 snippets: [
-                    SetupSnippet(id: .nextJSRouteHandler, title: String(localized: "Route handler")),
+                    SetupSnippet(id: .nextJSRouteHandler, title: String(localized: "Route handler", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(
                     for: .nextJS,
@@ -296,7 +296,7 @@ enum DeveloperSetupWorkflowCatalog {
                     SetupSnippet(id: .flutterDio5, title: "Dio 5"),
                     SetupSnippet(id: .flutterHttpClient, title: "HttpClient"),
                     SetupSnippet(id: .flutterHTTPPackage, title: "package:http"),
-                    SetupSnippet(id: .flutterAndroidNetworkSecurityConfig, title: String(localized: "Android XML")),
+                    SetupSnippet(id: .flutterAndroidNetworkSecurityConfig, title: String(localized: "Android XML", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(for: .flutter, runtimeName: "Flutter", preferredSnippetID: .flutterDio5)
             )
@@ -305,11 +305,8 @@ enum DeveloperSetupWorkflowCatalog {
             SetupWorkflow(
                 snippets: [
                     SetupSnippet(id: .reactNativeFetchProbe, title: "fetch"),
-                    SetupSnippet(
-                        id: .reactNativeAndroidNetworkSecurityConfig,
-                        title: String(localized: "Android XML")
-                    ),
-                    SetupSnippet(id: .reactNativeMetroChecklist, title: String(localized: "Metro checklist")),
+                    SetupSnippet(id: .reactNativeAndroidNetworkSecurityConfig, title: String(localized: "Android XML", bundle: RockxyLocalization.bundle)),
+                    SetupSnippet(id: .reactNativeMetroChecklist, title: String(localized: "Metro checklist", bundle: RockxyLocalization.bundle)),
                 ],
                 validation: validationSpec(
                     for: .reactNative,
@@ -341,13 +338,11 @@ enum DeveloperSetupWorkflowCatalog {
         return [
             SetupStep(
                 id: "proxy",
-                title: String(localized: "Proxy status"),
+                title: String(localized: "Proxy status", bundle: RockxyLocalization.bundle),
                 description: snapshot.proxyRunning
                     ?
-                    String(
-                        localized: "Rockxy is listening on \(snapshot.effectiveListenAddress):\(snapshot.activePort)."
-                    )
-                    : String(localized: "Start Rockxy before you point \(target.title) traffic at the local proxy."),
+                    String(localized: "Rockxy is listening on \(snapshot.effectiveListenAddress):\(snapshot.activePort).", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Start Rockxy before you point \(target.title) traffic at the local proxy.", bundle: RockxyLocalization.bundle),
                 actionTitle: snapshot.proxyStepActionTitle,
                 actionKind: .verifyProxy,
                 isComplete: snapshot.proxyRunning && snapshot.recordingEnabled,
@@ -355,14 +350,12 @@ enum DeveloperSetupWorkflowCatalog {
             ),
             SetupStep(
                 id: "certificate",
-                title: String(localized: "Certificate"),
+                title: String(localized: "Certificate", bundle: RockxyLocalization.bundle),
                 description: snapshot.certificateTrusted
-                    ? String(localized: "The Rockxy root certificate is trusted for HTTPS interception.")
+                    ? String(localized: "The Rockxy root certificate is trusted for HTTPS interception.", bundle: RockxyLocalization.bundle)
                     :
-                    String(
-                        localized: "Trust and export the Rockxy root certificate before validating HTTPS requests."
-                    ),
-                actionTitle: String(localized: "Open Certificate"),
+                    String(localized: "Trust and export the Rockxy root certificate before validating HTTPS requests.", bundle: RockxyLocalization.bundle),
+                actionTitle: String(localized: "Open Certificate", bundle: RockxyLocalization.bundle),
                 actionKind: .openCertificate,
                 isComplete: snapshot.certificateTrusted && snapshot.certificateExportable,
                 isEnabled: true
@@ -371,21 +364,19 @@ enum DeveloperSetupWorkflowCatalog {
                 id: "snippet",
                 title: snippetTitle,
                 description: snippetDescription,
-                actionTitle: String(localized: "View Snippet"),
+                actionTitle: String(localized: "View Snippet", bundle: RockxyLocalization.bundle),
                 actionKind: .copySnippet,
                 isComplete: selectedSnippetID != nil,
                 isEnabled: selectedSnippetID != nil
             ),
             SetupStep(
                 id: "validate",
-                title: String(localized: "Capture check"),
+                title: String(localized: "Capture check", bundle: RockxyLocalization.bundle),
                 description: snapshot.verificationState == .success
                     ?
-                    String(
-                        localized: "Rockxy captured the local validation probe and can reveal it in the main window."
-                    )
-                    : String(localized: "Run the local validation probe and wait for the first matching capture."),
-                actionTitle: String(localized: "Open Check"),
+                    String(localized: "Rockxy captured the local validation probe and can reveal it in the main window.", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Run the local validation probe and wait for the first matching capture.", bundle: RockxyLocalization.bundle),
+                actionTitle: String(localized: "Open Check", bundle: RockxyLocalization.bundle),
                 actionKind: .runValidation,
                 isComplete: snapshot.verificationState == .success,
                 isEnabled: true
@@ -1176,7 +1167,7 @@ enum DeveloperSetupWorkflowCatalog {
             GET \(validationURL). This confirms the probe reached Rockxy through the proxy, \
             but it does not attribute the request to a specific app, process, device, simulator, \
             emulator, or runtime.
-            """
+            """, bundle: RockxyLocalization.bundle
         )
     }
 
@@ -1214,77 +1205,71 @@ enum DeveloperSetupWorkflowCatalog {
     private static func snippetStepTitle(for targetID: SetupTarget.ID) -> String {
         switch targetID {
         case .curl:
-            String(localized: "cURL command")
+            String(localized: "cURL command", bundle: RockxyLocalization.bundle)
         case .javaVMs:
-            String(localized: "Java setup")
+            String(localized: "Java setup", bundle: RockxyLocalization.bundle)
         case .firefox,
              .postman,
              .insomnia,
              .paw:
-            String(localized: "Client configuration")
+            String(localized: "Client configuration", bundle: RockxyLocalization.bundle)
         case .docker:
-            String(localized: "Container command")
+            String(localized: "Container command", bundle: RockxyLocalization.bundle)
         case .electronJS:
-            String(localized: "Electron configuration")
+            String(localized: "Electron configuration", bundle: RockxyLocalization.bundle)
         case .nextJS:
-            String(localized: "Next.js handler")
+            String(localized: "Next.js handler", bundle: RockxyLocalization.bundle)
         case .flutter:
-            String(localized: "Flutter client")
+            String(localized: "Flutter client", bundle: RockxyLocalization.bundle)
         case .reactNative:
-            String(localized: "React Native setup")
+            String(localized: "React Native setup", bundle: RockxyLocalization.bundle)
         default:
-            String(localized: "Runtime snippet")
+            String(localized: "Runtime snippet", bundle: RockxyLocalization.bundle)
         }
     }
 
     private static func snippetStepDescription(for targetID: SetupTarget.ID) -> String {
         switch targetID {
         case .curl:
-            String(localized: "Choose the command or environment example that matches how you run cURL.")
+            String(localized: "Choose the command or environment example that matches how you run cURL.", bundle: RockxyLocalization.bundle)
         case .nodeJS:
-            String(localized: "Choose the Node.js library that matches your current runtime code path.")
+            String(localized: "Choose the Node.js library that matches your current runtime code path.", bundle: RockxyLocalization.bundle)
         case .ruby:
-            String(localized: "Choose the Ruby client that matches your current code path and copy the snippet.")
+            String(localized: "Choose the Ruby client that matches your current code path and copy the snippet.", bundle: RockxyLocalization.bundle)
         case .golang:
-            String(localized: "Choose the Go HTTP client that matches your runtime and copy the snippet.")
+            String(localized: "Choose the Go HTTP client that matches your runtime and copy the snippet.", bundle: RockxyLocalization.bundle)
         case .rust:
-            String(localized: "Use the reqwest snippet to point Rust traffic at Rockxy and trust the root certificate.")
+            String(localized: "Use the reqwest snippet to point Rust traffic at Rockxy and trust the root certificate.", bundle: RockxyLocalization.bundle)
         case .javaVMs:
-            String(localized: "Import the Rockxy CA with keytool, then run the HttpClient sample to confirm capture.")
+            String(localized: "Import the Rockxy CA with keytool, then run the HttpClient sample to confirm capture.", bundle: RockxyLocalization.bundle)
         case .firefox:
-            String(
-                localized: "Paste the proxy values into Firefox's Network Settings and import the CA into its own certificate store."
-            )
+            String(localized: "Paste the proxy values into Firefox's Network Settings and import the CA into its own certificate store.", bundle: RockxyLocalization.bundle)
         case .postman:
-            String(localized: "Paste the proxy values into Postman's settings and trust the exported PEM.")
+            String(localized: "Paste the proxy values into Postman's settings and trust the exported PEM.", bundle: RockxyLocalization.bundle)
         case .insomnia:
-            String(localized: "Enable Insomnia's proxy toggle, paste the values, and trust the exported PEM.")
+            String(localized: "Enable Insomnia's proxy toggle, paste the values, and trust the exported PEM.", bundle: RockxyLocalization.bundle)
         case .paw:
-            String(localized: "Point the macOS system proxy at Rockxy — Paw follows the system proxy automatically.")
+            String(localized: "Point the macOS system proxy at Rockxy — Paw follows the system proxy automatically.", bundle: RockxyLocalization.bundle)
         case .docker:
-            String(
-                localized: "Run one throwaway container to confirm host.docker.internal + the mounted CA work end-to-end."
-            )
+            String(localized: "Run one throwaway container to confirm host.docker.internal + the mounted CA work end-to-end.", bundle: RockxyLocalization.bundle)
         case .electronJS:
-            String(
-                localized: "Pick the CLI flag variant or the main-process session.setProxy call, depending on how you launch the app."
-            )
+            String(localized: "Pick the CLI flag variant or the main-process session.setProxy call, depending on how you launch the app.", bundle: RockxyLocalization.bundle)
         case .nextJS:
-            String(localized: "Add the route handler and start next dev with NODE_EXTRA_CA_CERTS + HTTPS_PROXY set.")
+            String(localized: "Add the route handler and start next dev with NODE_EXTRA_CA_CERTS + HTTPS_PROXY set.", bundle: RockxyLocalization.bundle)
         case .flutter:
             String(
                 localized: """
                 Choose the Flutter client path you use, then keep the iOS or Android device setup aligned with that runtime.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         case .reactNative:
             String(
                 localized: """
                 Choose the React Native probe, Android debug trust XML, or Metro checklist that matches the target runtime.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         default:
-            String(localized: "Choose the snippet that matches your current runtime or library and copy it.")
+            String(localized: "Choose the snippet that matches your current runtime or library and copy it.", bundle: RockxyLocalization.bundle)
         }
     }
 }

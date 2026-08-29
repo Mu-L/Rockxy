@@ -120,7 +120,7 @@ struct ProxyStatusIndicator: View {
     private var statusHelpText: String {
         let captureContext = [
             statusText,
-            String(localized: "Listening on \(listenerText)"),
+            String(localized: "Listening on \(listenerText)", bundle: RockxyLocalization.bundle),
         ]
         if let updateStatusSummary {
             return (captureContext + [
@@ -150,7 +150,7 @@ struct ProxyStatusIndicator: View {
         Button(action: openUpdates) {
             ViewThatFits(in: .horizontal) {
                 updateBadge(summary.badgeTitle)
-                updateBadge(String(localized: "Update"))
+                updateBadge(String(localized: "Update", bundle: RockxyLocalization.bundle))
             }
         }
         .buttonStyle(.plain)

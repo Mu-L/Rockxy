@@ -32,12 +32,13 @@ final class ModifyHeaderWindowViewModel {
     private(set) var allRules: [ProxyRule] = []
     var selectedRuleID: UUID?
     var editorSession: ModifyHeaderEditorSession?
+    var isToolEnabled: Bool
+
     var searchText = "" {
         didSet {
             reconcileSelection()
         }
     }
-    var isToolEnabled: Bool
 
     /// Unfiltered Modify Header rules in their global evaluation order.
     var headerRules: [ProxyRule] {
@@ -90,8 +91,8 @@ final class ModifyHeaderWindowViewModel {
             return nil
         }
         guard orderedSubset.count == currentIDs.count,
-              Set(orderedSubset.map(\.id)) == Set(currentIDs)
-        else {
+              Set(orderedSubset.map(\.id)) == Set(currentIDs) else
+        {
             return allRules
         }
 
@@ -260,12 +261,12 @@ final class ModifyHeaderWindowViewModel {
     func scopeSummary(for rule: ProxyRule) -> String {
         let phases = Set(operations(for: rule).map(\.phase))
         if phases == [.request] {
-            return String(localized: "Request")
+            return String(localized: "Request", bundle: RockxyLocalization.bundle)
         }
         if phases == [.response] {
-            return String(localized: "Response")
+            return String(localized: "Response", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "Both")
+        return String(localized: "Both", bundle: RockxyLocalization.bundle)
     }
 
     func operationSummary(for rule: ProxyRule) -> String {
@@ -370,6 +371,21 @@ struct ModifyHeaderWindowView: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var footerHint: String {
+        let countText = if viewModel.searchText.isEmpty {
+            "\(viewModel.headerRules.count) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
+        } else {
+            String(
+                localized: "\(viewModel.modifyHeaderRules.count) of \(viewModel.headerRules.count) rules",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        let reorderHint = viewModel.isReorderable
+            ? String(localized: "Drag rows to reorder", bundle: RockxyLocalization.bundle)
+            : String(localized: "Clear search to reorder", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · \(reorderHint)"
+    }
+
     private var toolbar: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
@@ -377,30 +393,34 @@ struct ModifyHeaderWindowView: View {
                     get: { viewModel.isToolEnabled },
                     set: { viewModel.setToolEnabled($0) }
                 )) {
-                    Text(String(localized: "Enable Modify Headers"))
+                    Text(String(localized: "Enable Modify Headers", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .medium))
                 }
                 .toggleStyle(.checkbox)
                 .help(
                     String(
-                        localized: "When off, Modify Header rules are skipped during evaluation. Other rule types are unaffected."
+                        localized: "When off, Modify Header rules are skipped during evaluation. Other rule types are unaffected.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
-                .accessibilityLabel(String(localized: "Enable Modify Headers"))
+                .accessibilityLabel(String(localized: "Enable Modify Headers", bundle: RockxyLocalization.bundle))
 
-                Text(String(localized: "Apply ordered header operations to matching requests and responses."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Apply ordered header operations to matching requests and responses.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Modify Header rules"))
+                .accessibilityLabel(String(localized: "Search Modify Header rules", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -413,13 +433,16 @@ struct ModifyHeaderWindowView: View {
                 Image(systemName: "list.bullet.header")
                     .font(.system(size: max(20, toolMetrics.bodyFontSize + 7)))
                     .foregroundStyle(.tertiary)
-                Text(String(localized: "No Modify Header Rules"))
+                Text(String(localized: "No Modify Header Rules", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .medium))
                     .foregroundStyle(.secondary)
-                Text(String(localized: "Add rules to modify HTTP request and response headers."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
+                Text(String(
+                    localized: "Add rules to modify HTTP request and response headers.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -459,19 +482,19 @@ struct ModifyHeaderWindowView: View {
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(width: 24, alignment: .trailing)
-            Text(String(localized: "Name"))
+            Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(width: 220, alignment: .leading)
-            Text(String(localized: "Scope"))
+            Text(String(localized: "Scope", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(width: 82, alignment: .leading)
-            Text(String(localized: "Match"))
+            Text(String(localized: "Match", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(String(localized: "Ops"))
+            Text(String(localized: "Ops", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
                 .foregroundStyle(.secondary)
                 .frame(width: 54, alignment: .trailing)
@@ -488,7 +511,8 @@ struct ModifyHeaderWindowView: View {
                 .foregroundStyle(.secondary)
             Text(
                 String(
-                    localized: "Set, add, or remove HTTP headers on matching requests and responses. Each rule can have multiple header operations."
+                    localized: "Set, add, or remove HTTP headers on matching requests and responses. Each rule can have multiple header operations.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -509,8 +533,8 @@ struct ModifyHeaderWindowView: View {
             }
             .buttonStyle(.borderless)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
-            .accessibilityLabel(String(localized: "New Modify Header rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "New Modify Header rule", bundle: RockxyLocalization.bundle))
 
             Button {
                 guard let id = viewModel.selectedRuleID else {
@@ -523,8 +547,11 @@ struct ModifyHeaderWindowView: View {
             .buttonStyle(.borderless)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
-            .help(String(localized: "Delete Rule"))
-            .accessibilityLabel(String(localized: "Delete selected Modify Header rule"))
+            .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(
+                localized: "Delete selected Modify Header rule",
+                bundle: RockxyLocalization.bundle
+            ))
 
             presetsMenu
 
@@ -532,15 +559,15 @@ struct ModifyHeaderWindowView: View {
                 .frame(height: max(16, toolMetrics.footerControlHeight - 10))
 
             Text(footerHint)
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
 
             Spacer()
 
             Text(
                 viewModel.isToolEnabled
-                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
-                    : String(localized: "MODIFY HEADERS OFF")
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE", bundle: RockxyLocalization.bundle))"
+                    : String(localized: "MODIFY HEADERS OFF", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
             .padding(.horizontal, 12)
@@ -548,8 +575,11 @@ struct ModifyHeaderWindowView: View {
             .rockxyChipStyle(tint: .green, isActive: viewModel.isToolEnabled)
             .accessibilityLabel(
                 viewModel.isToolEnabled
-                    ? String(localized: "\(viewModel.activeRuleCount) active Modify Header rules")
-                    : String(localized: "Modify Headers is off")
+                    ? String(
+                        localized: "\(viewModel.activeRuleCount) active Modify Header rules",
+                        bundle: RockxyLocalization.bundle
+                    )
+                    : String(localized: "Modify Headers is off", bundle: RockxyLocalization.bundle)
             )
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -558,14 +588,14 @@ struct ModifyHeaderWindowView: View {
     }
 
     @ViewBuilder private var contextMenuItems: some View {
-        Button(String(localized: "Edit…")) {
+        Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
             viewModel.presentEditorForSelection()
         }
         .keyboardShortcut("e", modifiers: .command)
 
         Divider()
 
-        Button(String(localized: "Delete"), role: .destructive) {
+        Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
             if let id = viewModel.selectedRuleID {
                 viewModel.removeRule(id: id)
             }
@@ -575,18 +605,18 @@ struct ModifyHeaderWindowView: View {
 
     private var presetsMenu: some View {
         Menu {
-            Button(String(localized: "Add CORS Headers")) {
+            Button(String(localized: "Add CORS Headers", bundle: RockxyLocalization.bundle)) {
                 Task { await viewModel.addRule(HeaderModifyPresets.corsHeaders()) }
             }
-            Button(String(localized: "Remove Authorization")) {
+            Button(String(localized: "Remove Authorization", bundle: RockxyLocalization.bundle)) {
                 Task { await viewModel.addRule(HeaderModifyPresets.removeAuthorization()) }
             }
-            Button(String(localized: "Strip Server Header")) {
+            Button(String(localized: "Strip Server Header", bundle: RockxyLocalization.bundle)) {
                 Task { await viewModel.addRule(HeaderModifyPresets.stripServerHeader()) }
             }
         } label: {
             Label {
-                Text(String(localized: "Presets"))
+                Text(String(localized: "Presets", bundle: RockxyLocalization.bundle))
             } icon: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
@@ -594,21 +624,6 @@ struct ModifyHeaderWindowView: View {
         }
         .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
-    }
-
-    private var footerHint: String {
-        let countText: String
-        if viewModel.searchText.isEmpty {
-            countText = "\(viewModel.headerRules.count) \(String(localized: "rules"))"
-        } else {
-            countText = String(
-                localized: "\(viewModel.modifyHeaderRules.count) of \(viewModel.headerRules.count) rules"
-            )
-        }
-        let reorderHint = viewModel.isReorderable
-            ? String(localized: "Drag rows to reorder")
-            : String(localized: "Clear search to reorder")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · \(reorderHint)"
     }
 
     @ViewBuilder
@@ -646,14 +661,17 @@ private struct ModifyHeaderRuleRow: View {
             .toggleStyle(.checkbox)
             .labelsHidden()
             .controlSize(.small)
-            .help(rule.isEnabled ? String(localized: "Disable this rule") : String(localized: "Enable this rule"))
-            .accessibilityLabel(String(localized: "Enable \(rule.name)"))
+            .help(rule.isEnabled ? String(localized: "Disable this rule", bundle: RockxyLocalization.bundle) : String(
+                localized: "Enable this rule",
+                bundle: RockxyLocalization.bundle
+            ))
+            .accessibilityLabel(String(localized: "Enable \(rule.name)", bundle: RockxyLocalization.bundle))
 
             Text("\(order)")
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
                 .frame(width: 24, alignment: .trailing)
-                .accessibilityLabel(String(localized: "Order \(order)"))
+                .accessibilityLabel(String(localized: "Order \(order)", bundle: RockxyLocalization.bundle))
 
             Text(rule.name)
                 .font(toolMetrics.font(weight: .medium))
@@ -680,10 +698,12 @@ private struct ModifyHeaderRuleRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text("\(operationCount) \(operationCount == 1 ? String(localized: "op") : String(localized: "ops"))")
-                .font(toolMetrics.secondaryFont(monospaced: true))
-                .foregroundStyle(.secondary)
-                .frame(width: 54, alignment: .trailing)
+            Text(
+                "\(operationCount) \(operationCount == 1 ? String(localized: "op", bundle: RockxyLocalization.bundle) : String(localized: "ops", bundle: RockxyLocalization.bundle))"
+            )
+            .font(toolMetrics.secondaryFont(monospaced: true))
+            .foregroundStyle(.secondary)
+            .frame(width: 54, alignment: .trailing)
         }
         .frame(minHeight: toolMetrics.tableRowHeight)
         .padding(.vertical, 2)
@@ -747,13 +767,16 @@ private struct ModifyHeaderEditSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
-                Text(isEditing ? String(localized: "Edit Header Rule") : String(localized: "New Header Rule"))
-                    .font(
-                        .system(
-                            size: max(15, toolMetrics.bodyFontSize + 2),
-                            weight: .semibold
-                        )
+                Text(isEditing ? String(localized: "Edit Header Rule", bundle: RockxyLocalization.bundle) : String(
+                    localized: "New Header Rule",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(
+                    .system(
+                        size: max(15, toolMetrics.bodyFontSize + 2),
+                        weight: .semibold
                     )
+                )
 
                 ModifyHeaderRuleDetailsSection(
                     name: $name,
@@ -765,7 +788,7 @@ private struct ModifyHeaderEditSheet: View {
                 )
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Ordered Operations"))
+                    Text(String(localized: "Ordered Operations", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.font(weight: .semibold))
                     ScrollView {
                         ModifyHeaderEditorView(operations: $operations)
@@ -783,7 +806,7 @@ private struct ModifyHeaderEditSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
 
@@ -802,7 +825,10 @@ private struct ModifyHeaderEditSheet: View {
                     }
                 } label: {
                     footerButtonLabel(
-                        isEditing ? String(localized: "Save") : String(localized: "Add")
+                        isEditing ? String(localized: "Save", bundle: RockxyLocalization.bundle) : String(
+                            localized: "Add",
+                            bundle: RockxyLocalization.bundle
+                        )
                     )
                 }
                 .keyboardShortcut(.defaultAction)
@@ -864,6 +890,8 @@ private struct ModifyHeaderEditSheet: View {
     }
 }
 
+// MARK: - ModifyHeaderRuleDetailsSection
+
 private struct ModifyHeaderRuleDetailsSection: View {
     // MARK: Internal
 
@@ -877,7 +905,7 @@ private struct ModifyHeaderRuleDetailsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
@@ -900,18 +928,18 @@ private struct ModifyHeaderRuleDetailsSection: View {
 
     private var identityFields: some View {
         HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-            fieldGroup(String(localized: "Name")) {
-                TextField(String(localized: "Untitled"), text: $name)
+            fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                TextField(String(localized: "Untitled", bundle: RockxyLocalization.bundle), text: $name)
                     .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(String(localized: "Rule name"))
+                    .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
             }
             .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-            fieldGroup(String(localized: "URL pattern")) {
+            fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                 TextField("https://example.com/api/*", text: $urlPattern)
                     .textFieldStyle(.roundedBorder)
                     .font(toolMetrics.font(monospaced: true))
-                    .accessibilityLabel(String(localized: "URL pattern"))
+                    .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
             }
             .frame(maxWidth: .infinity)
         }
@@ -919,7 +947,7 @@ private struct ModifyHeaderRuleDetailsSection: View {
 
     private var methodAndMatchRow: some View {
         HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-            inlineField(String(localized: "Method")) {
+            inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(HTTPMethodFilter.allCases, id: \.self) { method in
                         Button {
@@ -933,11 +961,11 @@ private struct ModifyHeaderRuleDetailsSection: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "HTTP Method"))
+                .accessibilityLabel(String(localized: "HTTP Method", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(90))
             }
 
-            inlineField(String(localized: "Match type")) {
+            inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                 Menu {
                     ForEach(RuleMatchType.allCases, id: \.self) { type in
                         Button {
@@ -951,12 +979,12 @@ private struct ModifyHeaderRuleDetailsSection: View {
                 }
                 .menuIndicator(.hidden)
                 .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Match Type"))
+                .accessibilityLabel(String(localized: "Match Type", bundle: RockxyLocalization.bundle))
                 .frame(width: toolMetrics.menuWidth(175))
             }
 
             if matchType == .wildcard {
-                Text(String(localized: "Support wildcard * and ?."))
+                Text(String(localized: "Support wildcard * and ?.", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -968,9 +996,12 @@ private struct ModifyHeaderRuleDetailsSection: View {
 
     @ViewBuilder private var conditionalFields: some View {
         if matchType == .wildcard {
-            Toggle(String(localized: "Include all subpaths of this URL"), isOn: $includeSubpaths)
-                .toggleStyle(.checkbox)
-                .font(toolMetrics.font())
+            Toggle(
+                String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
+                isOn: $includeSubpaths
+            )
+            .toggleStyle(.checkbox)
+            .font(toolMetrics.font())
         }
     }
 

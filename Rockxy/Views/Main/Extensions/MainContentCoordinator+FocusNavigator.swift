@@ -33,7 +33,7 @@ extension MainContentCoordinator {
 
     func duplicateFocusSet(_ focusSet: FocusSet) {
         var copy = FocusSet(
-            name: focusSet.name + " " + String(localized: "Copy"),
+            name: focusSet.name + " " + String(localized: "Copy", bundle: RockxyLocalization.bundle),
             appName: focusSet.appName,
             domain: focusSet.domain,
             pathPrefix: focusSet.pathPrefix,
@@ -55,7 +55,7 @@ extension MainContentCoordinator {
 
     func makeFocusSetFromCurrentScope() -> FocusSet {
         var focusSet = FocusSet(
-            name: String(localized: "New Focus Set"),
+            name: String(localized: "New Focus Set", bundle: RockxyLocalization.bundle),
             appName: filterCriteria.sidebarApp ?? "",
             domain: filterCriteria.sidebarDomain ?? "",
             pathPrefix: filterCriteria.sidebarPathPrefix ?? ""

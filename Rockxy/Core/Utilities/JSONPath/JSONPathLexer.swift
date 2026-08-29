@@ -37,17 +37,24 @@ enum JSONPathToken: Equatable, Sendable {
 // MARK: - JSONPathLexer
 
 struct JSONPathLexer {
-    let source: String
-    let limits: JSONPathEvaluationLimits
+    // MARK: Lifecycle
 
     init(source: String, limits: JSONPathEvaluationLimits = .default) {
         self.source = source
         self.limits = limits
     }
 
+    // MARK: Internal
+
+    let source: String
+    let limits: JSONPathEvaluationLimits
+
     func tokenize() throws -> [JSONPathToken] {
         guard source.count <= limits.maxQueryLength else {
-            throw JSONPathError.limitExceeded(String(localized: "Query is too long."))
+            throw JSONPathError.limitExceeded(String(
+                localized: "Query is too long.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         var scanner = JSONPathScanner(source)
@@ -115,7 +122,10 @@ struct JSONPathLexer {
                     scanner.advance()
                     tokens.append(.regexMatch)
                 } else {
-                    throw JSONPathError.invalidQuery(String(localized: "Unexpected '='."))
+                    throw JSONPathError.invalidQuery(String(
+                        localized: "Unexpected '='.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
             case "<":
                 scanner.advance()
@@ -136,19 +146,26 @@ struct JSONPathLexer {
             case "&":
                 scanner.advance()
                 guard scanner.peek() == "&" else {
-                    throw JSONPathError.invalidQuery(String(localized: "Expected &&."))
+                    throw JSONPathError.invalidQuery(String(
+                        localized: "Expected &&.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
                 scanner.advance()
                 tokens.append(.and)
             case "|":
                 scanner.advance()
                 guard scanner.peek() == "|" else {
-                    throw JSONPathError.invalidQuery(String(localized: "Expected ||."))
+                    throw JSONPathError.invalidQuery(String(
+                        localized: "Expected ||.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
                 scanner.advance()
                 tokens.append(.or)
-            case "\"", "'":
-                tokens.append(.string(try scanner.readString()))
+            case "\"",
+                 "'":
+                try tokens.append(.string(scanner.readString()))
             case "/":
                 let regex = try scanner.readRegex(maxPatternLength: limits.maxRegexPatternLength)
                 tokens.append(.regex(pattern: regex.pattern, options: regex.options))
@@ -159,7 +176,10 @@ struct JSONPathLexer {
                     let identifier = scanner.readIdentifier()
                     tokens.append(Self.token(forIdentifier: identifier))
                 } else {
-                    throw JSONPathError.invalidQuery(String(localized: "Unexpected character '\(String(char))'."))
+                    throw JSONPathError.invalidQuery(String(
+                        localized: "Unexpected character '\(String(char))'.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
             }
         }
@@ -167,6 +187,8 @@ struct JSONPathLexer {
         tokens.append(.eof)
         return tokens
     }
+
+    // MARK: Private
 
     private static func token(forIdentifier identifier: String) -> JSONPathToken {
         switch identifier {
@@ -194,12 +216,13 @@ struct JSONPathLexer {
 // MARK: - JSONPathScanner
 
 private struct JSONPathScanner {
-    private let characters: [Character]
-    private var index: Int = 0
+    // MARK: Lifecycle
 
     init(_ source: String) {
         characters = Array(source)
     }
+
+    // MARK: Internal
 
     func peek(offset: Int = 0) -> Character? {
         let target = index + offset
@@ -257,7 +280,7 @@ private struct JSONPathScanner {
 
     mutating func readString() throws -> String {
         guard let quote = peek() else {
-            throw JSONPathError.invalidQuery(String(localized: "Expected string."))
+            throw JSONPathError.invalidQuery(String(localized: "Expected string.", bundle: RockxyLocalization.bundle))
         }
         advance()
         var result = ""
@@ -268,7 +291,10 @@ private struct JSONPathScanner {
             }
             if char == "\\" {
                 guard let escaped = peek() else {
-                    throw JSONPathError.invalidQuery(String(localized: "Unterminated escape sequence."))
+                    throw JSONPathError.invalidQuery(String(
+                        localized: "Unterminated escape sequence.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
                 advance()
                 switch escaped {
@@ -287,7 +313,7 @@ private struct JSONPathScanner {
                 result.append(char)
             }
         }
-        throw JSONPathError.invalidQuery(String(localized: "Unterminated string."))
+        throw JSONPathError.invalidQuery(String(localized: "Unterminated string.", bundle: RockxyLocalization.bundle))
     }
 
     mutating func readRegex(maxPatternLength: Int) throws -> (pattern: String, options: NSRegularExpression.Options) {
@@ -311,13 +337,21 @@ private struct JSONPathScanner {
                     advance()
                 }
                 guard pattern.count <= maxPatternLength else {
-                    throw JSONPathError.limitExceeded(String(localized: "Regex pattern is too long."))
+                    throw JSONPathError.limitExceeded(String(
+                        localized: "Regex pattern is too long.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
                 return (pattern, options)
             } else {
                 pattern.append(char)
             }
         }
-        throw JSONPathError.invalidQuery(String(localized: "Unterminated regex."))
+        throw JSONPathError.invalidQuery(String(localized: "Unterminated regex.", bundle: RockxyLocalization.bundle))
     }
+
+    // MARK: Private
+
+    private let characters: [Character]
+    private var index: Int = 0
 }

@@ -12,9 +12,9 @@ enum AssistantTrafficScope: String, Equatable, Sendable {
     var title: String {
         switch self {
         case .selectedOnly:
-            String(localized: "Selected Traffic Only")
+            String(localized: "Selected Traffic Only", bundle: RockxyLocalization.bundle)
         case .selectedAndRelated:
-            String(localized: "Selected and Related Traffic")
+            String(localized: "Selected and Related Traffic", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -66,13 +66,13 @@ enum AssistantUserHandoff: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .prepareReplay:
-            String(localized: "Prepare Replay…")
+            String(localized: "Prepare Replay…", bundle: RockxyLocalization.bundle)
         case .compose:
-            String(localized: "Open in Compose")
+            String(localized: "Open in Compose", bundle: RockxyLocalization.bundle)
         case .export:
-            String(localized: "Export Selected…")
+            String(localized: "Export Selected…", bundle: RockxyLocalization.bundle)
         case .share:
-            String(localized: "Review & Share…")
+            String(localized: "Review & Share…", bundle: RockxyLocalization.bundle)
         }
     }
 

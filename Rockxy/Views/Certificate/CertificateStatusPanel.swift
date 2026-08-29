@@ -106,11 +106,11 @@ struct CertificateStatusPanel: View {
 
     private var systemValidationText: String {
         guard let snapshot, snapshot.hasTrustSettings else {
-            return String(localized: "Not Checked")
+            return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
         }
         return snapshot.isSystemTrustValidated
-            ? String(localized: "Passed")
-            : String(localized: "Failed")
+            ? String(localized: "Passed", bundle: RockxyLocalization.bundle)
+            : String(localized: "Failed", bundle: RockxyLocalization.bundle)
     }
 
     private var systemValidationColor: Color {
@@ -139,13 +139,15 @@ struct CertificateStatusPanel: View {
         }
         if expiryDate < Date() {
             return String(
-                localized: "Certificate has expired. Generate a new certificate and trust it to restore HTTPS interception."
+                localized: "Certificate has expired. Generate a new certificate and trust it to restore HTTPS interception.",
+                bundle: RockxyLocalization.bundle
             )
         }
         let daysRemaining = Int(expiryDate.timeIntervalSinceNow / (24 * 3_600))
         if daysRemaining < Self.expiryWarningDays {
             return String(
-                localized: "Certificate expires in \(daysRemaining) days. Generate a new certificate and re-trust to maintain HTTPS interception."
+                localized: "Certificate expires in \(daysRemaining) days. Generate a new certificate and re-trust to maintain HTTPS interception.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return nil
@@ -170,7 +172,7 @@ struct CertificateStatusPanel: View {
                 .font(.system(size: summaryIconFontSize))
                 .padding(.top, 2)
                 .accessibilityLabel(
-                    String(localized: "Root CA status: \(state.accessibilityLabel)")
+                    String(localized: "Root CA status: \(state.accessibilityLabel)", bundle: RockxyLocalization.bundle)
                 )
             VStack(alignment: .leading, spacing: 2) {
                 Text(state.title)
@@ -187,52 +189,52 @@ struct CertificateStatusPanel: View {
     private var diagnosticsGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
             diagnosticRow(
-                label: String(localized: "Generated:"),
+                label: String(localized: "Generated:", bundle: RockxyLocalization.bundle),
                 value: snapshot?.hasGeneratedCertificate == true
-                    ? String(localized: "Yes")
-                    : String(localized: "No"),
+                    ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
+                    : String(localized: "No", bundle: RockxyLocalization.bundle),
                 color: snapshot?.hasGeneratedCertificate == true ? .primary : .secondary
             )
 
             diagnosticRow(
-                label: String(localized: "Installed:"),
+                label: String(localized: "Installed:", bundle: RockxyLocalization.bundle),
                 value: snapshot?.isInstalledInKeychain == true
-                    ? String(localized: "Yes")
-                    : String(localized: "No"),
+                    ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
+                    : String(localized: "No", bundle: RockxyLocalization.bundle),
                 color: snapshot?.isInstalledInKeychain == true ? .primary : .secondary
             )
 
             diagnosticRow(
-                label: String(localized: "Trust Settings:"),
+                label: String(localized: "Trust Settings:", bundle: RockxyLocalization.bundle),
                 value: snapshot?.hasTrustSettings == true
-                    ? String(localized: "Present")
-                    : String(localized: "Missing"),
+                    ? String(localized: "Present", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Missing", bundle: RockxyLocalization.bundle),
                 color: snapshot?.hasTrustSettings == true ? .primary : .orange
             )
 
             diagnosticRow(
-                label: String(localized: "System Validation:"),
+                label: String(localized: "System Validation:", bundle: RockxyLocalization.bundle),
                 value: systemValidationText,
                 color: systemValidationColor
             )
 
             if snapshot?.hasGeneratedCertificate == true {
                 diagnosticRow(
-                    label: String(localized: "Valid From:"),
+                    label: String(localized: "Valid From:", bundle: RockxyLocalization.bundle),
                     value: snapshot?.notValidBefore?
                         .formatted(date: .abbreviated, time: .omitted) ?? "\u{2014}",
                     color: .primary
                 )
 
                 diagnosticRow(
-                    label: String(localized: "Valid Until:"),
+                    label: String(localized: "Valid Until:", bundle: RockxyLocalization.bundle),
                     value: snapshot?.notValidAfter?
                         .formatted(date: .abbreviated, time: .omitted) ?? "\u{2014}",
                     color: expiryColor
                 )
 
                 diagnosticRow(
-                    label: String(localized: "Fingerprint:"),
+                    label: String(localized: "Fingerprint:", bundle: RockxyLocalization.bundle),
                     value: truncatedFingerprint,
                     color: .primary,
                     fullAccessibilityValue: snapshot?.fingerprintSHA256
@@ -271,7 +273,8 @@ struct CertificateStatusPanel: View {
         {
             let message = snapshot.lastValidationErrorMessage
                 ?? String(
-                    localized: "Trust settings were applied but macOS still does not trust generated certificates. Try Reset Certificate, then Install & Trust again."
+                    localized: "Trust settings were applied but macOS still does not trust generated certificates. Try Reset Certificate, then Install & Trust again.",
+                    bundle: RockxyLocalization.bundle
                 )
             HStack(alignment: .top, spacing: 4) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -310,67 +313,67 @@ struct CertificateStatusPanel: View {
 
         switch state {
         case .notAvailable:
-            Button(String(localized: "Generate New\u{2026}")) {
+            Button(String(localized: "Generate New\u{2026}", bundle: RockxyLocalization.bundle)) {
                 onAction(.generate)
             }
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(isLoading)
 
         case .generatedOnly:
-            Button(String(localized: "Install & Trust")) {
+            Button(String(localized: "Install & Trust", bundle: RockxyLocalization.bundle)) {
                 onAction(.installAndTrust)
             }
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(isLoading)
             shareCertificateButton
-            Button(String(localized: "Generate New\u{2026}")) {
+            Button(String(localized: "Generate New\u{2026}", bundle: RockxyLocalization.bundle)) {
                 onAction(.generate)
             }
             .disabled(isLoading)
 
         case .trustIncomplete:
-            Button(String(localized: "Install & Trust")) {
+            Button(String(localized: "Install & Trust", bundle: RockxyLocalization.bundle)) {
                 onAction(.installAndTrust)
             }
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(isLoading)
             shareCertificateButton
-            Button(String(localized: "Reset Certificate"), role: .destructive) {
+            Button(String(localized: "Reset Certificate", bundle: RockxyLocalization.bundle), role: .destructive) {
                 onAction(.reset)
             }
             .disabled(isLoading)
-            Button(String(localized: "Recheck Status")) {
+            Button(String(localized: "Recheck Status", bundle: RockxyLocalization.bundle)) {
                 onAction(.recheck)
             }
             .disabled(isLoading)
 
         case .installedNotTrusted:
-            Button(String(localized: "Install & Trust")) {
+            Button(String(localized: "Install & Trust", bundle: RockxyLocalization.bundle)) {
                 onAction(.installAndTrust)
             }
             .rockxyGlassButtonStyle(prominent: true)
             .disabled(isLoading)
             shareCertificateButton
-            Button(String(localized: "Reset Certificate"), role: .destructive) {
+            Button(String(localized: "Reset Certificate", bundle: RockxyLocalization.bundle), role: .destructive) {
                 onAction(.reset)
             }
             .disabled(isLoading)
-            Button(String(localized: "Recheck Status")) {
+            Button(String(localized: "Recheck Status", bundle: RockxyLocalization.bundle)) {
                 onAction(.recheck)
             }
             .disabled(isLoading)
 
         case .trusted:
-            Button(String(localized: "Export Certificate\u{2026}")) {
+            Button(String(localized: "Export Certificate\u{2026}", bundle: RockxyLocalization.bundle)) {
                 onAction(.export)
             }
             .disabled(isLoading)
             shareCertificateButton
-            Button(String(localized: "Generate New\u{2026}")) {
+            Button(String(localized: "Generate New\u{2026}", bundle: RockxyLocalization.bundle)) {
                 onAction(.generate)
             }
             .disabled(isLoading)
-            Button(String(localized: "Reset Certificate"), role: .destructive) {
+            Button(String(localized: "Reset Certificate", bundle: RockxyLocalization.bundle), role: .destructive) {
                 onAction(.reset)
             }
             .disabled(isLoading)
@@ -378,7 +381,7 @@ struct CertificateStatusPanel: View {
     }
 
     private var shareCertificateButton: some View {
-        Button(String(localized: "Share Certificate\u{2026}")) {
+        Button(String(localized: "Share Certificate\u{2026}", bundle: RockxyLocalization.bundle)) {
             onAction(.share)
         }
         .disabled(isLoading)
@@ -446,45 +449,51 @@ private enum PanelState {
     var title: String {
         switch self {
         case .trusted:
-            String(localized: "Root CA Trusted")
+            String(localized: "Root CA Trusted", bundle: RockxyLocalization.bundle)
         case .trustIncomplete:
-            String(localized: "Trust Incomplete")
+            String(localized: "Trust Incomplete", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "Root CA Installed, Not Trusted")
+            String(localized: "Root CA Installed, Not Trusted", bundle: RockxyLocalization.bundle)
         case .generatedOnly:
-            String(localized: "Root CA Not Installed")
+            String(localized: "Root CA Not Installed", bundle: RockxyLocalization.bundle)
         case .notAvailable:
-            String(localized: "No Root CA")
+            String(localized: "No Root CA", bundle: RockxyLocalization.bundle)
         }
     }
 
     var subtitle: String {
         switch self {
         case .trusted:
-            String(localized: "HTTPS interception is ready.")
+            String(localized: "HTTPS interception is ready.", bundle: RockxyLocalization.bundle)
         case .trustIncomplete:
-            String(localized: "Trust settings exist but macOS validation failed.")
+            String(localized: "Trust settings exist but macOS validation failed.", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "The certificate is in the keychain but trust settings are missing.")
+            String(
+                localized: "The certificate is in the keychain but trust settings are missing.",
+                bundle: RockxyLocalization.bundle
+            )
         case .generatedOnly:
-            String(localized: "Install and trust the certificate to enable HTTPS interception.")
+            String(
+                localized: "Install and trust the certificate to enable HTTPS interception.",
+                bundle: RockxyLocalization.bundle
+            )
         case .notAvailable:
-            String(localized: "Generate a root certificate to get started.")
+            String(localized: "Generate a root certificate to get started.", bundle: RockxyLocalization.bundle)
         }
     }
 
     var accessibilityLabel: String {
         switch self {
         case .trusted:
-            String(localized: "trusted")
+            String(localized: "trusted", bundle: RockxyLocalization.bundle)
         case .trustIncomplete:
-            String(localized: "trust incomplete")
+            String(localized: "trust incomplete", bundle: RockxyLocalization.bundle)
         case .installedNotTrusted:
-            String(localized: "installed not trusted")
+            String(localized: "installed not trusted", bundle: RockxyLocalization.bundle)
         case .generatedOnly:
-            String(localized: "not installed")
+            String(localized: "not installed", bundle: RockxyLocalization.bundle)
         case .notAvailable:
-            String(localized: "not available")
+            String(localized: "not available", bundle: RockxyLocalization.bundle)
         }
     }
 }

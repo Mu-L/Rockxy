@@ -63,29 +63,46 @@ struct AssistantWorkspaceSummary: Sendable, Equatable {
             switch captureState {
             case .stopped:
                 return String(
-                    localized: "No requests are currently retained — capture is stopped. Start capture to record traffic."
+                    localized: "No requests are currently retained — capture is stopped. Start capture to record traffic.",
+                    bundle: RockxyLocalization.bundle
                 )
             case .paused:
-                return String(localized: "No requests are currently retained — capture is paused.")
+                return String(
+                    localized: "No requests are currently retained — capture is paused.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .running,
                  .starting:
-                return String(localized: "No requests are currently retained yet — capture is running.")
+                return String(
+                    localized: "No requests are currently retained yet — capture is running.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .unknown:
-                return String(localized: "No requests are currently retained.")
+                return String(localized: "No requests are currently retained.", bundle: RockxyLocalization.bundle)
             }
         }
         if visibleRequestCount == retainedRequestCount {
             if retainedRequestCount == 1 {
-                return String(localized: "There is 1 request currently retained in this session.")
+                return String(
+                    localized: "There is 1 request currently retained in this session.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
             return String(
-                localized: "There are \(retainedRequestCount) requests currently retained in this session."
+                localized: "There are \(retainedRequestCount) requests currently retained in this session.",
+                bundle: RockxyLocalization.bundle
             )
         }
         let visibleClause = visibleRequestCount == 1
-            ? String(localized: "1 request is showing with the current filters")
-            : String(localized: "\(visibleRequestCount) requests are showing with the current filters")
-        return String(localized: "\(visibleClause), out of \(retainedRequestCount) retained in this session.")
+            ? String(localized: "1 request is showing with the current filters", bundle: RockxyLocalization.bundle)
+            : String(
+                localized: "\(visibleRequestCount) requests are showing with the current filters",
+                bundle: RockxyLocalization.bundle
+            )
+        return String(
+            localized: "\(visibleClause), out of \(retainedRequestCount) retained in this session.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     /// English aggregate-only grounding for the model `<workspace_facts>` block. Scalars only; no

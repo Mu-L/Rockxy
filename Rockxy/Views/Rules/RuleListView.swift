@@ -19,9 +19,12 @@ struct RuleListView: View {
 
             if filteredRules.isEmpty {
                 ContentUnavailableView(
-                    String(localized: "No Rules"),
+                    String(localized: "No Rules", bundle: RockxyLocalization.bundle),
                     systemImage: "list.bullet.rectangle.portrait",
-                    description: Text(String(localized: "Add rules to intercept, block, or modify requests."))
+                    description: Text(String(
+                        localized: "Add rules to intercept, block, or modify requests.",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 )
             } else {
                 ruleTable
@@ -70,6 +73,10 @@ struct RuleListView: View {
         }
     }
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     // MARK: - Toolbar
 
     private var ruleToolbar: some View {
@@ -77,7 +84,7 @@ struct RuleListView: View {
             Button {
                 showAddSheet = true
             } label: {
-                Label(String(localized: "Add Rule"), systemImage: "plus")
+                Label(String(localized: "Add Rule", bundle: RockxyLocalization.bundle), systemImage: "plus")
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
@@ -89,7 +96,7 @@ struct RuleListView: View {
                 coordinator.removeRule(id: id)
                 selectedRuleID = nil
             } label: {
-                Label(String(localized: "Remove"), systemImage: "minus")
+                Label(String(localized: "Remove", bundle: RockxyLocalization.bundle), systemImage: "minus")
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
@@ -99,7 +106,7 @@ struct RuleListView: View {
                 .frame(height: 16)
 
             Picker(selection: $filterAction) {
-                Text(String(localized: "All Actions")).tag(RuleActionType?.none)
+                Text(String(localized: "All Actions", bundle: RockxyLocalization.bundle)).tag(RuleActionType?.none)
                 Divider()
                 ForEach(RuleActionType.allCases) { actionType in
                     Text(actionType.displayName).tag(Optional(actionType))
@@ -112,7 +119,7 @@ struct RuleListView: View {
 
             Spacer()
 
-            TextField(String(localized: "Filter rules..."), text: $searchText)
+            TextField(String(localized: "Filter rules...", bundle: RockxyLocalization.bundle), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
                 .frame(maxWidth: 200)
@@ -142,7 +149,7 @@ struct RuleListView: View {
                     Button(role: .destructive) {
                         coordinator.removeRule(id: rule.id)
                     } label: {
-                        Label(String(localized: "Delete"), systemImage: "trash")
+                        Label(String(localized: "Delete", bundle: RockxyLocalization.bundle), systemImage: "trash")
                     }
                 }
             }
@@ -155,18 +162,18 @@ struct RuleListView: View {
             Text("")
                 .frame(width: 40)
 
-            Text(String(localized: "Name"))
+            Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                 .frame(minWidth: 120, alignment: .leading)
 
-            Text(String(localized: "Pattern"))
+            Text(String(localized: "Pattern", bundle: RockxyLocalization.bundle))
                 .frame(minWidth: 160, alignment: .leading)
 
             Spacer()
 
-            Text(String(localized: "Action"))
+            Text(String(localized: "Action", bundle: RockxyLocalization.bundle))
                 .frame(width: 100, alignment: .center)
 
-            Text(String(localized: "Priority"))
+            Text(String(localized: "Priority", bundle: RockxyLocalization.bundle))
                 .frame(width: 60, alignment: .trailing)
         }
         .font(toolMetrics.secondaryFont())
@@ -176,42 +183,38 @@ struct RuleListView: View {
         .padding(.horizontal, 4)
     }
 
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
-    }
-
     // MARK: - Bottom Bar
 
     private var bottomBar: some View {
         HStack(spacing: 8) {
-            Text(String(localized: "\(filteredRules.count) rules"))
+            Text(String(localized: "\(filteredRules.count) rules", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
 
             Spacer()
 
-            Button(String(localized: "Import")) {
+            Button(String(localized: "Import", bundle: RockxyLocalization.bundle)) {
                 importRules()
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
 
-            Button(String(localized: "Export")) {
+            Button(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
                 exportRules()
             }
             .rockxyGlassButtonStyle()
             .controlSize(.small)
             .disabled(rules.isEmpty)
 
-            Menu(String(localized: "Presets")) {
-                Button(String(localized: "Block Ads")) {
+            Menu(String(localized: "Presets", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "Block Ads", bundle: RockxyLocalization.bundle)) {
                     addPresetRule(
                         name: "Block Ads",
                         pattern: ".*(\\.doubleclick\\.net|ads\\.|adservice\\.).*",
                         action: .block(statusCode: 403)
                     )
                 }
-                Button(String(localized: "Block Analytics")) {
+                Button(String(localized: "Block Analytics", bundle: RockxyLocalization.bundle)) {
                     addPresetRule(
                         name: "Block Analytics",
                         pattern: ".*(google-analytics\\.com|analytics\\.).*",
@@ -219,14 +222,14 @@ struct RuleListView: View {
                     )
                 }
                 Divider()
-                Button(String(localized: "Map API Local")) {
+                Button(String(localized: "Map API Local", bundle: RockxyLocalization.bundle)) {
                     addPresetRule(
                         name: "Map API Local",
                         pattern: ".*/api/.*",
                         action: .mapLocal(filePath: "")
                     )
                 }
-                Button(String(localized: "Throttle API")) {
+                Button(String(localized: "Throttle API", bundle: RockxyLocalization.bundle)) {
                     addPresetRule(
                         name: "Throttle API",
                         pattern: ".*/api/.*",
@@ -234,7 +237,7 @@ struct RuleListView: View {
                     )
                 }
                 Divider()
-                Button(String(localized: "Breakpoint All")) {
+                Button(String(localized: "Breakpoint All", bundle: RockxyLocalization.bundle)) {
                     addPresetRule(
                         name: "Breakpoint All",
                         pattern: ".*",
@@ -242,13 +245,13 @@ struct RuleListView: View {
                     )
                 }
                 Divider()
-                Button(String(localized: "Add CORS Headers")) {
+                Button(String(localized: "Add CORS Headers", bundle: RockxyLocalization.bundle)) {
                     coordinator.addRule(HeaderModifyPresets.corsHeaders())
                 }
-                Button(String(localized: "Remove Authorization")) {
+                Button(String(localized: "Remove Authorization", bundle: RockxyLocalization.bundle)) {
                     coordinator.addRule(HeaderModifyPresets.removeAuthorization())
                 }
-                Button(String(localized: "Strip Server Header")) {
+                Button(String(localized: "Strip Server Header", bundle: RockxyLocalization.bundle)) {
                     coordinator.addRule(HeaderModifyPresets.stripServerHeader())
                 }
             }
@@ -285,7 +288,7 @@ struct RuleListView: View {
 
     private func importRules() {
         let panel = NSOpenPanel()
-        panel.title = String(localized: "Import Rules")
+        panel.title = String(localized: "Import Rules", bundle: RockxyLocalization.bundle)
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
 
@@ -306,7 +309,7 @@ struct RuleListView: View {
 
     private func exportRules() {
         let panel = NSSavePanel()
-        panel.title = String(localized: "Export Rules")
+        panel.title = String(localized: "Export Rules", bundle: RockxyLocalization.bundle)
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = "rockxy-rules.json"
 
@@ -330,7 +333,6 @@ private struct RuleGridRow: View {
 
     let rule: ProxyRule
     let onToggle: () -> Void
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     var body: some View {
         HStack(spacing: 0) {
@@ -373,6 +375,12 @@ private struct RuleGridRow: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     @ViewBuilder private var actionBadge: some View {
         let (label, color) = actionInfo(rule.action)
         Text(label)
@@ -400,15 +408,16 @@ private struct RuleGridRow: View {
         case let .modifyHeader(operations):
             let count = operations.count
             let phaseLabel = operations.phaseSummaryLabel
-            let label = "\(count) \(count == 1 ? "op" : "ops") \u{00B7} \(phaseLabel)"
+            let opsLabel = String(AttributedString(
+                localized: "^[\(count) op](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            let label = "\(opsLabel) \u{00B7} \(phaseLabel)"
             return (label, .green)
         case let .networkCondition(preset, _):
             return ("Network \u{00B7} \(preset.displayName)", .cyan)
         }
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }
 
@@ -418,24 +427,26 @@ private struct RuleEditSheet: View {
     // MARK: Internal
 
     let onSave: (ProxyRule) -> Void
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section(String(localized: "Rule Info")) {
-                    TextField(String(localized: "Name"), text: $name)
+                Section(String(localized: "Rule Info", bundle: RockxyLocalization.bundle)) {
+                    TextField(String(localized: "Name", bundle: RockxyLocalization.bundle), text: $name)
                 }
 
-                Section(String(localized: "Match Condition")) {
+                Section(String(localized: "Match Condition", bundle: RockxyLocalization.bundle)) {
                     TextField("URL Pattern (regex)", text: $urlPattern)
                         .font(toolMetrics.font(monospaced: true))
                     TextField("HTTP Method", text: $method)
                         .textCase(.uppercase)
                 }
 
-                Section(String(localized: "Action")) {
-                    Picker(String(localized: "Action type"), selection: $selectedAction) {
+                Section(String(localized: "Action", bundle: RockxyLocalization.bundle)) {
+                    Picker(
+                        String(localized: "Action type", bundle: RockxyLocalization.bundle),
+                        selection: $selectedAction
+                    ) {
                         ForEach(RuleActionType.creatableCases) { actionType in
                             Text(actionType.displayName).tag(actionType)
                         }
@@ -444,18 +455,21 @@ private struct RuleEditSheet: View {
                     switch selectedAction {
                     case .block:
                         TextField(
-                            String(localized: "Status code"),
+                            String(localized: "Status code", bundle: RockxyLocalization.bundle),
                             value: $blockStatusCode,
                             format: .number
                         )
                     case .throttle:
                         TextField(
-                            String(localized: "Delay (ms)"),
+                            String(localized: "Delay (ms)", bundle: RockxyLocalization.bundle),
                             value: $throttleDelay,
                             format: .number
                         )
                     case .mapLocal:
-                        TextField(String(localized: "File path"), text: $mapLocalPath)
+                        TextField(
+                            String(localized: "File path", bundle: RockxyLocalization.bundle),
+                            text: $mapLocalPath
+                        )
                     case .mapRemote:
                         TextField("URL", text: $mapRemoteURL)
                     case .breakpoint:
@@ -471,12 +485,12 @@ private struct RuleEditSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle)) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button(String(localized: "Add Rule")) {
+                Button(String(localized: "Add Rule", bundle: RockxyLocalization.bundle)) {
                     let condition = RuleMatchCondition(
                         urlPattern: urlPattern.isEmpty ? nil : urlPattern,
                         method: method.isEmpty ? nil : method.uppercased()
@@ -505,6 +519,8 @@ private struct RuleEditSheet: View {
 
     // MARK: Private
 
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var urlPattern = ""
@@ -527,6 +543,10 @@ private struct RuleEditSheet: View {
         return true
     }
 
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
     private func buildAction() -> RuleAction {
         switch selectedAction {
         case .breakpoint:
@@ -544,10 +564,6 @@ private struct RuleEditSheet: View {
         case .networkCondition:
             preconditionFailure("Network conditions are created via the dedicated window, not the generic rule editor")
         }
-    }
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 }
 

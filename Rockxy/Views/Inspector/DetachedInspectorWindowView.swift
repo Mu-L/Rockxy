@@ -42,7 +42,10 @@ struct DetachedInspectorWindowView: View {
                 }
             } else {
                 InspectorEmptyStateView(
-                    requestSelectionDescription: String(localized: "Select a request to inspect")
+                    requestSelectionDescription: String(
+                        localized: "Select a request to inspect",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }

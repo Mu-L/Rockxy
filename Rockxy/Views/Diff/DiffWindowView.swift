@@ -2,6 +2,8 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - DiffWindowView
+
 /// Diff workspace window — 4-zone layout: header, candidate pool card,
 /// diff viewer, and control bar. Supports Request/Response/Timing comparison
 /// in Side by Side or Unified mode. Comparison is local and read-only.
@@ -35,23 +37,29 @@ struct DiffWindowView: View {
                 Button {
                     viewModel.swapSides()
                 } label: {
-                    Label(String(localized: "Swap Sides"), systemImage: "arrow.left.arrow.right")
+                    Label(
+                        String(localized: "Swap Sides", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.left.arrow.right"
+                    )
                 }
                 .keyboardShortcut("s", modifiers: [.command, .option])
                 .disabled(!viewModel.canSwapSides)
-                .help(String(localized: "Swap the left and right sides"))
+                .help(String(localized: "Swap the left and right sides", bundle: RockxyLocalization.bundle))
 
                 Button {
                     exportDiff()
                 } label: {
-                    Label(String(localized: "Export"), systemImage: "square.and.arrow.up")
+                    Label(
+                        String(localized: "Export", bundle: RockxyLocalization.bundle),
+                        systemImage: "square.and.arrow.up"
+                    )
                 }
                 .disabled(!canExport)
-                .help(String(localized: "Export the comparison as a text file"))
+                .help(String(localized: "Export the comparison as a text file", bundle: RockxyLocalization.bundle))
             }
         }
         .alert(
-            String(localized: "Export Failed"),
+            String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { exportErrorMessage != nil },
                 set: {
@@ -61,7 +69,9 @@ struct DiffWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK"), role: .cancel) { exportErrorMessage = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle), role: .cancel) {
+                exportErrorMessage = nil
+            }
         } message: {
             if let exportErrorMessage {
                 Text(exportErrorMessage)
@@ -95,11 +105,12 @@ struct DiffWindowView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "Basic Compare"))
+                Text(String(localized: "Basic Compare", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.font(weight: .semibold))
                 Text(
                     String(
-                        localized: "Compare captured transactions or pasted text without modifying live traffic."
+                        localized: "Compare captured transactions or pasted text without modifying live traffic.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -124,21 +135,27 @@ struct DiffWindowView: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: toolMetrics.smallIconFontSize))
                 .accessibilityHidden(true)
-            Text(String(localized: "Local · Read-only"))
+            Text(String(localized: "Local · Read-only", bundle: RockxyLocalization.bundle))
         }
         .font(toolMetrics.metadataFont(weight: .semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .rockxyChipStyle()
-        .help(String(localized: "Comparison runs on your captured transactions and never modifies live traffic."))
+        .help(String(
+            localized: "Comparison runs on your captured transactions and never modifies live traffic.",
+            bundle: RockxyLocalization.bundle
+        ))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "Local, read-only comparison"))
+        .accessibilityLabel(String(localized: "Local, read-only comparison", bundle: RockxyLocalization.bundle))
     }
 
     @ViewBuilder private var comparisonSourcePicker: some View {
         if toolMetrics.bodyFontSize >= 20 {
-            Picker(String(localized: "Comparison Source"), selection: $viewModel.workspaceMode) {
+            Picker(
+                String(localized: "Comparison Source", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.workspaceMode
+            ) {
                 ForEach(DiffViewModel.WorkspaceMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -146,9 +163,12 @@ struct DiffWindowView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(minWidth: 150)
-            .accessibilityLabel(String(localized: "Comparison source"))
+            .accessibilityLabel(String(localized: "Comparison source", bundle: RockxyLocalization.bundle))
         } else {
-            Picker(String(localized: "Comparison Source"), selection: $viewModel.workspaceMode) {
+            Picker(
+                String(localized: "Comparison Source", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.workspaceMode
+            ) {
                 ForEach(DiffViewModel.WorkspaceMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -156,7 +176,7 @@ struct DiffWindowView: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .frame(width: max(200, toolMetrics.secondaryFontSize * 10 + 92))
-            .accessibilityLabel(String(localized: "Comparison source"))
+            .accessibilityLabel(String(localized: "Comparison source", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -167,7 +187,7 @@ struct DiffWindowView: View {
         }
 
         let panel = NSSavePanel()
-        panel.title = String(localized: "Export Diff")
+        panel.title = String(localized: "Export Diff", bundle: RockxyLocalization.bundle)
         panel.allowedContentTypes = [.plainText]
         panel.nameFieldStringValue = "diff.txt"
 

@@ -45,13 +45,13 @@ enum ExternalProxyProtocolSelection: CaseIterable, Hashable, Identifiable {
     var displayName: String {
         switch self {
         case .automatic:
-            String(localized: "Automatic Proxy Configuration")
+            String(localized: "Automatic Proxy Configuration", bundle: RockxyLocalization.bundle)
         case .http:
-            String(localized: "Web Proxy (HTTP)")
+            String(localized: "Web Proxy (HTTP)", bundle: RockxyLocalization.bundle)
         case .https:
-            String(localized: "Secure Web Proxy (HTTPS)")
+            String(localized: "Secure Web Proxy (HTTPS)", bundle: RockxyLocalization.bundle)
         case .socks5:
-            String(localized: "SOCKS Proxy")
+            String(localized: "SOCKS Proxy", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -84,44 +84,7 @@ enum ExternalProxyProtocolSelection: CaseIterable, Hashable, Identifiable {
 // MARK: - ExternalProxySettingsDraft
 
 struct ExternalProxySettingsDraft: Equatable {
-    var isEnabled = false
-    var selectedProtocol: ExternalProxyProtocolSelection = .http
-    var host = ""
-    var portText = "8080"
-    var pacURL = ""
-    var usesAuthentication = false
-    var username = ""
-    var password = ""
-    var hasStoredCredentials = false
-    var storedUsername = ""
-    var bypassText = ""
-    var bypassLocalhost = true
-
-    var parsedBypassPatterns: [String] {
-        var seen: Set<String> = []
-        return bypassText
-            .components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
-            .map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            }
-            .filter { pattern in
-                !pattern.isEmpty && seen.insert(pattern).inserted
-            }
-    }
-
-    var bypassEntriesUsed: Int {
-        parsedBypassPatterns.count
-    }
-
-    var needsReplacementPassword: Bool {
-        guard usesAuthentication else {
-            return false
-        }
-        if !hasStoredCredentials {
-            return password.isEmpty
-        }
-        return username != storedUsername && password.isEmpty
-    }
+    // MARK: Lifecycle
 
     init(
         isEnabled: Bool = false,
@@ -169,6 +132,47 @@ struct ExternalProxySettingsDraft: Equatable {
             bypassText: configuration.bypassHostPatterns.joined(separator: ", "),
             bypassLocalhost: configuration.bypassLocalhost
         )
+    }
+
+    // MARK: Internal
+
+    var isEnabled = false
+    var selectedProtocol: ExternalProxyProtocolSelection = .http
+    var host = ""
+    var portText = "8080"
+    var pacURL = ""
+    var usesAuthentication = false
+    var username = ""
+    var password = ""
+    var hasStoredCredentials = false
+    var storedUsername = ""
+    var bypassText = ""
+    var bypassLocalhost = true
+
+    var parsedBypassPatterns: [String] {
+        var seen: Set<String> = []
+        return bypassText
+            .components(separatedBy: CharacterSet(charactersIn: ",\n\r"))
+            .map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            }
+            .filter { pattern in
+                !pattern.isEmpty && seen.insert(pattern).inserted
+            }
+    }
+
+    var bypassEntriesUsed: Int {
+        parsedBypassPatterns.count
+    }
+
+    var needsReplacementPassword: Bool {
+        guard usesAuthentication else {
+            return false
+        }
+        if !hasStoredCredentials {
+            return password.isEmpty
+        }
+        return username != storedUsername && password.isEmpty
     }
 
     func configuration() throws -> UpstreamProxyConfiguration {

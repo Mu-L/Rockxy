@@ -104,25 +104,44 @@ final class WelcomeViewModel {
             nil
         case .requiresApproval:
             String(
-                localized: "Approve Rockxy in System Settings → General → Login Items, then return here."
+                localized: "Approve Rockxy in System Settings → General → Login Items, then return here.",
+                bundle: RockxyLocalization.bundle
             )
         case .installedCompatible:
-            String(localized: "Installed, compatible, and reachable.")
+            String(localized: "Installed, compatible, and reachable.", bundle: RockxyLocalization.bundle)
         case .installedOutdated:
-            String(localized: "An older helper is installed. Update it from this version of Rockxy.")
+            String(
+                localized: "An older helper is installed. Update it from this version of Rockxy.",
+                bundle: RockxyLocalization.bundle
+            )
         case .installedIncompatible:
-            String(localized: "The installed helper is incompatible with this version of Rockxy.")
+            String(
+                localized: "The installed helper is incompatible with this version of Rockxy.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unreachable:
-            String(localized: "The helper is registered, but Rockxy cannot reach it.")
+            String(
+                localized: "The helper is registered, but Rockxy cannot reach it.",
+                bundle: RockxyLocalization.bundle
+            )
         case .signingMismatch:
             switch helperSigningIssue {
             case .applicationMustReopen:
-                String(localized: "Quit and reopen Rockxy, then check the helper again.")
+                String(
+                    localized: "Quit and reopen Rockxy, then check the helper again.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .identityMismatch:
-                String(localized: "The installed helper does not match this copy of Rockxy.")
+                String(
+                    localized: "The installed helper does not match this copy of Rockxy.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .appSignatureInvalid,
                  nil:
-                String(localized: "Rockxy could not verify this app copy. Open diagnostics before continuing.")
+                String(
+                    localized: "Rockxy could not verify this app copy. Open diagnostics before continuing.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         }
     }
@@ -199,7 +218,7 @@ final class WelcomeViewModel {
             return
         }
         errorMessage = HelperManager.shared.lastErrorMessage
-            ?? String(localized: "Rockxy still cannot reach the installed helper.")
+            ?? String(localized: "Rockxy still cannot reach the installed helper.", bundle: RockxyLocalization.bundle)
         helperFailureRecovery = .repairAndReinstall
     }
 
@@ -220,7 +239,10 @@ final class WelcomeViewModel {
             await refreshStatus()
             if helperStatus == .unreachable {
                 errorMessage = HelperManager.shared.lastErrorMessage
-                    ?? String(localized: "Rockxy reinstalled the helper but still cannot reach it.")
+                    ?? String(
+                        localized: "Rockxy reinstalled the helper but still cannot reach it.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 helperFailureRecovery = .repairAndReinstall
             } else {
                 errorArea = nil
@@ -285,7 +307,10 @@ final class WelcomeViewModel {
             await refreshStatus()
             if action == .helper, helperStatus == .unreachable {
                 errorMessage = HelperManager.shared.lastErrorMessage
-                    ?? String(localized: "Rockxy still cannot reach the installed helper.")
+                    ?? String(
+                        localized: "Rockxy still cannot reach the installed helper.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 helperFailureRecovery = .repairAndReinstall
             } else {
                 self.errorArea = nil

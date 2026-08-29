@@ -46,10 +46,13 @@ final class EditableHeaderOperation: Identifiable {
 
     var validationMessage: String? {
         guard !headerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return String(localized: "Header Name is required")
+            return String(localized: "Header Name is required", bundle: RockxyLocalization.bundle)
         }
         if type != .remove, headerValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return String(localized: "Header Value is required for \(type.editorLabel)")
+            return String(
+                localized: "Header Value is required for \(type.editorLabel)",
+                bundle: RockxyLocalization.bundle
+            )
         }
         return nil
     }
@@ -142,9 +145,12 @@ struct ModifyHeaderEditorView: View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
                 .foregroundStyle(Color.accentColor)
-            Text(String(localized: "Operations are applied in order. Later rows can overwrite earlier rows."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(Color(nsColor: .labelColor).opacity(0.72))
+            Text(String(
+                localized: "Operations are applied in order. Later rows can overwrite earlier rows.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(Color(nsColor: .labelColor).opacity(0.72))
             Spacer()
         }
     }
@@ -152,9 +158,12 @@ struct ModifyHeaderEditorView: View {
     private var emptyState: some View {
         HStack {
             Spacer()
-            Text(String(localized: "No operations. Add at least one header operation."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.tertiary)
+            Text(String(
+                localized: "No operations. Add at least one header operation.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.tertiary)
             Spacer()
         }
         .padding(.vertical, 8)
@@ -183,13 +192,13 @@ struct ModifyHeaderEditorView: View {
         HStack(spacing: rowSpacing) {
             Text(verbatim: "#")
                 .frame(width: orderWidth, alignment: .trailing)
-            Text(String(localized: "Phase"))
+            Text(String(localized: "Phase", bundle: RockxyLocalization.bundle))
                 .frame(width: phaseWidth, alignment: .leading)
-            Text(String(localized: "Operation"))
+            Text(String(localized: "Operation", bundle: RockxyLocalization.bundle))
                 .frame(width: operationWidth, alignment: .leading)
-            Text(String(localized: "Header Name"))
+            Text(String(localized: "Header Name", bundle: RockxyLocalization.bundle))
                 .frame(minWidth: fieldMinWidth, maxWidth: .infinity, alignment: .leading)
-            Text(String(localized: "Header Value"))
+            Text(String(localized: "Header Value", bundle: RockxyLocalization.bundle))
                 .frame(minWidth: fieldMinWidth, maxWidth: .infinity, alignment: .leading)
             Spacer()
                 .frame(width: reorderWidth)
@@ -209,7 +218,7 @@ struct ModifyHeaderEditorView: View {
                 operations.append(EditableHeaderOperation())
             }
         } label: {
-            Label(String(localized: "Add Operation"), systemImage: "plus")
+            Label(String(localized: "Add Operation", bundle: RockxyLocalization.bundle), systemImage: "plus")
         }
         .buttonStyle(.plain)
         .controlSize(.small)
@@ -228,7 +237,7 @@ struct ModifyHeaderEditorView: View {
         if !invalidOps.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(invalidOps, id: \.0) { index, message in
-                    Text(String(localized: "Row \(index + 1): \(message)"))
+                    Text(String(localized: "Row \(index + 1): \(message)", bundle: RockxyLocalization.bundle))
                         .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.red)
                 }
@@ -243,7 +252,7 @@ struct ModifyHeaderEditorView: View {
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
                 .frame(width: orderWidth, alignment: .trailing)
-                .accessibilityLabel(String(localized: "Operation \(index + 1)"))
+                .accessibilityLabel(String(localized: "Operation \(index + 1)", bundle: RockxyLocalization.bundle))
 
             Menu {
                 ForEach(HeaderModifyPhase.allCases, id: \.self) { phase in
@@ -280,7 +289,7 @@ struct ModifyHeaderEditorView: View {
             .frame(width: operationWidth, height: toolMetrics.formControlHeight)
 
             TextField(
-                String(localized: "e.g. X-Debug-Mode"),
+                String(localized: "e.g. X-Debug-Mode", bundle: RockxyLocalization.bundle),
                 text: Binding(
                     get: { operation.headerName },
                     set: { operation.headerName = $0 }
@@ -317,8 +326,8 @@ struct ModifyHeaderEditorView: View {
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
-            .help(String(localized: "Remove operation"))
-            .accessibilityLabel(String(localized: "Remove operation \(index + 1)"))
+            .help(String(localized: "Remove operation", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Remove operation \(index + 1)", bundle: RockxyLocalization.bundle))
             .frame(width: removeWidth, height: toolMetrics.formControlHeight)
         }
         .frame(minHeight: toolMetrics.formControlHeight)
@@ -327,7 +336,7 @@ struct ModifyHeaderEditorView: View {
     @ViewBuilder
     private func headerValueField(for operation: EditableHeaderOperation) -> some View {
         if operation.type == .remove {
-            Text(String(localized: "Not used"))
+            Text(String(localized: "Not used", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font())
                 .foregroundStyle(.secondary)
                 .frame(minWidth: fieldMinWidth, alignment: .leading)
@@ -337,7 +346,7 @@ struct ModifyHeaderEditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 5))
         } else {
             TextField(
-                String(localized: "e.g. enabled"),
+                String(localized: "e.g. enabled", bundle: RockxyLocalization.bundle),
                 text: Binding(
                     get: { operation.headerValue },
                     set: { operation.headerValue = $0 }
@@ -349,39 +358,6 @@ struct ModifyHeaderEditorView: View {
             .frame(minWidth: fieldMinWidth)
             .frame(height: toolMetrics.formControlHeight)
         }
-    }
-
-    private func move(_ operation: EditableHeaderOperation, by delta: Int) {
-        guard let index = operations.firstIndex(where: { $0.id == operation.id }) else {
-            return
-        }
-        let target = index + delta
-        guard operations.indices.contains(target) else {
-            return
-        }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            operations.swapAt(index, target)
-        }
-    }
-
-    private func reorderDelta(for index: Int) -> Int {
-        index == operations.count - 1 ? -1 : 1
-    }
-
-    private func reorderIconName(for index: Int) -> String {
-        index == operations.count - 1 ? "chevron.up" : "chevron.down"
-    }
-
-    private func reorderHelp(for index: Int) -> String {
-        index == operations.count - 1
-            ? String(localized: "Move operation up")
-            : String(localized: "Move operation down")
-    }
-
-    private func reorderAccessibilityLabel(for index: Int) -> String {
-        index == operations.count - 1
-            ? String(localized: "Move operation \(index + 1) up")
-            : String(localized: "Move operation \(index + 1) down")
     }
 
     private func dataEntryMenuLabel(_ title: String, width: CGFloat) -> some View {
@@ -412,14 +388,47 @@ struct ModifyHeaderEditorView: View {
         }
     }
 
+    private func move(_ operation: EditableHeaderOperation, by delta: Int) {
+        guard let index = operations.firstIndex(where: { $0.id == operation.id }) else {
+            return
+        }
+        let target = index + delta
+        guard operations.indices.contains(target) else {
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            operations.swapAt(index, target)
+        }
+    }
+
+    private func reorderDelta(for index: Int) -> Int {
+        index == operations.count - 1 ? -1 : 1
+    }
+
+    private func reorderIconName(for index: Int) -> String {
+        index == operations.count - 1 ? "chevron.up" : "chevron.down"
+    }
+
+    private func reorderHelp(for index: Int) -> String {
+        index == operations.count - 1
+            ? String(localized: "Move operation up", bundle: RockxyLocalization.bundle)
+            : String(localized: "Move operation down", bundle: RockxyLocalization.bundle)
+    }
+
+    private func reorderAccessibilityLabel(for index: Int) -> String {
+        index == operations.count - 1
+            ? String(localized: "Move operation \(index + 1) up", bundle: RockxyLocalization.bundle)
+            : String(localized: "Move operation \(index + 1) down", bundle: RockxyLocalization.bundle)
+    }
+
     private func phaseLabel(_ phase: HeaderModifyPhase) -> String {
         switch phase {
         case .request:
-            String(localized: "Request")
+            String(localized: "Request", bundle: RockxyLocalization.bundle)
         case .response:
-            String(localized: "Response")
+            String(localized: "Response", bundle: RockxyLocalization.bundle)
         case .both:
-            String(localized: "Both")
+            String(localized: "Both", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -480,11 +489,11 @@ extension HeaderOperationType {
     var editorLabel: String {
         switch self {
         case .add:
-            String(localized: "Add")
+            String(localized: "Add", bundle: RockxyLocalization.bundle)
         case .remove:
-            String(localized: "Remove")
+            String(localized: "Remove", bundle: RockxyLocalization.bundle)
         case .replace:
-            String(localized: "Set")
+            String(localized: "Set", bundle: RockxyLocalization.bundle)
         }
     }
 }

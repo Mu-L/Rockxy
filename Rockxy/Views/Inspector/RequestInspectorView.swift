@@ -13,7 +13,7 @@ struct RequestInspectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text(String(localized: "Request"))
+            Text(String(localized: "Request", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.fontSize, weight: .bold))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
@@ -84,13 +84,13 @@ struct RequestInspectorView: View {
                 .frame(width: metrics.inspectorTabHeight, height: metrics.inspectorTabHeight)
         }
         .buttonStyle(.plain)
-        .help(String(localized: "Preview Tabs"))
+        .help(String(localized: "Preview Tabs", bundle: RockxyLocalization.bundle))
         .popover(isPresented: $showPreviewPopover, arrowEdge: .bottom) {
             PreviewTabPopover(panel: .request, store: previewTabStore)
         }
     }
 
-    @ViewBuilder private var tabContent: some View {
+    private var tabContent: some View {
         Group {
             if let previewTab = selectedPreviewTab,
                previewTabStore.requestTabs.contains(where: { $0.id == previewTab.id })
@@ -129,7 +129,7 @@ struct RequestInspectorView: View {
     @ViewBuilder private var requestHeadersView: some View {
         if transaction.request.headers.isEmpty {
             InspectorEmptyStateView(
-                String(localized: "No Headers"),
+                String(localized: "No Headers", bundle: RockxyLocalization.bundle),
                 systemImage: "list.bullet"
             )
         } else {
@@ -140,7 +140,7 @@ struct RequestInspectorView: View {
                     source: .request,
                     coordinator: coordinator
                 )
-                    .padding()
+                .padding()
             }
         }
     }
@@ -155,9 +155,9 @@ struct RequestInspectorView: View {
             }
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Body"),
+                String(localized: "No Body", bundle: RockxyLocalization.bundle),
                 systemImage: "doc",
-                description: String(localized: "This request has no body")
+                description: String(localized: "This request has no body", bundle: RockxyLocalization.bundle)
             )
         }
     }

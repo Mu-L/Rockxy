@@ -13,16 +13,18 @@ enum CertificateExportFormat: CaseIterable, Equatable, Hashable {
     case rootCertificatePEM
     case rootCertificateDER
 
+    // MARK: Internal
+
     var menuTitle: String {
         switch self {
         case .privateKey:
-            String(localized: "Private Key…")
+            String(localized: "Private Key…", bundle: RockxyLocalization.bundle)
         case .rootCertificateP12:
-            String(localized: "Root Certificate as P12…")
+            String(localized: "Root Certificate as P12…", bundle: RockxyLocalization.bundle)
         case .rootCertificatePEM:
-            String(localized: "Root Certificate as PEM…")
+            String(localized: "Root Certificate as PEM…", bundle: RockxyLocalization.bundle)
         case .rootCertificateDER:
-            String(localized: "Root Certificate as DER…")
+            String(localized: "Root Certificate as DER…", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -41,7 +43,8 @@ enum CertificateExportFormat: CaseIterable, Equatable, Hashable {
 
     var allowedContentTypes: [UTType] {
         switch self {
-        case .privateKey, .rootCertificatePEM:
+        case .privateKey,
+             .rootCertificatePEM:
             [UTType(filenameExtension: "pem") ?? .data]
         case .rootCertificateP12:
             [UTType(filenameExtension: "p12") ?? .data]
@@ -52,9 +55,11 @@ enum CertificateExportFormat: CaseIterable, Equatable, Hashable {
 
     var containsPrivateMaterial: Bool {
         switch self {
-        case .privateKey, .rootCertificateP12:
+        case .privateKey,
+             .rootCertificateP12:
             true
-        case .rootCertificatePEM, .rootCertificateDER:
+        case .rootCertificatePEM,
+             .rootCertificateDER:
             false
         }
     }
@@ -79,8 +84,7 @@ struct CertificateExportMaterial {
 // MARK: - CertificateExportService
 
 struct CertificateExportService {
-    typealias MaterialProvider = @Sendable () async throws -> CertificateExportMaterial
-    typealias WriteHandler = @Sendable (Data, URL) throws -> Void
+    // MARK: Lifecycle
 
     init(
         materialProvider: @escaping MaterialProvider,
@@ -92,6 +96,11 @@ struct CertificateExportService {
         self.writeHandler = writeHandler
     }
 
+    // MARK: Internal
+
+    typealias MaterialProvider = @Sendable () async throws -> CertificateExportMaterial
+    typealias WriteHandler = @Sendable (Data, URL) throws -> Void
+
     func payload(for format: CertificateExportFormat) async throws -> CertificateExportPayload {
         let material = try await materialProvider()
         guard let certificate = material.certificate else {
@@ -101,7 +110,7 @@ struct CertificateExportService {
         let data: Data
         switch format {
         case .rootCertificatePEM:
-            data = Data(try certificatePEM(certificate).utf8)
+            data = try Data(certificatePEM(certificate).utf8)
         case .rootCertificateDER:
             data = try certificateDER(certificate)
         case .privateKey:
@@ -128,6 +137,8 @@ struct CertificateExportService {
         try writeHandler(payload.data, url)
     }
 
+    // MARK: Private
+
     private let materialProvider: MaterialProvider
     private let writeHandler: WriteHandler
 
@@ -146,7 +157,7 @@ struct CertificateExportService {
         let cert = try NIOSSLCertificate(bytes: Array(certificateDER(certificate)), format: .der)
         let key = try NIOSSLPrivateKey(bytes: Array(privateKey.pemRepresentation.utf8), format: .pem)
         let bundle = NIOSSLPKCS12Bundle(certificateChain: [cert], privateKey: key)
-        return Data(try bundle.serialize(passphrase: [UInt8]()))
+        return try Data(bundle.serialize(passphrase: [UInt8]()))
     }
 }
 
@@ -156,12 +167,14 @@ enum CertificateExportError: LocalizedError, Equatable {
     case missingCertificate
     case missingPrivateKey
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .missingCertificate:
-            String(localized: "Rockxy has not generated a root certificate yet.")
+            String(localized: "Rockxy has not generated a root certificate yet.", bundle: RockxyLocalization.bundle)
         case .missingPrivateKey:
-            String(localized: "Rockxy could not find the root CA private key.")
+            String(localized: "Rockxy could not find the root CA private key.", bundle: RockxyLocalization.bundle)
         }
     }
 }

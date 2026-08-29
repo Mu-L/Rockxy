@@ -19,7 +19,7 @@ enum PreviewRenderer {
 
     static func render(body: Data?, mode: PreviewRenderMode, beautify: Bool = false) -> PreviewResult {
         guard let body, !body.isEmpty else {
-            return .empty(reason: String(localized: "No body data"))
+            return .empty(reason: String(localized: "No body data", bundle: RockxyLocalization.bundle))
         }
 
         switch mode {
@@ -84,7 +84,7 @@ enum PreviewRenderer {
 
     private static func renderJSON(_ data: Data) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid text"))
+            return .empty(reason: String(localized: "Body is not valid text", bundle: RockxyLocalization.bundle))
         }
         guard let jsonObject = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(
@@ -99,7 +99,7 @@ enum PreviewRenderer {
 
     private static func renderJSONTree(_ data: Data) -> PreviewResult {
         guard let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
-            return .empty(reason: String(localized: "Body is not valid JSON"))
+            return .empty(reason: String(localized: "Body is not valid JSON", bundle: RockxyLocalization.bundle))
         }
         return .json(jsonObject)
     }
@@ -108,7 +108,7 @@ enum PreviewRenderer {
 
     private static func renderFormURLEncoded(_ data: Data) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid text"))
+            return .empty(reason: String(localized: "Body is not valid text", bundle: RockxyLocalization.bundle))
         }
         let pairs = text.split(separator: "&").map { pair -> String in
             let parts = pair.split(separator: "=", maxSplits: 1)
@@ -128,7 +128,7 @@ enum PreviewRenderer {
 
     private static func renderText(_ data: Data, beautify: Bool, language: String) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid text"))
+            return .empty(reason: String(localized: "Body is not valid text", bundle: RockxyLocalization.bundle))
         }
         if beautify {
             return .text(basicBeautify(text, language: language))
@@ -138,7 +138,7 @@ enum PreviewRenderer {
 
     private static func renderHTMLPreview(_ data: Data) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid HTML"))
+            return .empty(reason: String(localized: "Body is not valid HTML", bundle: RockxyLocalization.bundle))
         }
         return .text(text)
     }
@@ -147,7 +147,7 @@ enum PreviewRenderer {
 
     private static func renderXML(_ data: Data) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid text"))
+            return .empty(reason: String(localized: "Body is not valid text", bundle: RockxyLocalization.bundle))
         }
         return .text(text)
     }
@@ -168,7 +168,7 @@ enum PreviewRenderer {
 
     private static func renderJWT(_ data: Data) -> PreviewResult {
         guard let text = String(data: data, encoding: .utf8) else {
-            return .empty(reason: String(localized: "Body is not valid text"))
+            return .empty(reason: String(localized: "Body is not valid text", bundle: RockxyLocalization.bundle))
         }
         let result = JWTPreviewDecoder.decode(text)
         switch result {
@@ -177,7 +177,7 @@ enum PreviewRenderer {
         case let .error(_, message):
             return .empty(reason: message)
         default:
-            return .empty(reason: String(localized: "Body is not a JWT"))
+            return .empty(reason: String(localized: "Body is not a JWT", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -188,7 +188,10 @@ enum PreviewRenderer {
             return .text(text)
         }
         return .empty(
-            reason: String(localized: "Binary data (\(SizeFormatter.format(bytes: data.count)))")
+            reason: String(
+                localized: "Binary data (\(SizeFormatter.format(bytes: data.count)))",
+                bundle: RockxyLocalization.bundle
+            )
         )
     }
 

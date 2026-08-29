@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // Renders the protocol filter bar interface for toolbar controls and filtering.
@@ -42,11 +43,16 @@ struct ProtocolFilterBar: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+        .background {
+            ToolbarCustomizationWindowReader(reference: customizationWindowReference)
+                .frame(width: 0, height: 0)
+        }
     }
 
     // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
+    @State private var customizationWindowReference = ToolbarCustomizationWindowReference()
 
     private var hasActiveFilters: Bool {
         !activeFilters.isEmpty
@@ -100,10 +106,28 @@ struct ProtocolFilterBar: View {
             visiblePills: visiblePills
         )
         return Menu {
-            overflowSection(String(localized: "Transport"), ProtocolFilterSelection.transportFilters, visiblePills)
-            overflowSection(String(localized: "Protocol"), ProtocolFilterSelection.protocolFilters, visiblePills)
-            overflowSection(String(localized: "Content"), ProtocolFilterSelection.contentTypeFilters, visiblePills)
+            overflowSection(
+                String(localized: "Transport", bundle: RockxyLocalization.bundle),
+                ProtocolFilterSelection.transportFilters,
+                visiblePills
+            )
+            overflowSection(
+                String(localized: "Protocol", bundle: RockxyLocalization.bundle),
+                ProtocolFilterSelection.protocolFilters,
+                visiblePills
+            )
+            overflowSection(
+                String(localized: "Content", bundle: RockxyLocalization.bundle),
+                ProtocolFilterSelection.contentTypeFilters,
+                visiblePills
+            )
             overflowStatusSection(visiblePills)
+            Divider()
+            Button(String(localized: "Customize Toolbar…", bundle: RockxyLocalization.bundle)) {
+                NativeWorkspaceToolbar.presentCustomizationPalette(
+                    preferredWindow: customizationWindowReference.window
+                )
+            }
         } label: {
             Image(systemName: hasHidden ? "ellipsis.circle.fill" : "ellipsis.circle")
                 .font(.system(size: metrics.secondaryFontSize))
@@ -112,12 +136,12 @@ struct ProtocolFilterBar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .foregroundStyle(hasHidden ? Color.accentColor : Color.secondary)
-        .help(String(localized: "More filters"))
-        .accessibilityLabel(String(localized: "More filters"))
+        .help(String(localized: "More filters", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "More filters", bundle: RockxyLocalization.bundle))
         .accessibilityValue(
             hasHidden
-                ? String(localized: "Hidden filters active")
-                : String(localized: "No hidden filters active")
+                ? String(localized: "Hidden filters active", bundle: RockxyLocalization.bundle)
+                : String(localized: "No hidden filters active", bundle: RockxyLocalization.bundle)
         )
     }
 
@@ -146,8 +170,8 @@ struct ProtocolFilterBar: View {
             visiblePills: visiblePills
         )
         if !hidden.isEmpty {
-            Section(String(localized: "Status")) {
-                Toggle(String(localized: "Any Status"), isOn: anyStatusBinding)
+            Section(String(localized: "Status", bundle: RockxyLocalization.bundle)) {
+                Toggle(String(localized: "Any Status", bundle: RockxyLocalization.bundle), isOn: anyStatusBinding)
                 Divider()
                 ForEach(hidden, id: \.self) { filter in
                     Toggle(ProtocolFilterSelection.menuLabel(for: filter), isOn: binding(for: filter))
@@ -163,14 +187,14 @@ struct ProtocolFilterBar: View {
             if iconOnly {
                 Image(systemName: "xmark.circle")
             } else {
-                Text(String(localized: "Clear All"))
+                Text(String(localized: "Clear All", bundle: RockxyLocalization.bundle))
             }
         }
         .buttonStyle(.borderless)
         .font(.system(size: metrics.secondaryFontSize, weight: .medium))
         .foregroundStyle(Color.accentColor)
-        .help(String(localized: "Clear all traffic-type and status filters"))
-        .accessibilityLabel(String(localized: "Clear all protocol filters"))
+        .help(String(localized: "Clear all traffic-type and status filters", bundle: RockxyLocalization.bundle))
+        .accessibilityLabel(String(localized: "Clear all protocol filters", bundle: RockxyLocalization.bundle))
     }
 
     private func binding(for filter: ProtocolFilter) -> Binding<Bool> {
@@ -178,5 +202,45 @@ struct ProtocolFilterBar: View {
             get: { ProtocolFilterSelection.isSelected(filter, in: activeFilters) },
             set: { _ in activeFilters = ProtocolFilterSelection.toggling(filter, in: activeFilters) }
         )
+    }
+}
+
+// MARK: - ToolbarCustomizationWindowReference
+
+@MainActor
+private final class ToolbarCustomizationWindowReference {
+    weak var window: NSWindow?
+}
+
+// MARK: - ToolbarCustomizationWindowReader
+
+private struct ToolbarCustomizationWindowReader: NSViewRepresentable {
+    let reference: ToolbarCustomizationWindowReference
+
+    func makeNSView(context: Context) -> ToolbarCustomizationWindowAnchor {
+        let view = ToolbarCustomizationWindowAnchor()
+        view.reference = reference
+        return view
+    }
+
+    func updateNSView(_ nsView: ToolbarCustomizationWindowAnchor, context: Context) {
+        nsView.reference = reference
+        nsView.captureWindow()
+    }
+}
+
+// MARK: - ToolbarCustomizationWindowAnchor
+
+@MainActor
+private final class ToolbarCustomizationWindowAnchor: NSView {
+    weak var reference: ToolbarCustomizationWindowReference?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        captureWindow()
+    }
+
+    func captureWindow() {
+        reference?.window = window
     }
 }

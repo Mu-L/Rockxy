@@ -84,7 +84,10 @@ extension MainContentCoordinator {
         exportScopeContext = nil
 
         guard let plan = makeExportExecutionPlan(context: context, scope: scope) else {
-            activeToast = ToastMessage(style: .error, text: String(localized: "No transactions to export"))
+            activeToast = ToastMessage(
+                style: .error,
+                text: String(localized: "No transactions to export", bundle: RockxyLocalization.bundle)
+            )
             return
         }
 
@@ -117,8 +120,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to serialize export: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not create export data.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not create export data.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             return
         }
@@ -145,8 +151,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to export traffic: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not write export file.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not write export file.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -170,8 +179,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to serialize session: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Save Failed"),
-                message: String(localized: "Could not serialize session data.\n\n\(error.localizedDescription)")
+                title: String(localized: "Save Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not serialize session data.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             return
         }
@@ -190,8 +202,11 @@ extension MainContentCoordinator {
         } catch {
             Self.logger.error("Failed to save session: \(error.localizedDescription)")
             showExportError(
-                title: String(localized: "Save Failed"),
-                message: String(localized: "Could not write session file.\n\n\(error.localizedDescription)")
+                title: String(localized: "Save Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not write session file.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -248,7 +263,7 @@ extension MainContentCoordinator {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.runModal()
     }
 
@@ -284,7 +299,10 @@ extension MainContentCoordinator {
     ) {
         let transactionsToExport = eligibleExportTransactions(source, format: format)
         guard !transactionsToExport.isEmpty else {
-            activeToast = ToastMessage(style: .error, text: String(localized: "No OpenAPI-eligible requests to export"))
+            activeToast = ToastMessage(
+                style: .error,
+                text: String(localized: "No OpenAPI-eligible requests to export", bundle: RockxyLocalization.bundle)
+            )
             return
         }
 
@@ -312,8 +330,11 @@ extension MainContentCoordinator {
             }
         } catch {
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not create export data.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not create export data.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             return
         }
@@ -337,8 +358,11 @@ extension MainContentCoordinator {
             )
         } catch {
             showExportError(
-                title: String(localized: "Export Failed"),
-                message: String(localized: "Could not write export file.\n\n\(error.localizedDescription)")
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not write export file.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
     }
@@ -406,9 +430,13 @@ extension MainContentCoordinator {
     {
         if skippedCount > 0 {
             return String(
-                localized: "Exported \(format.successLabel) from \(count) requests; skipped \(skippedCount) ineligible requests"
+                localized: "Exported \(format.successLabel) from \(count) requests; skipped \(skippedCount) ineligible requests",
+                bundle: RockxyLocalization.bundle
             )
         }
-        return String(localized: "Exported \(format.successLabel) from \(count) requests")
+        return String(
+            localized: "Exported \(format.successLabel) from \(count) requests",
+            bundle: RockxyLocalization.bundle
+        )
     }
 }

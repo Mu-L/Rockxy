@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - RuleMatchCondition
+
 /// Defines the criteria a request must satisfy for a `ProxyRule` to fire.
 /// All non-nil fields must match (AND logic). URL patterns use regex matching.
 struct RuleMatchCondition: Codable, Equatable {
@@ -35,6 +37,34 @@ struct RuleMatchCondition: Codable, Equatable {
     var matchType: RuleMatchType?
     var includeSubpaths: Bool?
 
+    /// The regex source the runtime should compile and match against. When the editor
+    /// persisted authoring metadata (`matchType`/`sourceURLPattern`/`includeSubpaths`)
+    /// the pattern is rebuilt from that authored intent so a stale compiled `urlPattern`
+    /// never wins. Legacy rules without metadata fall back to the stored `urlPattern`.
+    var runtimeURLPattern: String? {
+        guard let urlPattern else {
+            return nil
+        }
+        guard let matchType else {
+            return urlPattern
+        }
+        let authoredPattern = sourceURLPattern ?? urlPattern
+        let includeSub = matchType == .wildcard ? includeSubpaths ?? false : false
+        let source = RulePatternBuilder.regexSource(
+            rawPattern: authoredPattern,
+            matchType: matchType,
+            includeSubpaths: includeSub
+        )
+        guard matchType == .wildcard else {
+            return source
+        }
+        return Self.applyWildcardEndBoundary(
+            source: source,
+            authoredPattern: authoredPattern,
+            includeSubpaths: includeSub
+        )
+    }
+
     func matches(
         method requestMethod: String,
         url: URL,
@@ -67,19 +97,50 @@ struct RuleMatchCondition: Codable, Equatable {
         }
         return true
     }
+}
 
-    private var runtimeURLPattern: String? {
-        guard let urlPattern else {
-            return nil
+// MARK: - Wildcard end-boundary parity
+
+private extension RuleMatchCondition {
+    /// The suffix `RulePatternBuilder` appends for an anchored (non-subpath) wildcard rule.
+    static let anchoredWildcardSuffix = "($|[?#])"
+    /// The suffix `RulePatternBuilder` appends for a subpath-including wildcard rule.
+    static let subpathWildcardSuffix = ".*"
+
+    /// Corrects the end-boundary `RulePatternBuilder` produces so wildcard matching mirrors
+    /// the validated full-URL behavior observed in Proxyman. The core escaping is left to
+    /// `RulePatternBuilder`; only the trailing boundary is rewritten here.
+    ///
+    /// Two corrections:
+    /// - **Trailing `?` wildcard, no subpaths:** the single-character wildcard already consumes
+    ///   the position a query separator would occupy, so a trailing `?query` must NOT match.
+    ///   The boundary is anchored to end-of-string (`$`) instead of allowing `[?#]`. Patterns
+    ///   ending in a literal keep the query-tolerant `($|[?#])` boundary.
+    /// - **Subpaths on a bare path (no trailing `/`, `*`, or `?`):** the base must match itself,
+    ///   slash children, and a query — but not a sibling that merely shares the prefix. The
+    ///   greedy `.*` (which sibling-matches) is replaced with `($|[/?#])`. Patterns already
+    ///   ending in `/` or a wildcard keep `.*`, which is sibling-safe or intentionally broad.
+    static func applyWildcardEndBoundary(
+        source: String,
+        authoredPattern: String,
+        includeSubpaths: Bool
+    )
+        -> String
+    {
+        if includeSubpaths {
+            guard !authoredPattern.hasSuffix("*"),
+                  !authoredPattern.hasSuffix("?"),
+                  !authoredPattern.hasSuffix("/"),
+                  source.hasSuffix(subpathWildcardSuffix) else
+            {
+                return source
+            }
+            return String(source.dropLast(subpathWildcardSuffix.count)) + "($|[/?#])"
         }
-        guard let matchType else {
-            return urlPattern
+
+        guard authoredPattern.hasSuffix("?"), source.hasSuffix(anchoredWildcardSuffix) else {
+            return source
         }
-        let authoredPattern = sourceURLPattern ?? urlPattern
-        return RulePatternBuilder.regexSource(
-            rawPattern: authoredPattern,
-            matchType: matchType,
-            includeSubpaths: matchType == .wildcard ? includeSubpaths ?? false : false
-        )
+        return String(source.dropLast(anchoredWildcardSuffix.count)) + "$"
     }
 }

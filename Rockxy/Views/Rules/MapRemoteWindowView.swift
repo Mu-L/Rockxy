@@ -296,9 +296,12 @@ struct MapRemoteWindowView: View {
 
     private var footerHint: String {
         let countText = isSearching
-            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
-            : String(localized: "\(viewModel.ruleCount) rules")
-        return "\(countText) · ⌘N \(String(localized: "New Rule")) · ⌘↩ \(String(localized: "Edit"))"
+            ? String(
+                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+        return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
@@ -309,7 +312,7 @@ struct MapRemoteWindowView: View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Toggle(
-                    String(localized: "Enable Map Remote"),
+                    String(localized: "Enable Map Remote", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { viewModel.isToolEnabled },
                         set: { viewModel.setToolEnabled($0) }
@@ -318,19 +321,22 @@ struct MapRemoteWindowView: View {
                 .toggleStyle(.checkbox)
                 .font(toolMetrics.font(weight: .medium))
 
-                Text(String(localized: "Rewrite matching requests to a different host, port, path, or query."))
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    localized: "Rewrite matching requests to a different host, port, path, or query.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
-                .accessibilityLabel(String(localized: "Search Map Remote rules"))
+                .accessibilityLabel(String(localized: "Search Map Remote rules", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -347,7 +353,7 @@ struct MapRemoteWindowView: View {
                     """
                     Map Remote participates in Rockxy's global first-match rule order. Blank fields keep matched request \
                     components; changing Protocol with a blank Port uses the new protocol's default.
-                    """
+                    """, bundle: RockxyLocalization.bundle
                 )
             )
             .font(toolMetrics.secondaryFont())
@@ -361,7 +367,7 @@ struct MapRemoteWindowView: View {
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleIDs) {
-            TableColumn(String(localized: "Enabled")) { rule in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
                 Toggle("", isOn: Binding(
                     get: { rule.isEnabled },
                     set: { _ in viewModel.toggleRule(id: rule.id) }
@@ -369,13 +375,16 @@ struct MapRemoteWindowView: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .accessibilityLabel(
-                    String(localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)")
+                    String(
+                        localized: "Enable \(rule.name.isEmpty ? "Untitled" : rule.name)",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
             .width(62)
 
-            TableColumn(String(localized: "Name")) { rule in
-                Text(rule.name.isEmpty ? String(localized: "Untitled") : rule.name)
+            TableColumn(String(localized: "Name", bundle: RockxyLocalization.bundle)) { rule in
+                Text(rule.name.isEmpty ? String(localized: "Untitled", bundle: RockxyLocalization.bundle) : rule.name)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .help(rule.name)
@@ -383,14 +392,14 @@ struct MapRemoteWindowView: View {
             }
             .width(min: 150, ideal: 190)
 
-            TableColumn(String(localized: "Method")) { rule in
+            TableColumn(String(localized: "Method", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.methodLabel(for: rule))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }
             .width(76)
 
-            TableColumn(String(localized: "Matching Rule")) { rule in
+            TableColumn(String(localized: "Matching Rule", bundle: RockxyLocalization.bundle)) { rule in
                 Text(viewModel.matchingRuleLabel(for: rule))
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -400,7 +409,7 @@ struct MapRemoteWindowView: View {
             }
             .width(min: 220, ideal: 300)
 
-            TableColumn(String(localized: "Remote Destination")) { rule in
+            TableColumn(String(localized: "Remote Destination", bundle: RockxyLocalization.bundle)) { rule in
                 HStack(spacing: 6) {
                     Text(viewModel.destinationLabel(for: rule))
                         .font(toolMetrics.font(monospaced: true))
@@ -429,13 +438,19 @@ struct MapRemoteWindowView: View {
             if viewModel.filteredRules.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No matching rules")
-                        : String(localized: "No Map Remote rules"),
+                        ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No Map Remote rules", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "arrow.triangle.branch",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different name, method, URL, or destination.")
-                            : String(localized: "Click \"+\" or press ⌘N to create a rule.")
+                            ? String(
+                                localized: "Try a different name, method, URL, or destination.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Click \"+\" or press ⌘N to create a rule.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -451,15 +466,18 @@ struct MapRemoteWindowView: View {
     }
 
     private var preserveHostBadge: some View {
-        Text(String(localized: "Host kept"))
+        Text(String(localized: "Host kept", bundle: RockxyLocalization.bundle))
             .font(toolMetrics.metadataFont(weight: .semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 1)
             .background(Color.secondary.opacity(0.14))
             .clipShape(Capsule())
-            .help(String(localized: "The Host header is preserved from the original request."))
-            .accessibilityLabel(String(localized: "Host header preserved"))
+            .help(String(
+                localized: "The Host header is preserved from the original request.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .accessibilityLabel(String(localized: "Host header preserved", bundle: RockxyLocalization.bundle))
     }
 
     private var footer: some View {
@@ -476,8 +494,8 @@ struct MapRemoteWindowView: View {
 
             Text(
                 viewModel.isToolEnabled
-                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE"))"
-                    : String(localized: "MAP REMOTE OFF")
+                    ? "\(viewModel.activeRuleCount) \(String(localized: "ACTIVE", bundle: RockxyLocalization.bundle))"
+                    : String(localized: "MAP REMOTE OFF", bundle: RockxyLocalization.bundle)
             )
             .font(toolMetrics.metadataFont(weight: .semibold))
             .padding(.horizontal, 12)
@@ -502,7 +520,7 @@ struct MapRemoteWindowView: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
-            .help(String(localized: "New Rule"))
+            .help(String(localized: "New Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -520,7 +538,7 @@ struct MapRemoteWindowView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleIDs.isEmpty)
-            .help(String(localized: "Remove Selected Rules"))
+            .help(String(localized: "Remove Selected Rules", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -536,19 +554,21 @@ struct MapRemoteWindowView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "New Rule")) { openNewEditor() }
+            Button(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) { openNewEditor() }
                 .keyboardShortcut("n", modifiers: .command)
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.selectedRule {
                     openEditor(for: rule)
                 }
             }
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(viewModel.selectedRule == nil)
-            Button(String(localized: "Duplicate")) { viewModel.duplicateSelectedRule() }
-                .keyboardShortcut("d", modifiers: .command)
-                .disabled(viewModel.selectedRule == nil)
-            Button(String(localized: "Toggle Enabled")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
+                viewModel.duplicateSelectedRule()
+            }
+            .keyboardShortcut("d", modifiers: .command)
+            .disabled(viewModel.selectedRule == nil)
+            Button(String(localized: "Toggle Enabled", bundle: RockxyLocalization.bundle)) {
                 if let id = viewModel.selectedRuleIDs.first {
                     viewModel.toggleRule(id: id)
                 }
@@ -556,14 +576,14 @@ struct MapRemoteWindowView: View {
             .keyboardShortcut(.space, modifiers: [])
             .disabled(viewModel.selectedRule == nil)
             Divider()
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelectedRules()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleIDs.isEmpty)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -576,17 +596,17 @@ struct MapRemoteWindowView: View {
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first {
-            Button(String(localized: "Edit Rule")) {
+            Button(String(localized: "Edit Rule", bundle: RockxyLocalization.bundle)) {
                 if let rule = viewModel.allRules.first(where: { $0.id == id }) {
                     openEditor(for: rule)
                 }
             }
-            Button(String(localized: "Duplicate")) {
+            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
                 viewModel.selectedRuleIDs = [id]
                 viewModel.duplicateSelectedRule()
             }
             Divider()
-            Button(String(localized: "Delete Rule"), role: .destructive) {
+            Button(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeRule(id: id)
             }
         }
@@ -661,8 +681,8 @@ struct MapRemoteEditorWindowView: View {
 
     private var editorTitle: String {
         viewModel.existingID == nil
-            ? String(localized: "New Map Remote Rule")
-            : String(localized: "Edit Map Remote Rule")
+            ? String(localized: "New Map Remote Rule", bundle: RockxyLocalization.bundle)
+            : String(localized: "Edit Map Remote Rule", bundle: RockxyLocalization.bundle)
     }
 
     private var quickCreateProvenance: String? {
@@ -670,9 +690,12 @@ struct MapRemoteEditorWindowView: View {
             return nil
         }
         if let sourceURL = draft.sourceURL {
-            return String(localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)")
+            return String(
+                localized: "Created from \(draft.sourceMethod ?? "ANY") \(sourceURL.absoluteString)",
+                bundle: RockxyLocalization.bundle
+            )
         }
-        return String(localized: "Created from domain \(draft.sourceHost)")
+        return String(localized: "Created from domain \(draft.sourceHost)", bundle: RockxyLocalization.bundle)
     }
 
     private var toolMetrics: ToolWindowDisplayMetrics {
@@ -681,23 +704,26 @@ struct MapRemoteEditorWindowView: View {
 
     private var ruleDetailsSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Rule Details"))
+            Text(String(localized: "Rule Details", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                    fieldGroup(String(localized: "Name")) {
-                        TextField(String(localized: "Untitled"), text: $viewModel.name)
-                            .textFieldStyle(.roundedBorder)
-                            .accessibilityLabel(String(localized: "Rule name"))
+                    fieldGroup(String(localized: "Name", bundle: RockxyLocalization.bundle)) {
+                        TextField(
+                            String(localized: "Untitled", bundle: RockxyLocalization.bundle),
+                            text: $viewModel.name
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel(String(localized: "Rule name", bundle: RockxyLocalization.bundle))
                     }
                     .frame(width: max(250, toolMetrics.fieldWidth(250)))
 
-                    fieldGroup(String(localized: "URL pattern")) {
+                    fieldGroup(String(localized: "URL pattern", bundle: RockxyLocalization.bundle)) {
                         TextField("https://example.com/api/*", text: $viewModel.urlText)
                             .textFieldStyle(.roundedBorder)
                             .font(toolMetrics.font())
-                            .accessibilityLabel(String(localized: "URL pattern"))
+                            .accessibilityLabel(String(localized: "URL pattern", bundle: RockxyLocalization.bundle))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -709,14 +735,14 @@ struct MapRemoteEditorWindowView: View {
                 }
 
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                    inlineField(String(localized: "Method")) {
+                    inlineField(String(localized: "Method", bundle: RockxyLocalization.bundle)) {
                         methodMenu
                     }
-                    inlineField(String(localized: "Match type")) {
+                    inlineField(String(localized: "Match type", bundle: RockxyLocalization.bundle)) {
                         matchTypeMenu
                     }
                     if viewModel.matchType == .wildcard {
-                        Text(String(localized: "Supports * and ?."))
+                        Text(String(localized: "Supports * and ?.", bundle: RockxyLocalization.bundle))
                             .font(toolMetrics.secondaryFont())
                             .foregroundStyle(.secondary)
                     }
@@ -725,7 +751,7 @@ struct MapRemoteEditorWindowView: View {
 
                 if viewModel.matchType == .wildcard {
                     Toggle(
-                        String(localized: "Include all subpaths of this URL"),
+                        String(localized: "Include all subpaths of this URL", bundle: RockxyLocalization.bundle),
                         isOn: $viewModel.includeSubpaths
                     )
                     .toggleStyle(.checkbox)
@@ -745,32 +771,44 @@ struct MapRemoteEditorWindowView: View {
 
     private var remoteDestinationSection: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(String(localized: "Remote Destination"))
+            Text(String(localized: "Remote Destination", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .semibold))
 
             VStack(alignment: .leading, spacing: toolMetrics.formRowSpacing) {
                 HStack(alignment: .center, spacing: toolMetrics.controlSpacing * 2) {
-                    inlineField(String(localized: "Protocol")) {
+                    inlineField(String(localized: "Protocol", bundle: RockxyLocalization.bundle)) {
                         schemeMenu
                     }
                     Spacer()
                 }
 
                 HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
-                    fieldGroup(String(localized: "Host")) {
-                        TextField(String(localized: "Keep original"), text: $viewModel.destHost)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font())
-                            .focused($isDestinationHostFocused)
-                            .accessibilityLabel(String(localized: "Destination host"))
+                    fieldGroup(String(localized: "Host", bundle: RockxyLocalization.bundle)) {
+                        TextField(
+                            String(localized: "Keep original", bundle: RockxyLocalization.bundle),
+                            text: $viewModel.destHost
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .focused($isDestinationHostFocused)
+                        .accessibilityLabel(String(
+                            localized: "Destination host",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     }
                     .frame(maxWidth: .infinity)
 
-                    fieldGroup(String(localized: "Port")) {
-                        TextField(String(localized: "Automatic"), text: $viewModel.destPort)
-                            .textFieldStyle(.roundedBorder)
-                            .font(toolMetrics.font())
-                            .accessibilityLabel(String(localized: "Destination port"))
+                    fieldGroup(String(localized: "Port", bundle: RockxyLocalization.bundle)) {
+                        TextField(
+                            String(localized: "Automatic", bundle: RockxyLocalization.bundle),
+                            text: $viewModel.destPort
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .font(toolMetrics.font())
+                        .accessibilityLabel(String(
+                            localized: "Destination port",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     }
                     .frame(width: toolMetrics.fieldWidth(90))
                 }
@@ -788,23 +826,30 @@ struct MapRemoteEditorWindowView: View {
                     validationLabel(destinationError)
                 }
 
-                fieldGroup(String(localized: "Path")) {
-                    TextField(String(localized: "Keep original"), text: $viewModel.destPath)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .accessibilityLabel(String(localized: "Destination path"))
+                fieldGroup(String(localized: "Path", bundle: RockxyLocalization.bundle)) {
+                    TextField(
+                        String(localized: "Keep original", bundle: RockxyLocalization.bundle),
+                        text: $viewModel.destPath
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .accessibilityLabel(String(localized: "Destination path", bundle: RockxyLocalization.bundle))
                 }
 
-                fieldGroup(String(localized: "Query")) {
-                    TextField(String(localized: "Keep original"), text: $viewModel.destQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .font(toolMetrics.font())
-                        .accessibilityLabel(String(localized: "Destination query"))
+                fieldGroup(String(localized: "Query", bundle: RockxyLocalization.bundle)) {
+                    TextField(
+                        String(localized: "Keep original", bundle: RockxyLocalization.bundle),
+                        text: $viewModel.destQuery
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(toolMetrics.font())
+                    .accessibilityLabel(String(localized: "Destination query", bundle: RockxyLocalization.bundle))
                 }
 
                 Text(
                     String(
-                        localized: "Blank fields keep the matched request component. If Protocol changes while Port is blank, Rockxy uses the new protocol's default port."
+                        localized: "Blank fields keep the matched request component. If Protocol changes while Port is blank, Rockxy uses the new protocol's default port.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -821,34 +866,45 @@ struct MapRemoteEditorWindowView: View {
                 Divider()
 
                 Toggle(
-                    String(localized: "Keep original request path and query"),
+                    String(localized: "Keep original request path and query", bundle: RockxyLocalization.bundle),
                     isOn: $viewModel.preserveOriginalURL
                 )
                 .toggleStyle(.checkbox)
                 .font(toolMetrics.font())
                 .accessibilityHint(
-                    String(localized: "Forwards the original request target while connecting to the remote destination.")
+                    String(
+                        localized: "Forwards the original request target while connecting to the remote destination.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 Text(
                     String(
                         localized:
-                        "The destination protocol, host, and port still choose the remote server. Path and query overrides are ignored while this is enabled."
+                        "The destination protocol, host, and port still choose the remote server. Path and query overrides are ignored while this is enabled.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-                Toggle(String(localized: "Preserve Host header"), isOn: $viewModel.preserveHost)
-                    .toggleStyle(.checkbox)
-                    .font(toolMetrics.font())
-                    .accessibilityHint(
-                        String(localized: "Keeps the request's Host header even when the destination host changes.")
+                Toggle(
+                    String(localized: "Preserve Host header", bundle: RockxyLocalization.bundle),
+                    isOn: $viewModel.preserveHost
+                )
+                .toggleStyle(.checkbox)
+                .font(toolMetrics.font())
+                .accessibilityHint(
+                    String(
+                        localized: "Keeps the request's Host header even when the destination host changes.",
+                        bundle: RockxyLocalization.bundle
                     )
+                )
                 Text(
                     String(
                         localized:
-                        "The Host header stays as the original request sent it. The destination host, DNS lookup, and TLS server name still use the rewritten host above."
+                        "The Host header stays as the original request sent it. The destination host, DNS lookup, and TLS server name still use the rewritten host above.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -868,7 +924,7 @@ struct MapRemoteEditorWindowView: View {
 
     private var fullURLRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(String(localized: "Fill from full URL"))
+            Text(String(localized: "Fill from full URL", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font())
                 .foregroundStyle(.secondary)
             HStack(spacing: toolMetrics.controlSpacing) {
@@ -877,8 +933,8 @@ struct MapRemoteEditorWindowView: View {
                     .font(toolMetrics.font())
                     .frame(height: toolMetrics.formControlHeight)
                     .onSubmit { applyPastedURL() }
-                    .accessibilityLabel(String(localized: "Full destination URL"))
-                Button(String(localized: "Fill fields")) { applyPastedURL() }
+                    .accessibilityLabel(String(localized: "Full destination URL", bundle: RockxyLocalization.bundle))
+                Button(String(localized: "Fill fields", bundle: RockxyLocalization.bundle)) { applyPastedURL() }
                     .frame(height: toolMetrics.formControlHeight)
                     .disabled(viewModel.destinationURLPaste.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -933,7 +989,7 @@ struct MapRemoteEditorWindowView: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .frame(width: toolMetrics.menuWidth(90))
-        .accessibilityLabel(String(localized: "Request method"))
+        .accessibilityLabel(String(localized: "Request method", bundle: RockxyLocalization.bundle))
     }
 
     private var matchTypeMenu: some View {
@@ -949,13 +1005,16 @@ struct MapRemoteEditorWindowView: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .frame(width: toolMetrics.menuWidth(150))
-        .accessibilityLabel(String(localized: "Match type"))
+        .accessibilityLabel(String(localized: "Match type", bundle: RockxyLocalization.bundle))
     }
 
     private var schemeMenu: some View {
         Menu {
             Button { viewModel.destScheme = "" } label: {
-                menuCheckmarkLabel(String(localized: "Keep Original"), isSelected: viewModel.destScheme.isEmpty)
+                menuCheckmarkLabel(
+                    String(localized: "Keep Original", bundle: RockxyLocalization.bundle),
+                    isSelected: viewModel.destScheme.isEmpty
+                )
             }
             Divider()
             Button { viewModel.destScheme = "http" } label: {
@@ -966,14 +1025,16 @@ struct MapRemoteEditorWindowView: View {
             }
         } label: {
             dataEntryMenuLabel(
-                viewModel.destScheme.isEmpty ? String(localized: "Keep Original") : viewModel.destScheme,
+                viewModel.destScheme
+                    .isEmpty ? String(localized: "Keep Original", bundle: RockxyLocalization.bundle) : viewModel
+                    .destScheme,
                 width: toolMetrics.menuWidth(150)
             )
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .frame(width: toolMetrics.menuWidth(150))
-        .accessibilityLabel(String(localized: "Destination protocol"))
+        .accessibilityLabel(String(localized: "Destination protocol", bundle: RockxyLocalization.bundle))
     }
 
     private var footer: some View {
@@ -987,7 +1048,7 @@ struct MapRemoteEditorWindowView: View {
                 Button {
                     dismiss()
                 } label: {
-                    footerButtonLabel(String(localized: "Cancel"))
+                    footerButtonLabel(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                 }
                 .keyboardShortcut(.cancelAction)
                 .disabled(viewModel.isSaving)
@@ -997,10 +1058,10 @@ struct MapRemoteEditorWindowView: View {
                 } label: {
                     footerButtonLabel(
                         viewModel.isSaving
-                            ? String(localized: "Saving…")
+                            ? String(localized: "Saving…", bundle: RockxyLocalization.bundle)
                             : viewModel.existingID == nil
-                            ? String(localized: "Add")
-                            : String(localized: "Save")
+                            ? String(localized: "Add", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Save", bundle: RockxyLocalization.bundle)
                     )
                 }
                 .keyboardShortcut(.defaultAction)

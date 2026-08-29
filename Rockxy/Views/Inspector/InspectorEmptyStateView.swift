@@ -4,9 +4,7 @@ import SwiftUI
 /// Inspector parents are top-leading by default, so plain `ContentUnavailableView`
 /// can look accidentally pinned to the upper-left corner.
 struct InspectorEmptyStateView: View {
-    let title: String
-    let systemImage: String
-    var description: String?
+    // MARK: Lifecycle
 
     init(_ title: String, systemImage: String, description: String? = nil) {
         self.title = title
@@ -19,11 +17,17 @@ struct InspectorEmptyStateView: View {
     /// inspector and vertical context inspector remain visually consistent.
     init(requestSelectionDescription description: String) {
         self.init(
-            String(localized: "No Selection"),
+            String(localized: "No Selection", bundle: RockxyLocalization.bundle),
             systemImage: "doc.text.magnifyingglass",
             description: description
         )
     }
+
+    // MARK: Internal
+
+    let title: String
+    let systemImage: String
+    var description: String?
 
     var body: some View {
         VStack(spacing: 0) {

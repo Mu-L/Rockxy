@@ -8,6 +8,8 @@ import Testing
 // MARK: - RuleEngineTests
 
 struct RuleEngineTests {
+    // MARK: Internal
+
     @Test("URL pattern matching with regex")
     func urlPatternMatching() async throws {
         let engine = RuleEngine()
@@ -378,6 +380,215 @@ struct RuleEngineTests {
         #expect(reordered.map(\.id) == [block.id, headerC.id, throttle.id, headerA.id, headerB.id])
     }
 
+    @Test("Map Local reorder preserves unrelated global slots")
+    func mapLocalReorderPreservesUnrelatedSlots() async {
+        let engine = RuleEngine()
+        let block = ProxyRule(
+            name: "Block",
+            matchCondition: RuleMatchCondition(urlPattern: ".*"),
+            action: .block(statusCode: 403)
+        )
+        let mapA = Self.mapLocalRule(named: "A")
+        let throttle = ProxyRule(
+            name: "Throttle",
+            matchCondition: RuleMatchCondition(urlPattern: ".*"),
+            action: .throttle(delayMs: 100)
+        )
+        let mapB = Self.mapLocalRule(named: "B")
+        let mapC = Self.mapLocalRule(named: "C")
+        await engine.replaceAll([block, mapA, throttle, mapB, mapC])
+
+        await engine.reorderMapLocalRules(orderedIDs: [mapC.id, mapA.id, mapB.id])
+
+        let reordered = await engine.allRules
+        #expect(reordered.map(\.id) == [block.id, mapC.id, throttle.id, mapA.id, mapB.id])
+    }
+
+    @Test("First enabled Map Local rule wins on overlapping matches")
+    func mapLocalFirstMatchWins() async throws {
+        let engine = RuleEngine()
+        let first = ProxyRule(
+            name: "First",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .mapLocal(filePath: "/tmp/first.json")
+        )
+        let second = ProxyRule(
+            name: "Second",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .mapLocal(filePath: "/tmp/second.json")
+        )
+        await engine.replaceAll([first, second])
+
+        let url = try #require(URL(string: "https://example.com/x"))
+        let result = await engine.evaluate(method: "GET", url: url, headers: [])
+        if case let .mapLocal(path, _, _, _, _) = result {
+            #expect(path == "/tmp/first.json")
+        } else {
+            Issue.record("Expected .mapLocal")
+        }
+    }
+
+    @Test("Map Local runtime matching uses authored metadata, not a stale compiled pattern")
+    func mapLocalMetadataRuntimeMatching() async throws {
+        let engine = RuleEngine()
+        // The compiled `urlPattern` is deliberately wrong; the authored wildcard should win.
+        let condition = RuleMatchCondition(
+            urlPattern: ".*never-matches\\.invalid.*",
+            sourceURLPattern: "https://api.example.com/*",
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let rule = ProxyRule(
+            name: "MapLocal",
+            isEnabled: true,
+            matchCondition: condition,
+            action: .mapLocal(filePath: "/tmp/mock.json")
+        )
+        await engine.addRule(rule)
+
+        let url = try #require(URL(string: "https://api.example.com/users"))
+        let result = await engine.evaluate(method: "GET", url: url, headers: [])
+        guard case .mapLocal = result else {
+            Issue.record("Expected the authored wildcard to match at runtime")
+            return
+        }
+    }
+
+    @Test("Wildcard ? matches exactly one character")
+    func wildcardSingleCharacterBoundary() async throws {
+        let engine = RuleEngine()
+        let rule = ProxyRule(
+            name: "MapLocal",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(
+                urlPattern: "https://api.example.com/v?/users",
+                sourceURLPattern: "https://api.example.com/v?/users",
+                matchType: .wildcard,
+                includeSubpaths: false
+            ),
+            action: .mapLocal(filePath: "/tmp/v.json")
+        )
+        await engine.addRule(rule)
+
+        let oneChar = try #require(URL(string: "https://api.example.com/v1/users"))
+        let zeroChar = try #require(URL(string: "https://api.example.com/v/users"))
+        let twoChar = try #require(URL(string: "https://api.example.com/v12/users"))
+
+        #expect(await engine.evaluate(method: "GET", url: oneChar, headers: []) != nil)
+        #expect(await engine.evaluate(method: "GET", url: zeroChar, headers: []) == nil)
+        #expect(await engine.evaluate(method: "GET", url: twoChar, headers: []) == nil)
+    }
+
+    @Test("includeSubpaths controls whether a Map Local wildcard matches child paths")
+    func includeSubpathsBoundary() async throws {
+        func engine(includeSubpaths: Bool) async -> RuleEngine {
+            let engine = RuleEngine()
+            await engine.addRule(ProxyRule(
+                name: "MapLocal",
+                isEnabled: true,
+                matchCondition: RuleMatchCondition(
+                    urlPattern: "https://api.example.com/data",
+                    sourceURLPattern: "https://api.example.com/data",
+                    matchType: .wildcard,
+                    includeSubpaths: includeSubpaths
+                ),
+                action: .mapLocal(filePath: "/tmp/data.json")
+            ))
+            return engine
+        }
+
+        let exact = try #require(URL(string: "https://api.example.com/data"))
+        let query = try #require(URL(string: "https://api.example.com/data?page=2"))
+        let child = try #require(URL(string: "https://api.example.com/data/child"))
+
+        let strict = await engine(includeSubpaths: false)
+        #expect(await strict.evaluate(method: "GET", url: exact, headers: []) != nil)
+        #expect(await strict.evaluate(method: "GET", url: query, headers: []) != nil)
+        #expect(await strict.evaluate(method: "GET", url: child, headers: []) == nil)
+
+        let subpaths = await engine(includeSubpaths: true)
+        #expect(await subpaths.evaluate(method: "GET", url: child, headers: []) != nil)
+    }
+
+    @Test("Trailing ? wildcard anchors to end of URL and never allows a trailing query")
+    func trailingQuestionMarkWildcardAnchorsToEnd() async throws {
+        // Validated Proxyman behavior: `/api/item?` matches `item` + exactly one character and
+        // then the URL must END — a trailing `?query` must NOT match (it reaches the origin).
+        let engine = RuleEngine()
+        await engine.addRule(ProxyRule(
+            name: "MapLocal",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(
+                urlPattern: "https://api.example.com/api/item?",
+                sourceURLPattern: "https://api.example.com/api/item?",
+                matchType: .wildcard,
+                includeSubpaths: false
+            ),
+            action: .mapLocal(filePath: "/tmp/item.json")
+        ))
+
+        let oneChar = try #require(URL(string: "https://api.example.com/api/items"))
+        let twoChar = try #require(URL(string: "https://api.example.com/api/itemss"))
+        let query = try #require(URL(string: "https://api.example.com/api/items?x=1"))
+
+        #expect(await engine.evaluate(method: "GET", url: oneChar, headers: []) != nil)
+        #expect(await engine.evaluate(method: "GET", url: twoChar, headers: []) == nil)
+        // The wildcard already consumed the boundary character, so the query must not match.
+        #expect(await engine.evaluate(method: "GET", url: query, headers: []) == nil)
+    }
+
+    @Test("includeSubpaths on a bare path matches base, children, and query but not a sibling prefix")
+    func includeSubpathsRejectsSiblingPrefix() async throws {
+        let engine = RuleEngine()
+        await engine.addRule(ProxyRule(
+            name: "MapLocal",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(
+                urlPattern: "https://api.example.com/data",
+                sourceURLPattern: "https://api.example.com/data",
+                matchType: .wildcard,
+                includeSubpaths: true
+            ),
+            action: .mapLocal(filePath: "/tmp/data.json")
+        ))
+
+        let base = try #require(URL(string: "https://api.example.com/data"))
+        let child = try #require(URL(string: "https://api.example.com/data/child"))
+        let query = try #require(URL(string: "https://api.example.com/data?page=2"))
+        let sibling = try #require(URL(string: "https://api.example.com/datax"))
+
+        #expect(await engine.evaluate(method: "GET", url: base, headers: []) != nil)
+        #expect(await engine.evaluate(method: "GET", url: child, headers: []) != nil)
+        #expect(await engine.evaluate(method: "GET", url: query, headers: []) != nil)
+        // A sibling that only shares the prefix must not be captured by includeSubpaths.
+        #expect(await engine.evaluate(method: "GET", url: sibling, headers: []) == nil)
+    }
+
+    @Test("A rule whose regex cannot compile is disabled on load and never matches")
+    func invalidRegexRuleDisabledOnLoad() async throws {
+        let engine = RuleEngine()
+        let invalid = ProxyRule(
+            name: "Broken Regex",
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(
+                urlPattern: "https://api.example.com/[",
+                sourceURLPattern: "https://api.example.com/[",
+                matchType: .regex
+            ),
+            action: .mapLocal(filePath: "/tmp/broken.json")
+        )
+        // replaceAll runs compilePatterns(), which disables rules with an invalid regex.
+        await engine.replaceAll([invalid])
+
+        let disabled = await engine.allRules.first
+        #expect(disabled?.isEnabled == false)
+
+        let url = try #require(URL(string: "https://api.example.com/anything"))
+        #expect(await engine.evaluate(method: "GET", url: url, headers: []) == nil)
+    }
+
     @Test("Add rule and evaluate successfully")
     func addRuleAndEvaluate() async throws {
         let engine = RuleEngine()
@@ -418,6 +629,8 @@ struct RuleEngineTests {
         #expect(rulesAfterRemove.isEmpty)
     }
 
+    // MARK: Private
+
     private static func modifyHeaderRule(named name: String) -> ProxyRule {
         ProxyRule(
             name: name,
@@ -426,6 +639,15 @@ struct RuleEngineTests {
             action: .modifyHeader(operations: [
                 HeaderOperation(type: .add, headerName: "X-\(name)", headerValue: "1"),
             ])
+        )
+    }
+
+    private static func mapLocalRule(named name: String) -> ProxyRule {
+        ProxyRule(
+            name: name,
+            isEnabled: true,
+            matchCondition: RuleMatchCondition(urlPattern: ".*example\\.com.*"),
+            action: .mapLocal(filePath: "/tmp/\(name).json")
         )
     }
 }

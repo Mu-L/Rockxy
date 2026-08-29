@@ -28,9 +28,12 @@ struct WebSocketInspectorView: View {
                 }
             } else {
                 InspectorEmptyStateView(
-                    String(localized: "No WebSocket Data"),
+                    String(localized: "No WebSocket Data", bundle: RockxyLocalization.bundle),
                     systemImage: "arrow.left.arrow.right",
-                    description: String(localized: "This request does not contain WebSocket frames.")
+                    description: String(
+                        localized: "This request does not contain WebSocket frames.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }
@@ -74,7 +77,7 @@ struct WebSocketInspectorView: View {
                 HStack(spacing: 4) {
                     Image(systemName: showDetail ? "chevron.down" : "chevron.right")
                         .font(.system(size: metrics.badgeFontSize))
-                    Text(String(localized: "Frame Detail"))
+                    Text(String(localized: "Frame Detail", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize))
                         .fontWeight(.medium)
                 }
@@ -88,20 +91,20 @@ struct WebSocketInspectorView: View {
             if showDetail, let frame = selectedFrame {
                 HStack(spacing: 12) {
                     HStack(spacing: 2) {
-                        Text(String(localized: "Direction:"))
+                        Text(String(localized: "Direction:", bundle: RockxyLocalization.bundle))
                             .foregroundStyle(.secondary)
                         Image(systemName: frame.direction == .sent ? "arrow.up.circle" : "arrow.down.circle")
                             .foregroundStyle(frame.direction == .sent ? .blue : .green)
                         Text(frame.direction == .sent
-                            ? String(localized: "Sent")
-                            : String(localized: "Received"))
+                            ? String(localized: "Sent", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Received", bundle: RockxyLocalization.bundle))
                     }
                     HStack(spacing: 2) {
-                        Text(String(localized: "Type:")).foregroundStyle(.secondary)
+                        Text(String(localized: "Type:", bundle: RockxyLocalization.bundle)).foregroundStyle(.secondary)
                         Text(opcodeInfo(frame.opcode).0)
                     }
                     HStack(spacing: 2) {
-                        Text(String(localized: "Size:")).foregroundStyle(.secondary)
+                        Text(String(localized: "Size:", bundle: RockxyLocalization.bundle)).foregroundStyle(.secondary)
                         Text(SizeFormatter.format(bytes: frame.payload.count))
                     }
                 }
@@ -114,9 +117,12 @@ struct WebSocketInspectorView: View {
                 framePayloadView(frame)
             } else if showDetail {
                 InspectorEmptyStateView(
-                    String(localized: "No Frame Selected"),
+                    String(localized: "No Frame Selected", bundle: RockxyLocalization.bundle),
                     systemImage: "arrow.left.arrow.right",
-                    description: String(localized: "Select a frame to inspect its payload.")
+                    description: String(
+                        localized: "Select a frame to inspect its payload.",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
                 .frame(maxHeight: 120)
             }
@@ -127,35 +133,41 @@ struct WebSocketInspectorView: View {
 
     private func connectionSummary(_ connection: WebSocketConnection) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            summaryRow(String(localized: "URL"), value: connection.upgradeRequest.url.absoluteString)
+            summaryRow(
+                String(localized: "URL", bundle: RockxyLocalization.bundle),
+                value: connection.upgradeRequest.url.absoluteString
+            )
             HStack(spacing: 16) {
                 HStack(spacing: 4) {
-                    summaryLabel(String(localized: "State"))
+                    summaryLabel(String(localized: "State", bundle: RockxyLocalization.bundle))
                     Image(systemName: "circle.fill")
                         .font(.system(size: 6))
                         .foregroundStyle(transaction.state == .completed ? .red : .green)
                     Text(transaction.state == .completed
-                        ? String(localized: "Closed")
-                        : String(localized: "Active"))
+                        ? String(localized: "Closed", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Active", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                 }
                 if let duration = connectionDuration(connection) {
-                    summaryRow(String(localized: "Duration"), value: duration)
+                    summaryRow(String(localized: "Duration", bundle: RockxyLocalization.bundle), value: duration)
                 }
             }
             HStack(spacing: 16) {
                 summaryRow(
-                    String(localized: "Sent"),
+                    String(localized: "Sent", bundle: RockxyLocalization.bundle),
                     value: "\(connection.sentFrames.count) (\(totalSize(connection.sentFrames)))"
                 )
                 summaryRow(
-                    String(localized: "Received"),
+                    String(localized: "Received", bundle: RockxyLocalization.bundle),
                     value: "\(connection.receivedFrames.count) (\(totalSize(connection.receivedFrames)))"
                 )
             }
             if connection.isCaptureLimitReached {
                 Label(
-                    String(localized: "Frame capture stopped at the safety limit; the live connection remains active."),
+                    String(
+                        localized: "Frame capture stopped at the safety limit; the live connection remains active.",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.system(size: metrics.secondaryFontSize))
@@ -188,10 +200,14 @@ struct WebSocketInspectorView: View {
 
     private func directionFilter(_ connection: WebSocketConnection) -> some View {
         Picker(selection: $directionFilterValue) {
-            Text(String(localized: "All (\(connection.frameCount))")).tag(FrameDirection?.none)
-            Text("↑ \(String(localized: "Sent")) (\(connection.sentFrames.count))").tag(Optional(FrameDirection.sent))
-            Text("↓ \(String(localized: "Received")) (\(connection.receivedFrames.count))")
-                .tag(Optional(FrameDirection.received))
+            Text(String(localized: "All (\(connection.frameCount))", bundle: RockxyLocalization.bundle))
+                .tag(FrameDirection?.none)
+            Text("↑ \(String(localized: "Sent", bundle: RockxyLocalization.bundle)) (\(connection.sentFrames.count))")
+                .tag(Optional(FrameDirection.sent))
+            Text(
+                "↓ \(String(localized: "Received", bundle: RockxyLocalization.bundle)) (\(connection.receivedFrames.count))"
+            )
+            .tag(Optional(FrameDirection.received))
         } label: {
             EmptyView()
         }
@@ -208,10 +224,11 @@ struct WebSocketInspectorView: View {
         return Group {
             if frames.isEmpty {
                 InspectorEmptyStateView(
-                    String(localized: "Waiting for Frames"),
+                    String(localized: "Waiting for Frames", bundle: RockxyLocalization.bundle),
                     systemImage: "arrow.left.arrow.right",
                     description: String(
-                        localized: "WebSocket connection established. Frames will appear here as they arrive."
+                        localized: "WebSocket connection established. Frames will appear here as they arrive.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             } else {
@@ -269,25 +286,33 @@ struct WebSocketInspectorView: View {
     @ViewBuilder
     private func framePayloadView(_ frame: WebSocketFrameData) -> some View {
         if frame.payload.isEmpty {
-            Text(String(localized: "(empty payload)"))
+            Text(String(localized: "(empty payload)", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .padding(12)
         } else {
             VStack(spacing: 0) {
                 HStack {
-                    Picker(String(localized: "Payload View"), selection: $payloadMode) {
-                        Text(String(localized: "Payload")).tag(WebSocketPayloadInspectorMode.payload)
-                        Text(String(localized: "Protobuf")).tag(WebSocketPayloadInspectorMode.protobuf)
+                    Picker(
+                        String(localized: "Payload View", bundle: RockxyLocalization.bundle),
+                        selection: $payloadMode
+                    ) {
+                        Text(String(localized: "Payload", bundle: RockxyLocalization.bundle))
+                            .tag(WebSocketPayloadInspectorMode.payload)
+                        Text(String(localized: "Protobuf", bundle: RockxyLocalization.bundle))
+                            .tag(WebSocketPayloadInspectorMode.protobuf)
                     }
                     .pickerStyle(.segmented)
                     .controlSize(.small)
                     .frame(width: 190)
 
                     if ProtobufDetector.isLikelyProtobuf(frame.payload) {
-                        Label(String(localized: "Likely Protobuf"), systemImage: "sparkles")
-                            .font(.system(size: metrics.metadataFontSize))
-                            .foregroundStyle(.secondary)
+                        Label(
+                            String(localized: "Likely Protobuf", bundle: RockxyLocalization.bundle),
+                            systemImage: "sparkles"
+                        )
+                        .font(.system(size: metrics.metadataFontSize))
+                        .foregroundStyle(.secondary)
                     }
 
                     Spacer()
@@ -320,7 +345,7 @@ struct WebSocketInspectorView: View {
                     return .text(text)
                 }
                 return .unavailable(
-                    title: String(localized: "Binary Payload"),
+                    title: String(localized: "Binary Payload", bundle: RockxyLocalization.bundle),
                     systemImage: "doc",
                     description: SizeFormatter.format(bytes: payload.count)
                 )
@@ -342,9 +367,12 @@ struct WebSocketInspectorView: View {
                 .frame(maxHeight: 220)
         } else {
             InspectorEmptyStateView(
-                String(localized: "No Protobuf Fields"),
+                String(localized: "No Protobuf Fields", bundle: RockxyLocalization.bundle),
                 systemImage: "curlybraces",
-                description: String(localized: "This frame does not look like a valid Protobuf wire-format payload.")
+                description: String(
+                    localized: "This frame does not look like a valid Protobuf wire-format payload.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
             .frame(maxHeight: 160)
         }

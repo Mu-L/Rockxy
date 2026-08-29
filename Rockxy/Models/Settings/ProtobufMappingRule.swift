@@ -16,11 +16,11 @@ enum ProtobufPayloadEncoding: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .auto:
-            String(localized: "Auto")
+            String(localized: "Auto", bundle: RockxyLocalization.bundle)
         case .singleMessage:
-            String(localized: "Single Message")
+            String(localized: "Single Message", bundle: RockxyLocalization.bundle)
         case .delimitedList:
-            String(localized: "Delimited List")
+            String(localized: "Delimited List", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -119,11 +119,11 @@ enum ProtobufSchemaReference: Equatable {
     var displayLabel: String {
         switch self {
         case .notSelected:
-            String(localized: "Not selected")
+            String(localized: "Not selected", bundle: RockxyLocalization.bundle)
         case let .selected(name):
             name
         case .missing:
-            String(localized: "Missing Schema")
+            String(localized: "Missing Schema", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -139,9 +139,12 @@ enum ProtobufMappingRuleValidationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .emptyPattern:
-            String(localized: "Matching rule cannot be empty.")
+            String(localized: "Matching rule cannot be empty.", bundle: RockxyLocalization.bundle)
         case .invalidMessageType:
-            String(localized: "Message type can only contain letters, numbers, underscores, periods, and dollar signs.")
+            String(
+                localized: "Message type can only contain letters, numbers, underscores, periods, and dollar signs.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

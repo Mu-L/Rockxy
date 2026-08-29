@@ -13,7 +13,7 @@ struct ContextDetailsView: View {
         contextContent
             .background(Color.clear)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel(String(localized: "Inspector Details"))
+            .accessibilityLabel(String(localized: "Inspector Details", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -55,21 +55,27 @@ struct ContextDetailsView: View {
 
     private var multiSelectionFields: [ContextTableField] {
         [
-            ContextTableField(label: String(localized: "Requests"), value: "\(selectedTransactions.count)"),
             ContextTableField(
-                label: String(localized: "Hosts"),
+                label: String(localized: "Requests", bundle: RockxyLocalization.bundle),
+                value: "\(selectedTransactions.count)"
+            ),
+            ContextTableField(
+                label: String(localized: "Hosts", bundle: RockxyLocalization.bundle),
                 value: "\(Set(selectedTransactions.map(\.request.host)).count)"
             ),
             ContextTableField(
-                label: String(localized: "Errors"),
+                label: String(localized: "Errors", bundle: RockxyLocalization.bundle),
                 value: "\(selectedErrorCount)",
                 color: selectedErrorCount > 0 ? .red : .primary
             ),
             ContextTableField(
-                label: String(localized: "Rules Hit"),
+                label: String(localized: "Rules Hit", bundle: RockxyLocalization.bundle),
                 value: "\(selectedTransactions.count { $0.matchedRuleID != nil })"
             ),
-            ContextTableField(label: String(localized: "Transferred"), value: selectedTransferredText),
+            ContextTableField(
+                label: String(localized: "Transferred", bundle: RockxyLocalization.bundle),
+                value: selectedTransferredText
+            ),
         ]
     }
 
@@ -107,8 +113,8 @@ struct ContextDetailsView: View {
                 HStack {
                     Label(
                         coordinator.isProxyRunning
-                            ? String(localized: "Capture Running")
-                            : String(localized: "Capture Stopped"),
+                            ? String(localized: "Capture Running", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Capture Stopped", bundle: RockxyLocalization.bundle),
                         systemImage: coordinator.isProxyRunning ? "record.circle" : "stop.circle"
                     )
                     Spacer()
@@ -124,13 +130,16 @@ struct ContextDetailsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     ContextInspectorFieldTable(
-                        title: String(localized: "Selection"),
+                        title: String(localized: "Selection", bundle: RockxyLocalization.bundle),
                         fields: multiSelectionFields
                     )
 
-                    Text(String(localized: "Select one request to inspect payload and timing details."))
-                        .font(.system(size: metrics.secondaryFontSize))
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "Select one request to inspect payload and timing details.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(.system(size: metrics.secondaryFontSize))
+                    .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
@@ -146,14 +155,20 @@ struct ContextDetailsView: View {
                         }
                         coordinator.compareTransactions(transactions[0], transactions[1])
                     } label: {
-                        Label(String(localized: "Compare"), systemImage: "arrow.left.arrow.right")
+                        Label(
+                            String(localized: "Compare", bundle: RockxyLocalization.bundle),
+                            systemImage: "arrow.left.arrow.right"
+                        )
                     }
                     .disabled(selectedTransactions.count != 2)
                     Spacer()
                     Button {
                         coordinator.presentSelectedExport(format: .har)
                     } label: {
-                        Label(String(localized: "Export Selection"), systemImage: "square.and.arrow.up")
+                        Label(
+                            String(localized: "Export Selection", bundle: RockxyLocalization.bundle),
+                            systemImage: "square.and.arrow.up"
+                        )
                     }
                     .disabled(selectedTransactions.isEmpty)
                 }
@@ -197,9 +212,12 @@ struct ContextDetailsView: View {
                 HStack(spacing: 6) {
                     Text(transaction.request.method)
                         .font(.system(size: metrics.secondaryFontSize, weight: .semibold, design: .monospaced))
-                    Text(transaction.response.map { String($0.statusCode) } ?? String(localized: "Pending"))
-                        .font(.system(size: metrics.secondaryFontSize, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(statusColor(for: transaction))
+                    Text(transaction.response.map { String($0.statusCode) } ?? String(
+                        localized: "Pending",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(.system(size: metrics.secondaryFontSize, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(statusColor(for: transaction))
                 }
                 Text(transaction.request.host)
                     .font(.system(size: metrics.primaryFontSize, weight: .semibold, design: .monospaced))
@@ -221,14 +239,14 @@ struct ContextDetailsView: View {
 
     private func overviewSection(_ transaction: HTTPTransaction) -> some View {
         ContextInspectorFieldTable(
-            title: String(localized: "Details"),
+            title: String(localized: "Details", bundle: RockxyLocalization.bundle),
             fields: overviewFields(transaction)
         )
     }
 
     private func insightSection(_ transaction: HTTPTransaction) -> some View {
         let values = insights(for: transaction)
-        return ContextInspectorTable(title: String(localized: "Insights")) {
+        return ContextInspectorTable(title: String(localized: "Insights", bundle: RockxyLocalization.bundle)) {
             ForEach(Array(values.enumerated()), id: \.element.id) { index, insight in
                 if index > 0 {
                     Divider()
@@ -249,13 +267,13 @@ struct ContextDetailsView: View {
             let phases = timingPhases(timing)
             let slowest = phases.max { $0.duration < $1.duration }
             ContextInspectorDisclosureTable(
-                title: String(localized: "Timing"),
+                title: String(localized: "Timing", bundle: RockxyLocalization.bundle),
                 isExpanded: $isTimingExpanded,
                 summary: formatDuration(timing.totalDuration)
             ) {
                 if let slowest {
                     ContextInspectorFieldRow(field: ContextTableField(
-                        label: String(localized: "Slowest Phase"),
+                        label: String(localized: "Slowest Phase", bundle: RockxyLocalization.bundle),
                         value: slowest.title,
                         monospaced: false
                     ))
@@ -275,14 +293,14 @@ struct ContextDetailsView: View {
     }
 
     private func payloadSection(_ transaction: HTTPTransaction) -> some View {
-        ContextInspectorTable(title: String(localized: "Payload")) {
+        ContextInspectorTable(title: String(localized: "Payload", bundle: RockxyLocalization.bundle)) {
             ContextInspectorFieldRow(field: ContextTableField(
-                label: String(localized: "Request"),
+                label: String(localized: "Request", bundle: RockxyLocalization.bundle),
                 value: payloadSummary(body: transaction.request.body, contentType: transaction.request.contentType)
             ))
             Divider()
             ContextInspectorFieldRow(field: ContextTableField(
-                label: String(localized: "Response"),
+                label: String(localized: "Response", bundle: RockxyLocalization.bundle),
                 value: payloadSummary(
                     body: transaction.response?.body,
                     contentType: transaction.response?.contentType
@@ -290,19 +308,22 @@ struct ContextDetailsView: View {
             ))
             Divider()
             ContextInspectorFieldRow(field: ContextTableField(
-                label: String(localized: "Request Headers"),
+                label: String(localized: "Request Headers", bundle: RockxyLocalization.bundle),
                 value: "\(transaction.request.headers.count)"
             ))
             Divider()
             ContextInspectorFieldRow(field: ContextTableField(
-                label: String(localized: "Response Headers"),
+                label: String(localized: "Response Headers", bundle: RockxyLocalization.bundle),
                 value: "\(transaction.response?.headers.count ?? 0)"
             ))
             if transaction.response?.bodyTruncated == true {
                 Divider()
                 ContextInspectorFullRow {
                     Label(
-                        String(localized: "Response body was truncated during capture"),
+                        String(
+                            localized: "Response body was truncated during capture",
+                            bundle: RockxyLocalization.bundle
+                        ),
                         systemImage: "scissors"
                     )
                     .font(.system(size: metrics.metadataFontSize))
@@ -315,15 +336,18 @@ struct ContextDetailsView: View {
     private func relatedSection(_ transaction: HTTPTransaction) -> some View {
         let related = Array(relatedTransactions(to: transaction).prefix(6))
         return ContextInspectorDisclosureTable(
-            title: String(localized: "Related Requests"),
+            title: String(localized: "Related Requests", bundle: RockxyLocalization.bundle),
             isExpanded: $isRelatedExpanded,
             summary: related.isEmpty ? nil : "\(related.count)"
         ) {
             if related.isEmpty {
                 ContextInspectorFullRow {
-                    Text(String(localized: "No other requests to this host in the current session."))
-                        .font(.system(size: metrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        localized: "No other requests to this host in the current session.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(.system(size: metrics.metadataFontSize))
+                    .foregroundStyle(.secondary)
                 }
             } else {
                 ForEach(Array(related.enumerated()), id: \.element.id) { index, item in
@@ -367,18 +391,21 @@ struct ContextDetailsView: View {
     }
 
     private func ruleImpactSection(_ transaction: HTTPTransaction) -> some View {
-        ContextInspectorTable(title: String(localized: "Rule Impact")) {
+        ContextInspectorTable(title: String(localized: "Rule Impact", bundle: RockxyLocalization.bundle)) {
             if transaction.matchedRuleID != nil {
                 ContextInspectorFieldRow(field: ContextTableField(
-                    label: String(localized: "Rule"),
-                    value: transaction.matchedRuleName ?? String(localized: "Rule matched"),
+                    label: String(localized: "Rule", bundle: RockxyLocalization.bundle),
+                    value: transaction.matchedRuleName ?? String(
+                        localized: "Rule matched",
+                        bundle: RockxyLocalization.bundle
+                    ),
                     monospaced: false,
                     color: .green
                 ))
                 if let summary = transaction.matchedRuleActionSummary {
                     Divider()
                     ContextInspectorFieldRow(field: ContextTableField(
-                        label: String(localized: "Action"),
+                        label: String(localized: "Action", bundle: RockxyLocalization.bundle),
                         value: summary,
                         monospaced: false
                     ))
@@ -386,7 +413,7 @@ struct ContextDetailsView: View {
                 if let pattern = transaction.matchedRulePattern {
                     Divider()
                     ContextInspectorFieldRow(field: ContextTableField(
-                        label: String(localized: "Pattern"),
+                        label: String(localized: "Pattern", bundle: RockxyLocalization.bundle),
                         value: pattern
                     ))
                 }
@@ -396,9 +423,12 @@ struct ContextDetailsView: View {
                 }
             } else {
                 ContextInspectorFullRow {
-                    Label(String(localized: "No rule modified this request"), systemImage: "minus.circle")
-                        .font(.system(size: metrics.secondaryFontSize))
-                        .foregroundStyle(.secondary)
+                    Label(
+                        String(localized: "No rule modified this request", bundle: RockxyLocalization.bundle),
+                        systemImage: "minus.circle"
+                    )
+                    .font(.system(size: metrics.secondaryFontSize))
+                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -410,9 +440,12 @@ struct ContextDetailsView: View {
         } label: {
             ContextInspectorFullRow {
                 HStack(spacing: 6) {
-                    Label(String(localized: "Open Rule"), systemImage: "arrow.up.forward.app")
-                        .font(.system(size: metrics.secondaryFontSize, weight: .medium))
-                        .foregroundStyle(Color.accentColor)
+                    Label(
+                        String(localized: "Open Rule", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.up.forward.app"
+                    )
+                    .font(.system(size: metrics.secondaryFontSize, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
                     Spacer(minLength: 6)
                     Image(systemName: "chevron.right")
                         .font(.system(size: metrics.metadataFontSize, weight: .semibold))
@@ -422,11 +455,11 @@ struct ContextDetailsView: View {
             }
         }
         .buttonStyle(.plain)
-        .help(help ?? String(localized: "Open the rule's editor window"))
+        .help(help ?? String(localized: "Open the rule's editor window", bundle: RockxyLocalization.bundle))
     }
 
     private func notesSection(_ transaction: HTTPTransaction) -> some View {
-        ContextInspectorTable(title: String(localized: "Notes")) {
+        ContextInspectorTable(title: String(localized: "Notes", bundle: RockxyLocalization.bundle)) {
             ContextInspectorFullRow {
                 ContextNotesEditor(coordinator: coordinator, transaction: transaction)
             }
@@ -439,26 +472,39 @@ struct ContextDetailsView: View {
                 Button {
                     coordinator.replayTransaction(transaction)
                 } label: {
-                    Label(String(localized: "Replay"), systemImage: "arrow.clockwise")
+                    Label(
+                        String(localized: "Replay", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.clockwise"
+                    )
                 }
                 .disabled(transaction.webSocketConnection != nil)
                 .help(transaction.webSocketConnection == nil
-                    ? String(localized: "Replay this request")
-                    : String(localized: "WebSocket transactions cannot be replayed as HTTP requests"))
+                    ? String(localized: "Replay this request", bundle: RockxyLocalization.bundle)
+                    : String(
+                        localized: "WebSocket transactions cannot be replayed as HTTP requests",
+                        bundle: RockxyLocalization.bundle
+                    ))
 
                 Button {
                     coordinator.togglePin(for: transaction)
                 } label: {
                     Image(systemName: transaction.isPinned ? "pin.slash" : "pin")
                 }
-                .help(transaction.isPinned ? String(localized: "Unpin Evidence") : String(localized: "Pin Evidence"))
+                .help(transaction
+                    .isPinned ? String(localized: "Unpin Evidence", bundle: RockxyLocalization.bundle) : String(
+                        localized: "Pin Evidence",
+                        bundle: RockxyLocalization.bundle
+                    ))
 
                 Spacer(minLength: 0)
 
                 Button {
                     coordinator.createBreakpointRule(for: transaction)
                 } label: {
-                    Label(String(localized: "Create Rule"), systemImage: "plus.circle")
+                    Label(
+                        String(localized: "Create Rule", bundle: RockxyLocalization.bundle),
+                        systemImage: "plus.circle"
+                    )
                 }
             }
             .controlSize(.small)
@@ -468,22 +514,37 @@ struct ContextDetailsView: View {
     private func overviewFields(_ transaction: HTTPTransaction) -> [ContextTableField] {
         var fields: [ContextTableField] = [
             ContextTableField(
-                label: String(localized: "Outcome"),
+                label: String(localized: "Outcome", bundle: RockxyLocalization.bundle),
                 value: outcomeText(for: transaction),
                 color: statusColor(for: transaction)
             ),
             ContextTableField(
-                label: String(localized: "Application"),
-                value: transaction.clientApp ?? String(localized: "Unknown"),
+                label: String(localized: "Application", bundle: RockxyLocalization.bundle),
+                value: transaction.clientApp ?? String(localized: "Unknown", bundle: RockxyLocalization.bundle),
                 monospaced: false
             ),
-            ContextTableField(label: String(localized: "Protocol"), value: transaction.request.httpVersion),
-            ContextTableField(label: String(localized: "Transport"), value: transportText(for: transaction)),
-            ContextTableField(label: String(localized: "Duration"), value: durationText(for: transaction)),
-            ContextTableField(label: String(localized: "Transferred"), value: transferredText(for: transaction)),
+            ContextTableField(
+                label: String(localized: "Protocol", bundle: RockxyLocalization.bundle),
+                value: transaction.request.httpVersion
+            ),
+            ContextTableField(
+                label: String(localized: "Transport", bundle: RockxyLocalization.bundle),
+                value: transportText(for: transaction)
+            ),
+            ContextTableField(
+                label: String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                value: durationText(for: transaction)
+            ),
+            ContextTableField(
+                label: String(localized: "Transferred", bundle: RockxyLocalization.bundle),
+                value: transferredText(for: transaction)
+            ),
         ]
         if let sourcePort = transaction.sourcePort {
-            fields.append(ContextTableField(label: String(localized: "Source Port"), value: String(sourcePort)))
+            fields.append(ContextTableField(
+                label: String(localized: "Source Port", bundle: RockxyLocalization.bundle),
+                value: String(sourcePort)
+            ))
         }
         return fields
     }
@@ -510,8 +571,11 @@ struct ContextDetailsView: View {
         if values.isEmpty {
             values.append(ContextInsight(
                 id: "healthy",
-                title: String(localized: "No unusual behavior detected"),
-                detail: String(localized: "Status, timing, payload, and rule checks look normal."),
+                title: String(localized: "No unusual behavior detected", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Status, timing, payload, and rule checks look normal.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "checkmark.circle",
                 color: .secondary
             ))
@@ -523,16 +587,22 @@ struct ContextDetailsView: View {
         if let status = transaction.response?.statusCode, status >= 400 {
             values.append(ContextInsight(
                 id: "http-error",
-                title: String(localized: "HTTP error \(status)"),
-                detail: String(localized: "Inspect the response payload and nearby requests to this host."),
+                title: String(localized: "HTTP error \(status)", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Inspect the response payload and nearby requests to this host.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "exclamationmark.triangle.fill",
                 color: .red
             ))
         } else if transaction.state == .failed {
             values.append(ContextInsight(
                 id: "transport-error",
-                title: String(localized: "Transport failed"),
-                detail: String(localized: "No successful response was captured for this request."),
+                title: String(localized: "Transport failed", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "No successful response was captured for this request.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "xmark.octagon.fill",
                 color: .red
             ))
@@ -547,9 +617,10 @@ struct ContextDetailsView: View {
             let percent = Int(((duration / baseline) - 1) * 100)
             values.append(ContextInsight(
                 id: "host-baseline",
-                title: String(localized: "Slower than this host's recent requests"),
+                title: String(localized: "Slower than this host's recent requests", bundle: RockxyLocalization.bundle),
                 detail: String(
-                    localized: "About \(percent)% slower than the session median of \(formatDuration(baseline))."
+                    localized: "About \(percent)% slower than the session median of \(formatDuration(baseline)).",
+                    bundle: RockxyLocalization.bundle
                 ),
                 systemImage: "chart.line.uptrend.xyaxis",
                 color: .orange
@@ -557,8 +628,11 @@ struct ContextDetailsView: View {
         } else if duration >= 1 {
             values.append(ContextInsight(
                 id: "slow",
-                title: String(localized: "Slow request"),
-                detail: String(localized: "Total duration is \(formatDuration(duration))."),
+                title: String(localized: "Slow request", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Total duration is \(formatDuration(duration)).",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "hourglass",
                 color: .orange
             ))
@@ -570,16 +644,22 @@ struct ContextDetailsView: View {
         if timing.timeToFirstByte / timing.totalDuration >= 0.6, timing.timeToFirstByte >= 0.25 {
             values.append(ContextInsight(
                 id: "ttfb",
-                title: String(localized: "Server wait dominates"),
-                detail: String(localized: "Time to first byte accounts for most of the request duration."),
+                title: String(localized: "Server wait dominates", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Time to first byte accounts for most of the request duration.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "server.rack",
                 color: .orange
             ))
         } else if timing.contentTransfer / timing.totalDuration >= 0.6, timing.contentTransfer >= 0.25 {
             values.append(ContextInsight(
                 id: "transfer",
-                title: String(localized: "Content transfer dominates"),
-                detail: String(localized: "Payload transfer accounts for most of the request duration."),
+                title: String(localized: "Content transfer dominates", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Payload transfer accounts for most of the request duration.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "arrow.down.circle",
                 color: .orange
             ))
@@ -590,17 +670,26 @@ struct ContextDetailsView: View {
         if transaction.webSocketConnection != nil {
             values.append(ContextInsight(
                 id: "websocket",
-                title: String(localized: "WebSocket connection"),
-                detail: String(localized: "Use the horizontal inspector to review individual frames."),
+                title: String(localized: "WebSocket connection", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "Use the horizontal inspector to review individual frames.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "arrow.left.arrow.right",
                 color: .blue
             ))
         }
         if let graphQL = transaction.graphQLInfo {
-            let operation = graphQL.operationName ?? String(localized: "Unnamed operation")
+            let operation = graphQL.operationName ?? String(
+                localized: "Unnamed operation",
+                bundle: RockxyLocalization.bundle
+            )
             values.append(ContextInsight(
                 id: "graphql",
-                title: String(localized: "GraphQL \(graphQL.operationType.rawValue)"),
+                title: String(
+                    localized: "GraphQL \(graphQL.operationType.rawValue)",
+                    bundle: RockxyLocalization.bundle
+                ),
                 detail: operation,
                 systemImage: "point.3.connected.trianglepath.dotted",
                 color: .purple
@@ -609,8 +698,11 @@ struct ContextDetailsView: View {
         if transaction.matchedRuleID != nil {
             values.append(ContextInsight(
                 id: "rule",
-                title: String(localized: "A rule affected this request"),
-                detail: transaction.matchedRuleActionSummary ?? String(localized: "Review Rule Impact above."),
+                title: String(localized: "A rule affected this request", bundle: RockxyLocalization.bundle),
+                detail: transaction.matchedRuleActionSummary ?? String(
+                    localized: "Review Rule Impact above.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "wand.and.stars",
                 color: .green
             ))
@@ -621,8 +713,11 @@ struct ContextDetailsView: View {
         if transaction.response?.bodyTruncated == true {
             values.append(ContextInsight(
                 id: "truncated",
-                title: String(localized: "Response body is incomplete"),
-                detail: String(localized: "The captured response exceeded the configured buffer limit."),
+                title: String(localized: "Response body is incomplete", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "The captured response exceeded the configured buffer limit.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "scissors",
                 color: .orange
             ))
@@ -633,8 +728,11 @@ struct ContextDetailsView: View {
         if relatedErrors >= 2 {
             values.append(ContextInsight(
                 id: "repeated-errors",
-                title: String(localized: "Repeated host errors"),
-                detail: String(localized: "\(relatedErrors) nearby requests to this host also failed."),
+                title: String(localized: "Repeated host errors", bundle: RockxyLocalization.bundle),
+                detail: String(
+                    localized: "\(relatedErrors) nearby requests to this host also failed.",
+                    bundle: RockxyLocalization.bundle
+                ),
                 systemImage: "exclamationmark.arrow.triangle.2.circlepath",
                 color: .red
             ))
@@ -667,11 +765,31 @@ struct ContextDetailsView: View {
 
     private func timingPhases(_ timing: TimingInfo) -> [TimingPhase] {
         [
-            TimingPhase(id: "dns", title: String(localized: "DNS"), duration: timing.dnsLookup),
-            TimingPhase(id: "connect", title: String(localized: "Connect"), duration: timing.tcpConnection),
-            TimingPhase(id: "tls", title: String(localized: "TLS"), duration: timing.tlsHandshake),
-            TimingPhase(id: "wait", title: String(localized: "Server Wait"), duration: timing.timeToFirstByte),
-            TimingPhase(id: "transfer", title: String(localized: "Transfer"), duration: timing.contentTransfer),
+            TimingPhase(
+                id: "dns",
+                title: String(localized: "DNS", bundle: RockxyLocalization.bundle),
+                duration: timing.dnsLookup
+            ),
+            TimingPhase(
+                id: "connect",
+                title: String(localized: "Connect", bundle: RockxyLocalization.bundle),
+                duration: timing.tcpConnection
+            ),
+            TimingPhase(
+                id: "tls",
+                title: String(localized: "TLS", bundle: RockxyLocalization.bundle),
+                duration: timing.tlsHandshake
+            ),
+            TimingPhase(
+                id: "wait",
+                title: String(localized: "Server Wait", bundle: RockxyLocalization.bundle),
+                duration: timing.timeToFirstByte
+            ),
+            TimingPhase(
+                id: "transfer",
+                title: String(localized: "Transfer", bundle: RockxyLocalization.bundle),
+                duration: timing.contentTransfer
+            ),
         ]
     }
 
@@ -679,11 +797,14 @@ struct ContextDetailsView: View {
         if let response = transaction.response {
             return "\(response.statusCode) \(response.statusMessage)"
         }
-        return transaction.state == .failed ? String(localized: "Failed") : String(localized: "Pending")
+        return transaction.state == .failed ? String(localized: "Failed", bundle: RockxyLocalization.bundle) : String(
+            localized: "Pending",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private func transportText(for transaction: HTTPTransaction) -> String {
-        transaction.request.url.scheme?.uppercased() ?? String(localized: "Unknown")
+        transaction.request.url.scheme?.uppercased() ?? String(localized: "Unknown", bundle: RockxyLocalization.bundle)
     }
 
     private func payloadSummary(body: Data?, contentType: ContentType?) -> String {
@@ -696,7 +817,7 @@ struct ContextDetailsView: View {
 
     private func durationText(for transaction: HTTPTransaction) -> String {
         guard let duration = transaction.timingInfo?.totalDuration ?? transaction.measuredDuration else {
-            return String(localized: "Unavailable")
+            return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
         }
         return formatDuration(duration)
     }
@@ -721,7 +842,10 @@ struct ContextDetailsView: View {
 
     private func relativeTimeText(_ timestamp: Date, from reference: Date) -> String {
         let difference = timestamp.timeIntervalSince(reference)
-        let direction = difference < 0 ? String(localized: "before") : String(localized: "after")
+        let direction = difference < 0 ? String(localized: "before", bundle: RockxyLocalization.bundle) : String(
+            localized: "after",
+            bundle: RockxyLocalization.bundle
+        )
         return "\(formatDuration(abs(difference))) \(direction)"
     }
 
@@ -756,7 +880,7 @@ private struct ContextNotesEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topLeading) {
                 if noteText.isEmpty {
-                    Text(String(localized: "Add a note about this request…"))
+                    Text(String(localized: "Add a note about this request…", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.primaryFontSize))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 5)
@@ -768,7 +892,7 @@ private struct ContextNotesEditor: View {
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 52, maxHeight: 108)
                     .padding(.horizontal, 1)
-                    .accessibilityLabel(String(localized: "Request note"))
+                    .accessibilityLabel(String(localized: "Request note", bundle: RockxyLocalization.bundle))
             }
             .background(
                 RoundedRectangle(cornerRadius: 5)
@@ -787,8 +911,8 @@ private struct ContextNotesEditor: View {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .disabled(!isDirty)
-                .help(String(localized: "Save Note"))
-                .accessibilityLabel(String(localized: "Save Note"))
+                .help(String(localized: "Save Note", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Save Note", bundle: RockxyLocalization.bundle))
             }
         }
         .onAppear {

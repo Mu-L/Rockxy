@@ -4,6 +4,8 @@ import Security
 // MARK: - RootCADownloadSession
 
 struct RootCADownloadSession: Identifiable, Equatable, Sendable {
+    // MARK: Internal
+
     let id: UUID
     let token: String
     let publicURL: URL
@@ -14,6 +16,11 @@ struct RootCADownloadSession: Identifiable, Equatable, Sendable {
 
     var isExpired: Bool {
         isExpired(at: Date())
+    }
+
+    static func make(host: String, port: Int, now: Date = Date(), ttl: TimeInterval = 600) throws -> Self {
+        let token = try makeToken()
+        return try make(id: UUID(), token: token, host: host, port: port, now: now, ttl: ttl)
     }
 
     func isExpired(at date: Date) -> Bool {
@@ -27,16 +34,29 @@ struct RootCADownloadSession: Identifiable, Equatable, Sendable {
         return Self.constantTimeEquals(candidate, token)
     }
 
-    static func make(host: String, port: Int, now: Date = Date(), ttl: TimeInterval = 600) throws -> Self {
-        let token = try makeToken()
-        return try make(id: UUID(), token: token, host: host, port: port, now: now, ttl: ttl)
-    }
-
     func withPort(_ port: Int) throws -> Self {
-        try Self.make(id: id, token: token, host: host, port: port, now: createdAt, ttl: expiresAt.timeIntervalSince(createdAt))
+        try Self.make(
+            id: id,
+            token: token,
+            host: host,
+            port: port,
+            now: createdAt,
+            ttl: expiresAt.timeIntervalSince(createdAt)
+        )
     }
 
-    private static func make(id: UUID, token: String, host: String, port: Int, now: Date, ttl: TimeInterval) throws -> Self {
+    // MARK: Private
+
+    private static func make(
+        id: UUID,
+        token: String,
+        host: String,
+        port: Int,
+        now: Date,
+        ttl: TimeInterval
+    )
+        throws -> Self
+    {
         guard let url = URL(string: "http://\(host):\(port)/root-ca.pem?token=\(token)") else {
             throw RootCADownloadError.invalidSessionURL
         }
@@ -90,18 +110,26 @@ enum RootCADownloadError: LocalizedError {
     case noRootCA
     case portUnavailable
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .tokenGenerationFailed:
-            String(localized: "Failed to generate a secure sharing token.")
+            String(localized: "Failed to generate a secure sharing token.", bundle: RockxyLocalization.bundle)
         case .invalidSessionURL:
-            String(localized: "Failed to build the certificate sharing URL.")
+            String(localized: "Failed to build the certificate sharing URL.", bundle: RockxyLocalization.bundle)
         case .noReachableLANAddress:
-            String(localized: "No reachable LAN IPv4 address was found. Connect this Mac to Wi-Fi or Ethernet, then try again.")
+            String(
+                localized: "No reachable LAN IPv4 address was found. Connect this Mac to Wi-Fi or Ethernet, then try again.",
+                bundle: RockxyLocalization.bundle
+            )
         case .noRootCA:
-            String(localized: "No Root CA certificate is available to share.")
+            String(localized: "No Root CA certificate is available to share.", bundle: RockxyLocalization.bundle)
         case .portUnavailable:
-            String(localized: "Rockxy could not start the temporary certificate sharing server.")
+            String(
+                localized: "Rockxy could not start the temporary certificate sharing server.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
@@ -113,14 +141,25 @@ enum RootCAShareValidationError: LocalizedError {
     case certificateFingerprintUnavailable
     case fingerprintMismatch
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .missingFingerprint:
-            String(localized: "The Root CA fingerprint is unavailable. Stop sharing and regenerate the Root CA before installing it on another device.")
+            String(
+                localized: "The Root CA fingerprint is unavailable. Stop sharing and regenerate the Root CA before installing it on another device.",
+                bundle: RockxyLocalization.bundle
+            )
         case .certificateFingerprintUnavailable:
-            String(localized: "Rockxy could not compute the Root CA fingerprint. Stop sharing and regenerate the Root CA before installing it on another device.")
+            String(
+                localized: "Rockxy could not compute the Root CA fingerprint. Stop sharing and regenerate the Root CA before installing it on another device.",
+                bundle: RockxyLocalization.bundle
+            )
         case .fingerprintMismatch:
-            String(localized: "The Root CA fingerprint changed before sharing. Stop sharing and try again.")
+            String(
+                localized: "The Root CA fingerprint changed before sharing. Stop sharing and try again.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
@@ -128,6 +167,8 @@ enum RootCAShareValidationError: LocalizedError {
 // MARK: - RootCAFingerprintVerifier
 
 enum RootCAFingerprintVerifier {
+    // MARK: Internal
+
     static func verifiedFingerprint(certificatePEM: String, expectedFingerprint: String?) throws -> String {
         guard let expectedFingerprint, !expectedFingerprint.isEmpty else {
             throw RootCAShareValidationError.missingFingerprint
@@ -158,6 +199,8 @@ enum RootCAFingerprintVerifier {
 
         return KeychainHelper.computeFingerprintSHA256(derData)
     }
+
+    // MARK: Private
 
     private static func normalized(_ fingerprint: String) -> String {
         fingerprint

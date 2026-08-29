@@ -17,9 +17,12 @@ enum HTTPToolkitImporter {
         var errorDescription: String? {
             switch self {
             case .invalidFormat:
-                String(localized: "The file is not a valid HTTPToolkit settings export.")
+                String(
+                    localized: "The file is not a valid HTTPToolkit settings export.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .noHostsFound:
-                String(localized: "No usable SSL hosts found in the imported file.")
+                String(localized: "No usable SSL hosts found in the imported file.", bundle: RockxyLocalization.bundle)
             }
         }
     }

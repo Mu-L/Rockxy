@@ -16,16 +16,16 @@ struct ContextDockView: View {
                 segments: [
                     WorkspaceModeSegment(
                         value: ContextDockTab.details,
-                        title: String(localized: "Details"),
+                        title: String(localized: "Details", bundle: RockxyLocalization.bundle),
                         systemImage: "doc.text.magnifyingglass"
                     ),
                     WorkspaceModeSegment(
                         value: ContextDockTab.aiAssistant,
-                        title: String(localized: "AI Assistant"),
+                        title: String(localized: "AI Assistant", bundle: RockxyLocalization.bundle),
                         systemImage: "sparkles"
                     ),
                 ],
-                accessibilityLabel: String(localized: "Inspector")
+                accessibilityLabel: String(localized: "Inspector", bundle: RockxyLocalization.bundle)
             )
             .workspaceModeSwitcherStyle()
 
@@ -40,7 +40,7 @@ struct ContextDockView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Inspector"))
+        .accessibilityLabel(String(localized: "Inspector", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -93,7 +93,7 @@ private struct AIAssistantDockView: View {
         }
         .background(Color.clear)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "AI Assistant"))
+        .accessibilityLabel(String(localized: "AI Assistant", bundle: RockxyLocalization.bundle))
         .sheet(item: reviewPackBinding) { _ in
             DebugAssistantReviewDataSheet(
                 coordinator: coordinator,
@@ -103,12 +103,15 @@ private struct AIAssistantDockView: View {
             )
         }
         .alert(
-            String(localized: "Rename Conversation"),
+            String(localized: "Rename Conversation", bundle: RockxyLocalization.bundle),
             isPresented: renameConversationBinding
         ) {
-            TextField(String(localized: "Conversation name"), text: $conversationRenameDraft)
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Rename")) {
+            TextField(
+                String(localized: "Conversation name", bundle: RockxyLocalization.bundle),
+                text: $conversationRenameDraft
+            )
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Rename", bundle: RockxyLocalization.bundle)) {
                 guard let conversationBeingRenamed else {
                     return
                 }
@@ -119,37 +122,35 @@ private struct AIAssistantDockView: View {
             }
         }
         .confirmationDialog(
-            String(localized: "Delete this conversation?"),
+            String(localized: "Delete this conversation?", bundle: RockxyLocalization.bundle),
             isPresented: deleteConversationBinding,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Delete Conversation"), role: .destructive) {
+            Button(String(localized: "Delete Conversation", bundle: RockxyLocalization.bundle), role: .destructive) {
                 guard let conversationPendingDeletion else {
                     return
                 }
                 coordinator.deleteDebugAssistantConversation(conversationPendingDeletion.id)
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
-            Text(String(localized: "This removes the conversation from this workspace history."))
+            Text(String(localized: "This removes the conversation from this workspace history.", bundle: RockxyLocalization.bundle))
         }
         .confirmationDialog(
-            String(localized: "Prepare this request for replay?"),
+            String(localized: "Prepare this request for replay?", bundle: RockxyLocalization.bundle),
             isPresented: prepareReplayBinding,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Open in Compose")) {
+            Button(String(localized: "Open in Compose", bundle: RockxyLocalization.bundle)) {
                 guard let resultPendingReplay else {
                     return
                 }
                 coordinator.performUserInitiatedDebugAssistantHandoff(.prepareReplay, result: resultPendingReplay)
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
-                String(
-                    localized: "Rockxy will create an editable draft. Nothing is sent until you press Send in Compose."
-                )
+                String(localized: "Rockxy will create an editable draft. Nothing is sent until you press Send in Compose.", bundle: RockxyLocalization.bundle)
             )
         }
         .onAppear(perform: focusComposerIfRequested)
@@ -248,20 +249,18 @@ private struct AIAssistantDockView: View {
 
     private var configuredModelLabel: String {
         guard let assistantConfiguration, assistantConfiguration.isComplete else {
-            return String(localized: "No Configured Model")
+            return String(localized: "No Configured Model", bundle: RockxyLocalization.bundle)
         }
-        return String(
-            localized: "Global Default · \(assistantConfiguration.kind.title) · \(assistantConfiguration.model)"
-        )
+        return String(localized: "Global Default · \(assistantConfiguration.kind.title) · \(assistantConfiguration.model)", bundle: RockxyLocalization.bundle)
     }
 
     private var modelSelectionLabel: String {
         guard coordinator.activeWorkspace.debugAssistantUsesConfiguredModel,
               configuredModelIsAvailable else
         {
-            return String(localized: "Built-in")
+            return String(localized: "Built-in", bundle: RockxyLocalization.bundle)
         }
-        return assistantConfiguration?.model ?? String(localized: "Model")
+        return assistantConfiguration?.model ?? String(localized: "Model", bundle: RockxyLocalization.bundle)
     }
 
     private var selectedTransactions: [HTTPTransaction] {
@@ -288,7 +287,7 @@ private struct AIAssistantDockView: View {
         guard selectedContextCount < selectedTransactions.count else {
             return selectedContextCount.formatted()
         }
-        return String(localized: "\(selectedContextCount) of \(selectedTransactions.count)")
+        return String(localized: "\(selectedContextCount) of \(selectedTransactions.count)", bundle: RockxyLocalization.bundle)
     }
 
     private var conversationIsEmpty: Bool {
@@ -353,8 +352,8 @@ private struct AIAssistantDockView: View {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
-            .help(String(localized: "Search conversations"))
-            .accessibilityLabel(String(localized: "Conversation History"))
+            .help(String(localized: "Search conversations", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Conversation History", bundle: RockxyLocalization.bundle))
             .popover(isPresented: $isConversationSwitcherPresented, arrowEdge: .top) {
                 conversationSwitcher
             }
@@ -368,8 +367,8 @@ private struct AIAssistantDockView: View {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
-            .help(String(localized: "New conversation"))
-            .accessibilityLabel(String(localized: "New Conversation"))
+            .help(String(localized: "New conversation", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "New Conversation", bundle: RockxyLocalization.bundle))
         }
         .padding(.horizontal, 10)
         .frame(minHeight: max(36, appMetrics.primaryFontSize + 20))
@@ -378,14 +377,14 @@ private struct AIAssistantDockView: View {
 
     private var conversationSwitcher: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Conversations"))
+            Text(String(localized: "Conversations", bundle: RockxyLocalization.bundle))
                 .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
 
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                 TextField(
-                    String(localized: "Search titles and messages"),
+                    String(localized: "Search titles and messages", bundle: RockxyLocalization.bundle),
                     text: $conversationSearch
                 )
                 .textFieldStyle(.plain)
@@ -403,8 +402,8 @@ private struct AIAssistantDockView: View {
                 ContentUnavailableView {
                     Label(
                         conversationSearch.isEmpty
-                            ? String(localized: "No Conversations")
-                            : String(localized: "No Results"),
+                            ? String(localized: "No Conversations", bundle: RockxyLocalization.bundle)
+                            : String(localized: "No Results", bundle: RockxyLocalization.bundle),
                         systemImage: conversationSearch.isEmpty
                             ? "bubble.left.and.bubble.right"
                             : "magnifyingglass"
@@ -445,7 +444,7 @@ private struct AIAssistantDockView: View {
                         coordinator.setDebugAssistantTrafficScope(.selectedOnly)
                     } label: {
                         Label(
-                            String(localized: "Selected Traffic Only (\(selectedContextLabel))"),
+                            String(localized: "Selected Traffic Only (\(selectedContextLabel))", bundle: RockxyLocalization.bundle),
                             systemImage: coordinator.activeWorkspace.debugAssistantTrafficScope == .selectedOnly
                                 ? "checkmark" : "circle"
                         )
@@ -455,7 +454,7 @@ private struct AIAssistantDockView: View {
                         coordinator.setDebugAssistantTrafficScope(.selectedAndRelated)
                     } label: {
                         Label(
-                            String(localized: "Include Related Requests (+\(relatedTransactionCount))"),
+                            String(localized: "Include Related Requests (+\(relatedTransactionCount))", bundle: RockxyLocalization.bundle),
                             systemImage: coordinator.activeWorkspace.debugAssistantTrafficScope == .selectedAndRelated
                                 ? "checkmark" : "circle"
                         )
@@ -469,9 +468,9 @@ private struct AIAssistantDockView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .controlSize(.small)
-                .help(String(localized: "Choose the read-only traffic scope"))
+                .help(String(localized: "Choose the read-only traffic scope", bundle: RockxyLocalization.bundle))
                 .accessibilityLabel(
-                    String(localized: "Read-only traffic scope, \(contextTransactions.count) requests")
+                    String(localized: "Read-only traffic scope, \(contextTransactions.count) requests", bundle: RockxyLocalization.bundle)
                 )
             }
             .padding(.horizontal, 10)
@@ -479,15 +478,13 @@ private struct AIAssistantDockView: View {
             .background(Color.clear)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(
-                String(
-                    localized: "Attached traffic: \(requestSummary(for: transaction)), \(contextTransactions.count) requests"
-                )
+                String(localized: "Attached traffic: \(requestSummary(for: transaction)), \(contextTransactions.count) requests", bundle: RockxyLocalization.bundle)
             )
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "paperclip")
                     .foregroundStyle(.secondary)
-                Text(String(localized: "Select traffic to add context"))
+                Text(String(localized: "Select traffic to add context", bundle: RockxyLocalization.bundle))
                     .font(assistantFont(appMetrics.secondaryFontSize))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -546,13 +543,13 @@ private struct AIAssistantDockView: View {
     /// It intentionally shows no recipe cards — there is nothing to investigate yet.
     private var noSelectionEmptyState: some View {
         VStack(spacing: 6) {
-            Text(String(localized: "Investigate captured traffic"))
+            Text(String(localized: "Investigate captured traffic", bundle: RockxyLocalization.bundle))
                 .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
-            Text(String(localized: "Select a request to investigate, or type a question below."))
-                .font(assistantFont(appMetrics.secondaryFontSize))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(localized: "Select a request to investigate, or type a question below.", bundle: RockxyLocalization.bundle))
+            .font(assistantFont(appMetrics.secondaryFontSize))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
     }
@@ -568,7 +565,7 @@ private struct AIAssistantDockView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
-            Text(String(localized: "Start an investigation"))
+            Text(String(localized: "Start an investigation", bundle: RockxyLocalization.bundle))
                 .font(assistantFont(appMetrics.primaryFontSize, weight: .semibold))
 
             LazyVGrid(
@@ -596,8 +593,8 @@ private struct AIAssistantDockView: View {
             currentResultTurn(result)
         case let .investigating(_, recipe):
             workEvent(
-                title: String(localized: "Inspecting selected traffic"),
-                detail: String(localized: "Gathering evidence for \(recipe.title.lowercased())."),
+                title: String(localized: "Inspecting selected traffic", bundle: RockxyLocalization.bundle),
+                detail: String(localized: "Gathering evidence for \(recipe.title.lowercased()).", bundle: RockxyLocalization.bundle),
                 cancel: coordinator.cancelDebugAssistant
             )
         case let .failed(message):
@@ -616,11 +613,11 @@ private struct AIAssistantDockView: View {
                     ProgressView()
                         .controlSize(.small)
                     Text(text.isEmpty
-                        ? String(localized: "Generating with \(model)")
-                        : String(localized: "Responding with \(model)"))
+                        ? String(localized: "Generating with \(model)", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Responding with \(model)", bundle: RockxyLocalization.bundle))
                         .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
                     Spacer(minLength: 0)
-                    Button(String(localized: "Stop")) {
+                    Button(String(localized: "Stop", bundle: RockxyLocalization.bundle)) {
                         coordinator.cancelDebugAssistantModelAnalysis()
                     }
                     .controlSize(.mini)
@@ -628,8 +625,8 @@ private struct AIAssistantDockView: View {
                 if text.isEmpty {
                     Text(
                         executionLocation.isLocal
-                            ? String(localized: "The local model is reading the reviewed request context.")
-                            : String(localized: "The configured provider is processing the reviewed request context.")
+                            ? String(localized: "The local model is reading the reviewed request context.", bundle: RockxyLocalization.bundle)
+                            : String(localized: "The configured provider is processing the reviewed request context.", bundle: RockxyLocalization.bundle)
                     )
                     .font(assistantFont(appMetrics.metadataFontSize))
                     .foregroundStyle(.secondary)
@@ -646,7 +643,7 @@ private struct AIAssistantDockView: View {
         case let .failed(message):
             assistantBubble {
                 Label(
-                    String(localized: "I couldn’t complete the model response."),
+                    String(localized: "I couldn’t complete the model response.", bundle: RockxyLocalization.bundle),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(assistantFont(appMetrics.secondaryFontSize, weight: .semibold))
@@ -656,13 +653,13 @@ private struct AIAssistantDockView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    Button(String(localized: "Review & Retry")) {
+                    Button(String(localized: "Review & Retry", bundle: RockxyLocalization.bundle)) {
                         coordinator.prepareDebugAssistantReview()
                     }
                     .controlSize(.small)
 
                     if assistantConfiguration?.kind == .ollama {
-                        Button(String(localized: "Check Local Model…")) {
+                        Button(String(localized: "Check Local Model…", bundle: RockxyLocalization.bundle)) {
                             RockxySettingsTab.select(.assistant)
                             onOpenSettings()
                         }
@@ -686,11 +683,11 @@ private struct AIAssistantDockView: View {
                     ProgressView()
                         .controlSize(.small)
                     Text(text.isEmpty
-                        ? String(localized: "Generating with \(model)")
-                        : String(localized: "Responding with \(model)"))
+                        ? String(localized: "Generating with \(model)", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Responding with \(model)", bundle: RockxyLocalization.bundle))
                         .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
                     Spacer(minLength: 0)
-                    Button(String(localized: "Stop")) {
+                    Button(String(localized: "Stop", bundle: RockxyLocalization.bundle)) {
                         coordinator.cancelDebugAssistantProductHelp()
                     }
                     .controlSize(.mini)
@@ -702,7 +699,7 @@ private struct AIAssistantDockView: View {
         case let .failed(message, _, handoff):
             assistantBubble {
                 Label(
-                    String(localized: "I couldn’t complete the response."),
+                    String(localized: "I couldn’t complete the response.", bundle: RockxyLocalization.bundle),
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(assistantFont(appMetrics.secondaryFontSize, weight: .semibold))
@@ -712,7 +709,7 @@ private struct AIAssistantDockView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
-                    Button(String(localized: "Try Again")) {
+                    Button(String(localized: "Try Again", bundle: RockxyLocalization.bundle)) {
                         coordinator.retryDebugAssistantProductHelp()
                     }
                     .controlSize(.small)
@@ -729,8 +726,8 @@ private struct AIAssistantDockView: View {
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(
                     primaryTransaction == nil
-                        ? String(localized: "Ask Rockxy AI Assistant…")
-                        : String(localized: "Ask about this traffic…"),
+                        ? String(localized: "Ask Rockxy AI Assistant…", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Ask about this traffic…", bundle: RockxyLocalization.bundle),
                     text: draftBinding,
                     axis: .vertical
                 )
@@ -750,8 +747,8 @@ private struct AIAssistantDockView: View {
                 .controlSize(.small)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!canSendDraft)
-                .help(String(localized: "Send message"))
-                .accessibilityLabel(String(localized: "Send Message"))
+                .help(String(localized: "Send message", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Send Message", bundle: RockxyLocalization.bundle))
             }
             .padding(.leading, 10)
             .padding(.trailing, 6)
@@ -775,7 +772,7 @@ private struct AIAssistantDockView: View {
                         coordinator.activeWorkspace.debugAssistantUsesConfiguredModel = false
                     } label: {
                         Label(
-                            String(localized: "Built-in Analysis (No Model)"),
+                            String(localized: "Built-in Analysis (No Model)", bundle: RockxyLocalization.bundle),
                             systemImage: coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
                                 ? "circle" : "checkmark"
                         )
@@ -800,7 +797,10 @@ private struct AIAssistantDockView: View {
                         RockxySettingsTab.select(.assistant)
                         onOpenSettings()
                     } label: {
-                        Label(String(localized: "Manage AI Models…"), systemImage: "gearshape")
+                        Label(
+                            String(localized: "Manage AI Models…", bundle: RockxyLocalization.bundle),
+                            systemImage: "gearshape"
+                        )
                     }
                 } label: {
                     Label(modelSelectionLabel, systemImage: "cpu")
@@ -811,21 +811,21 @@ private struct AIAssistantDockView: View {
                 .controlSize(.mini)
                 .font(assistantFont(appMetrics.metadataFontSize))
                 .fixedSize()
-                .help(String(localized: "Choose local analysis or the app-wide AI model"))
+                .help(String(localized: "Choose local analysis or the app-wide AI model", bundle: RockxyLocalization.bundle))
 
                 Spacer(minLength: 4)
 
                 Button {
                     isTrustPopoverPresented.toggle()
                 } label: {
-                    Label(String(localized: "Read-only"), systemImage: "lock.shield")
+                    Label(String(localized: "Read-only", bundle: RockxyLocalization.bundle), systemImage: "lock.shield")
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.mini)
                 .font(assistantFont(appMetrics.metadataFontSize))
                 .foregroundStyle(.secondary)
-                .help(String(localized: "Review the AI Assistant trust boundary"))
-                .accessibilityLabel(String(localized: "Read-only Assistant privacy details"))
+                .help(String(localized: "Review the AI Assistant trust boundary", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Read-only Assistant privacy details", bundle: RockxyLocalization.bundle))
                 .popover(isPresented: $isTrustPopoverPresented, arrowEdge: .bottom) {
                     AssistantTrustPopover()
                 }
@@ -870,28 +870,28 @@ private struct AIAssistantDockView: View {
             } else if coordinator.activeWorkspace.isPreparingDebugAssistantReview {
                 assistantBubble {
                     AssistantProgressRow(
-                        title: String(localized: "Selected traffic inspected"),
+                        title: String(localized: "Selected traffic inspected", bundle: RockxyLocalization.bundle),
                         systemImage: "checkmark.circle.fill",
                         color: .green
                     )
                     AssistantProgressRow(
-                        title: String(localized: "Redacting sensitive fields"),
+                        title: String(localized: "Redacting sensitive fields", bundle: RockxyLocalization.bundle),
                         showsProgress: true
                     )
-                    Text(String(localized: "Preparing the exact request for Review Data."))
-                        .font(assistantFont(appMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
+                    Text(String(localized: "Preparing the exact request for Review Data.", bundle: RockxyLocalization.bundle))
+                    .font(assistantFont(appMetrics.metadataFontSize))
+                    .foregroundStyle(.secondary)
                 }
             } else if coordinator.activeWorkspace.debugAssistantReviewPack != nil {
                 assistantBubble {
                     AssistantProgressRow(
-                        title: String(localized: "Waiting for Review Data"),
+                        title: String(localized: "Waiting for Review Data", bundle: RockxyLocalization.bundle),
                         systemImage: "lock.shield",
                         color: .secondary
                     )
-                    Text(String(localized: "Confirm the redacted traffic and conversation before the model runs."))
-                        .font(assistantFont(appMetrics.metadataFontSize))
-                        .foregroundStyle(.secondary)
+                    Text(String(localized: "Confirm the redacted traffic and conversation before the model runs.", bundle: RockxyLocalization.bundle))
+                    .font(assistantFont(appMetrics.metadataFontSize))
+                    .foregroundStyle(.secondary)
                 }
             } else {
                 reviewReadyTurn(result)
@@ -944,7 +944,7 @@ private struct AIAssistantDockView: View {
                 coordinator.togglePinnedDebugAssistantConversation(conversation.id)
             } label: {
                 Label(
-                    conversation.isPinned ? String(localized: "Unpin") : String(localized: "Pin"),
+                    conversation.isPinned ? String(localized: "Unpin", bundle: RockxyLocalization.bundle) : String(localized: "Pin", bundle: RockxyLocalization.bundle),
                     systemImage: conversation.isPinned ? "pin.slash" : "pin"
                 )
             }
@@ -952,13 +952,13 @@ private struct AIAssistantDockView: View {
                 conversationBeingRenamed = conversation
                 conversationRenameDraft = conversation.title
             } label: {
-                Label(String(localized: "Rename"), systemImage: "pencil")
+                Label(String(localized: "Rename", bundle: RockxyLocalization.bundle), systemImage: "pencil")
             }
             Divider()
             Button(role: .destructive) {
                 conversationPendingDeletion = conversation
             } label: {
-                Label(String(localized: "Delete"), systemImage: "trash")
+                Label(String(localized: "Delete", bundle: RockxyLocalization.bundle), systemImage: "trash")
             }
         }
         .accessibilityLabel("\(conversation.title), \(conversation.preview)")
@@ -976,7 +976,7 @@ private struct AIAssistantDockView: View {
                 assistantBubble {
                     AssistantMarkdownText(
                         source: message.text.isEmpty
-                            ? String(localized: "The model completed without returning text.")
+                            ? String(localized: "The model completed without returning text.", bundle: RockxyLocalization.bundle)
                             : message.text
                     )
 
@@ -1050,7 +1050,7 @@ private struct AIAssistantDockView: View {
         Button(modelResult.endpointHost) {}
             .disabled(true)
         if let usage = modelResult.usage {
-            Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens")) {}
+            Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output tokens", bundle: RockxyLocalization.bundle)) {}
                 .disabled(true)
         }
         Divider()
@@ -1059,7 +1059,7 @@ private struct AIAssistantDockView: View {
     /// A blocked-tool-call safety warning stays visible on the reply, rendered as concise plain text
     /// without a decorative hand icon so the answer remains the surface.
     private func blockedToolCallWarning(_ count: Int) -> some View {
-        Text(String(localized: "Rockxy blocked \(count) model action request(s)."))
+        Text(String(localized: "Rockxy blocked \(count) model action request(s).", bundle: RockxyLocalization.bundle))
             .font(assistantFont(appMetrics.metadataFontSize))
             .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
@@ -1132,7 +1132,7 @@ private struct AIAssistantDockView: View {
                 .disabled(true)
             if let usage {
                 Divider()
-                Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output")) {}
+                Button(String(localized: "\(usage.inputTokens) input · \(usage.outputTokens) output", bundle: RockxyLocalization.bundle)) {}
                     .disabled(true)
             }
         } label: {
@@ -1145,13 +1145,13 @@ private struct AIAssistantDockView: View {
         .font(assistantFont(appMetrics.metadataFontSize, monospaced: true))
         .foregroundStyle(.secondary)
         .help("\(provider) · \(model) · \(endpointHost)")
-        .accessibilityLabel(String(localized: "Model details: \(provider), \(model), \(endpointHost)"))
+        .accessibilityLabel(String(localized: "Model details: \(provider), \(model), \(endpointHost)", bundle: RockxyLocalization.bundle))
     }
 
     private func reviewReadyTurn(_ result: InvestigationResult) -> some View {
         assistantBubble {
             AssistantProgressRow(
-                title: String(localized: "Selected traffic inspected"),
+                title: String(localized: "Selected traffic inspected", bundle: RockxyLocalization.bundle),
                 systemImage: "checkmark.circle.fill",
                 color: .green
             )
@@ -1162,7 +1162,10 @@ private struct AIAssistantDockView: View {
             Button {
                 coordinator.prepareDebugAssistantReview()
             } label: {
-                Label(String(localized: "Review Data & Run Model"), systemImage: "lock.shield")
+                Label(
+                    String(localized: "Review Data & Run Model", bundle: RockxyLocalization.bundle),
+                    systemImage: "lock.shield"
+                )
             }
             .controlSize(.small)
         }
@@ -1182,7 +1185,7 @@ private struct AIAssistantDockView: View {
                 Text(title)
                     .font(assistantFont(appMetrics.secondaryFontSize, weight: .medium))
                 Spacer(minLength: 4)
-                Button(String(localized: "Stop"), action: cancel)
+                Button(String(localized: "Stop", bundle: RockxyLocalization.bundle), action: cancel)
                     .controlSize(.mini)
             }
             Text(detail)
@@ -1194,7 +1197,7 @@ private struct AIAssistantDockView: View {
     private func failureTurn(_ message: String) -> some View {
         assistantBubble {
             Label(
-                String(localized: "I couldn’t finish that investigation."),
+                String(localized: "I couldn’t finish that investigation.", bundle: RockxyLocalization.bundle),
                 systemImage: "exclamationmark.triangle.fill"
             )
             .font(assistantFont(appMetrics.secondaryFontSize, weight: .semibold))
@@ -1204,7 +1207,7 @@ private struct AIAssistantDockView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if primaryTransaction != nil {
-                Button(String(localized: "Try Again")) {
+                Button(String(localized: "Try Again", bundle: RockxyLocalization.bundle)) {
                     coordinator.startDebugAssistant(.explainFailure)
                 }
                 .controlSize(.small)
@@ -1305,10 +1308,10 @@ private extension AIAssistantDockView {
     func relativeDateLabel(_ date: Date) -> String {
         let interval = max(0, Date().timeIntervalSince(date))
         if interval < 60 {
-            return String(localized: "Now")
+            return String(localized: "Now", bundle: RockxyLocalization.bundle)
         }
         if interval < 3_600 {
-            return String(localized: "\(Int(interval / 60))m")
+            return String(localized: "\(Int(interval / 60))m", bundle: RockxyLocalization.bundle)
         }
         if Calendar.current.isDateInToday(date) {
             return date.formatted(date: .omitted, time: .shortened)

@@ -69,7 +69,7 @@ struct ComposeWindowView: View {
             isURLFocused = true
         }
         .alert(
-            String(localized: "Import Failed"),
+            String(localized: "Import Failed", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: {
@@ -79,7 +79,7 @@ struct ComposeWindowView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK"), role: .cancel) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle), role: .cancel) {
                 importErrorMessage = nil
             }
         } message: {
@@ -88,17 +88,20 @@ struct ComposeWindowView: View {
             }
         }
         .alert(
-            String(localized: "Clear Compose History?"),
+            String(localized: "Clear Compose History?", bundle: RockxyLocalization.bundle),
             isPresented: $isShowingClearHistoryConfirmation
         ) {
-            Button(String(localized: "Cancel"), role: .cancel) {}
-            Button(String(localized: "Clear History"), role: .destructive) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
+            Button(String(localized: "Clear History", bundle: RockxyLocalization.bundle), role: .destructive) {
                 Task {
                     await viewModel.clearHistory()
                 }
             }
         } message: {
-            Text(String(localized: "This removes all locally stored Compose request and response history."))
+            Text(String(
+                localized: "This removes all locally stored Compose request and response history.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
     }
 
@@ -130,9 +133,29 @@ struct ComposeWindowView: View {
         return false
     }
 
+    private var methodControlWidth: CGFloat {
+        max(toolMetrics.menuWidth(96), toolMetrics.bodyFontSize * 4.5 + 36)
+    }
+
+    private var sendControlWidth: CGFloat {
+        max(78, toolMetrics.bodyFontSize * 2.8 + 44)
+    }
+
+    private var shouldShowRequestRestriction: Bool {
+        switch viewModel.responseState {
+        case .empty,
+             .success,
+             .error:
+            true
+        case .loading,
+             .unsupported:
+            false
+        }
+    }
+
     private var composeBar: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
-            Picker(String(localized: "HTTP Method"), selection: $viewModel.method) {
+            Picker(String(localized: "HTTP Method", bundle: RockxyLocalization.bundle), selection: $viewModel.method) {
                 ForEach(Self.httpMethods, id: \.self) { method in
                     Text(method).tag(method)
                 }
@@ -146,22 +169,25 @@ struct ComposeWindowView: View {
             .onChange(of: viewModel.method) {
                 viewModel.syncUnsupportedState()
             }
-            .accessibilityLabel(String(localized: "HTTP method"))
+            .accessibilityLabel(String(localized: "HTTP method", bundle: RockxyLocalization.bundle))
             .disabled(isSending)
 
-            TextField(String(localized: "https://example.com/path"), text: $viewModel.url)
-                .textFieldStyle(.roundedBorder)
-                .font(toolMetrics.font(monospaced: true))
-                .frame(height: toolMetrics.formControlHeight)
-                .focused($isURLFocused)
-                .onSubmit {
-                    startSend()
-                }
-                .onChange(of: viewModel.url) {
-                    viewModel.syncURLToQuery()
-                }
-                .accessibilityLabel(String(localized: "Request URL"))
-                .disabled(isSending)
+            TextField(
+                String(localized: "https://example.com/path", bundle: RockxyLocalization.bundle),
+                text: $viewModel.url
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font(monospaced: true))
+            .frame(height: toolMetrics.formControlHeight)
+            .focused($isURLFocused)
+            .onSubmit {
+                startSend()
+            }
+            .onChange(of: viewModel.url) {
+                viewModel.syncURLToQuery()
+            }
+            .accessibilityLabel(String(localized: "Request URL", bundle: RockxyLocalization.bundle))
+            .disabled(isSending)
 
             sendButton
         }
@@ -175,19 +201,19 @@ struct ComposeWindowView: View {
             Button {
                 cancelSend()
             } label: {
-                Text(String(localized: "Cancel"))
+                Text(String(localized: "Cancel", bundle: RockxyLocalization.bundle))
                     .frame(width: sendControlWidth)
             }
             .rockxyGlassButtonStyle()
             .controlSize(.regular)
             .frame(height: toolMetrics.formControlHeight)
             .keyboardShortcut(".", modifiers: .command)
-            .help(String(localized: "Cancel the active request"))
+            .help(String(localized: "Cancel the active request", bundle: RockxyLocalization.bundle))
         } else {
             Button {
                 startSend()
             } label: {
-                Text(String(localized: "Send"))
+                Text(String(localized: "Send", bundle: RockxyLocalization.bundle))
                     .frame(width: sendControlWidth)
             }
             .rockxyGlassButtonStyle(prominent: true)
@@ -226,7 +252,7 @@ struct ComposeWindowView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if viewModel.sourceHasUnsupportedBinaryBody || viewModel.sourceHasTruncatedHistoryBody {
-                    Button(String(localized: "Use Empty Body")) {
+                    Button(String(localized: "Use Empty Body", bundle: RockxyLocalization.bundle)) {
                         viewModel.replaceUnavailableBody(with: "")
                     }
                     .rockxyGlassButtonStyle()
@@ -243,10 +269,13 @@ struct ComposeWindowView: View {
             historyMenu
             settingsMenu
             Spacer()
-            Text(isSending ? String(localized: "⌘. Cancel") : String(localized: "⌘↩ Send"))
-                .font(toolMetrics.metadataFont())
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
+            Text(isSending ? String(localized: "⌘. Cancel", bundle: RockxyLocalization.bundle) : String(
+                localized: "⌘↩ Send",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.metadataFont())
+            .foregroundStyle(.tertiary)
+            .accessibilityHidden(true)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.footerTopPadding)
@@ -278,11 +307,11 @@ struct ComposeWindowView: View {
                 viewModel.applyTemplate(.postMultipart)
             }
             Divider()
-            Button(String(localized: "Import from cURL...")) {
+            Button(String(localized: "Import from cURL...", bundle: RockxyLocalization.bundle)) {
                 importCurlFromPasteboard()
             }
         } label: {
-            Label(String(localized: "Template"), systemImage: "doc.badge.plus")
+            Label(String(localized: "Template", bundle: RockxyLocalization.bundle), systemImage: "doc.badge.plus")
                 .labelStyle(.titleAndIcon)
         }
         .menuStyle(.button)
@@ -292,7 +321,7 @@ struct ComposeWindowView: View {
     private var historyMenu: some View {
         Menu {
             if viewModel.history.isEmpty {
-                Text(String(localized: "No History"))
+                Text(String(localized: "No History", bundle: RockxyLocalization.bundle))
             } else {
                 ForEach(viewModel.history) { entry in
                     Button(entry.menuTitle) {
@@ -303,17 +332,21 @@ struct ComposeWindowView: View {
                 Divider()
                 Text(
                     String(
-                        localized: "History stays on this Mac. Authentication and cookie header values are redacted; URLs and bodies remain stored locally."
+                        localized: "History stays on this Mac. Authentication and cookie header values are redacted; URLs and bodies remain stored locally.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
-                    .font(toolMetrics.secondaryFont())
-                Button(String(localized: "Clear All..."), role: .destructive) {
+                .font(toolMetrics.secondaryFont())
+                Button(String(localized: "Clear All...", bundle: RockxyLocalization.bundle), role: .destructive) {
                     isShowingClearHistoryConfirmation = true
                 }
             }
         } label: {
-            Label(String(localized: "History"), systemImage: "clock.arrow.circlepath")
-                .labelStyle(.titleAndIcon)
+            Label(
+                String(localized: "History", bundle: RockxyLocalization.bundle),
+                systemImage: "clock.arrow.circlepath"
+            )
+            .labelStyle(.titleAndIcon)
         }
         .menuStyle(.button)
         .keyboardShortcut("y", modifiers: .command)
@@ -321,12 +354,12 @@ struct ComposeWindowView: View {
 
     private var settingsMenu: some View {
         Menu {
-            Button(String(localized: "Focus URL Field")) {
+            Button(String(localized: "Focus URL Field", bundle: RockxyLocalization.bundle)) {
                 isURLFocused = true
             }
             .keyboardShortcut("l", modifiers: .command)
             Divider()
-            Menu(String(localized: "Request Timeout")) {
+            Menu(String(localized: "Request Timeout", bundle: RockxyLocalization.bundle)) {
                 ForEach(ComposeRequestTimeout.allCases) { timeout in
                     Button {
                         viewModel.requestTimeout = timeout
@@ -341,11 +374,11 @@ struct ComposeWindowView: View {
             }
             Divider()
             Toggle(
-                String(localized: "Automatically Follow Redirects"),
+                String(localized: "Automatically Follow Redirects", bundle: RockxyLocalization.bundle),
                 isOn: $viewModel.followsRedirects
             )
             Divider()
-            Button(String(localized: "Reset to Fresh Request")) {
+            Button(String(localized: "Reset to Fresh Request", bundle: RockxyLocalization.bundle)) {
                 cancelSend()
                 viewModel.resetDraft()
                 isURLFocused = true
@@ -356,7 +389,7 @@ struct ComposeWindowView: View {
                 .imageScale(.large)
         }
         .menuStyle(.button)
-        .help(String(localized: "Request Options"))
+        .help(String(localized: "Request Options", bundle: RockxyLocalization.bundle))
     }
 
     private func consumeDraftRequest() {
@@ -419,23 +452,6 @@ struct ComposeWindowView: View {
             sendTaskID = nil
         } catch {
             importErrorMessage = error.localizedDescription
-        }
-    }
-
-    private var methodControlWidth: CGFloat {
-        max(toolMetrics.menuWidth(96), toolMetrics.bodyFontSize * 4.5 + 36)
-    }
-
-    private var sendControlWidth: CGFloat {
-        max(78, toolMetrics.bodyFontSize * 2.8 + 44)
-    }
-
-    private var shouldShowRequestRestriction: Bool {
-        switch viewModel.responseState {
-        case .empty, .success, .error:
-            true
-        case .loading, .unsupported:
-            false
         }
     }
 

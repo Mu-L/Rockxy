@@ -49,9 +49,9 @@ struct ComposeResponseViewer: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(String(localized: "No Response"), systemImage: "arrow.up.circle")
+            Label(String(localized: "No Response", bundle: RockxyLocalization.bundle), systemImage: "arrow.up.circle")
         } description: {
-            Text(String(localized: "Send a request to see the response here."))
+            Text(String(localized: "Send a request to see the response here.", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -61,7 +61,7 @@ struct ComposeResponseViewer: View {
         VStack(spacing: 8) {
             ProgressView()
                 .controlSize(.regular)
-            Text(String(localized: "Sending..."))
+            Text(String(localized: "Sending...", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }
@@ -70,7 +70,7 @@ struct ComposeResponseViewer: View {
 
     @ViewBuilder private var responseTabPicker: some View {
         if toolMetrics.bodyFontSize >= 20 {
-            Picker(String(localized: "Response Section"), selection: $selectedTab) {
+            Picker(String(localized: "Response Section", bundle: RockxyLocalization.bundle), selection: $selectedTab) {
                 ForEach(ComposeResponseTab.allCases) { tab in
                     Text(tab.title).tag(tab)
                 }
@@ -78,9 +78,9 @@ struct ComposeResponseViewer: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(minWidth: 130)
-            .accessibilityLabel(String(localized: "Response section"))
+            .accessibilityLabel(String(localized: "Response section", bundle: RockxyLocalization.bundle))
         } else {
-            Picker(String(localized: "Response Section"), selection: $selectedTab) {
+            Picker(String(localized: "Response Section", bundle: RockxyLocalization.bundle), selection: $selectedTab) {
                 ForEach(ComposeResponseTab.allCases) { tab in
                     Text(tab.title).tag(tab)
                 }
@@ -88,7 +88,7 @@ struct ComposeResponseViewer: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .fixedSize()
-            .accessibilityLabel(String(localized: "Response section"))
+            .accessibilityLabel(String(localized: "Response section", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -127,9 +127,12 @@ struct ComposeResponseViewer: View {
                 .font(toolMetrics.secondaryFont(monospaced: true))
                 .foregroundStyle(.secondary)
             if response.bodyTruncated {
-                Label(String(localized: "History snapshot truncated"), systemImage: "scissors")
-                    .font(toolMetrics.metadataFont())
-                    .foregroundStyle(.orange)
+                Label(
+                    String(localized: "History snapshot truncated", bundle: RockxyLocalization.bundle),
+                    systemImage: "scissors"
+                )
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.orange)
             }
             Spacer()
             Text(Self.formatBodySize(response.bodySize))
@@ -158,10 +161,10 @@ struct ComposeResponseViewer: View {
     private func responseHeaders(_ response: ComposeResponse) -> some View {
         ScrollView {
             LazyVGrid(columns: Self.headerColumns, alignment: .leading, spacing: 4) {
-                Text(String(localized: "Name"))
+                Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
                     .foregroundStyle(.secondary)
-                Text(String(localized: "Value"))
+                Text(String(localized: "Value", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.tableHeaderFont())
                     .foregroundStyle(.secondary)
 
@@ -193,12 +196,15 @@ struct ComposeResponseViewer: View {
 
     private func unsupportedState(_ message: String) -> some View {
         ContentUnavailableView {
-            Label(String(localized: "Cannot Send This Request"), systemImage: "exclamationmark.triangle")
+            Label(
+                String(localized: "Cannot Send This Request", bundle: RockxyLocalization.bundle),
+                systemImage: "exclamationmark.triangle"
+            )
         } description: {
             Text(message)
         } actions: {
             if viewModel.sourceHasUnsupportedBinaryBody || viewModel.sourceHasTruncatedHistoryBody {
-                Button(String(localized: "Use Empty Body")) {
+                Button(String(localized: "Use Empty Body", bundle: RockxyLocalization.bundle)) {
                     viewModel.replaceUnavailableBody(with: "")
                 }
             }
@@ -259,9 +265,9 @@ private enum ComposeResponseTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .body: String(localized: "Body")
-        case .headers: String(localized: "Headers")
-        case .raw: String(localized: "Raw")
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
+        case .headers: String(localized: "Headers", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
         }
     }
 }

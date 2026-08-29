@@ -3,6 +3,8 @@ import SwiftUI
 // Renders the image preview interface for the request and response inspector.
 
 struct ImagePreviewView: View {
+    // MARK: Internal
+
     let data: Data
 
     var body: some View {
@@ -25,12 +27,17 @@ struct ImagePreviewView: View {
             .padding(12)
         } else {
             ContentUnavailableView {
-                Label(String(localized: "Cannot Display Image"), systemImage: "photo")
+                Label(
+                    String(localized: "Cannot Display Image", bundle: RockxyLocalization.bundle),
+                    systemImage: "photo"
+                )
             } description: {
-                Text(String(localized: "Image data could not be decoded"))
+                Text(String(localized: "Image data could not be decoded", bundle: RockxyLocalization.bundle))
             }
         }
     }
+
+    // MARK: Private
 
     @Environment(\.appUIDisplayMetrics) private var metrics
 }

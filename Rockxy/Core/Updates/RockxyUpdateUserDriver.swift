@@ -4,17 +4,19 @@ import Sparkle
 
 @MainActor
 final class RockxyUpdateUserDriver: NSObject, SPUUserDriver {
+    // MARK: Lifecycle
+
     init(hostBundle: Bundle, configuration: RockxyUpdateConfiguration) {
         standardUserDriver = SPUStandardUserDriver(hostBundle: hostBundle, delegate: nil)
         controller = SoftwareUpdateController(configuration: configuration)
         super.init()
     }
 
+    // MARK: Internal
+
     let controller: SoftwareUpdateController
     var updateFoundHandler: ((SUAppcastItem) -> Void)?
     var noUpdateHandler: ((NSError) -> Void)?
-
-    private let standardUserDriver: SPUStandardUserDriver
 
     func show(_ request: SPUUpdatePermissionRequest, reply: @escaping (SUUpdatePermissionResponse) -> Void) {
         standardUserDriver.show(request, reply: reply)
@@ -40,7 +42,10 @@ final class RockxyUpdateUserDriver: NSObject, SPUUserDriver {
     func showUpdateReleaseNotesFailedToDownloadWithError(_ error: Error) {
         controller.updateReleaseNotes(
             .unavailable(
-                String(localized: "Release notes couldn’t be loaded for this update.")
+                String(
+                    localized: "Release notes couldn’t be loaded for this update.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         )
     }
@@ -97,11 +102,12 @@ final class RockxyUpdateUserDriver: NSObject, SPUUserDriver {
         }
 
         let alert = NSAlert()
-        alert.messageText = String(localized: "Update Installed")
+        alert.messageText = String(localized: "Update Installed", bundle: RockxyLocalization.bundle)
         alert.informativeText = String(
-            localized: "The update was installed, but Rockxy did not relaunch automatically. Quit and reopen Rockxy to finish using the updated version."
+            localized: "The update was installed, but Rockxy did not relaunch automatically. Quit and reopen Rockxy to finish using the updated version.",
+            bundle: RockxyLocalization.bundle
         )
-        alert.addButton(withTitle: String(localized: "OK"))
+        alert.addButton(withTitle: String(localized: "OK", bundle: RockxyLocalization.bundle))
         alert.alertStyle = .informational
         alert.icon = AppIconProvider.appIcon
         alert.runModal()
@@ -117,4 +123,8 @@ final class RockxyUpdateUserDriver: NSObject, SPUUserDriver {
     func showUpdateInFocus() {
         controller.showInFocus()
     }
+
+    // MARK: Private
+
+    private let standardUserDriver: SPUStandardUserDriver
 }

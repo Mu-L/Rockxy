@@ -65,7 +65,7 @@ enum SoftwareUpdateReleaseNotesContent: Equatable {
             !text.isEmpty else
         {
             return .unavailable(
-                String(localized: "Release notes are unavailable for this update.")
+                String(localized: "Release notes are unavailable for this update.", bundle: RockxyLocalization.bundle)
             )
         }
 

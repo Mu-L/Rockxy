@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - FilterPreset
+
 struct FilterPreset: Identifiable, Codable, Hashable {
     var id = UUID()
     var name: String
@@ -8,8 +10,12 @@ struct FilterPreset: Identifiable, Codable, Hashable {
     var updatedAt = Date()
 }
 
+// MARK: - FilterPresetStore
+
 @MainActor @Observable
 final class FilterPresetStore {
+    // MARK: Lifecycle
+
     init(
         userDefaults: UserDefaults = .standard,
         storageKey: String = RockxyIdentity.current.defaultsKey("advancedFilterPresets")
@@ -18,6 +24,8 @@ final class FilterPresetStore {
         self.storageKey = storageKey
         presets = Self.loadPresets(from: userDefaults, key: storageKey)
     }
+
+    // MARK: Internal
 
     var presets: [FilterPreset] = []
 
@@ -52,13 +60,24 @@ final class FilterPresetStore {
         persist()
     }
 
+    // MARK: Private
+
     private let userDefaults: UserDefaults
     private let storageKey: String
+
+    private static func loadPresets(from userDefaults: UserDefaults, key: String) -> [FilterPreset] {
+        guard let data = userDefaults.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([FilterPreset].self, from: data) else
+        {
+            return []
+        }
+        return decoded
+    }
 
     private func generatedPresetName(for rules: [FilterRule]) -> String {
         let activeRules = FilterRuleEvaluator.activeRules(in: rules, isFilterBarVisible: true)
         guard let first = activeRules.first else {
-            return String(localized: "Advanced Filter")
+            return String(localized: "Advanced Filter", bundle: RockxyLocalization.bundle)
         }
         let base = "\(first.field.displayName): \(first.value)"
         if activeRules.count == 1 {
@@ -72,14 +91,5 @@ final class FilterPresetStore {
             return
         }
         userDefaults.set(data, forKey: storageKey)
-    }
-
-    private static func loadPresets(from userDefaults: UserDefaults, key: String) -> [FilterPreset] {
-        guard let data = userDefaults.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([FilterPreset].self, from: data) else
-        {
-            return []
-        }
-        return decoded
     }
 }

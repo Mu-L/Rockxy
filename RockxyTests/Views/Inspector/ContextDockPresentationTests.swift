@@ -127,9 +127,9 @@ struct ContextDockInvestigationReportTests {
         #expect(!report.contains("Model Analysis"))
 
         // Editorial text-only section headings for Summary and Next step (bold, no SF Symbol).
-        #expect(report.contains("String(localized: \"Summary\")"))
-        #expect(report.contains("String(localized: \"Next step\")"))
-        #expect(!report.contains("String(localized: \"Proposed Actions\")"))
+        #expect(report.contains("String(localized: \"Summary\", bundle: RockxyLocalization.bundle)"))
+        #expect(report.contains("String(localized: \"Next step\", bundle: RockxyLocalization.bundle)"))
+        #expect(!report.contains("String(localized: \"Proposed Actions\", bundle: RockxyLocalization.bundle)"))
         #expect(!report.contains("InvestigationFindingsDisclosure"))
         #expect(!report.contains("InvestigationReportHeader"))
 
@@ -137,7 +137,7 @@ struct ContextDockInvestigationReportTests {
         // "Try this next" copy, no pill or mini card.
         #expect(report.contains("result.nextStep"))
         #expect(report.contains("private func nextStep("))
-        #expect(!report.contains("String(localized: \"Try this next\")"))
+        #expect(!report.contains("String(localized: \"Try this next\", bundle: RockxyLocalization.bundle)"))
         #expect(!report.contains("lightbulb"))
 
         // Summary and Next step read as three bounded editorial frames: one shared, reusable,
@@ -146,8 +146,14 @@ struct ContextDockInvestigationReportTests {
         // a 0.5 separator-color stroke, compact padding, and no fill tint, icon, badge, shadow, or
         // material. Frames are editorial grouping only, never a dashboard/robot surface.
         #expect(report.contains("struct InvestigationSectionFrame<Content: View>: View"))
-        #expect(report.contains("InvestigationSectionFrame(title: String(localized: \"Summary\")) {"))
-        #expect(report.contains("InvestigationSectionFrame(title: String(localized: \"Next step\")) {"))
+        #expect(report
+            .contains(
+                "InvestigationSectionFrame(title: String(localized: \"Summary\", bundle: RockxyLocalization.bundle)) {"
+            ))
+        #expect(report
+            .contains(
+                "InvestigationSectionFrame(title: String(localized: \"Next step\", bundle: RockxyLocalization.bundle)) {"
+            ))
         #expect(report.contains("func investigationSectionFrameStyle() -> some View"))
         #expect(report.contains(".investigationSectionFrameStyle()"))
         #expect(report
@@ -157,7 +163,10 @@ struct ContextDockInvestigationReportTests {
         // The section frame carries no tint, shadow, material, or status color — the reusable
         // component takes only a text title plus content (no systemImage parameter or call site).
         #expect(report.contains("let title: String\n    @ViewBuilder let content: Content"))
-        #expect(!report.contains("InvestigationSectionFrame(title: String(localized: \"Summary\"), systemImage:"))
+        #expect(!report
+            .contains(
+                "InvestigationSectionFrame(title: String(localized: \"Summary\", bundle: RockxyLocalization.bundle), systemImage:"
+            ))
         #expect(!report.contains(".fill(Color("))
         #expect(!report.contains(".shadow("))
         #expect(!report.contains(".ultraThinMaterial"))
@@ -165,24 +174,36 @@ struct ContextDockInvestigationReportTests {
 
         // Technical material collapses behind one quiet "Details" disclosure, collapsed by default,
         // that still carries scope, grouped findings, unknowns, and local/model attribution + count.
-        #expect(report.contains("String(localized: \"Details\")"))
-        #expect(!report.contains("String(localized: \"Why this answer\")"))
+        #expect(report.contains("String(localized: \"Details\", bundle: RockxyLocalization.bundle)"))
+        #expect(!report.contains("String(localized: \"Why this answer\", bundle: RockxyLocalization.bundle)"))
         #expect(report.contains("DisclosureGroup(isExpanded: $isEvidenceExpanded)"))
         #expect(report.contains("@State private var isEvidenceExpanded = false"))
-        #expect(report.contains("String(localized: \"Scope\")"))
-        #expect(report.contains("String(localized: \"Findings\")"))
-        #expect(report.contains("String(localized: \"Unknowns\")"))
+        #expect(report.contains("String(localized: \"Scope\", bundle: RockxyLocalization.bundle)"))
+        #expect(report.contains("String(localized: \"Findings\", bundle: RockxyLocalization.bundle)"))
+        #expect(report.contains("String(localized: \"Unknowns\", bundle: RockxyLocalization.bundle)"))
         #expect(report.contains("InvestigationUnknownsView("))
         #expect(report.contains("scopeTransactionIDs.count) requests"))
 
         // Detail chrome is simplified: text-only section headings (no SF Symbol argument on
         // InvestigationReportSection) and no group-level accessibility override on the disclosure.
-        #expect(report.contains("InvestigationReportSection(title: String(localized: \"Scope\")) {"))
-        #expect(report.contains("InvestigationReportSection(title: String(localized: \"Findings\")) {"))
+        #expect(report
+            .contains(
+                "InvestigationReportSection(title: String(localized: \"Scope\", bundle: RockxyLocalization.bundle)) {"
+            ))
+        #expect(report
+            .contains(
+                "InvestigationReportSection(title: String(localized: \"Findings\", bundle: RockxyLocalization.bundle)) {"
+            ))
         #expect(!report.contains("systemImage: \"scope\""))
         #expect(!report.contains("systemImage: \"list.bullet\""))
-        #expect(!report.contains(".accessibilityLabel(String(localized: \"Why this answer, evidence and scope\"))"))
-        #expect(!report.contains(".accessibilityHint(String(localized: \"Shows evidence and request scope\"))"))
+        #expect(!report
+            .contains(
+                ".accessibilityLabel(String(localized: \"Why this answer, evidence and scope\", bundle: RockxyLocalization.bundle))"
+            ))
+        #expect(!report
+            .contains(
+                ".accessibilityHint(String(localized: \"Shows evidence and request scope\", bundle: RockxyLocalization.bundle))"
+            ))
 
         // Model provenance lives inside the collapsed disclosure through attributionLabel — plain text
         // (no decorative cpu icon) carrying provider + model + scoped request count, with endpoint host
@@ -229,10 +250,11 @@ struct ContextDockInvestigationReportTests {
         #expect(report.contains("performHandoff("))
 
         // Model escalation copy still calls the existing review callback and preparing state.
-        #expect(report.contains("String(localized: \"Ask Configured Model\")"))
+        #expect(report.contains("String(localized: \"Ask Configured Model\", bundle: RockxyLocalization.bundle)"))
         #expect(!report.contains("Continue With Model"))
         #expect(report.contains("onContinueWithModel()"))
-        #expect(report.contains("String(localized: \"Preparing redacted preview…\")"))
+        #expect(report
+            .contains("String(localized: \"Preparing redacted preview…\", bundle: RockxyLocalization.bundle)"))
 
         // The existing handoff / replay callbacks remain wired.
         #expect(report.contains("onHandoff"))
@@ -254,7 +276,7 @@ struct ContextDockInvestigationReportTests {
             .contains("Text(title)\n                .font(.system(size: metrics.metadataFontSize, weight: .semibold))"))
         #expect(report
             .contains(
-                "Text(String(localized: \"Unknowns\"))\n"
+                "Text(String(localized: \"Unknowns\", bundle: RockxyLocalization.bundle))\n"
                     + "                    .font(.system(size: metrics.secondaryFontSize, weight: .semibold))\n"
                     + "                    .foregroundStyle(.primary)"
             ))
@@ -301,7 +323,10 @@ struct ContextDockInvestigationReportTests {
 
         // Reveal behavior, disabled semantics, help, and accessibility labels for evidence stay intact.
         #expect(report.contains(".disabled(evidence.sourceTransactionID == nil)"))
-        #expect(report.contains("String(localized: \"Reveal the request behind this finding\")"))
+        #expect(report
+            .contains(
+                "String(localized: \"Reveal the request behind this finding\", bundle: RockxyLocalization.bundle)"
+            ))
         #expect(report.contains("\\(evidence.kind.title) finding: \\(evidence.title)"))
     }
 
@@ -319,11 +344,13 @@ struct ContextDockInvestigationReportTests {
         #expect(overflow.contains("Menu {"))
         #expect(overflow.contains("overflowItems"))
         #expect(overflow.contains("Button(action: onFollowUp)"))
-        #expect(overflow.contains("Label(String(localized: \"Follow Up\"), systemImage:"))
+        #expect(overflow.contains("String(localized: \"Follow Up\", bundle: RockxyLocalization.bundle)"))
+        #expect(overflow.contains("systemImage: \"arrowshape.turn.up.left\""))
         #expect(overflow.contains("Button(action: onRevealRequest)"))
-        #expect(overflow.contains("Label(String(localized: \"Reveal Request\")"))
+        #expect(overflow.contains("Label(String(localized: \"Reveal Request\", bundle: RockxyLocalization.bundle)"))
         #expect(overflow.contains("Button(action: onRetry)"))
-        #expect(overflow.contains("Label(String(localized: \"Review & Retry\")"))
+        #expect(overflow.contains("String(localized: \"Review & Retry\", bundle: RockxyLocalization.bundle)"))
+        #expect(overflow.contains("systemImage: \"arrow.clockwise\""))
 
         // The Menu and its ellipsis glyph use the app-wide configurable control font metric so items
         // no longer inherit the footer's metadata scale.
@@ -337,8 +364,9 @@ struct ContextDockInvestigationReportTests {
         #expect(overflow.contains(".frame(minWidth: 18, minHeight: 18)"))
 
         // Accessibility and help are preserved on the overflow control.
-        #expect(overflow.contains(".accessibilityLabel(String(localized: \"More actions\"))"))
-        #expect(overflow.contains(".help(String(localized: \"More actions\"))"))
+        #expect(overflow
+            .contains(".accessibilityLabel(String(localized: \"More actions\", bundle: RockxyLocalization.bundle))"))
+        #expect(overflow.contains(".help(String(localized: \"More actions\", bundle: RockxyLocalization.bundle))"))
 
         // The compact Copy control keeps its .mini sizing (asserted outside the overflow helper).
         let copyStart = try #require(components.range(of: "private func compactAction("))
@@ -357,7 +385,7 @@ struct ContextDockInvestigationReportTests {
         #expect(components.contains(".frame(maxWidth: .infinity, alignment: .trailing)"))
         #expect(components.contains("Spacer(minLength: 44)"))
         #expect(components.contains(".textSelection(.enabled)"))
-        #expect(components.contains("String(localized: \"You: \\(text)\")"))
+        #expect(components.contains("String(localized: \"You: \\(text)\", bundle: RockxyLocalization.bundle)"))
 
         // Response side: one coherent neutral rounded card — subtle background, hairline separator
         // border, compact padding. No assistant logo/icon/identity row and no duplicate card type.
@@ -368,16 +396,17 @@ struct ContextDockInvestigationReportTests {
             .contains(
                 "RoundedRectangle(cornerRadius: 9)\n                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)"
             ))
-        #expect(!components.contains("String(localized: \"Rockxy Assistant\")"))
-        #expect(!components.contains("String(localized: \"AI Assistant Response\")"))
+        #expect(!components.contains("String(localized: \"Rockxy Assistant\", bundle: RockxyLocalization.bundle)"))
+        #expect(!components.contains("String(localized: \"AI Assistant Response\", bundle: RockxyLocalization.bundle)"))
         #expect(!components.contains("waveform.badge.magnifyingglass"))
 
         // Response footer: exactly two quiet affordances — a Copy control and one ellipsis overflow
         // menu. Follow Up is a menu item only, never a visible icon button in the body.
         #expect(components.contains("struct AssistantResponseActionBar"))
         #expect(components.contains("Image(systemName: \"ellipsis\")"))
-        #expect(components.contains("String(localized: \"Copy\")"))
-        #expect(components.contains("Label(String(localized: \"Follow Up\"), systemImage:"))
+        #expect(components.contains("String(localized: \"Copy\", bundle: RockxyLocalization.bundle)"))
+        #expect(components.contains("String(localized: \"Follow Up\", bundle: RockxyLocalization.bundle)"))
+        #expect(components.contains("systemImage: \"arrowshape.turn.up.left\""))
     }
 
     @Test("Unknowns render only when non-empty and never show a verbose empty state")
@@ -414,7 +443,7 @@ struct ContextDockInvestigationReportTests {
 
         // Selected traffic: a centered sparkles hero above the "Start an investigation" title.
         #expect(dock.contains("Image(systemName: \"sparkles\")"))
-        #expect(dock.contains("String(localized: \"Start an investigation\")"))
+        #expect(dock.contains("String(localized: \"Start an investigation\", bundle: RockxyLocalization.bundle)"))
 
         // A two-column grid rendering every recipe in existing allCases order (last card alone left).
         #expect(dock.contains("LazyVGrid"))
@@ -425,7 +454,7 @@ struct ContextDockInvestigationReportTests {
         // No workflow-taxonomy clusters, "More suggestions" disclosure, or adaptive grid remain.
         #expect(!dock.contains("struct AssistantSuggestionCluster"))
         #expect(!dock.contains("suggestionClusters"))
-        #expect(!dock.contains("String(localized: \"More suggestions\")"))
+        #expect(!dock.contains("String(localized: \"More suggestions\", bundle: RockxyLocalization.bundle)"))
         #expect(!dock.contains("isMoreSuggestionsExpanded"))
         #expect(!dock.contains("GridItem(.adaptive("))
 
@@ -475,16 +504,18 @@ struct ContextDockInvestigationReportTests {
     func modeSwitcherUsesNativeIconSegments() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
         let dockHeader = try #require(dock.components(separatedBy: "Divider()").first)
-        #expect(dock.contains("title: String(localized: \"Details\")"))
+        #expect(dock.contains("title: String(localized: \"Details\", bundle: RockxyLocalization.bundle)"))
         #expect(dock.contains("systemImage: \"doc.text.magnifyingglass\""))
-        #expect(dock.contains("title: String(localized: \"AI Assistant\")"))
+        #expect(dock.contains("title: String(localized: \"AI Assistant\", bundle: RockxyLocalization.bundle)"))
         #expect(dock.contains("systemImage: \"sparkles\""))
         #expect(dock.components(separatedBy: "WorkspaceModeSegment(").count == 3)
         #expect(dock.contains("WorkspaceModeSegmentedControl("))
-        #expect(dock.contains("accessibilityLabel: String(localized: \"Inspector\")"))
+        #expect(dock
+            .contains("accessibilityLabel: String(localized: \"Inspector\", bundle: RockxyLocalization.bundle)"))
         #expect(dockHeader.contains(".workspaceModeSwitcherStyle()"))
         #expect(!dockHeader.contains(".rockxyFunctionalBar()"))
-        #expect(dock.contains(".accessibilityLabel(String(localized: \"Inspector\"))"))
+        #expect(dock
+            .contains(".accessibilityLabel(String(localized: \"Inspector\", bundle: RockxyLocalization.bundle))"))
         // Stable internal enum cases are unchanged.
         #expect(dock.contains("ContextDockTab.details"))
         #expect(dock.contains("ContextDockTab.aiAssistant"))
@@ -528,19 +559,29 @@ struct ContextDockInvestigationReportTests {
 
         // Every named diagnostics group maps to a table.
         #expect(details.contains(#"ContextInspectorFieldTable("#))
-        #expect(details.contains(#"title: String(localized: "Selection")"#))
-        #expect(details.contains(#"title: String(localized: "Details")"#))
-        #expect(details.contains(#"ContextInspectorTable(title: String(localized: "Rule Impact"))"#))
-        #expect(details.contains(#"ContextInspectorTable(title: String(localized: "Payload"))"#))
-        #expect(details.contains(#"ContextInspectorTable(title: String(localized: "Insights"))"#))
-        #expect(details.contains(#"ContextInspectorTable(title: String(localized: "Notes"))"#))
-        #expect(details.contains(#"title: String(localized: "Timing")"#))
-        #expect(details.contains(#"title: String(localized: "Related Requests")"#))
+        #expect(details.contains(#"title: String(localized: "Selection", bundle: RockxyLocalization.bundle)"#))
+        #expect(details.contains(#"title: String(localized: "Details", bundle: RockxyLocalization.bundle)"#))
+        #expect(details
+            .contains(
+                #"ContextInspectorTable(title: String(localized: "Rule Impact", bundle: RockxyLocalization.bundle))"#
+            ))
+        #expect(details
+            .contains(
+                #"ContextInspectorTable(title: String(localized: "Payload", bundle: RockxyLocalization.bundle))"#
+            ))
+        #expect(details
+            .contains(
+                #"ContextInspectorTable(title: String(localized: "Insights", bundle: RockxyLocalization.bundle))"#
+            ))
+        #expect(details
+            .contains(#"ContextInspectorTable(title: String(localized: "Notes", bundle: RockxyLocalization.bundle))"#))
+        #expect(details.contains(#"title: String(localized: "Timing", bundle: RockxyLocalization.bundle)"#))
+        #expect(details.contains(#"title: String(localized: "Related Requests", bundle: RockxyLocalization.bundle)"#))
 
         // Rule Impact keeps truthful rows plus an in-table Open Rule action row.
-        #expect(details.contains(#"label: String(localized: "Rule")"#))
-        #expect(details.contains(#"label: String(localized: "Action")"#))
-        #expect(details.contains(#"label: String(localized: "Pattern")"#))
+        #expect(details.contains(#"label: String(localized: "Rule", bundle: RockxyLocalization.bundle)"#))
+        #expect(details.contains(#"label: String(localized: "Action", bundle: RockxyLocalization.bundle)"#))
+        #expect(details.contains(#"label: String(localized: "Pattern", bundle: RockxyLocalization.bundle)"#))
         #expect(details.contains("openRuleActionRow(windowID:"))
 
         // Timing and Related keep progressive disclosure via the table disclosure shell.

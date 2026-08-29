@@ -288,6 +288,8 @@ protocol CustomCertificateMetadataWriter: Sendable {
     func write(_ data: Data, to url: URL) throws
 }
 
+// MARK: - FileCustomCertificateMetadataWriter
+
 struct FileCustomCertificateMetadataWriter: CustomCertificateMetadataWriter {
     func write(_ data: Data, to url: URL) throws {
         try FileManager.default.createDirectory(
@@ -601,7 +603,9 @@ final class CustomCertificateManager: @unchecked Sendable {
         currentEntries: [CustomCertificateMetadata],
         proposedEntries: [CustomCertificateMetadata],
         removedEntries: [CustomCertificateMetadata]
-    ) throws {
+    )
+        throws
+    {
         let accountsToDelete = unreferencedAccounts(
             removedEntries: removedEntries,
             retainedEntries: proposedEntries
@@ -628,7 +632,9 @@ final class CustomCertificateManager: @unchecked Sendable {
     private func unreferencedAccounts(
         removedEntries: [CustomCertificateMetadata],
         retainedEntries: [CustomCertificateMetadata]
-    ) -> [String] {
+    )
+        -> [String]
+    {
         let retainedAccounts = Set(retainedEntries.map(\.keychainAccount))
         var seenAccounts = Set<String>()
         return removedEntries.compactMap { entry in
@@ -703,9 +709,15 @@ enum CustomCertificateError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidCertificateKeyPair:
-            String(localized: "The certificate and private key do not belong to the same identity.")
+            String(
+                localized: "The certificate and private key do not belong to the same identity.",
+                bundle: RockxyLocalization.bundle
+            )
         case .missingPrivateKey:
-            String(localized: "The private key for this certificate could not be found in Keychain.")
+            String(
+                localized: "The private key for this certificate could not be found in Keychain.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
@@ -715,9 +727,12 @@ enum CustomCertificateError: LocalizedError, Equatable {
 enum CustomCertificateTransactionError: LocalizedError, Equatable {
     case recoveryFailed
 
+    // MARK: Internal
+
     var errorDescription: String? {
         String(
-            localized: "Rockxy could not fully recover the custom certificate store. Restart Rockxy before making more certificate changes."
+            localized: "Rockxy could not fully recover the custom certificate store. Restart Rockxy before making more certificate changes.",
+            bundle: RockxyLocalization.bundle
         )
     }
 }
@@ -735,15 +750,25 @@ enum CustomCertificateImportError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidCertificate:
-            String(localized: "The selected certificate must be a valid PEM or DER X.509 certificate.")
+            String(
+                localized: "The selected certificate must be a valid PEM or DER X.509 certificate.",
+                bundle: RockxyLocalization.bundle
+            )
         case .invalidPrivateKey:
-            String(localized: "The selected private key must be a valid PEM or DER private key.")
+            String(
+                localized: "The selected private key must be a valid PEM or DER private key.",
+                bundle: RockxyLocalization.bundle
+            )
         case .invalidPKCS12:
             String(
-                localized: "The selected P12 file could not be imported. Check that the file contains a certificate and private key, then try the correct password."
+                localized: "The selected P12 file could not be imported. Check that the file contains a certificate and private key, then try the correct password.",
+                bundle: RockxyLocalization.bundle
             )
         case .missingCertificate:
-            String(localized: "The selected P12 file does not contain a certificate.")
+            String(
+                localized: "The selected P12 file does not contain a certificate.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

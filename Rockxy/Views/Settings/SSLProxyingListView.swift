@@ -69,7 +69,7 @@ struct SSLProxyingListView: View {
             handleImport(result)
         }
         .confirmationDialog(
-            String(localized: "Replace existing HTTPS decryption settings?"),
+            String(localized: "Replace existing HTTPS decryption settings?", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { pendingImportSource != nil },
                 set: { isPresented in
@@ -80,7 +80,10 @@ struct SSLProxyingListView: View {
             ),
             titleVisibility: .visible
         ) {
-            Button(String(localized: "Choose File and Replace…"), role: .destructive) {
+            Button(
+                String(localized: "Choose File and Replace…", bundle: RockxyLocalization.bundle),
+                role: .destructive
+            ) {
                 guard let pendingImportSource else {
                     return
                 }
@@ -88,14 +91,14 @@ struct SSLProxyingListView: View {
                 self.pendingImportSource = nil
                 showImporter = true
             }
-            Button(String(localized: "Cancel"), role: .cancel) {
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {
                 pendingImportSource = nil
             }
         } message: {
             Text(importConfirmationMessage)
         }
         .alert(
-            String(localized: "HTTPS Decryption"),
+            String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle),
             isPresented: Binding(
                 get: { importError != nil },
                 set: { newValue in
@@ -105,7 +108,7 @@ struct SSLProxyingListView: View {
                 }
             )
         ) {
-            Button(String(localized: "OK")) { importError = nil }
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { importError = nil }
         } message: {
             if let error = importError {
                 Text(error)
@@ -163,42 +166,49 @@ struct SSLProxyingListView: View {
         if !viewModel.isSSLProxyingEnabled {
             return String(
                 localized:
-                "HTTPS decryption is off. All HTTPS connections are tunneled unread; individual rules keep their state."
+                "HTTPS decryption is off. All HTTPS connections are tunneled unread; individual rules keep their state.",
+                bundle: RockxyLocalization.bundle
             )
         }
         if canInterceptHTTPS {
             return String(
                 localized:
-                "Decrypt rules apply to new HTTPS connections. Tunnel rules take priority on overlaps; row order does not affect matching."
+                "Decrypt rules apply to new HTTPS connections. Tunnel rules take priority on overlaps; row order does not affect matching.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return String(
             localized:
-            "HTTPS decryption is unavailable until the Rockxy root certificate is trusted. HTTPS is tunneled unread for now."
+            "HTTPS decryption is unavailable until the Rockxy root certificate is trusted. HTTPS is tunneled unread for now.",
+            bundle: RockxyLocalization.bundle
         )
     }
 
     private var footerHint: String {
         let countText = isSearching
-            ? String(localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules")
-            : String(localized: "\(viewModel.ruleCount) rules")
+            ? String(
+                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
+                bundle: RockxyLocalization.bundle
+            )
+            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
         let breakdown = String(
-            localized: "\(viewModel.decryptCount) decrypt · \(viewModel.tunnelCount) tunnel"
+            localized: "\(viewModel.decryptCount) decrypt · \(viewModel.tunnelCount) tunnel",
+            bundle: RockxyLocalization.bundle
         )
         return "\(countText) · \(breakdown)"
     }
 
     private var statusCapsuleText: String {
         if !viewModel.isSSLProxyingEnabled {
-            return String(localized: "TOOL OFF")
+            return String(localized: "TOOL OFF", bundle: RockxyLocalization.bundle)
         }
         if !canInterceptHTTPS {
-            return String(localized: "PASSTHROUGH ACTIVE")
+            return String(localized: "PASSTHROUGH ACTIVE", bundle: RockxyLocalization.bundle)
         }
         if viewModel.enabledDecryptCount == 0 {
-            return String(localized: "NO DECRYPT RULES")
+            return String(localized: "NO DECRYPT RULES", bundle: RockxyLocalization.bundle)
         }
-        return String(localized: "DECRYPTION READY")
+        return String(localized: "DECRYPTION READY", bundle: RockxyLocalization.bundle)
     }
 
     private var statusCapsuleColor: Color {
@@ -216,13 +226,26 @@ struct SSLProxyingListView: View {
         if pendingImportSource == .rockxy {
             return String(
                 localized:
-                "Rockxy import replaces the current rules, master state, and TLS passthrough exceptions. Export first if you need a backup."
+                "Rockxy import replaces the current rules, master state, and TLS passthrough exceptions. Export first if you need a backup.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return String(
             localized:
-            "This import replaces the current HTTPS rules. The master state and TLS passthrough exceptions remain unchanged."
+            "This import replaces the current HTTPS rules. The master state and TLS passthrough exceptions remain unchanged.",
+            bundle: RockxyLocalization.bundle
         )
+    }
+
+    private var infoBannerSystemImage: String {
+        if !viewModel.isSSLProxyingEnabled {
+            return "pause.circle"
+        }
+        return canInterceptHTTPS ? "info.circle" : "exclamationmark.triangle.fill"
+    }
+
+    private var infoBannerColor: Color {
+        canInterceptHTTPS || !viewModel.isSSLProxyingEnabled ? .secondary : .orange
     }
 
     // MARK: - Header
@@ -231,7 +254,7 @@ struct SSLProxyingListView: View {
         HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
             VStack(alignment: .leading, spacing: 3) {
                 Toggle(
-                    String(localized: "Enable HTTPS Decryption"),
+                    String(localized: "Enable HTTPS Decryption", bundle: RockxyLocalization.bundle),
                     isOn: Binding(
                         get: { viewModel.isSSLProxyingEnabled },
                         set: { viewModel.setEnabled($0) }
@@ -242,14 +265,16 @@ struct SSLProxyingListView: View {
                 .help(
                     String(
                         localized:
-                        "When off, Rockxy tunnels all HTTPS without decrypting it. Individual rules keep their state."
+                        "When off, Rockxy tunnels all HTTPS without decrypting it. Individual rules keep their state.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
 
                 Text(
                     String(
                         localized:
-                        "Rules decide which HTTPS hosts Rockxy decrypts. Other hosts still pass through Rockxy as opaque TLS tunnels."
+                        "Rules decide which HTTPS hosts Rockxy decrypts. Other hosts still pass through Rockxy as opaque TLS tunnels.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
                 .font(toolMetrics.secondaryFont())
@@ -259,13 +284,16 @@ struct SSLProxyingListView: View {
 
             Spacer()
 
-            TextField(String(localized: "Search rules"), text: $viewModel.searchText)
+            TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle), text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .controlSize(.regular)
                 .frame(width: 240, height: toolMetrics.formControlHeight)
                 .focused($isSearchFocused)
-                .accessibilityLabel(String(localized: "Search HTTPS decryption rules"))
+                .accessibilityLabel(String(
+                    localized: "Search HTTPS decryption rules",
+                    bundle: RockxyLocalization.bundle
+                ))
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerBottomPadding)
@@ -284,7 +312,7 @@ struct SSLProxyingListView: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
             if !canInterceptHTTPS {
-                Button(String(localized: "Open Advanced Proxy Settings…")) {
+                Button(String(localized: "Open Advanced Proxy Settings…", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "advancedProxySettings")
                 }
                 .buttonStyle(.link)
@@ -302,22 +330,11 @@ struct SSLProxyingListView: View {
         }
     }
 
-    private var infoBannerSystemImage: String {
-        if !viewModel.isSSLProxyingEnabled {
-            return "pause.circle"
-        }
-        return canInterceptHTTPS ? "info.circle" : "exclamationmark.triangle.fill"
-    }
-
-    private var infoBannerColor: Color {
-        canInterceptHTTPS || !viewModel.isSSLProxyingEnabled ? .secondary : .orange
-    }
-
     // MARK: - Table
 
     private var tableContent: some View {
         Table(viewModel.filteredRules, selection: $viewModel.selectedRuleID) {
-            TableColumn(String(localized: "Enabled")) { rule in
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
                 Toggle("", isOn: Binding(
                     get: { rule.isEnabled },
                     set: { viewModel.setRuleEnabled(id: rule.id, enabled: $0) }
@@ -325,11 +342,11 @@ struct SSLProxyingListView: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel(String(localized: "Enable \(rule.domain)"))
+                .accessibilityLabel(String(localized: "Enable \(rule.domain)", bundle: RockxyLocalization.bundle))
             }
             .width(62)
 
-            TableColumn(String(localized: "Host Pattern")) { rule in
+            TableColumn(String(localized: "Host Pattern", bundle: RockxyLocalization.bundle)) { rule in
                 Text(rule.domain)
                     .font(toolMetrics.font(monospaced: true))
                     .lineLimit(1)
@@ -339,7 +356,7 @@ struct SSLProxyingListView: View {
             }
             .width(min: 220, ideal: 340)
 
-            TableColumn(String(localized: "Behavior")) { rule in
+            TableColumn(String(localized: "Behavior", bundle: RockxyLocalization.bundle)) { rule in
                 HStack(spacing: 6) {
                     Image(systemName: rule.listType == .include ? "lock.open" : "lock")
                         .font(toolMetrics.metadataFont())
@@ -353,7 +370,8 @@ struct SSLProxyingListView: View {
                             .help(
                                 String(
                                     localized:
-                                    "This host has both behaviors. Tunnel Without Decryption takes priority."
+                                    "This host has both behaviors. Tunnel Without Decryption takes priority.",
+                                    bundle: RockxyLocalization.bundle
                                 )
                             )
                     }
@@ -373,13 +391,19 @@ struct SSLProxyingListView: View {
             if viewModel.filteredRules.isEmpty {
                 ContentUnavailableView(
                     isSearching
-                        ? String(localized: "No matching rules")
-                        : String(localized: "No HTTPS decryption rules"),
+                        ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No HTTPS decryption rules", bundle: RockxyLocalization.bundle),
                     systemImage: isSearching ? "magnifyingglass" : "lock.shield",
                     description: Text(
                         isSearching
-                            ? String(localized: "Try a different host pattern or behavior.")
-                            : String(localized: "Add a host pattern or observed domains to decrypt their HTTPS.")
+                            ? String(
+                                localized: "Try a different host pattern or behavior.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Add a host pattern or observed domains to decrypt their HTTPS.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -422,13 +446,13 @@ struct SSLProxyingListView: View {
     private var addRemoveControl: some View {
         HStack(spacing: 0) {
             Menu {
-                Button(String(localized: "Add Host Pattern…")) {
+                Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
                     viewModel.editingRule = nil
                     viewModel.showAddDomainSheet = true
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
 
-                Button(String(localized: "Add Observed Domains…")) {
+                Button(String(localized: "Add Observed Domains…", bundle: RockxyLocalization.bundle)) {
                     viewModel.showAddAppSheet = true
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -442,7 +466,7 @@ struct SSLProxyingListView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(String(localized: "Add Rule"))
+            .help(String(localized: "Add Rule", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -459,7 +483,7 @@ struct SSLProxyingListView: View {
             }
             .buttonStyle(.plain)
             .disabled(viewModel.selectedRuleID == nil)
-            .help(String(localized: "Delete Rule"))
+            .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -472,7 +496,7 @@ struct SSLProxyingListView: View {
 
     private var moreMenu: some View {
         Menu {
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 viewModel.presentEditorForSelection()
             }
             .keyboardShortcut(.return, modifiers: .command)
@@ -488,64 +512,66 @@ struct SSLProxyingListView: View {
 
             Divider()
 
-            Section(String(localized: "Bypass")) {
-                Button(String(localized: "TLS Passthrough Exceptions…")) {
+            Section(String(localized: "Bypass", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "TLS Passthrough Exceptions…", bundle: RockxyLocalization.bundle)) {
                     viewModel.showBypassSheet = true
                 }
                 .help(
                     String(
                         localized:
-                        "Hosts here skip decryption but still flow through Rockxy. It never disables Rockxy proxying."
+                        "Hosts here skip decryption but still flow through Rockxy. It never disables Rockxy proxying.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
 
-                Button(String(localized: "Full Proxy Bypass…")) {
+                Button(String(localized: "Full Proxy Bypass…", bundle: RockxyLocalization.bundle)) {
                     openWindow(id: "bypassProxyList")
                 }
                 .help(
                     String(
                         localized:
-                        "System-proxy clients connect directly. Manually configured clients that still reach Rockxy are tunneled without decryption."
+                        "System-proxy clients connect directly. Manually configured clients that still reach Rockxy are tunneled without decryption.",
+                        bundle: RockxyLocalization.bundle
                     )
                 )
             }
 
             Divider()
 
-            Menu(String(localized: "Import Settings")) {
-                Button(String(localized: "From Rockxy…")) {
+            Menu(String(localized: "Import Settings", bundle: RockxyLocalization.bundle)) {
+                Button(String(localized: "From Rockxy…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .rockxy)
                 }
 
                 Divider()
 
-                Button(String(localized: "From Proxyman…")) {
+                Button(String(localized: "From Proxyman…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .proxyman)
                 }
 
-                Button(String(localized: "From Charles Proxy…")) {
+                Button(String(localized: "From Charles Proxy…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .charlesProxy)
                 }
 
-                Button(String(localized: "From HTTP Toolkit…")) {
+                Button(String(localized: "From HTTP Toolkit…", bundle: RockxyLocalization.bundle)) {
                     requestImport(from: .httpToolkit)
                 }
             }
 
-            Button(String(localized: "Export Settings…")) {
+            Button(String(localized: "Export Settings…", bundle: RockxyLocalization.bundle)) {
                 prepareExport()
             }
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.removeSelected()
             }
             .keyboardShortcut(.delete, modifiers: .command)
             .disabled(viewModel.selectedRuleID == nil)
         } label: {
             HStack(spacing: 6) {
-                Text(String(localized: "More"))
+                Text(String(localized: "More", bundle: RockxyLocalization.bundle))
                 Image(systemName: "chevron.down")
                     .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
             }
@@ -560,7 +586,7 @@ struct SSLProxyingListView: View {
     @ViewBuilder
     private func tableContextMenu(ids: Set<UUID>) -> some View {
         if let id = ids.first {
-            Button(String(localized: "Edit…")) {
+            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
                 viewModel.presentEditor(for: id)
             }
             .keyboardShortcut(.return, modifiers: .command)
@@ -572,7 +598,7 @@ struct SSLProxyingListView: View {
 
             Divider()
 
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
                 viewModel.selectedRuleID = id
                 viewModel.removeSelected()
             }
@@ -592,7 +618,10 @@ struct SSLProxyingListView: View {
 
     private func prepareExport() {
         guard let data = viewModel.manager.exportRules() else {
-            importError = String(localized: "Rockxy could not prepare the HTTPS Decryption export.")
+            importError = String(
+                localized: "Rockxy could not prepare the HTTPS Decryption export.",
+                bundle: RockxyLocalization.bundle
+            )
             return
         }
         exportDocument = SSLProxyingJSONDocument(data: data)
@@ -618,12 +647,18 @@ struct SSLProxyingListView: View {
             do {
                 let resourceValues = try url.resourceValues(forKeys: [.fileSizeKey])
                 if let fileSize = resourceValues.fileSize, fileSize > Self.maxImportFileBytes {
-                    importError = String(localized: "File is too large to import (max 1 MB).")
+                    importError = String(
+                        localized: "File is too large to import (max 1 MB).",
+                        bundle: RockxyLocalization.bundle
+                    )
                     return
                 }
                 let data = try Data(contentsOf: url)
                 guard data.count <= Self.maxImportFileBytes else {
-                    importError = String(localized: "File is too large to import (max 1 MB).")
+                    importError = String(
+                        localized: "File is too large to import (max 1 MB).",
+                        bundle: RockxyLocalization.bundle
+                    )
                     return
                 }
                 switch importSource {

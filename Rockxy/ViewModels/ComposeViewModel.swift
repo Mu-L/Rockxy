@@ -35,12 +35,15 @@ struct DefaultComposeExecutor: ComposeRequestExecutor {
 enum ComposeResponseError: LocalizedError, Equatable {
     case bodyTooLarge(limitBytes: Int)
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case let .bodyTooLarge(limitBytes):
             let limitMB = Double(limitBytes) / (1_024 * 1_024)
             return String(
-                localized: "The response body exceeded the \(String(format: "%.0f", limitMB)) MB Compose limit."
+                localized: "The response body exceeded the \(String(format: "%.0f", limitMB)) MB Compose limit.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -74,13 +77,13 @@ enum ComposeRequestTimeout: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .fifteen:
-            String(localized: "15 seconds")
+            String(localized: "15 seconds", bundle: RockxyLocalization.bundle)
         case .thirty:
-            String(localized: "30 seconds")
+            String(localized: "30 seconds", bundle: RockxyLocalization.bundle)
         case .sixty:
-            String(localized: "60 seconds")
+            String(localized: "60 seconds", bundle: RockxyLocalization.bundle)
         case .none:
-            String(localized: "0 (No Timeout)")
+            String(localized: "0 (No Timeout)", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -118,15 +121,15 @@ enum ComposeTemplate: CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .empty:
-            String(localized: "Empty Request")
+            String(localized: "Empty Request", bundle: RockxyLocalization.bundle)
         case .getWithQuery:
-            String(localized: "GET with Query")
+            String(localized: "GET with Query", bundle: RockxyLocalization.bundle)
         case .postJSON:
-            String(localized: "POST with JSON")
+            String(localized: "POST with JSON", bundle: RockxyLocalization.bundle)
         case .postForm:
-            String(localized: "POST with Form")
+            String(localized: "POST with Form", bundle: RockxyLocalization.bundle)
         case .postMultipart:
-            String(localized: "POST with Multiparts")
+            String(localized: "POST with Multiparts", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -144,14 +147,15 @@ enum ComposeImportError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .emptyCommand:
-            String(localized: "Pasteboard does not contain a cURL command.")
+            String(localized: "Pasteboard does not contain a cURL command.", bundle: RockxyLocalization.bundle)
         case .unsupportedCommand:
-            String(localized: "Only cURL commands can be imported.")
+            String(localized: "Only cURL commands can be imported.", bundle: RockxyLocalization.bundle)
         case .missingURL:
-            String(localized: "The cURL command does not contain a URL.")
+            String(localized: "The cURL command does not contain a URL.", bundle: RockxyLocalization.bundle)
         case .fileBackedBodyUnsupported:
             String(
-                localized: "File-backed cURL bodies are not imported automatically. Load the file from the Body tab instead."
+                localized: "File-backed cURL bodies are not imported automatically. Load the file from the Body tab instead.",
+                bundle: RockxyLocalization.bundle
             )
         }
     }
@@ -162,10 +166,12 @@ enum ComposeImportError: LocalizedError, Equatable {
 enum ComposeBodyImportError: LocalizedError, Equatable {
     case unsupportedTextEncoding
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .unsupportedTextEncoding:
-            String(localized: "The selected file is not valid UTF-8 text.")
+            String(localized: "The selected file is not valid UTF-8 text.", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -173,19 +179,7 @@ enum ComposeBodyImportError: LocalizedError, Equatable {
 // MARK: - ComposeHistoryEntry
 
 struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
-    let id: UUID
-    let method: String
-    let url: String
-    let headers: [EditableReplayHeader]
-    let queryItems: [EditableQueryItem]
-    let body: String
-    let bodyContentType: String?
-    let statusCode: Int?
-    let responseHeaders: [EditableReplayHeader]?
-    let responseBody: String?
-    let bodyTruncated: Bool
-    let responseBodyTruncated: Bool
-    let timestamp: Date
+    // MARK: Lifecycle
 
     init(
         id: UUID = UUID(),
@@ -217,8 +211,24 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
         self.timestamp = timestamp
     }
 
+    // MARK: Internal
+
+    let id: UUID
+    let method: String
+    let url: String
+    let headers: [EditableReplayHeader]
+    let queryItems: [EditableQueryItem]
+    let body: String
+    let bodyContentType: String?
+    let statusCode: Int?
+    let responseHeaders: [EditableReplayHeader]?
+    let responseBody: String?
+    let bodyTruncated: Bool
+    let responseBodyTruncated: Bool
+    let timestamp: Date
+
     var menuTitle: String {
-        let status = statusCode.map { "\($0)" } ?? String(localized: "No Response")
+        let status = statusCode.map { "\($0)" } ?? String(localized: "No Response", bundle: RockxyLocalization.bundle)
         return "[\(method)] \(url) • \(status) • \(Self.relativeFormatter.localizedString(for: timestamp, relativeTo: Date()))"
     }
 
@@ -238,6 +248,8 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
             bodyContentType ?? "",
         ].joined(separator: "\u{1E}")
     }
+
+    // MARK: Private
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -262,7 +274,7 @@ struct ComposeResponse {
         if let text = bodyText {
             return text
         }
-        return String(localized: "(binary data, \(bodyData.count) bytes)")
+        return String(localized: "(binary data, \(bodyData.count) bytes)", bundle: RockxyLocalization.bundle)
     }
 
     var bodySize: Int {
@@ -304,7 +316,6 @@ final class ComposeViewModel {
     private(set) var lastFormattingError: String?
     private(set) var restoreConfirmationID = UUID()
     private(set) var restoreConfirmationMessage: String?
-    private var historyClearGeneration = 0
 
     // MARK: - Response State
 
@@ -332,19 +343,27 @@ final class ComposeViewModel {
 
     var replayRestrictionMessage: String? {
         if sourceIsWebSocket {
-            return String(localized: "WebSocket requests cannot be replayed as HTTP requests.")
+            return String(
+                localized: "WebSocket requests cannot be replayed as HTTP requests.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if method == "CONNECT" {
-            return String(localized: "CONNECT requests cannot be replayed from Compose.")
+            return String(
+                localized: "CONNECT requests cannot be replayed from Compose.",
+                bundle: RockxyLocalization.bundle
+            )
         }
         if sourceHasUnsupportedBinaryBody {
             return String(
-                localized: "This captured request has a binary body that the text editor cannot replay safely. Replace it in the Body tab or use an empty body."
+                localized: "This captured request has a binary body that the text editor cannot replay safely. Replace it in the Body tab or use an empty body.",
+                bundle: RockxyLocalization.bundle
             )
         }
         if sourceHasTruncatedHistoryBody {
             return String(
-                localized: "This request body was shortened for local history storage. Replace it in the Body tab before sending."
+                localized: "This request body was shortened for local history storage. Replace it in the Body tab before sending.",
+                bundle: RockxyLocalization.bundle
             )
         }
         return nil
@@ -445,7 +464,7 @@ final class ComposeViewModel {
 
         guard let requestURL = URL(string: url) else {
             activeRunID = nil
-            responseState = .error(String(localized: "Invalid URL"))
+            responseState = .error(String(localized: "Invalid URL", bundle: RockxyLocalization.bundle))
             return
         }
 
@@ -600,7 +619,8 @@ final class ComposeViewModel {
         while index < tokens.count {
             let token = tokens[index]
             switch token {
-            case "-X", "--request":
+            case "-X",
+                 "--request":
                 if let value = tokens[safe: index + 1] {
                     importedMethod = value
                     index += 1
@@ -609,7 +629,8 @@ final class ComposeViewModel {
                 importedMethod = String(value.dropFirst(2))
             case let value where value.hasPrefix("--request="):
                 importedMethod = String(value.dropFirst("--request=".count))
-            case "-H", "--header":
+            case "-H",
+                 "--header":
                 if let value = tokens[safe: index + 1] {
                     appendHeader(value, to: &importedHeaders)
                     index += 1
@@ -624,7 +645,10 @@ final class ComposeViewModel {
                     }
                     index += 1
                 }
-            case "-d", "--data", "--data-binary", "--data-ascii":
+            case "-d",
+                 "--data",
+                 "--data-binary",
+                 "--data-ascii":
                 if let value = tokens[safe: index + 1] {
                     try rejectFileBackedCurlBody(value)
                     importedBody = value
@@ -742,7 +766,7 @@ final class ComposeViewModel {
             responseState = .empty
         }
         restoreConfirmationID = UUID()
-        restoreConfirmationMessage = String(localized: "Restored from history")
+        restoreConfirmationMessage = String(localized: "Restored from history", bundle: RockxyLocalization.bundle)
     }
 
     func clearRestoreConfirmation() {
@@ -785,9 +809,13 @@ final class ComposeViewModel {
         guard let data = body.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data),
               JSONSerialization.isValidJSONObject(object),
-              let prettyData = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
-              let pretty = String(data: prettyData, encoding: .utf8) else {
-            lastFormattingError = String(localized: "Body is not valid JSON.")
+              let prettyData = try? JSONSerialization.data(
+                  withJSONObject: object,
+                  options: [.prettyPrinted, .sortedKeys]
+              ),
+              let pretty = String(data: prettyData, encoding: .utf8) else
+        {
+            lastFormattingError = String(localized: "Body is not valid JSON.", bundle: RockxyLocalization.bundle)
             return
         }
         body = pretty
@@ -797,8 +825,9 @@ final class ComposeViewModel {
     func prettifyXMLBody() {
         lastFormattingError = nil
         guard let data = body.data(using: .utf8),
-              let document = try? XMLDocument(data: data, options: [.nodePreserveWhitespace]) else {
-            lastFormattingError = String(localized: "Body is not valid XML.")
+              let document = try? XMLDocument(data: data, options: [.nodePreserveWhitespace]) else
+        {
+            lastFormattingError = String(localized: "Body is not valid XML.", bundle: RockxyLocalization.bundle)
             return
         }
         body = document.xmlString(options: [.nodePrettyPrint])
@@ -859,7 +888,10 @@ final class ComposeViewModel {
         switch responseState {
         case .empty where isUnsupportedForReplay:
             responseState = .unsupported(
-                replayRestrictionMessage ?? String(localized: "Replay is not supported for this request type.")
+                replayRestrictionMessage ?? String(
+                    localized: "Replay is not supported for this request type.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         case .unsupported where !isUnsupportedForReplay:
             responseState = .empty
@@ -870,12 +902,142 @@ final class ComposeViewModel {
 
     // MARK: Private
 
+    private struct SentRequestSnapshot {
+        let method: String
+        let url: String
+        let headers: [EditableReplayHeader]
+        let queryItems: [EditableQueryItem]
+        let body: String
+        let bodyContentType: String?
+        let sourceIsWebSocket: Bool
+    }
+
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "ComposeViewModel")
+
+    private var historyClearGeneration = 0
 
     private let executor: ComposeRequestExecutor
     private let historyStore: ComposeHistoryStore
     private let bodyImportSizeLimit: UInt64
     private var activeRunID: UUID?
+
+    nonisolated private static func readUTF8Body(
+        from fileURL: URL,
+        maximumBytes: UInt64
+    )
+        async throws -> String
+    {
+        let readTask = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            let fileHandle = try FileHandle(forReadingFrom: fileURL)
+            defer { try? fileHandle.close() }
+
+            var data = Data()
+            let chunkSize = 64 * 1_024
+            while let chunk = try fileHandle.read(upToCount: chunkSize), !chunk.isEmpty {
+                try Task.checkCancellation()
+                let nextSize = UInt64(data.count) + UInt64(chunk.count)
+                guard nextSize <= maximumBytes else {
+                    throw ImportSizeError.fileTooLarge(
+                        actualBytes: nextSize,
+                        limitBytes: maximumBytes
+                    )
+                }
+                data.append(chunk)
+            }
+            guard let importedBody = String(data: data, encoding: .utf8) else {
+                throw ComposeBodyImportError.unsupportedTextEncoding
+            }
+            return importedBody
+        }
+        return try await withTaskCancellationHandler {
+            try await readTask.value
+        } onCancel: {
+            readTask.cancel()
+        }
+    }
+
+    nonisolated private static func decodeUTF8Body(_ data: Data) async throws -> String? {
+        let decodeTask = Task.detached(priority: .userInitiated) { () throws -> String? in
+            var decoded = ""
+            decoded.reserveCapacity(data.count)
+            var start = data.startIndex
+            let chunkSize = 1_024 * 1_024
+
+            while start < data.endIndex {
+                try Task.checkCancellation()
+                let remaining = data.distance(from: start, to: data.endIndex)
+                let tentativeEnd = data.index(start, offsetBy: min(chunkSize, remaining))
+                var end = tentativeEnd
+                if end < data.endIndex {
+                    while end > start, data[end] & 0b11000000 == 0b10000000 {
+                        end = data.index(before: end)
+                    }
+                }
+                guard end > start,
+                      let chunk = String(data: Data(data[start ..< end]), encoding: .utf8) else
+                {
+                    return nil
+                }
+                decoded.append(chunk)
+                start = end
+            }
+            try Task.checkCancellation()
+            return decoded
+        }
+        return try await withTaskCancellationHandler {
+            try await decodeTask.value
+        } onCancel: {
+            decodeTask.cancel()
+        }
+    }
+
+    private static func shellTokens(from command: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var quote: Character?
+        var isEscaping = false
+
+        for character in command {
+            if isEscaping {
+                if character != "\n" {
+                    current.append(character)
+                }
+                isEscaping = false
+                continue
+            }
+
+            if character == "\\" {
+                isEscaping = true
+                continue
+            }
+
+            if let activeQuote = quote {
+                if character == activeQuote {
+                    quote = nil
+                } else {
+                    current.append(character)
+                }
+                continue
+            }
+
+            if character == "'" || character == "\"" {
+                quote = character
+            } else if character.isWhitespace {
+                if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+            } else {
+                current.append(character)
+            }
+        }
+
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+        return tokens
+    }
 
     private func invalidateActiveRun() {
         activeRunID = nil
@@ -956,142 +1118,13 @@ final class ComposeViewModel {
         lastFormattingError = ComposeImportError.fileBackedBodyUnsupported.localizedDescription
         throw ComposeImportError.fileBackedBodyUnsupported
     }
-
-    nonisolated private static func readUTF8Body(
-        from fileURL: URL,
-        maximumBytes: UInt64
-    ) async throws -> String {
-        let readTask = Task.detached(priority: .userInitiated) {
-            try Task.checkCancellation()
-            let fileHandle = try FileHandle(forReadingFrom: fileURL)
-            defer { try? fileHandle.close() }
-
-            var data = Data()
-            let chunkSize = 64 * 1_024
-            while let chunk = try fileHandle.read(upToCount: chunkSize), !chunk.isEmpty {
-                try Task.checkCancellation()
-                let nextSize = UInt64(data.count) + UInt64(chunk.count)
-                guard nextSize <= maximumBytes else {
-                    throw ImportSizeError.fileTooLarge(
-                        actualBytes: nextSize,
-                        limitBytes: maximumBytes
-                    )
-                }
-                data.append(chunk)
-            }
-            guard let importedBody = String(data: data, encoding: .utf8) else {
-                throw ComposeBodyImportError.unsupportedTextEncoding
-            }
-            return importedBody
-        }
-        return try await withTaskCancellationHandler {
-            try await readTask.value
-        } onCancel: {
-            readTask.cancel()
-        }
-    }
-
-    nonisolated private static func decodeUTF8Body(_ data: Data) async throws -> String? {
-        let decodeTask = Task.detached(priority: .userInitiated) { () throws -> String? in
-            var decoded = ""
-            decoded.reserveCapacity(data.count)
-            var start = data.startIndex
-            let chunkSize = 1_024 * 1_024
-
-            while start < data.endIndex {
-                try Task.checkCancellation()
-                let remaining = data.distance(from: start, to: data.endIndex)
-                let tentativeEnd = data.index(start, offsetBy: min(chunkSize, remaining))
-                var end = tentativeEnd
-                if end < data.endIndex {
-                    while end > start, data[end] & 0b1100_0000 == 0b1000_0000 {
-                        end = data.index(before: end)
-                    }
-                }
-                guard end > start,
-                      let chunk = String(data: Data(data[start ..< end]), encoding: .utf8) else
-                {
-                    return nil
-                }
-                decoded.append(chunk)
-                start = end
-            }
-            try Task.checkCancellation()
-            return decoded
-        }
-        return try await withTaskCancellationHandler {
-            try await decodeTask.value
-        } onCancel: {
-            decodeTask.cancel()
-        }
-    }
-
-    private static func shellTokens(from command: String) -> [String] {
-        var tokens: [String] = []
-        var current = ""
-        var quote: Character?
-        var isEscaping = false
-
-        for character in command {
-            if isEscaping {
-                if character != "\n" {
-                    current.append(character)
-                }
-                isEscaping = false
-                continue
-            }
-
-            if character == "\\" {
-                isEscaping = true
-                continue
-            }
-
-            if let activeQuote = quote {
-                if character == activeQuote {
-                    quote = nil
-                } else {
-                    current.append(character)
-                }
-                continue
-            }
-
-            if character == "'" || character == "\"" {
-                quote = character
-            } else if character.isWhitespace {
-                if !current.isEmpty {
-                    tokens.append(current)
-                    current = ""
-                }
-            } else {
-                current.append(character)
-            }
-        }
-
-        if !current.isEmpty {
-            tokens.append(current)
-        }
-        return tokens
-    }
-
-    private struct SentRequestSnapshot {
-        let method: String
-        let url: String
-        let headers: [EditableReplayHeader]
-        let queryItems: [EditableQueryItem]
-        let body: String
-        let bodyContentType: String?
-        let sourceIsWebSocket: Bool
-    }
 }
 
 // MARK: - EditableReplayHeader
 
 /// Identifiable header pair for the compose window's editable header list.
 struct EditableReplayHeader: Codable, Equatable, Identifiable, Sendable {
-    let id: UUID
-    var name: String
-    var value: String
-    var isEnabled = true
+    // MARK: Lifecycle
 
     init(id: UUID = UUID(), name: String, value: String, isEnabled: Bool = true) {
         self.id = id
@@ -1099,6 +1132,13 @@ struct EditableReplayHeader: Codable, Equatable, Identifiable, Sendable {
         self.value = value
         self.isEnabled = isEnabled
     }
+
+    // MARK: Internal
+
+    let id: UUID
+    var name: String
+    var value: String
+    var isEnabled = true
 }
 
 // MARK: - BoundedComposeRequestOperation
@@ -1127,7 +1167,9 @@ final class BoundedComposeRequestOperation: NSObject, URLSessionDataDelegate, @u
         configuration: URLSessionConfiguration,
         followsRedirects: Bool,
         maximumBytes: Int
-    ) -> AsyncThrowingStream<(Data, HTTPURLResponse), Error> {
+    )
+        -> AsyncThrowingStream<(Data, HTTPURLResponse), Error>
+    {
         AsyncThrowingStream { continuation in
             let operation = BoundedComposeRequestOperation(
                 request: request,
@@ -1249,6 +1291,7 @@ final class BoundedComposeRequestOperation: NSObject, URLSessionDataDelegate, @u
         queue.maxConcurrentOperationCount = 1
         return queue
     }()
+
     private var session: URLSession?
     private var dataTask: URLSessionDataTask?
     private var response: HTTPURLResponse?

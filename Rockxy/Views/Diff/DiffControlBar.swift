@@ -12,7 +12,7 @@ struct DiffControlBar: View {
             if viewModel.isTextMode {
                 textAction
             } else {
-                Text(String(localized: "Compare"))
+                Text(String(localized: "Compare", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
 
@@ -21,7 +21,7 @@ struct DiffControlBar: View {
 
             Spacer()
 
-            Text(String(localized: "View"))
+            Text(String(localized: "View", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
 
@@ -44,13 +44,21 @@ struct DiffControlBar: View {
         ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
+    private var comparePickerWidth: CGFloat {
+        max(250, toolMetrics.secondaryFontSize * 15 + 96)
+    }
+
+    private var presentationPickerWidth: CGFloat {
+        max(260, toolMetrics.secondaryFontSize * 13 + 140)
+    }
+
     private var differenceSummary: some View {
         let result = viewModel.activeDiffResult
         return HStack(spacing: toolMetrics.controlSpacing) {
             if viewModel.isComparing {
                 ProgressView()
                     .controlSize(.small)
-                Text(String(localized: "Comparing…"))
+                Text(String(localized: "Comparing…", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(.secondary)
             }
@@ -58,13 +66,19 @@ struct DiffControlBar: View {
                 Label("+\(result.addedCount)", systemImage: "plus.circle")
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(Theme.Highlight.green)
-                    .accessibilityLabel(String(localized: "\(result.addedCount) added"))
+                    .accessibilityLabel(String(
+                        localized: "\(result.addedCount) added",
+                        bundle: RockxyLocalization.bundle
+                    ))
             }
             if result.removedCount > 0 {
                 Label("-\(result.removedCount)", systemImage: "minus.circle")
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(Theme.Highlight.red)
-                    .accessibilityLabel(String(localized: "\(result.removedCount) removed"))
+                    .accessibilityLabel(String(
+                        localized: "\(result.removedCount) removed",
+                        bundle: RockxyLocalization.bundle
+                    ))
             }
             Text("^[\(result.differenceCount) line change](inflect: true)")
                 .font(toolMetrics.secondaryFont())
@@ -74,12 +88,12 @@ struct DiffControlBar: View {
 
     @ViewBuilder private var textAction: some View {
         if viewModel.isPresentingTextDiff {
-            Button(String(localized: "Edit Text")) {
+            Button(String(localized: "Edit Text", bundle: RockxyLocalization.bundle)) {
                 viewModel.editText()
             }
             .disabled(viewModel.isComparing)
         } else {
-            Button(String(localized: "Compare Text")) {
+            Button(String(localized: "Compare Text", bundle: RockxyLocalization.bundle)) {
                 viewModel.compareText()
             }
             .keyboardShortcut(.return, modifiers: [.command])
@@ -89,7 +103,10 @@ struct DiffControlBar: View {
 
     @ViewBuilder private var compareTargetPicker: some View {
         if toolMetrics.bodyFontSize >= 20 {
-            Picker(String(localized: "Compare"), selection: $viewModel.compareTarget) {
+            Picker(
+                String(localized: "Compare", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.compareTarget
+            ) {
                 ForEach(CompareTarget.allCases, id: \.self) { target in
                     Text(target.title).tag(target)
                 }
@@ -97,9 +114,12 @@ struct DiffControlBar: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 180)
-            .accessibilityLabel(String(localized: "Comparison target"))
+            .accessibilityLabel(String(localized: "Comparison target", bundle: RockxyLocalization.bundle))
         } else {
-            Picker(String(localized: "Compare"), selection: $viewModel.compareTarget) {
+            Picker(
+                String(localized: "Compare", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.compareTarget
+            ) {
                 ForEach(CompareTarget.allCases, id: \.self) { target in
                     Text(target.title).tag(target)
                 }
@@ -107,13 +127,16 @@ struct DiffControlBar: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .frame(width: comparePickerWidth)
-            .accessibilityLabel(String(localized: "Comparison target"))
+            .accessibilityLabel(String(localized: "Comparison target", bundle: RockxyLocalization.bundle))
         }
     }
 
     @ViewBuilder private var presentationModePicker: some View {
         if toolMetrics.bodyFontSize >= 20 {
-            Picker(String(localized: "View"), selection: $viewModel.presentationMode) {
+            Picker(
+                String(localized: "View", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.presentationMode
+            ) {
                 ForEach(PresentationMode.allCases, id: \.self) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -121,10 +144,13 @@ struct DiffControlBar: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 190)
-            .accessibilityLabel(String(localized: "Presentation mode"))
+            .accessibilityLabel(String(localized: "Presentation mode", bundle: RockxyLocalization.bundle))
             .disabled(viewModel.isTextMode && !viewModel.isPresentingTextDiff)
         } else {
-            Picker(String(localized: "View"), selection: $viewModel.presentationMode) {
+            Picker(
+                String(localized: "View", bundle: RockxyLocalization.bundle),
+                selection: $viewModel.presentationMode
+            ) {
                 ForEach(PresentationMode.allCases, id: \.self) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -132,16 +158,8 @@ struct DiffControlBar: View {
             .labelsHidden()
             .pickerStyle(.segmented)
             .frame(width: presentationPickerWidth)
-            .accessibilityLabel(String(localized: "Presentation mode"))
+            .accessibilityLabel(String(localized: "Presentation mode", bundle: RockxyLocalization.bundle))
             .disabled(viewModel.isTextMode && !viewModel.isPresentingTextDiff)
         }
-    }
-
-    private var comparePickerWidth: CGFloat {
-        max(250, toolMetrics.secondaryFontSize * 15 + 96)
-    }
-
-    private var presentationPickerWidth: CGFloat {
-        max(260, toolMetrics.secondaryFontSize * 13 + 140)
     }
 }

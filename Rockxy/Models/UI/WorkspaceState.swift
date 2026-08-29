@@ -38,7 +38,7 @@ final class WorkspaceState: Identifiable {
 
     init(
         id: UUID = UUID(),
-        title: String = String(localized: "All Traffic"),
+        title: String = String(localized: "All Traffic", bundle: RockxyLocalization.bundle),
         isClosable: Bool = true,
         initialFilter: FilterCriteria = .empty,
         inspectorLayout: InspectorLayout = .hidden,
@@ -77,7 +77,7 @@ final class WorkspaceState: Identifiable {
     var debugAssistantMessages: [DebugAssistantMessage] = []
     var debugAssistantDraft = ""
     var debugAssistantConversationID = UUID()
-    var debugAssistantConversationTitle = String(localized: "New Conversation")
+    var debugAssistantConversationTitle = String(localized: "New Conversation", bundle: RockxyLocalization.bundle)
     var debugAssistantConversationCreatedAt = Date()
     var debugAssistantConversationUpdatedAt = Date()
     var debugAssistantConversationContext: DebugAssistantConversationContext?
@@ -186,7 +186,7 @@ final class WorkspaceState: Identifiable {
         debugAssistantMessages.removeAll()
         debugAssistantDraft = ""
         debugAssistantConversationID = UUID()
-        debugAssistantConversationTitle = String(localized: "New Conversation")
+        debugAssistantConversationTitle = String(localized: "New Conversation", bundle: RockxyLocalization.bundle)
         debugAssistantConversationCreatedAt = Date()
         debugAssistantConversationUpdatedAt = Date()
         debugAssistantConversationContext = nil

@@ -46,23 +46,23 @@ enum AssistantProductHandoff: String, CaseIterable, Identifiable, Sendable {
     /// The exact destination window name — must match the `Window(...)` title in `RockxyApp`.
     var destinationName: String {
         switch self {
-        case .developerSetup: String(localized: "Developer Setup")
-        case .httpsDecryption: String(localized: "HTTPS Decryption")
-        case .mapLocal: String(localized: "Map Local")
-        case .mapRemote: String(localized: "Map Remote")
-        case .blockList: String(localized: "Block List")
-        case .allowList: String(localized: "Allow List")
-        case .modifyHeaders: String(localized: "Modify Headers")
-        case .networkConditions: String(localized: "Network Conditions")
-        case .breakpointRules: String(localized: "Breakpoint Rules")
-        case .externalProxy: String(localized: "External Proxy Settings")
-        case .scripting: String(localized: "Scripting")
+        case .developerSetup: String(localized: "Developer Setup", bundle: RockxyLocalization.bundle)
+        case .httpsDecryption: String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle)
+        case .mapLocal: String(localized: "Map Local", bundle: RockxyLocalization.bundle)
+        case .mapRemote: String(localized: "Map Remote", bundle: RockxyLocalization.bundle)
+        case .blockList: String(localized: "Block List", bundle: RockxyLocalization.bundle)
+        case .allowList: String(localized: "Allow List", bundle: RockxyLocalization.bundle)
+        case .modifyHeaders: String(localized: "Modify Headers", bundle: RockxyLocalization.bundle)
+        case .networkConditions: String(localized: "Network Conditions", bundle: RockxyLocalization.bundle)
+        case .breakpointRules: String(localized: "Breakpoint Rules", bundle: RockxyLocalization.bundle)
+        case .externalProxy: String(localized: "External Proxy Settings", bundle: RockxyLocalization.bundle)
+        case .scripting: String(localized: "Scripting", bundle: RockxyLocalization.bundle)
         }
     }
 
     /// The button label. Labels match the destination window exactly, prefixed with "Open".
     var actionTitle: String {
-        String(localized: "Open \(destinationName)")
+        String(localized: "Open \(destinationName)", bundle: RockxyLocalization.bundle)
     }
 
     var accessibilityLabel: String {
@@ -70,7 +70,7 @@ enum AssistantProductHandoff: String, CaseIterable, Identifiable, Sendable {
     }
 
     var accessibilityHint: String {
-        String(localized: "Opens the \(destinationName) window.")
+        String(localized: "Opens the \(destinationName) window.", bundle: RockxyLocalization.bundle)
     }
 }
 
@@ -116,7 +116,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Developer Setup: guided onboarding to route a runtime, browser, or device through Rockxy's proxy.",
             answer: String(
-                localized: "Developer Setup walks you through pointing a runtime, browser, or device at Rockxy's proxy and verifying traffic flows."
+                localized: "Developer Setup walks you through pointing a runtime, browser, or device at Rockxy's proxy and verifying traffic flows.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -127,7 +128,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "HTTPS Decryption: enable per-domain TLS interception so encrypted request and response content becomes readable.",
             answer: String(
-                localized: "HTTPS Decryption enables TLS interception per domain so Rockxy can read otherwise-encrypted bodies (its root certificate must be trusted first)."
+                localized: "HTTPS Decryption enables TLS interception per domain so Rockxy can read otherwise-encrypted bodies (its root certificate must be trusted first).",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -138,7 +140,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Map Local: serve a response from a local file with a custom status code, headers, and body.",
             answer: String(
-                localized: "Map Local serves a matching request from a local file — you set the status code, headers, and body — so you can mock an endpoint."
+                localized: "Map Local serves a matching request from a local file — you set the status code, headers, and body — so you can mock an endpoint.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -149,7 +152,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Map Remote: redirect a matching request to a different protocol, host, port, or path.",
             answer: String(
-                localized: "Map Remote redirects a matching request to a different host, port, or path — handy for pointing an app at staging or a local server."
+                localized: "Map Remote redirects a matching request to a different host, port, or path — handy for pointing an app at staging or a local server.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -160,7 +164,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Block List: return 403 or drop connections for matching requests.",
             answer: String(
-                localized: "The Block List returns 403 or drops the connection for matching requests, so you can simulate an endpoint being unavailable."
+                localized: "The Block List returns 403 or drops the connection for matching requests, so you can simulate an endpoint being unavailable.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -171,7 +176,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Allow List: restrict capture to matching hosts so unrelated traffic is ignored.",
             answer: String(
-                localized: "The Allow List restricts capture to the hosts you specify, so Rockxy ignores everything else and the request list stays focused."
+                localized: "The Allow List restricts capture to the hosts you specify, so Rockxy ignores everything else and the request list stays focused.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -182,7 +188,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Modify Headers: add, remove, or replace request or response headers via a rule.",
             answer: String(
-                localized: "Modify Headers adds, removes, or replaces headers on matching requests or responses — for example injecting or stripping one."
+                localized: "Modify Headers adds, removes, or replaces headers on matching requests or responses — for example injecting or stripping one.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -193,7 +200,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Network Conditions: throttle bandwidth and add latency to simulate slow or unreliable networks.",
             answer: String(
-                localized: "Network Conditions throttles bandwidth and adds latency so you can reproduce how your app behaves on a slow connection."
+                localized: "Network Conditions throttles bandwidth and adds latency so you can reproduce how your app behaves on a slow connection.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -204,7 +212,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Breakpoint Rules: pause a matching request or response mid-flight to edit it before it continues.",
             answer: String(
-                localized: "Breakpoint Rules pause a matching request or response mid-flight so you can edit the URL, headers, body, or status first."
+                localized: "Breakpoint Rules pause a matching request or response mid-flight so you can edit the URL, headers, body, or status first.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -217,7 +226,7 @@ struct AssistantProductHelpCatalog: Sendable {
                 localized: """
                 SOCKS5 upstream proxying isn't available in this build — only HTTP/HTTPS proxies \
                 or a PAC URL can be applied. Open External Proxy Settings to configure one of those.
-                """
+                """, bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -228,7 +237,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "External Proxy: route captured traffic out through an upstream HTTP/HTTPS CONNECT proxy, or auto-select via a PAC URL.",
             answer: String(
-                localized: "External Proxy Settings route Rockxy's outbound traffic through an upstream HTTP/HTTPS proxy, or a PAC URL."
+                localized: "External Proxy Settings route Rockxy's outbound traffic through an upstream HTTP/HTTPS proxy, or a PAC URL.",
+                bundle: RockxyLocalization.bundle
             )
         ),
         AssistantProductHelpTopic(
@@ -239,7 +249,8 @@ struct AssistantProductHelpCatalog: Sendable {
             ],
             capability: "Scripting: run JavaScript hooks that inspect or modify requests and responses programmatically.",
             answer: String(
-                localized: "Scripting runs JavaScript hooks that inspect or modify requests and responses programmatically, beyond what a static rule does."
+                localized: "Scripting runs JavaScript hooks that inspect or modify requests and responses programmatically, beyond what a static rule does.",
+                bundle: RockxyLocalization.bundle
             )
         ),
     ]
@@ -291,7 +302,7 @@ struct AssistantProductHelpCatalog: Sendable {
             I can help with Rockxy's workflows — capture, HTTPS decryption, mapping, \
             breakpoints, rules, and scripting. I couldn't match that to a feature; \
             try naming the workflow or open Settings.
-            """
+            """, bundle: RockxyLocalization.bundle
         )
     }
 }

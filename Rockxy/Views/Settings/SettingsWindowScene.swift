@@ -16,7 +16,7 @@ struct SettingsWindowScene: Scene {
     // MARK: Private
 
     private var settingsWindow: some Scene {
-        let base = Window(String(localized: "Settings"), id: "settings") {
+        let base = Window(String(localized: "Settings", bundle: RockxyLocalization.bundle), id: "settings") {
             AppUIDisplayMetricsProvider {
                 SettingsView()
             }

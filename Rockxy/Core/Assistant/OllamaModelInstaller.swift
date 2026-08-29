@@ -3,50 +3,7 @@ import Foundation
 // MARK: - AssistantDownloadableModel
 
 struct AssistantDownloadableModel: Identifiable, Equatable, Sendable {
-    static let recommended = [
-        AssistantDownloadableModel(
-            id: "qwen3:4b",
-            name: "Qwen 3 4B",
-            family: "Qwen",
-            approximateDownloadBytes: 2_500_000_000,
-            detail: String(localized: "Balanced local model for debugging and tool-oriented prompts")
-        ),
-        AssistantDownloadableModel(
-            id: "llama3.2:3b",
-            name: "Llama 3.2 3B",
-            family: "Llama",
-            approximateDownloadBytes: 2_000_000_000,
-            detail: String(localized: "Compact general-purpose model for Apple silicon Macs")
-        ),
-        AssistantDownloadableModel(
-            id: "gemma3:4b",
-            name: "Gemma 3 4B",
-            family: "Gemma",
-            approximateDownloadBytes: 3_300_000_000,
-            detail: String(localized: "Small multilingual model with a strong quality-to-size balance")
-        ),
-        AssistantDownloadableModel(
-            id: "deepseek-r1:1.5b",
-            name: "DeepSeek R1 1.5B",
-            family: "DeepSeek",
-            approximateDownloadBytes: 1_100_000_000,
-            detail: String(localized: "Small reasoning model for lower-memory Macs")
-        ),
-        AssistantDownloadableModel(
-            id: "phi4-mini:3.8b",
-            name: "Phi-4 Mini 3.8B",
-            family: "Phi",
-            approximateDownloadBytes: 2_500_000_000,
-            detail: String(localized: "Compact multilingual reasoning model from Microsoft")
-        ),
-        AssistantDownloadableModel(
-            id: "mistral:7b",
-            name: "Mistral 7B",
-            family: "Mistral",
-            approximateDownloadBytes: 4_400_000_000,
-            detail: String(localized: "Larger general-purpose model for Macs with more unified memory")
-        ),
-    ]
+    // MARK: Lifecycle
 
     init(
         id: String,
@@ -61,6 +18,68 @@ struct AssistantDownloadableModel: Identifiable, Equatable, Sendable {
         self.approximateDownloadBytes = approximateDownloadBytes
         self.detail = detail
     }
+
+    // MARK: Internal
+
+    static let recommended = [
+        AssistantDownloadableModel(
+            id: "qwen3:4b",
+            name: "Qwen 3 4B",
+            family: "Qwen",
+            approximateDownloadBytes: 2_500_000_000,
+            detail: String(
+                localized: "Balanced local model for debugging and tool-oriented prompts",
+                bundle: RockxyLocalization.bundle
+            )
+        ),
+        AssistantDownloadableModel(
+            id: "llama3.2:3b",
+            name: "Llama 3.2 3B",
+            family: "Llama",
+            approximateDownloadBytes: 2_000_000_000,
+            detail: String(
+                localized: "Compact general-purpose model for Apple silicon Macs",
+                bundle: RockxyLocalization.bundle
+            )
+        ),
+        AssistantDownloadableModel(
+            id: "gemma3:4b",
+            name: "Gemma 3 4B",
+            family: "Gemma",
+            approximateDownloadBytes: 3_300_000_000,
+            detail: String(
+                localized: "Small multilingual model with a strong quality-to-size balance",
+                bundle: RockxyLocalization.bundle
+            )
+        ),
+        AssistantDownloadableModel(
+            id: "deepseek-r1:1.5b",
+            name: "DeepSeek R1 1.5B",
+            family: "DeepSeek",
+            approximateDownloadBytes: 1_100_000_000,
+            detail: String(localized: "Small reasoning model for lower-memory Macs", bundle: RockxyLocalization.bundle)
+        ),
+        AssistantDownloadableModel(
+            id: "phi4-mini:3.8b",
+            name: "Phi-4 Mini 3.8B",
+            family: "Phi",
+            approximateDownloadBytes: 2_500_000_000,
+            detail: String(
+                localized: "Compact multilingual reasoning model from Microsoft",
+                bundle: RockxyLocalization.bundle
+            )
+        ),
+        AssistantDownloadableModel(
+            id: "mistral:7b",
+            name: "Mistral 7B",
+            family: "Mistral",
+            approximateDownloadBytes: 4_400_000_000,
+            detail: String(
+                localized: "Larger general-purpose model for Macs with more unified memory",
+                bundle: RockxyLocalization.bundle
+            )
+        ),
+    ]
 
     let id: String
     let name: String

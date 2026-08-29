@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct KeyboardShortcutsView: View {
+    // MARK: Internal
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -12,6 +14,8 @@ struct KeyboardShortcutsView: View {
         .frame(minWidth: 640, idealWidth: 720, minHeight: 520, idealHeight: 620)
     }
 
+    // MARK: Private
+
     @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
 
@@ -21,13 +25,13 @@ struct KeyboardShortcutsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(String(localized: "Keyboard Shortcuts"))
+            Text(String(localized: "Keyboard Shortcuts", bundle: RockxyLocalization.bundle))
                 .font(.title3.weight(.semibold))
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField(String(localized: "Search shortcuts"), text: $searchText)
+                TextField(String(localized: "Search shortcuts", bundle: RockxyLocalization.bundle), text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
                 if !searchText.isEmpty {
@@ -59,6 +63,18 @@ struct KeyboardShortcutsView: View {
             }
             .padding(20)
         }
+    }
+
+    private var footer: some View {
+        Text(String(
+            localized: "Some shortcuts depend on focus — click the panel first.",
+            bundle: RockxyLocalization.bundle
+        ))
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 
     private func shortcutSection(_ section: KeyboardShortcutSection) -> some View {
@@ -101,14 +117,5 @@ struct KeyboardShortcutsView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color(nsColor: .separatorColor).opacity(0.7), lineWidth: 1)
             }
-    }
-
-    private var footer: some View {
-        Text(String(localized: "Some shortcuts depend on focus — click the panel first."))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
     }
 }

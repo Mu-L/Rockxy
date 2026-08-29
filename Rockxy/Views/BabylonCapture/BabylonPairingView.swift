@@ -176,17 +176,18 @@ struct BabylonPairingView: View {
             minHeight: max(400, toolMetrics.bodyFontSize * 18 + 166)
         )
         .confirmationDialog(
-            String(localized: "Regenerate Babylon Pairing Token?"),
+            String(localized: "Regenerate Babylon Pairing Token?", bundle: RockxyLocalization.bundle),
             isPresented: $showsRegenerateConfirmation
         ) {
-            Button(String(localized: "Regenerate Token"), role: .destructive) {
+            Button(String(localized: "Regenerate Token", bundle: RockxyLocalization.bundle), role: .destructive) {
                 regenerateToken()
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
                 String(
-                    localized: "Existing connections disconnect immediately, and every Babylon client must be updated with the new token before it can reconnect."
+                    localized: "Existing connections disconnect immediately, and every Babylon client must be updated with the new token before it can reconnect.",
+                    bundle: RockxyLocalization.bundle
                 )
             )
         }
@@ -243,29 +244,44 @@ struct BabylonPairingView: View {
 
     private var statusTitle: String {
         switch availability {
-        case .stopped: String(localized: "Stopped")
-        case .starting: String(localized: "Starting…")
-        case .waiting: String(localized: "Waiting for Network")
-        case .ready: String(localized: "Ready")
-        case .tokenMissing: String(localized: "Not Ready")
-        case .unavailable: String(localized: "Unavailable")
+        case .stopped: String(localized: "Stopped", bundle: RockxyLocalization.bundle)
+        case .starting: String(localized: "Starting…", bundle: RockxyLocalization.bundle)
+        case .waiting: String(localized: "Waiting for Network", bundle: RockxyLocalization.bundle)
+        case .ready: String(localized: "Ready", bundle: RockxyLocalization.bundle)
+        case .tokenMissing: String(localized: "Not Ready", bundle: RockxyLocalization.bundle)
+        case .unavailable: String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
         }
     }
 
     private var statusSubtitle: String {
         switch availability {
         case .stopped:
-            String(localized: "Babylon capture is not running.")
+            String(localized: "Babylon capture is not running.", bundle: RockxyLocalization.bundle)
         case .starting:
-            String(localized: "Waiting for the local Babylon listener to come online.")
+            String(
+                localized: "Waiting for the local Babylon listener to come online.",
+                bundle: RockxyLocalization.bundle
+            )
         case .waiting:
-            String(localized: "The listener will resume automatically when a viable network becomes available.")
+            String(
+                localized: "The listener will resume automatically when a viable network becomes available.",
+                bundle: RockxyLocalization.bundle
+            )
         case .ready:
-            String(localized: "The listener is accepting local-network connections on this Mac.")
+            String(
+                localized: "The listener is accepting local-network connections on this Mac.",
+                bundle: RockxyLocalization.bundle
+            )
         case .tokenMissing:
-            String(localized: "Generate a pairing token so Babylon clients can authenticate.")
+            String(
+                localized: "Generate a pairing token so Babylon clients can authenticate.",
+                bundle: RockxyLocalization.bundle
+            )
         case .unavailable:
-            String(localized: "The Babylon listener isn't running. Clients can't connect until it restarts.")
+            String(
+                localized: "The Babylon listener isn't running. Clients can't connect until it restarts.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -277,12 +293,15 @@ struct BabylonPairingView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(String(localized: "Babylon Pairing"))
+            Text(String(localized: "Babylon Pairing", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .medium))
-            Text(String(localized: "Pair the Babylon debug client with this Mac over the local network."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(
+                localized: "Pair the Babylon debug client with this Mac over the local network.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
@@ -295,7 +314,7 @@ struct BabylonPairingView: View {
 
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Connection"))
+            Text(String(localized: "Connection", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             HStack(alignment: .top, spacing: toolMetrics.controlSpacing) {
@@ -341,26 +360,29 @@ struct BabylonPairingView: View {
     private var connectionDetails: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
             GridRow {
-                detailLabel(String(localized: "Bonjour Service"))
+                detailLabel(String(localized: "Bonjour Service", bundle: RockxyLocalization.bundle))
                 Text(BabylonCaptureProtocol.serviceType)
                     .font(toolMetrics.font(monospaced: true))
                     .textSelection(.enabled)
             }
             GridRow {
-                detailLabel(String(localized: "Port"))
+                detailLabel(String(localized: "Port", bundle: RockxyLocalization.bundle))
                 Text("\(BabylonCaptureProtocol.port)")
                     .font(toolMetrics.font(monospaced: true))
                     .textSelection(.enabled)
             }
             GridRow {
-                detailLabel(String(localized: "Open Connections"))
+                detailLabel(String(localized: "Open Connections", bundle: RockxyLocalization.bundle))
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(receiver.openConnectionCount)")
                         .font(toolMetrics.font(monospaced: true))
-                    Text(String(localized: "Open connections may still be authenticating."))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(String(
+                        localized: "Open connections may still be authenticating.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    .font(toolMetrics.metadataFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -370,7 +392,7 @@ struct BabylonPairingView: View {
 
     private var tokenSection: some View {
         VStack(alignment: .leading, spacing: toolMetrics.controlSpacing) {
-            Text(String(localized: "Pairing Token"))
+            Text(String(localized: "Pairing Token", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.tableHeaderFont())
 
             if store.token.isEmpty {
@@ -398,9 +420,9 @@ struct BabylonPairingView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(String(localized: "Pairing token"))
+                .accessibilityLabel(String(localized: "Pairing token", bundle: RockxyLocalization.bundle))
                 .accessibilityValue(
-                    isTokenRevealed ? store.token : String(localized: "Hidden")
+                    isTokenRevealed ? store.token : String(localized: "Hidden", bundle: RockxyLocalization.bundle)
                 )
 
             Button {
@@ -413,9 +435,15 @@ struct BabylonPairingView: View {
                     .accessibilityHidden(true)
             }
             .buttonStyle(.borderless)
-            .help(isTokenRevealed ? String(localized: "Hide Token") : String(localized: "Show Token"))
+            .help(isTokenRevealed ? String(localized: "Hide Token", bundle: RockxyLocalization.bundle) : String(
+                localized: "Show Token",
+                bundle: RockxyLocalization.bundle
+            ))
             .accessibilityLabel(
-                isTokenRevealed ? String(localized: "Hide Token") : String(localized: "Show Token")
+                isTokenRevealed ? String(localized: "Hide Token", bundle: RockxyLocalization.bundle) : String(
+                    localized: "Show Token",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
         .padding(.horizontal, toolMetrics.controlSpacing)
@@ -445,20 +473,23 @@ struct BabylonPairingView: View {
                 copyToken()
             } label: {
                 actionButtonLabel(
-                    didCopyToken ? String(localized: "Copied") : String(localized: "Copy")
+                    didCopyToken ? String(localized: "Copied", bundle: RockxyLocalization.bundle) : String(
+                        localized: "Copy",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
             .disabled(store.token.isEmpty)
             .accessibilityLabel(
                 didCopyToken
-                    ? String(localized: "Pairing token copied")
-                    : String(localized: "Copy pairing token")
+                    ? String(localized: "Pairing token copied", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Copy pairing token", bundle: RockxyLocalization.bundle)
             )
 
             Button(role: .destructive) {
                 showsRegenerateConfirmation = true
             } label: {
-                actionButtonLabel(String(localized: "Regenerate…"))
+                actionButtonLabel(String(localized: "Regenerate…", bundle: RockxyLocalization.bundle))
             }
 
             Spacer(minLength: 0)
@@ -471,10 +502,13 @@ struct BabylonPairingView: View {
                 .foregroundStyle(.secondary)
                 .font(.system(size: toolMetrics.compactIconFontSize))
                 .accessibilityHidden(true)
-            Text(String(localized: "No pairing token is available. Regenerate a token to allow clients to connect."))
-                .font(toolMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(String(
+                localized: "No pairing token is available. Regenerate a token to allow clients to connect.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
     }
@@ -482,14 +516,17 @@ struct BabylonPairingView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        Text(String(localized: "Keep this token private. Anyone with it can send capture data to this Mac."))
-            .font(toolMetrics.secondaryFont())
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, toolMetrics.contentHorizontalPadding)
-            .padding(.vertical, toolMetrics.footerTopPadding)
-            .rockxyFunctionalBar()
+        Text(String(
+            localized: "Keep this token private. Anyone with it can send capture data to this Mac.",
+            bundle: RockxyLocalization.bundle
+        ))
+        .font(toolMetrics.secondaryFont())
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding)
+        .padding(.vertical, toolMetrics.footerTopPadding)
+        .rockxyFunctionalBar()
     }
 
     private func detailLabel(_ label: String) -> some View {
@@ -509,7 +546,7 @@ struct BabylonPairingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if showsRetry {
-                Button(String(localized: "Retry Listener")) {
+                Button(String(localized: "Retry Listener", bundle: RockxyLocalization.bundle)) {
                     receiver.retryListener()
                 }
             }

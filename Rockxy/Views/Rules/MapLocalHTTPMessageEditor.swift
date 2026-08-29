@@ -196,6 +196,7 @@ struct MapLocalHTTPMessageEditor: NSViewRepresentable {
 
     @Binding var text: String
     var editorSettings = InspectorTextEditorSettings(useMonospacedFont: true, wordWrap: false)
+    var isEditable = true
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, editorSettings: editorSettings)
@@ -212,6 +213,8 @@ struct MapLocalHTTPMessageEditor: NSViewRepresentable {
         guard let textView = nsView.documentView as? NSTextView else {
             return
         }
+        textView.isEditable = isEditable
+        textView.allowsUndo = isEditable
         let settingsChanged = context.coordinator.editorSettings != editorSettings
         if textView.string != text {
             let selectedRange = textView.selectedRange()
@@ -246,9 +249,9 @@ struct MapLocalHTTPMessageEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else {
             return
         }
-        textView.isEditable = true
+        textView.isEditable = isEditable
         textView.isSelectable = true
-        textView.allowsUndo = true
+        textView.allowsUndo = isEditable
         textView.usesFindBar = true
         textView.isRichText = true
         textView.importsGraphics = false

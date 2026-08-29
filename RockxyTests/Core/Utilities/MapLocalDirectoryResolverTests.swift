@@ -104,39 +104,41 @@ struct MapLocalDirectoryResolverTests {
         }
     }
 
-    // MARK: - Root Path / Index Fallback
+    // MARK: - Root Path / Directory Targets (no index synthesis)
 
-    @Test("Root path falls back to index.html")
-    func rootPathFallback() {
+    @Test("Empty suffix (mapped root) does not synthesize index.html and fails to the origin")
+    func rootPathDoesNotSynthesizeIndex() {
+        // Proxyman parity: a request for the mapped root (`/static/`) is NOT rewritten to
+        // `index.html`. The resolver returns a failure so the handler forwards the origin.
         let result = MapLocalDirectoryResolver.resolve(
             requestPath: "/static/",
             urlPattern: "https://cdn.example.com/static/.*",
             directoryPath: testDir.path
         )
         switch result {
-        case let .success(file):
-            #expect(file.mimeType == "text/html")
-            let content = String(data: file.data, encoding: .utf8)
-            #expect(content?.contains("<!DOCTYPE html>") == true)
-        case let .failure(error):
-            Issue.record("Expected success, got \(error)")
+        case .success:
+            Issue.record("Empty suffix must not synthesize an index file")
+        case .failure(.fileNotFound):
+            break
+        case let .failure(other):
+            Issue.record("Expected .fileNotFound, got \(other)")
         }
     }
 
-    @Test("Subdirectory path falls back to its index.html")
-    func subdirIndexFallback() {
+    @Test("Subdirectory target does not synthesize its index.html and fails to the origin")
+    func subdirDoesNotSynthesizeIndex() {
         let result = MapLocalDirectoryResolver.resolve(
             requestPath: "/static/subdir/",
             urlPattern: "https://cdn.example.com/static/.*",
             directoryPath: testDir.path
         )
         switch result {
-        case let .success(file):
-            #expect(file.mimeType == "text/html")
-            let content = String(data: file.data, encoding: .utf8)
-            #expect(content?.contains("subdir") == true)
-        case let .failure(error):
-            Issue.record("Expected success, got \(error)")
+        case .success:
+            Issue.record("Directory target must not synthesize an index file")
+        case .failure(.fileNotFound):
+            break
+        case let .failure(other):
+            Issue.record("Expected .fileNotFound, got \(other)")
         }
     }
 
@@ -350,6 +352,263 @@ struct MapLocalDirectoryResolverTests {
             } else {
                 Issue.record("Expected fileTooLarge, got \(error)")
             }
+        }
+    }
+
+    // MARK: - Authored Match Context Resolution
+
+    @Test("Wildcard authored pattern maps the suffix after the authored prefix")
+    func wildcardAuthoredSuffix() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: "https://cdn\\.example\\.com/static/.*",
+            matchType: .wildcard,
+            includeSubpaths: false
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/api/users.json",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "application/json")
+            #expect(String(data: file.data, encoding: .utf8)?.contains("Alice") == true)
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Query string is stripped before filesystem resolution")
+    func queryStrippedFromSubpath() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/js/app.js?v=123&cache=false",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "application/javascript")
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Regex authored pattern uses the first capture group as the subpath")
+    func regexCaptureSubpath() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn\\.example\\.com/static/(.*)",
+            compiledURLPattern: "https://cdn\\.example\\.com/static/(.*)",
+            matchType: .regex,
+            includeSubpaths: nil
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/css/style.css",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "text/css")
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Question-mark wildcard is the prefix boundary and never confuses query or fragment")
+    func questionMarkWildcardBoundary() {
+        // `?` is a single-character wildcard in authored wildcard syntax and appears before the
+        // `*` here, so it is the earliest wildcard boundary — the literal prefix is everything
+        // up to it. The request's own query and fragment must be stripped before resolution.
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/?*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/api/users.json?v=9&cache=false#section",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "application/json")
+            #expect(String(data: file.data, encoding: .utf8)?.contains("Alice") == true)
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Regex capture group strips a trailing query before filesystem resolution")
+    func regexCaptureStripsQuery() {
+        // A greedy `(.*)` capture swallows the query too; the resolver must strip it so the
+        // query never becomes part of the served file path.
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn\\.example\\.com/static/(.*)",
+            compiledURLPattern: "https://cdn\\.example\\.com/static/(.*)",
+            matchType: .regex,
+            includeSubpaths: nil
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/js/app.js?v=42",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "application/javascript")
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Invalid regex directory pattern fails so the handler falls back to the origin")
+    func invalidRegexDirectoryFails() {
+        // An unbalanced group cannot compile; the resolver must fail (never serve) so the
+        // caller degrades to the upstream request.
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/([",
+            compiledURLPattern: "https://cdn.example.com/static/([",
+            matchType: .regex,
+            includeSubpaths: nil
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/js/app.js",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case .success:
+            Issue.record("Invalid regex must not resolve to a served file")
+        case .failure:
+            break
+        }
+    }
+
+    @Test("Regex without a capture group fails safely instead of reinterpreting the request path")
+    func regexNoCaptureGroupFailsSafely() {
+        // Proxyman requires a capture group for regex directory mapping. A regex that matches
+        // but declares no capture group must fail (never serve) so the handler forwards the
+        // origin. The request path here (`/css/style.css`) maps to a real fixture under the
+        // root, so the previous docroot-relative behavior WOULD have served it — this proves
+        // that reinterpretation is gone.
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn\\.example\\.com/.*",
+            compiledURLPattern: "https://cdn\\.example\\.com/.*",
+            matchType: .regex,
+            includeSubpaths: nil
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/css/style.css",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case .success:
+            Issue.record("No-capture regex must not resolve to a served file")
+        case .failure(.fileNotFound):
+            break
+        case let .failure(other):
+            Issue.record("Expected .fileNotFound, got \(other)")
+        }
+    }
+
+    @Test("Fragment is stripped before filesystem resolution")
+    func fragmentStrippedFromSubpath() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/css/style.css#section",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "text/css")
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Authored wildcard root request does not synthesize index.html and fails to the origin")
+    func wildcardRootDoesNotServeIndex() {
+        // The mapped root reached through an authored wildcard behaves the same as the legacy
+        // entry point: no implicit index, so the handler falls back to the origin.
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case .success:
+            Issue.record("Empty suffix must not synthesize an index file")
+        case .failure(.fileNotFound):
+            break
+        case let .failure(other):
+            Issue.record("Expected .fileNotFound, got \(other)")
+        }
+    }
+
+    @Test("Binary file resolved through a directory mapping is served byte-for-byte")
+    func binaryFileServedExactly() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: true
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/images/logo.png",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case let .success(file):
+            #expect(file.mimeType == "image/png")
+            #expect(Array(file.data) == [0x89, 0x50, 0x4E, 0x47])
+        case let .failure(error):
+            Issue.record("Expected success, got \(error)")
+        }
+    }
+
+    @Test("Authored wildcard still blocks path traversal")
+    func authoredWildcardBlocksTraversal() {
+        let context = MapLocalMatchContext(
+            authoredPattern: "https://cdn.example.com/static/*",
+            compiledURLPattern: nil,
+            matchType: .wildcard,
+            includeSubpaths: false
+        )
+        let result = MapLocalDirectoryResolver.resolve(
+            requestURL: "https://cdn.example.com/static/../../../etc/passwd",
+            matchContext: context,
+            directoryPath: testDir.path
+        )
+        switch result {
+        case .success:
+            Issue.record("Expected traversal rejection")
+        case .failure(.pathTraversal),
+             .failure(.fileNotFound):
+            break
+        case let .failure(other):
+            Issue.record("Expected .pathTraversal or .fileNotFound, got \(other)")
         }
     }
 

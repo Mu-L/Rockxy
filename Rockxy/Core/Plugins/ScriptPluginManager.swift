@@ -176,7 +176,10 @@ actor ScriptPluginManager {
 
         let refreshedPlugins = await discovery.discoverPlugins()
         guard let refreshed = refreshedPlugins.first(where: { $0.id == id }) else {
-            let message = String(localized: "The script bundle could not be found after reloading.")
+            let message = String(
+                localized: "The script bundle could not be found after reloading.",
+                bundle: RockxyLocalization.bundle
+            )
             if let currentIndex = plugins.firstIndex(where: { $0.id == id }) {
                 plugins[currentIndex].status = .error(message)
                 plugins[currentIndex].lastError = message

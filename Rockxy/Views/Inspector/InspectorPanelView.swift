@@ -47,7 +47,10 @@ struct InspectorPanelView: View {
                 }
             } else {
                 InspectorEmptyStateView(
-                    requestSelectionDescription: String(localized: "Select a request to inspect")
+                    requestSelectionDescription: String(
+                        localized: "Select a request to inspect",
+                        bundle: RockxyLocalization.bundle
+                    )
                 )
             }
         }
@@ -68,19 +71,31 @@ private struct InspectorSelectionSummaryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(String(localized: "Selection Summary"), systemImage: "square.stack.3d.up")
-                .font(.headline)
+            Label(
+                String(localized: "Selection Summary", bundle: RockxyLocalization.bundle),
+                systemImage: "square.stack.3d.up"
+            )
+            .font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
-                summaryRow(String(localized: "Selected"), "\(transactions.count)")
-                summaryRow(String(localized: "Hosts"), "\(Set(transactions.map { $0.request.host }).count)")
-                summaryRow(String(localized: "Errors"), "\(transactions.count { ($0.response?.statusCode ?? 0) >= 400 })")
+                summaryRow(String(localized: "Selected", bundle: RockxyLocalization.bundle), "\(transactions.count)")
                 summaryRow(
-                    String(localized: "Transferred"),
+                    String(localized: "Hosts", bundle: RockxyLocalization.bundle),
+                    "\(Set(transactions.map(\.request.host)).count)"
+                )
+                summaryRow(
+                    String(localized: "Errors", bundle: RockxyLocalization.bundle),
+                    "\(transactions.count { ($0.response?.statusCode ?? 0) >= 400 })"
+                )
+                summaryRow(
+                    String(localized: "Transferred", bundle: RockxyLocalization.bundle),
                     ByteCountFormatter.string(fromByteCount: transferredBytes, countStyle: .file)
                 )
             }
-            Text(String(localized: "Select one request to inspect raw payload, or exactly two requests to compare."))
-                .foregroundStyle(.secondary)
+            Text(String(
+                localized: "Select one request to inspect raw payload, or exactly two requests to compare.",
+                bundle: RockxyLocalization.bundle
+            ))
+            .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(16)
@@ -99,7 +114,6 @@ private struct InspectorSelectionSummaryView: View {
         }
     }
 
-    @ViewBuilder
     private func summaryRow(_ label: String, _ value: String) -> some View {
         GridRow {
             Text(label).foregroundStyle(.secondary)

@@ -18,13 +18,19 @@ enum AllowListSettingsCodec {
         var errorDescription: String? {
             switch self {
             case .invalidFormat:
-                String(localized: "The file is not a valid Allow List settings export.")
+                String(
+                    localized: "The file is not a valid Allow List settings export.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .noRulesFound:
-                String(localized: "No Allow List rules found in the file.")
+                String(localized: "No Allow List rules found in the file.", bundle: RockxyLocalization.bundle)
             case let .invalidRegex(pattern, reason):
-                String(localized: "Invalid matching rule '\(pattern)': \(reason)")
+                String(localized: "Invalid matching rule '\(pattern)': \(reason)", bundle: RockxyLocalization.bundle)
             case let .patternTooLong(pattern, limit):
-                String(localized: "Matching rule '\(pattern)' exceeds \(limit) characters.")
+                String(
+                    localized: "Matching rule '\(pattern)' exceeds \(limit) characters.",
+                    bundle: RockxyLocalization.bundle
+                )
             }
         }
     }

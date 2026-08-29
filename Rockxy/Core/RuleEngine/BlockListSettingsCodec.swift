@@ -17,11 +17,14 @@ enum BlockListSettingsCodec {
         var errorDescription: String? {
             switch self {
             case .invalidFormat:
-                String(localized: "The file is not a valid Block List settings export.")
+                String(
+                    localized: "The file is not a valid Block List settings export.",
+                    bundle: RockxyLocalization.bundle
+                )
             case .noRulesFound:
-                String(localized: "No Block List rules found in the file.")
+                String(localized: "No Block List rules found in the file.", bundle: RockxyLocalization.bundle)
             case let .invalidRegex(pattern, reason):
-                String(localized: "Invalid matching rule '\(pattern)': \(reason)")
+                String(localized: "Invalid matching rule '\(pattern)': \(reason)", bundle: RockxyLocalization.bundle)
             }
         }
     }
@@ -79,9 +82,13 @@ enum BlockListSettingsCodec {
     // MARK: Private
 
     private struct ExportPayload: Codable {
+        // MARK: Internal
+
         let format = "rockxy.block-list"
         let version: Int
         let blockRules: [ProxyRule]
+
+        // MARK: Private
 
         private enum CodingKeys: String, CodingKey {
             case format
