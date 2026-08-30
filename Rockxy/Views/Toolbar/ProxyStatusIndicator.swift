@@ -87,7 +87,8 @@ struct ProxyStatusIndicator: View {
 
     private var statusColor: Color {
         switch displayState {
-        case .starting:
+        case .starting,
+             .stopping:
             Color.accentColor
         case .running:
             Color(nsColor: .systemGreen)
@@ -102,7 +103,8 @@ struct ProxyStatusIndicator: View {
         switch displayState {
         case .running:
             Color(nsColor: .systemGreen).opacity(0.45)
-        case .starting:
+        case .starting,
+             .stopping:
             Color.accentColor.opacity(0.35)
         default:
             Color.clear

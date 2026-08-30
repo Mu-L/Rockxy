@@ -164,6 +164,10 @@ struct BreakpointEditorView: View {
             VStack(spacing: 0) {
                 alertBanner(item: item)
                 Divider()
+                if let message = item.editableDraft.executionValidationMessage {
+                    validationBanner(message)
+                    Divider()
+                }
                 if !item.editableDraft.isBodyEditable {
                     binaryBodyNotice
                     Divider()
@@ -176,6 +180,18 @@ struct BreakpointEditorView: View {
         } else {
             emptyState
         }
+    }
+
+    private func validationBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(toolMetrics.secondaryFont())
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.07))
+            .accessibilityLabel(String(localized: "Breakpoint edit error", bundle: RockxyLocalization.bundle))
+            .accessibilityValue(message)
     }
 
     private func alertBanner(item: PausedBreakpointItem) -> some View {
@@ -236,6 +252,7 @@ struct BreakpointEditorView: View {
         }
         .labelsHidden()
         .frame(width: toolMetrics.menuWidth(100))
+        .accessibilityLabel(String(localized: "HTTP method", bundle: RockxyLocalization.bundle))
     }
 
     @ViewBuilder
@@ -258,18 +275,25 @@ struct BreakpointEditorView: View {
             .font(toolMetrics.font(monospaced: true))
             .frame(minHeight: toolMetrics.formControlHeight)
         } else {
-            editableURLField(itemId: itemId)
-        }
-    }
+            Text(httpSchemePrefix(itemId: itemId))
+                .font(toolMetrics.secondaryFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .help(String(
+                    localized: "The scheme is fixed for this cleartext connection",
+                    bundle: RockxyLocalization.bundle
+                ))
 
-    private func editableURLField(itemId: UUID) -> some View {
-        TextField(String(localized: "URL", bundle: RockxyLocalization.bundle), text: Binding(
-            get: { draftFor(itemId)?.url ?? "" },
-            set: { newValue in manager.updateDraft(id: itemId) { $0.url = newValue } }
-        ))
-        .textFieldStyle(.roundedBorder)
-        .font(toolMetrics.font(monospaced: true))
-        .frame(minHeight: toolMetrics.formControlHeight)
+            TextField(
+                String(localized: "Host, path, and query", bundle: RockxyLocalization.bundle),
+                text: Binding(
+                    get: { httpAuthorityPathAndQuery(itemId: itemId) },
+                    set: { updateHTTPAuthorityPathAndQuery($0, itemId: itemId) }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font(monospaced: true))
+            .frame(minHeight: toolMetrics.formControlHeight)
+        }
     }
 
     private func readOnlyURL(itemId: UUID) -> some View {
@@ -290,19 +314,38 @@ struct BreakpointEditorView: View {
 
     private func statusCodePicker(itemId: UUID) -> some View {
         let currentStatusCode = draftFor(itemId)?.statusCode ?? 200
-        return Picker("", selection: Binding(
-            get: { currentStatusCode },
-            set: { newValue in manager.updateDraft(id: itemId) { $0.statusCode = newValue } }
-        )) {
-            if !Self.statusCodes.contains(where: { $0.code == currentStatusCode }) {
-                Text(String(currentStatusCode)).tag(currentStatusCode)
+        return HStack(spacing: 6) {
+            Picker("", selection: Binding(
+                get: { currentStatusCode },
+                set: { newValue in manager.updateDraft(id: itemId) { $0.statusCode = newValue } }
+            )) {
+                if !Self.statusCodes.contains(where: { $0.code == currentStatusCode }) {
+                    Text(String(currentStatusCode)).tag(currentStatusCode)
+                }
+                ForEach(Self.statusCodes, id: \.code) { status in
+                    Text("\(status.code) \(status.text)").tag(status.code)
+                }
             }
-            ForEach(Self.statusCodes, id: \.code) { status in
-                Text("\(status.code) \(status.text)").tag(status.code)
-            }
+            .labelsHidden()
+            .frame(width: toolMetrics.menuWidth(160))
+            .accessibilityLabel(String(localized: "Common HTTP response status", bundle: RockxyLocalization.bundle))
+
+            TextField(
+                String(localized: "Code", bundle: RockxyLocalization.bundle),
+                text: Binding(
+                    get: { String(draftFor(itemId)?.statusCode ?? 200) },
+                    set: { value in
+                        let statusCode = Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                        manager.updateDraft(id: itemId) { $0.statusCode = statusCode }
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .font(toolMetrics.font(monospaced: true))
+            .frame(width: 68)
+            .frame(minHeight: toolMetrics.formControlHeight)
+            .accessibilityLabel(String(localized: "Custom HTTP response status code", bundle: RockxyLocalization.bundle))
         }
-        .labelsHidden()
-        .frame(width: toolMetrics.menuWidth(160))
     }
 
     private func tabContent(itemId: UUID) -> some View {
@@ -314,6 +357,7 @@ struct BreakpointEditorView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel(String(localized: "Message editor section", bundle: RockxyLocalization.bundle))
             .padding(.horizontal, 12)
             .padding(.top, 8)
             .onAppear {
@@ -390,6 +434,11 @@ struct BreakpointEditorView: View {
                                 .foregroundStyle(.red)
                         }
                         .buttonStyle(.plain)
+                        .help(String(localized: "Remove header", bundle: RockxyLocalization.bundle))
+                        .accessibilityLabel(String(
+                            localized: "Remove header \(header.name)",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     }
                 }
 
@@ -534,6 +583,11 @@ struct BreakpointEditorView: View {
                                 .foregroundStyle(.red)
                         }
                         .buttonStyle(.plain)
+                        .help(String(localized: "Remove query parameter", bundle: RockxyLocalization.bundle))
+                        .accessibilityLabel(String(
+                            localized: "Remove query parameter \(item.name)",
+                            bundle: RockxyLocalization.bundle
+                        ))
                     }
                 }
 
@@ -657,6 +711,38 @@ struct BreakpointEditorView: View {
         manager.updateDraft(id: itemId) { $0.url = updatedURL }
     }
 
+    private func httpSchemePrefix(itemId: UUID) -> String {
+        guard let url = draftFor(itemId)?.url,
+              let scheme = URLComponents(string: url)?.scheme,
+              !scheme.isEmpty else
+        {
+            return "http://"
+        }
+        return "\(scheme)://"
+    }
+
+    private func httpAuthorityPathAndQuery(itemId: UUID) -> String {
+        guard let url = draftFor(itemId)?.url else {
+            return ""
+        }
+        let prefix = httpSchemePrefix(itemId: itemId)
+        guard url.lowercased().hasPrefix(prefix.lowercased()) else {
+            return url
+        }
+        return String(url.dropFirst(prefix.count))
+    }
+
+    private func updateHTTPAuthorityPathAndQuery(_ value: String, itemId: UUID) {
+        let authorityAndTarget: String
+        if let separator = value.range(of: "://") {
+            authorityAndTarget = String(value[separator.upperBound...])
+        } else {
+            authorityAndTarget = value
+        }
+        let schemePrefix = httpSchemePrefix(itemId: itemId)
+        manager.updateDraft(id: itemId) { $0.url = schemePrefix + authorityAndTarget }
+    }
+
     private func headerValue(itemId: UUID, headerId: UUID) -> EditableHeader? {
         draftFor(itemId)?.headers.first(where: { $0.id == headerId })
     }
@@ -667,7 +753,7 @@ struct BreakpointEditorView: View {
 
     private func refreshApplyAvailability() {
         guard let selectedItemId = manager.selectedItemId,
-              let draft = draftFor(selectedItemId) else
+              draftFor(selectedItemId) != nil else
         {
             canApplySelectedChanges = false
             return

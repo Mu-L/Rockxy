@@ -103,7 +103,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
         self.port = port
@@ -120,6 +121,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
+        self.breakpointBridgeTracker = breakpointBridgeTracker
     }
 
     // MARK: Internal
@@ -298,6 +300,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         BreakpointDecision,
         BreakpointRequestData
     ))?
+    private let breakpointBridgeTracker: BreakpointBridgeTracker?
     private var bufferedData: [NIOAny] = []
     private let tunnelStartedAt = DispatchTime.now()
 
@@ -410,7 +413,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 tunnelCaptureContext: self.tunnelCaptureContext,
                 clientSourcePort: self.clientSourcePort,
                 onTransactionComplete: callback,
-                onBreakpointHit: breakpointHit
+                onBreakpointHit: breakpointHit,
+                breakpointBridgeTracker: self.breakpointBridgeTracker
             )
 
             let detector = ProtocolDetectorHandler(
@@ -555,7 +559,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
         self.port = port
@@ -570,6 +575,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
+        self.breakpointBridgeTracker = breakpointBridgeTracker
     }
 
     // MARK: Internal
@@ -595,7 +601,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                 captureContextProvider: captureContextProvider,
                 clientSourcePort: clientSourcePort,
                 onTransactionComplete: onTransactionComplete,
-                onBreakpointHit: onBreakpointHit
+                onBreakpointHit: onBreakpointHit,
+                breakpointBridgeTracker: breakpointBridgeTracker
             )
 
             let pipeline = context.pipeline
@@ -704,6 +711,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         BreakpointDecision,
         BreakpointRequestData
     ))?
+    private let breakpointBridgeTracker: BreakpointBridgeTracker?
     private var handshakeResolved = false
     private let tunnelStartedAt = DispatchTime.now()
 

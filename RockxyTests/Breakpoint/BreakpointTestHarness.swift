@@ -235,6 +235,108 @@ actor BreakpointTestHarness {
     }
 }
 
+// MARK: - BreakpointRawHTTPClient
+
+/// A minimal explicit-proxy client for lifecycle tests. Closing its descriptor sends a
+/// real downstream disconnect to the proxy, unlike URLSession cancellation which may
+/// retain a pooled connection after the request task has been cancelled.
+final class BreakpointRawHTTPClient: @unchecked Sendable {
+    // MARK: Lifecycle
+
+    deinit {
+        close()
+    }
+
+    // MARK: Internal
+
+    static func connect(proxyPort: Int, requestURL: URL) throws -> BreakpointRawHTTPClient {
+        let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else {
+            throw BreakpointHarnessError.socket("Unable to create raw breakpoint client socket.")
+        }
+
+        var noSignal: Int32 = 1
+        setsockopt(
+            descriptor,
+            SOL_SOCKET,
+            SO_NOSIGPIPE,
+            &noSignal,
+            socklen_t(MemoryLayout<Int32>.size)
+        )
+
+        var address = sockaddr_in()
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = UInt16(proxyPort).bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let connectResult = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard connectResult == 0 else {
+            Darwin.close(descriptor)
+            throw BreakpointHarnessError.socket("Unable to connect raw breakpoint client to the proxy.")
+        }
+
+        let client = BreakpointRawHTTPClient(descriptor: descriptor)
+        try client.sendRequest(to: requestURL)
+        return client
+    }
+
+    func close() {
+        lock.lock()
+        let descriptor = self.descriptor
+        self.descriptor = -1
+        lock.unlock()
+        if descriptor >= 0 {
+            Darwin.shutdown(descriptor, SHUT_RDWR)
+            Darwin.close(descriptor)
+        }
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var descriptor: Int32
+
+    private init(descriptor: Int32) {
+        self.descriptor = descriptor
+    }
+
+    private func sendRequest(to url: URL) throws {
+        guard let host = url.host else {
+            throw BreakpointHarnessError.socket("Raw breakpoint client received a URL without a host.")
+        }
+        let authority = url.port.map { "\(host):\($0)" } ?? host
+        let request = "GET \(url.absoluteString) HTTP/1.1\r\nHost: \(authority)\r\nConnection: close\r\n\r\n"
+        let bytes = Array(request.utf8)
+
+        let sentAll = bytes.withUnsafeBytes { rawBuffer -> Bool in
+            guard let baseAddress = rawBuffer.baseAddress else {
+                return false
+            }
+            var sentCount = 0
+            while sentCount < rawBuffer.count {
+                let result = Darwin.send(
+                    descriptor,
+                    baseAddress.advanced(by: sentCount),
+                    rawBuffer.count - sentCount,
+                    0
+                )
+                guard result > 0 else {
+                    return false
+                }
+                sentCount += result
+            }
+            return true
+        }
+        guard sentAll else {
+            close()
+            throw BreakpointHarnessError.socket("Unable to send the raw breakpoint client request.")
+        }
+    }
+}
+
 // MARK: - BreakpointLocalHTTPServer
 
 actor BreakpointLocalHTTPServer {

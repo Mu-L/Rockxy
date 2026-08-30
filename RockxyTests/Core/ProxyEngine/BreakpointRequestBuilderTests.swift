@@ -84,6 +84,77 @@ struct BreakpointRequestBuilderTests {
         #expect(result.requestData.url.host() == "secure.example.com")
     }
 
+    @Test("HTTPS fixed authority preserves a non-default port")
+    func httpsFixedAuthorityPreservesPort() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "/path")
+        let originalData = TestFixtures.makeRequest(url: "https://secure.example.com:8443/path")
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "https://other.example/path",
+            headers: [EditableHeader(name: "Host", value: "other.example")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData,
+            isHTTPS: true,
+            originalHost: "secure.example.com",
+            originalPort: 8_443
+        )
+
+        #expect(result.requestData.url.absoluteString == "https://secure.example.com:8443/path")
+        #expect(result.head.headers["Host"].first == "secure.example.com:8443")
+    }
+
+    @Test("HTTPS fixed IPv6 authority is bracketed and preserves its port")
+    func httpsIPv6AuthorityIsBracketed() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "/path")
+        let originalData = TestFixtures.makeRequest(url: "https://[2001:db8::1]:8443/path")
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "https://other.example/path",
+            headers: [],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData,
+            isHTTPS: true,
+            originalHost: "2001:db8::1",
+            originalPort: 8_443
+        )
+
+        #expect(result.requestData.url.absoluteString == "https://[2001:db8::1]:8443/path")
+        #expect(result.head.headers["Host"].first == "[2001:db8::1]:8443")
+    }
+
+    @Test("Edited request content type follows edited headers and body")
+    func editedContentTypeIsRecomputed() {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .POST, uri: "/submit")
+        let originalData = TestFixtures.makeRequest(method: "POST", url: "http://api.example.com/submit")
+        let modified = BreakpointRequestData(
+            method: "POST",
+            url: "http://api.example.com/submit",
+            headers: [EditableHeader(name: "Content-Type", value: "application/json")],
+            body: #"{"edited":true}"#,
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.requestData.contentType == .json)
+    }
+
     @Test("Header edits are preserved")
     func headerEditsPreserved() {
         let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "/")
@@ -131,6 +202,194 @@ struct BreakpointRequestBuilderTests {
 
         #expect(result.requestData.host == "new.com")
         #expect(result.head.uri == "/other?q=1")
+    }
+
+    @Test("Untouched original Host follows an HTTP URL redirect to the new authority")
+    func hostFollowsHTTPRedirect() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://old.com/path")
+        let originalData = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "http://old.com/path")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "old.com")],
+            body: nil
+        )
+
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "http://new.com/other",
+            headers: [EditableHeader(name: "Host", value: "old.com")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.requestData.headers.first { $0.name.caseInsensitiveCompare("Host") == .orderedSame }?
+            .value == "new.com")
+        #expect(result.head.headers["Host"].first == "new.com")
+        #expect(result.requestData.host == "new.com")
+    }
+
+    @Test("Host follows an HTTP redirect carrying a non-default explicit port")
+    func hostFollowsHTTPRedirectWithExplicitPort() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://old.com/path")
+        let originalData = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "http://old.com/path")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "old.com")],
+            body: nil
+        )
+
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "http://new.com:8443/other",
+            headers: [EditableHeader(name: "Host", value: "old.com")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.requestData.headers.first { $0.name.caseInsensitiveCompare("Host") == .orderedSame }?
+            .value == "new.com:8443")
+        #expect(result.head.headers["Host"].first == "new.com:8443")
+        #expect(result.requestData.url.port == 8_443)
+    }
+
+    @Test("HTTP request editing emits one canonical Host and Content-Length")
+    func singletonRoutingAndFramingHeadersAreCanonicalized() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .POST, uri: "http://old.com/path")
+        let originalData = try HTTPRequestData(
+            method: "POST",
+            url: #require(URL(string: "http://old.com/path")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "old.com")],
+            body: Data("old".utf8)
+        )
+        let modified = BreakpointRequestData(
+            method: "POST",
+            url: "http://new.com/upload",
+            headers: [
+                EditableHeader(name: "Host", value: "old.com"),
+                EditableHeader(name: "host", value: "conflicting.example"),
+                EditableHeader(name: "Content-Length", value: "1"),
+                EditableHeader(name: "content-length", value: "999"),
+                EditableHeader(name: "", value: "ignored"),
+            ],
+            body: "updated",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        let hosts = result.requestData.headers.filter {
+            $0.name.caseInsensitiveCompare("Host") == .orderedSame
+        }
+        let lengths = result.requestData.headers.filter {
+            $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
+        }
+        #expect(hosts.map(\.value) == ["new.com"])
+        #expect(lengths.map(\.value) == ["7"])
+        #expect(!result.requestData.headers.contains { $0.name.isEmpty })
+    }
+
+    @Test("Percent-encoded path delimiters survive request rebuilding")
+    func percentEncodedPathSurvives() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://example.com/original")
+        let originalData = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "http://example.com/original")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "example.com")],
+            body: nil
+        )
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "http://example.com/files/a%2Fb?q=hello%20world&literal=%2B",
+            headers: [EditableHeader(name: "Host", value: "example.com")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.head.uri == "/files/a%2Fb?q=hello%20world&literal=%2B")
+    }
+
+    @Test("IPv6 HTTP authority is bracketed in Host")
+    func ipv6AuthorityIsBracketed() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://old.com/path")
+        let originalData = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "http://old.com/path")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "old.com")],
+            body: nil
+        )
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "http://[::1]:18080/path",
+            headers: [EditableHeader(name: "Host", value: "old.com")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.head.headers["Host"].first == "[::1]:18080")
+    }
+
+    @Test("Explicit custom Host override is preserved across an HTTP redirect")
+    func explicitCustomHostPreserved() throws {
+        let originalHead = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://old.com/path")
+        let originalData = try HTTPRequestData(
+            method: "GET",
+            url: #require(URL(string: "http://old.com/path")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "Host", value: "old.com")],
+            body: nil
+        )
+
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "http://new.com/other",
+            headers: [EditableHeader(name: "Host", value: "virtual.internal")],
+            body: "",
+            statusCode: 200
+        )
+
+        let result = BreakpointRequestBuilder.build(
+            from: modified,
+            originalHead: originalHead,
+            originalRequestData: originalData
+        )
+
+        #expect(result.requestData.headers.first { $0.name.caseInsensitiveCompare("Host") == .orderedSame }?
+            .value == "virtual.internal")
+        #expect(result.head.headers["Host"].first == "virtual.internal")
+        #expect(result.requestData.host == "new.com")
     }
 
     @Test("Empty body produces nil data")
@@ -283,12 +542,12 @@ struct BreakpointRequestBuilderTests {
     }
 
     @Test("Non-editable request body is preserved while headers can change")
-    func nonEditableBodyPreserved() {
+    func nonEditableBodyPreserved() throws {
         let binary = Data([0x1F, 0x8B, 0x08, 0x00])
         let originalHead = HTTPRequestHead(version: .http1_1, method: .POST, uri: "/upload")
-        let originalData = HTTPRequestData(
+        let originalData = try HTTPRequestData(
             method: "POST",
-            url: URL(string: "http://api.example.com/upload")!,
+            url: #require(URL(string: "http://api.example.com/upload")),
             httpVersion: "HTTP/1.1",
             headers: [HTTPHeader(name: "Content-Encoding", value: "gzip")],
             body: binary

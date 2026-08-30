@@ -1,51 +1,76 @@
 ---
 title: Breakpoints
-description: Pause HTTP requests and responses in Rockxy, edit them live, and continue the request only after you have changed what matters.
+description: Pause a live HTTP request or response, edit it safely, and choose exactly how the transaction continues.
 ---
 
 # Breakpoints
 
-Breakpoints are the right tool when you want to inspect or modify a live request or response before it continues.
+Breakpoints let you stop a transaction at the proxy boundary and inspect or change the message that is already in flight. They are useful when the request is almost right, the backend cannot produce the state you need, or changing application code would make the debugging loop slower.
 
-## Use breakpoints when
+## Choose the phase
 
-- you want to change a request body without changing app code,
-- you need to test a different response payload immediately,
-- you want to alter headers, query parameters, or method mid-flight,
-- or you are reproducing a bug that depends on one precise request shape.
+| Phase | Pause point | What you can change |
+|---|---|---|
+| **Request** | Before Rockxy connects to the origin | Method, HTTP host, path and query, headers, and text body |
+| **Response** | After the origin replies but before Rockxy returns the response to the client | Status code, headers, and text body |
+| **Request & Response** | At both points in the same transaction | Both message editors, one after the other |
 
-## How the workflow works
+For an HTTPS request, Rockxy keeps the established TLS authority fixed. You can still edit its path, query, headers, and body without creating a mismatch with the active connection.
 
-1. Create a breakpoint rule from a captured request or from the tool window.
-2. Trigger the matching request again.
-3. Rockxy pauses the request or response.
-4. Edit the relevant fields.
-5. Choose whether to execute, cancel, or abort it.
+## Create a rule
 
-## Request-phase versus response-phase
+The fastest path starts from traffic you have already captured:
 
-Use a request breakpoint when the client is sending the wrong thing.
+1. Select a transaction in the main request list.
+2. Press `⌘B`, or choose **Add Breakpoint Rule** from the tools menu.
+3. Give the rule a recognizable name.
+4. Choose **Request**, **Response**, or both phases.
+5. Review the prefilled method, URL pattern, match type, and path scope.
+6. Press `⌘↩` to add the rule.
 
-Use a response breakpoint when the server replied with something close to what you need but not exactly the scenario you want to test.
+To author a rule without a captured transaction, open **Breakpoint Rules** with `⇧⌘B`, then press `⌘N`.
 
-## Why breakpoints are powerful
+## Resolve paused traffic
 
-They shorten the feedback loop between:
+When an enabled rule matches, Rockxy opens the Breakpoint Queue. The main-window footer also shows how many transactions are waiting, so closing the queue never hides an active pause.
 
-- observe,
-- change,
-- resend,
-- verify.
+Choose one of three explicit outcomes:
 
-That makes them especially useful during mobile, frontend, or SDK debugging where reproducing state in code can be slower than changing the wire data directly.
+- **Apply Changes & Continue** (`⌘↩`) rebuilds the message from the current editor and resumes the transaction.
+- **Continue Original** discards the draft edits and resumes with the captured message.
+- **Abort with 503** (`⌘.`) stops the transaction and returns `503 Service Unavailable` to the client.
+
+`Esc` closes the queue without resolving anything. Use the orange queue indicator in the main-window footer to return to the waiting transactions.
+
+Rockxy supports multiple paused transactions. Use `⌘[` and `⌘]` to move through the queue. Resolving one item does not change the draft or decision for the others.
+
+## Edit safely
+
+The structured tabs cover headers, body, query parameters, and the raw HTTP message. Before forwarding an edited message, Rockxy rebuilds its framing so the body length is not left stale.
+
+If the captured body is not UTF-8 text, Rockxy protects the original bytes and disables body editing. You can still change request-line, status, or header fields without corrupting the payload.
+
+## Verify the result
+
+After the transaction completes, select it in the main request list. The inspector shows the final request and response that passed through Rockxy, along with the matched-rule impact. This makes it possible to compare what the origin produced with what the client actually received.
+
+## Recovery behavior
+
+- If the client closes its connection while traffic is paused, Rockxy removes that item from the queue and does not send it upstream later.
+- Stopping the proxy releases all waiting items and clears the queue.
+- Disabling a rule affects new traffic. It does not silently resolve a transaction that is already paused.
+
+## Try a deterministic local example
+
+The [live response debugging walkthrough](/use-cases/live-response-debugging-with-breakpoints) uses a localhost origin that always returns `plan: free`. A response breakpoint changes only the proxied result to `plan: pro`, then verifies continue-original, abort, and disabled-rule behavior.
 
 ## Related pages
 
 <CardGroup cols={2}>
   <Card title="Request Replay" icon="rotate-right" href="/features/request-replay">
-    Use replay when you want a faster resend without pausing live traffic.
+    Resend a completed request without pausing live traffic.
   </Card>
   <Card title="Map Local" icon="file" href="/rules/map-local">
-    Use a fixed local response once you already know the payload you want.
+    Serve a repeatable local response after you know the payload you want.
   </Card>
 </CardGroup>

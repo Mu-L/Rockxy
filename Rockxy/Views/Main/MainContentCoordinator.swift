@@ -7,6 +7,7 @@ import os
 
 enum ProxyDisplayState: Equatable {
     case starting
+    case stopping
     case running
     case paused
     case stopped
@@ -17,6 +18,8 @@ enum ProxyDisplayState: Equatable {
         switch self {
         case .starting:
             String(localized: "Starting", bundle: RockxyLocalization.bundle)
+        case .stopping:
+            String(localized: "Stopping", bundle: RockxyLocalization.bundle)
         case .running:
             String(localized: "Running", bundle: RockxyLocalization.bundle)
         case .paused:
@@ -30,6 +33,8 @@ enum ProxyDisplayState: Equatable {
         switch self {
         case .starting:
             String(localized: "Starting Capture", bundle: RockxyLocalization.bundle)
+        case .stopping:
+            String(localized: "Stopping Capture", bundle: RockxyLocalization.bundle)
         case .running:
             String(localized: "Capturing Traffic", bundle: RockxyLocalization.bundle)
         case .paused:
@@ -43,6 +48,8 @@ enum ProxyDisplayState: Equatable {
         switch self {
         case .starting:
             String(localized: "Preparing the listener and system routing.", bundle: RockxyLocalization.bundle)
+        case .stopping:
+            String(localized: "Closing active connections and restoring system routing.", bundle: RockxyLocalization.bundle)
         case .running:
             String(localized: "New traffic is being added to the active workspace.", bundle: RockxyLocalization.bundle)
         case .paused:
@@ -59,6 +66,8 @@ enum ProxyDisplayState: Equatable {
         switch self {
         case .starting:
             "circle.dotted"
+        case .stopping:
+            "stop.circle"
         case .running:
             "record.circle.fill"
         case .paused:
@@ -72,6 +81,8 @@ enum ProxyDisplayState: Equatable {
         switch self {
         case .starting:
             String(localized: "Starting…", bundle: RockxyLocalization.bundle)
+        case .stopping:
+            String(localized: "Stopping…", bundle: RockxyLocalization.bundle)
         case .running,
              .paused:
             String(localized: "Stop Capture", bundle: RockxyLocalization.bundle)
@@ -236,6 +247,7 @@ final class MainContentCoordinator {
     var persistedFavorites: [HTTPTransaction] = []
     var isProxyRunning = false
     var isProxyStarting = false
+    var isProxyStopping = false
     var activeProxyPort = AppSettingsManager.shared.settings.proxyPort
     var isRecording = true
     var sessionGeneration: UInt = 0
@@ -381,6 +393,9 @@ final class MainContentCoordinator {
     }
 
     var proxyDisplayState: ProxyDisplayState {
+        if isProxyStopping {
+            return .stopping
+        }
         if isProxyStarting {
             return .starting
         }
@@ -388,6 +403,10 @@ final class MainContentCoordinator {
             return isRecording ? .running : .paused
         }
         return .stopped
+    }
+
+    var canStartProxy: Bool {
+        !isProxyRunning && !isProxyStarting && !isProxyStopping
     }
 
     var activeWorkspace: WorkspaceState {
@@ -655,7 +674,7 @@ final class MainContentCoordinator {
     )
         -> Bool
     {
-        guard settings.recordOnLaunch, !isProxyRunning, !isProxyStarting else {
+        guard settings.recordOnLaunch, canStartProxy else {
             return false
         }
 

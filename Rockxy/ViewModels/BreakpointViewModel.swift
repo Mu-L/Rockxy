@@ -35,12 +35,55 @@ struct BreakpointRequestData {
     var phase: BreakpointPhase = .request
     var isBodyEditable = true
     var fixedHTTPSAuthority: String?
+    var matchedRuleName: String?
 
     /// Whether the original request uses HTTPS. Used by the breakpoint editor to constrain
     /// the URL editor so the user can only modify path and query — the host is fixed by the
     /// TLS tunnel and cannot be changed mid-connection.
     var isHTTPS: Bool {
         url.lowercased().hasPrefix("https://")
+    }
+
+    /// Phase-aware validation shared by the structured editor and proxy builders.
+    /// Origin-form targets remain valid because Raw editing intentionally exposes
+    /// the HTTP request line while preserving the captured connection authority.
+    var executionValidationMessage: String? {
+        if phase == .request {
+            let normalizedMethod = method.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !Self.isValidHTTPToken(normalizedMethod) {
+                return String(localized: "Enter a valid HTTP method.", bundle: RockxyLocalization.bundle)
+            }
+
+            if url.hasPrefix("/") {
+                guard let target = URLComponents(string: url),
+                      !target.percentEncodedPath.isEmpty else
+                {
+                    return String(localized: "Enter a valid request path.", bundle: RockxyLocalization.bundle)
+                }
+            } else {
+                guard let components = URLComponents(string: url),
+                      let scheme = components.scheme?.lowercased(),
+                      scheme == "http" || scheme == "https",
+                      let host = components.host,
+                      !host.isEmpty,
+                      components.url != nil else
+                {
+                    return String(localized: "Enter a valid HTTP URL with a host.", bundle: RockxyLocalization.bundle)
+                }
+            }
+        } else if !(100 ... 599).contains(statusCode) {
+            return String(localized: "Enter a valid HTTP status code.", bundle: RockxyLocalization.bundle)
+        }
+
+        for header in headers {
+            if !Self.isValidHTTPHeaderName(header.name) {
+                return String(localized: "Header names must use valid HTTP token characters.", bundle: RockxyLocalization.bundle)
+            }
+            if !Self.isValidHTTPHeaderValue(header.value) {
+                return String(localized: "Header values cannot contain line breaks.", bundle: RockxyLocalization.bundle)
+            }
+        }
+        return nil
     }
 
     /// Projects captured bytes into the text-only breakpoint editor without
@@ -67,6 +110,27 @@ struct BreakpointRequestData {
         components.percentEncodedPath = editedTarget.percentEncodedPath
         components.percentEncodedQuery = editedTarget.percentEncodedQuery
         return components.string
+    }
+
+    static func isValidHTTPHeaderName(_ name: String) -> Bool {
+        isValidHTTPToken(name.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    static func isValidHTTPHeaderValue(_ value: String) -> Bool {
+        !value.unicodeScalars.contains { scalar in
+            scalar.value == 0 || scalar.value == 10 || scalar.value == 13
+        }
+    }
+
+    private static func isValidHTTPToken(_ value: String) -> Bool {
+        guard !value.isEmpty else {
+            return false
+        }
+        let allowedPunctuation = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~")
+        return value.unicodeScalars.allSatisfy {
+            $0.value < 128
+                && (CharacterSet.alphanumerics.contains($0) || allowedPunctuation.contains($0))
+        }
     }
 }
 

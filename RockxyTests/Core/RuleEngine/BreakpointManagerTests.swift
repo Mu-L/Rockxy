@@ -89,7 +89,7 @@ struct BreakpointManagerTests {
         #expect(manager.selectedItemId == manager.pausedItems.first?.id)
     }
 
-    @Test("enqueue projects Proxyman-style queue metadata")
+    @Test("enqueue projects queue metadata")
     func enqueueProjectsQueueMetadata() async throws {
         let manager = BreakpointManager()
         let data = BreakpointRequestData(
@@ -101,7 +101,8 @@ struct BreakpointManagerTests {
             ],
             body: #"{"operationName":"BodyName"}"#,
             statusCode: 200,
-            phase: .request
+            phase: .request,
+            matchedRuleName: "Profile request"
         )
 
         Task { _ = await manager.enqueueAndWait(data) }
@@ -112,6 +113,7 @@ struct BreakpointManagerTests {
         #expect(item.url == "127.0.0.1:43210/rockxy-demo/profile?operationName=ExpiredToken")
         #expect(item.client == "Flutter")
         #expect(item.queryName == "ExpiredToken")
+        #expect(item.matchedRuleName == "Profile request")
 
         manager.resolve(id: item.id, decision: .cancel)
     }
@@ -300,7 +302,107 @@ struct BreakpointManagerTests {
         #expect(result.1.isBodyEditable == false)
     }
 
+    // MARK: - Cancellation-aware waiting
+
+    @Test("cancelling a waiting task removes only that item and returns .cancel with the original draft")
+    func cancelRemovesOnlyThatItemWithOriginalDraft() async throws {
+        let manager = BreakpointManager()
+        let dataA = BreakpointRequestData(
+            method: "GET", url: "https://a.com", headers: [], body: "original-a", statusCode: 200, phase: .request
+        )
+        let dataB = BreakpointRequestData(
+            method: "POST", url: "https://b.com", headers: [], body: "original-b", statusCode: 200, phase: .request
+        )
+
+        let taskA = Task { await manager.enqueueAndWait(dataA) }
+        try await waitForCount(1, on: manager)
+        let itemAID = try #require(manager.pausedItems.first).id
+        let taskB = Task { await manager.enqueueAndWait(dataB) }
+        try await waitForCount(2, on: manager)
+        let itemBID = try #require(manager.pausedItems.last).id
+
+        // Cancelling task A must drain exactly A and leave B paused.
+        taskA.cancel()
+        try await waitForCount(1, on: manager)
+
+        let resultA = await taskA.value
+        #expect(resultA.0 == .cancel)
+        #expect(resultA.1.body == "original-a")
+
+        let remaining = try #require(manager.pausedItems.first)
+        #expect(remaining.id == itemBID)
+        #expect(remaining.id != itemAID)
+
+        // B was never resolved by A's cancellation: it still honors its own decision.
+        manager.resolve(id: remaining.id, decision: .execute)
+        let resultB = await taskB.value
+        #expect(resultB.0 == .execute)
+    }
+
+    @Test("a task cancelled before it enqueues never adds a row and returns .cancel")
+    func cancelBeforeEnqueueAddsNoRow() async {
+        let manager = BreakpointManager()
+        let data = BreakpointRequestData(
+            method: "GET", url: "https://a.com", headers: [], body: "orig", statusCode: 200, phase: .request
+        )
+
+        let task = Task {
+            // Yield so the cancellation below lands before the continuation registers.
+            await Task.yield()
+            return await manager.enqueueAndWait(data)
+        }
+        task.cancel()
+
+        let result = await task.value
+        #expect(result.0 == .cancel)
+        #expect(result.1.body == "orig")
+        #expect(manager.pausedItems.isEmpty)
+    }
+
+    @Test("cancelling one paused task never resolves a concurrently paused task")
+    func cancelOneDoesNotResolveAnother() async throws {
+        let manager = BreakpointManager()
+        let first = Task {
+            await manager.enqueueAndWait(
+                BreakpointRequestData(
+                    method: "GET", url: "https://first.com", headers: [], body: "", statusCode: 200, phase: .request
+                )
+            )
+        }
+        try await waitForCount(1, on: manager)
+        let firstID = try #require(manager.pausedItems.first).id
+        let second = Task {
+            await manager.enqueueAndWait(
+                BreakpointRequestData(
+                    method: "GET", url: "https://second.com", headers: [], body: "", statusCode: 200, phase: .request
+                )
+            )
+        }
+        try await waitForCount(2, on: manager)
+        let secondID = try #require(manager.pausedItems.last).id
+
+        first.cancel()
+        try await waitForCount(1, on: manager)
+        _ = await first.value
+
+        // The survivor is the second item, still suspended and independently resolvable.
+        let survivor = try #require(manager.pausedItems.first)
+        #expect(survivor.id == secondID)
+        #expect(survivor.id != firstID)
+        manager.resolve(id: survivor.id, decision: .abort)
+        let secondResult = await second.value
+        #expect(secondResult.0 == .abort)
+    }
+
     // MARK: Private
+
+    /// Poll until the queue reaches `count` items or a bounded number of ticks elapse.
+    private func waitForCount(_ count: Int, on manager: BreakpointManager) async throws {
+        for _ in 0 ..< 200 where manager.pausedItems.count != count {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        #expect(manager.pausedItems.count == count)
+    }
 
     /// Enqueue one paused item and wait until it is appended, so the queue order
     /// is deterministic across sequential `enqueueItem` calls. The spawned task's

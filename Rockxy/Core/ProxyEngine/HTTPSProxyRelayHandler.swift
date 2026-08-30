@@ -32,7 +32,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
         self.port = port
@@ -45,6 +46,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         self.clientSourcePort = clientSourcePort
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
+        self.breakpointBridgeTracker = breakpointBridgeTracker
     }
 
     // MARK: Internal
@@ -105,12 +107,24 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
     }
 
     nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {
+        cancelPendingBreakpoint()
         if let sslError = error as? NIOSSLError, case .uncleanShutdown = sslError {
             context.close(promise: nil)
             return
         }
         httpsRelayLogger.error("HTTPS relay error for \(self.host): \(String(describing: error))")
         context.close(promise: nil)
+    }
+
+    nonisolated func channelInactive(context: ChannelHandlerContext) {
+        // Client disconnected while a request breakpoint may still be paused: cancel
+        // the waiting Task so the queue drains and no upstream work is initiated.
+        cancelPendingBreakpoint()
+        context.fireChannelInactive()
+    }
+
+    nonisolated func handlerRemoved(context: ChannelHandlerContext) {
+        cancelPendingBreakpoint()
     }
 
     // MARK: Private
@@ -129,8 +143,14 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         BreakpointDecision,
         BreakpointRequestData
     ))?
+    private let breakpointBridgeTracker: BreakpointBridgeTracker?
 
     private var pendingBreakpointPhase: BreakpointRulePhase?
+    private var pendingBreakpointRuleName: String?
+    /// The unstructured Task bridging an in-flight request breakpoint to the
+    /// @MainActor queue. Retained so a client disconnect / proxy stop can cancel it
+    /// and drain the paused item instead of leaking the row and its continuation.
+    private var pendingBreakpointTask: Task<Void, Never>?
 
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
@@ -171,6 +191,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         head: HTTPRequestHead
     ) {
         pendingBreakpointPhase = nil
+        pendingBreakpointRuleName = nil
         var requestData = buildRequestData(from: head)
 
         var head = head
@@ -205,8 +226,13 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             let evaluation = try? result.get()
             let breakpointRule = evaluation?.0
             let matchedRule = evaluation?.1
-            let matchedRuleCallback = self.makeTransactionCallback(for: matchedRule)
+            let ruleForTransaction = ProxyHandlerShared.transactionRule(
+                breakpointRule: breakpointRule,
+                matchedRule: matchedRule
+            )
+            let matchedRuleCallback = self.makeTransactionCallback(for: ruleForTransaction)
 
+            self.pendingBreakpointRuleName = breakpointRule?.name
             if let responsePhase = breakpointRule?.action.responseBreakpointPhase {
                 self.pendingBreakpointPhase = responsePhase
             }
@@ -309,8 +335,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             nil
         }
         let fallbackURL = URL(string: "https://localhost/")!
-        let parsedURL = URL(string: "https://\(host)\(head.uri)")
-            ?? URL(string: "https://\(host)/")
+        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: "https")
+        let requestTarget = head.uri.hasPrefix("/") ? head.uri : "/\(head.uri)"
+        let parsedURL = URL(string: "https://\(authority)\(requestTarget)")
+            ?? URL(string: "https://\(authority)/")
             ?? fallbackURL
         return HTTPRequestData(
             method: head.method.rawValue,
@@ -431,14 +459,17 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 isHTTPS: true,
                 sourcePort: self.clientSourcePort,
                 breakpointPhase: self.pendingBreakpointPhase,
+                breakpointRuleName: self.pendingBreakpointRuleName,
                 headerResponseOperations: responseHeaderOperations,
                 networkConditionProfile: networkConditionProfile,
                 scriptPluginManager: self.scriptPluginManager,
                 onBreakpointHit: self.onBreakpointHit,
+                breakpointBridgeTracker: self.breakpointBridgeTracker,
                 onTransactionComplete: callback,
                 onChannelClosed: { limiter.release(host: upstreamHost, port: upstreamPort) }
             )
             self.pendingBreakpointPhase = nil
+            self.pendingBreakpointRuleName = nil
             clientChannel.pipeline.addHandler(responseHandler).whenComplete { result in
                 switch result {
                 case .success:
@@ -981,7 +1012,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             return
         }
 
-        let urlString = "https://\(host)\(head.uri)"
+        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: "https")
+        let urlString = "https://\(authority)\(head.uri)"
         let bodyProjection = BreakpointRequestData.editableBodyProjection(from: requestData.body)
         let breakpointData = BreakpointRequestData(
             method: head.method.rawValue,
@@ -991,18 +1023,29 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
             statusCode: 200,
             phase: .request,
             isBodyEditable: bodyProjection.isEditable,
-            fixedHTTPSAuthority: host
+            fixedHTTPSAuthority: authority,
+            matchedRuleName: pendingBreakpointRuleName
         )
 
         let eventLoop = context.eventLoop
         let promise = eventLoop.makePromise(of: (BreakpointDecision, BreakpointRequestData).self)
 
-        promise.completeWithTask {
+        let bridgeLease = breakpointBridgeTracker?.begin()
+        pendingBreakpointTask = promise.completeWithTask {
             await onBreakpointHit(breakpointData)
         }
+        context.channel.probeBreakpointClientLiveness()
 
         promise.futureResult.whenComplete { [weak self] result in
+            defer { bridgeLease?.finish() }
             guard let self else {
+                return
+            }
+            self.pendingBreakpointTask = nil
+            // If the downstream client is gone (disconnect / proxy stop), a resolved
+            // breakpoint must not start any origin work or write a response.
+            guard context.channel.isActive else {
+                httpsRelayLogger.debug("HTTPS breakpoint resolved after client disconnect; dropping upstream work")
                 return
             }
             switch result {
@@ -1033,6 +1076,11 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         }
     }
 
+    nonisolated private func cancelPendingBreakpoint() {
+        pendingBreakpointTask?.cancel()
+        pendingBreakpointTask = nil
+    }
+
     nonisolated private func executeBreakpointDecision(
         _ decision: BreakpointDecision,
         modifiedData: BreakpointRequestData,
@@ -1050,7 +1098,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 originalHead: head,
                 originalRequestData: requestData,
                 isHTTPS: true,
-                originalHost: self.host
+                originalHost: self.host,
+                originalPort: self.port
             )
             self.connectToUpstream(
                 context: context,

@@ -91,6 +91,7 @@ extension MainContentCoordinator {
     private func assistantWorkspaceCaptureState() -> AssistantWorkspaceSummary.CaptureState {
         switch proxyDisplayState {
         case .starting: .starting
+        case .stopping: .stopped
         case .running: .running
         case .paused: .paused
         case .stopped: .stopped

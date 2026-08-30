@@ -52,6 +52,7 @@ struct CenterContentView: View {
                 mapLocalToolEnabled: mapLocalToolEnabled,
                 mapRemoteToolEnabled: mapRemoteToolEnabled,
                 breakpointToolEnabled: breakpointToolEnabled,
+                pausedBreakpointCount: coordinator.breakpointManager.pausedItems.count,
                 onSwitchOffProxyOverride: {
                     coordinator.switchOffSystemProxyOverride()
                 },
