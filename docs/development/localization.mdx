@@ -1,6 +1,6 @@
 ---
 title: "Localization"
-description: "How Rockxy is localized, how to add or improve a language, and the catalog hygiene rules contributors must follow"
+description: "How to report, repair, test, and contribute Rockxy translations or add a new language"
 ---
 
 Rockxy uses native Xcode **String Catalogs** (`.xcstrings`). The catalogs checked
@@ -21,8 +21,24 @@ automatically.
 | `Rockxy/InfoPlist.xcstrings` | `Info.plist` user-facing text (e.g. the Local Network usage prompt) |
 
 The source language is **English (`en`)**. The first shipped translation is
-**Simplified Chinese (`zh-Hans`)**. `knownRegions` in `Rockxy.xcodeproj/project.pbxproj`
-lists every language the project builds.
+**Simplified Chinese (`zh-Hans`)**. `knownRegions` in
+`Rockxy.xcodeproj/project.pbxproj` lists every language the project builds.
+
+## What contributions are welcome
+
+Rockxy accepts localization contributions for every language, including:
+
+- inaccurate, unnatural, overly literal, or culturally inappropriate wording,
+- text that is too long, clipped, or unclear in its actual UI context,
+- incorrect technical terminology or inconsistent wording,
+- missing translator context and corrections to the English source,
+- complete translations for a new language.
+
+You do not need to be a programmer or have Xcode to report or repair a small
+translation. If you prefer not to edit a catalog, open a
+[Translation Improvement issue](https://github.com/RockxyApp/Rockxy/issues/new?template=4-Translation_Improvement.md)
+with the language, where the text appears, the current wording, your proposed
+wording, and why it is better.
 
 ## Writing localizable code
 
@@ -57,20 +73,82 @@ Rules that keep extraction clean and translations safe:
 - **Comments are for translators.** Add a `comment` to any catalog entry whose
   meaning is ambiguous out of context, and to flag tokens that must stay verbatim.
 
-## Adding or improving a language
+## Translation principles
+
+- **Translate meaning in context.** Prefer natural product language in the target
+  language over word-for-word English structure.
+- **Preserve technical meaning.** A polished sentence that changes how a proxy,
+  certificate, rule, or destructive action behaves is not an acceptable translation.
+- **Keep the UI concise.** Match the tone of a native macOS application and check
+  that labels, buttons, menus, tables, and settings do not truncate.
+- **Be consistent.** Reuse established translations for the same action or concept.
+- **Review generated drafts.** Machine translation may be used as a starting point,
+  but do not submit bulk-generated catalog output without fluent human review.
+- **Protect user data.** Redact private URLs, headers, credentials, tokens, request
+  bodies, and captured traffic from screenshots or examples.
+
+## Repairing an existing translation
+
+Translation repair PRs are welcome, including PRs that change only one phrase. A
+small, focused correction is easier to review and does not need unrelated catalog
+entries, Swift tests, SwiftLint, SwiftFormat, or a changelog entry.
+
+### Without Xcode
+
+For a small repair, GitHub's web editor or any UTF-8 text editor is enough:
+
+1. Fork the repository and create a branch from `develop`.
+2. Search `Rockxy/Localizable.xcstrings` or `Rockxy/InfoPlist.xcstrings` for the
+   exact text currently shown in the app.
+3. In that entry's `localizations` object, change only the `value` for your locale.
+   Do not rename the English key, reorder the whole file, or reformat unrelated JSON.
+4. Run `python3 .github/tools/validate_xcstrings.py --no-compile`. This needs only
+   Python 3 and works without Xcode on macOS, Linux, and Windows (where the command
+   may be `python` instead of `python3`).
+5. Open a PR against `develop` and complete the localization section of the PR
+   template.
+
+### With Xcode
+
+1. Open `Rockxy.xcodeproj` and select the affected `.xcstrings` catalog.
+2. Filter by the target language or search for the English key/current translation.
+3. Edit only the affected localized value and review every variation shown by Xcode.
+4. Run the validator and verify the changed UI in Rockxy.
+5. Open a focused PR against `develop`.
+
+For either workflow, include the locale, affected screen or catalog key, and a
+short reason the wording is better. Useful evidence can be native-speaker knowledge,
+a platform terminology reference, a screenshot showing context or truncation, or a
+clear explanation of the technical meaning. A public citation is helpful when one
+exists, but it is not required for ordinary native-language corrections.
+
+If the English source is wrong, say so explicitly. Changing an English key can
+affect every locale, so update the impacted translations or keep the source change
+in a separate PR that can receive broader review.
+
+## Adding a new language
 
 Anyone may contribute a language through a normal reviewed pull request:
 
-1. Open `Rockxy/Localizable.xcstrings` (and `InfoPlist.xcstrings`) in Xcode.
-2. Add your language from the catalog's **+** control, or edit an existing one.
-3. Translate every entry. Preserve, exactly:
+1. Choose the standard locale identifier used by Apple, such as `de`, `fr`, `ja`,
+   `ko`, `zh-Hant`, or `pt-BR`. Use a region-specific locale only when the wording
+   genuinely differs from the base language.
+2. Open `Rockxy/Localizable.xcstrings` and `Rockxy/InfoPlist.xcstrings` in Xcode.
+3. Add the same language to **both catalogs** from the catalog's **+** control.
+   Confirm Xcode also added the locale to `knownRegions` in
+   `Rockxy.xcodeproj/project.pbxproj`.
+4. Translate every translatable entry. Preserve, exactly:
    - placeholders and their **order** (`%@`, `%lld`, positional `%1$@` / `%2$lld`),
    - plural / device variations,
    - leading/trailing whitespace and newlines,
    - Markdown and HTML fragments,
    - keyboard notation, file extensions, and technical/product terms.
-4. Run the validator (below) until it is clean.
-5. Open a PR against `develop`. A maintainer reviews every `.xcstrings` change
+5. Run `python3 .github/tools/validate_xcstrings.py --require <locale>` until it
+   is clean. The default validator also discovers and checks every locale present
+   in either catalog.
+6. Build Rockxy, select the new language under **Settings › Appearance › Language**,
+   and inspect the important surfaces listed below.
+7. Open a PR against `develop`. A maintainer reviews every `.xcstrings` change
    (see `.github/CODEOWNERS`) — this protects placeholder integrity and the shared
    English source, and does **not** block your contribution.
 
@@ -78,26 +156,62 @@ Translations may land as a first pass and be refined later, but a language shoul
 not be advertised as supported until its **runtime coverage is complete** — every
 translatable entry has a non-empty value.
 
+## What must remain unchanged
+
+Unless the term has an established localized product spelling, preserve these
+exactly:
+
+- placeholders and their order (`%@`, `%lld`, `%1$@`, `%2$lld`),
+- protocol and product names (`HTTP`, `HTTPS`, `WebSocket`, `GraphQL`, `MCP`,
+  `Rockxy`),
+- header names, MIME types, URLs, routes, file extensions, and code fragments,
+- keyboard notation and shortcuts,
+- Markdown/HTML structure, intentional whitespace, and newlines.
+
+If a technical token must move to make the sentence natural, use positional
+placeholders so its semantic argument order remains unambiguous; do not change the
+placeholder's conversion type.
+
+## Runtime review
+
+Catalog validation proves structure and placeholder safety, but it cannot judge
+language quality or layout. Before marking a new-language PR ready, select the
+language in Rockxy and review at least:
+
+- onboarding and permission dialogs,
+- **Settings**, including **Appearance › Language**,
+- the main capture toolbar, traffic list, filters, and empty states,
+- request/response inspectors and error messages,
+- rules, breakpoints, certificate, import/export, and destructive confirmations,
+- menus, tooltips, keyboard shortcuts, and `Info.plist` permission prompts.
+
+Look for clipping, overlapping controls, untranslated English, incorrect plural or
+format substitutions, and wording that changes the action's meaning. Attach focused,
+redacted screenshots to the PR when a reviewer cannot infer the UI context from the
+catalog key alone.
+
 ## Validation
 
-Run the deterministic validator before pushing. It needs no secrets and no Xcode
-project, so it runs the same way locally and in CI:
+Run the deterministic validator before pushing. It needs no secrets or third-party
+packages, so it runs the same way locally and in CI:
 
 ```bash
-# Validate the default catalogs, requiring full zh-Hans coverage
+# Validate both catalogs and every locale discovered in either catalog
 python3 .github/tools/validate_xcstrings.py
 
-# Check a different language (or several)
+# Require a specific language (or several) explicitly
 python3 .github/tools/validate_xcstrings.py --require zh-Hans,de
 
 # Skip the optional xcstringstool compile (e.g. on a non-macOS machine)
 python3 .github/tools/validate_xcstrings.py --no-compile
 ```
 
-The validator checks: valid JSON, `sourceLanguage == en`, full coverage for the
-required languages, no empty values, and placeholder parity between the source and
-every translation. When Xcode's toolchain is available it also compiles each catalog
-with `xcrun xcstringstool compile`. You can compile a catalog by hand too:
+The validator checks: valid JSON, `sourceLanguage == en`, matching locale coverage
+across both catalogs, full coverage for every discovered or explicitly required
+language, parity with the Xcode project's `knownRegions`, no empty values, variation
+parity, and placeholder parity between the source and every translation. When
+Xcode's toolchain is available it also compiles each catalog with
+`xcrun xcstringstool compile`. You can compile a catalog by hand too:
 
 ```bash
 xcrun xcstringstool compile --output-directory /tmp/xcstrings Rockxy/Localizable.xcstrings
