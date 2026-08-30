@@ -14,12 +14,13 @@ enum NetworkConditionPreset: String, CaseIterable, Codable {
 
     var displayName: String {
         switch self {
+        // Cellular/network standard names render verbatim regardless of language.
         case .threeG: "3G"
         case .edge: "EDGE"
         case .lte: "LTE"
-        case .veryBadNetwork: "Very Bad Network"
         case .wifi: "WiFi"
-        case .custom: "Custom"
+        case .veryBadNetwork: String(localized: "Very Bad Network", bundle: RockxyLocalization.bundle)
+        case .custom: String(localized: "Custom", bundle: RockxyLocalization.bundle)
         }
     }
 

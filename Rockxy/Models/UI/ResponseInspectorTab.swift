@@ -19,12 +19,13 @@ enum ResponseInspectorTab: String, CaseIterable {
 
     var displayName: String {
         switch self {
+        // "AI" is a product/acronym token; "Set-Cookie" is an HTTP header name — both verbatim.
         case .ai: "AI"
-        case .headers: "Headers"
-        case .body: "Body"
+        case .headers: String(localized: "Headers", bundle: RockxyLocalization.bundle)
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
         case .setCookie: "Set-Cookie"
-        case .auth: "Auth"
-        case .timeline: "Timeline"
+        case .auth: String(localized: "Auth", bundle: RockxyLocalization.bundle)
+        case .timeline: String(localized: "Timeline", bundle: RockxyLocalization.bundle)
         }
     }
 }

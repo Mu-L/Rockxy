@@ -14,12 +14,12 @@ enum LogLevel: Int, Comparable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .debug: "Debug"
-        case .info: "Info"
-        case .notice: "Notice"
-        case .warning: "Warning"
-        case .error: "Error"
-        case .fault: "Fault"
+        case .debug: String(localized: "Debug", bundle: RockxyLocalization.bundle)
+        case .info: String(localized: "Info", bundle: RockxyLocalization.bundle)
+        case .notice: String(localized: "Notice", bundle: RockxyLocalization.bundle)
+        case .warning: String(localized: "Warning", bundle: RockxyLocalization.bundle)
+        case .error: String(localized: "Error", bundle: RockxyLocalization.bundle)
+        case .fault: String(localized: "Fault", bundle: RockxyLocalization.bundle)
         }
     }
 

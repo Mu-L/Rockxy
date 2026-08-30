@@ -260,7 +260,11 @@ struct ResponseInspectorView: View {
                 Button {
                     openResponseBody(bundleIdentifier: "com.microsoft.VSCode")
                 } label: {
-                    Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label {
+                        Text(verbatim: "Code")
+                    } icon: {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    }
                 }
 
                 Button {

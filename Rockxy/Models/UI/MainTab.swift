@@ -12,9 +12,9 @@ enum MainTab: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .traffic: "Traffic"
-        case .logs: "Logs"
-        case .timeline: "Timeline"
+        case .traffic: String(localized: "Traffic", bundle: RockxyLocalization.bundle)
+        case .logs: String(localized: "Logs", bundle: RockxyLocalization.bundle)
+        case .timeline: String(localized: "Timeline", bundle: RockxyLocalization.bundle)
         }
     }
 

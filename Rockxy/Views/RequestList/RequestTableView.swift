@@ -122,7 +122,7 @@ struct RequestTableView: NSViewRepresentable {
             ),
             ColumnSpec(
                 id: "code",
-                title: String(localized: "Code", bundle: RockxyLocalization.bundle),
+                title: String(localized: "Compact HTTP status code", bundle: RockxyLocalization.bundle),
                 width: 52,
                 minWidth: 44
             ),
@@ -2038,7 +2038,7 @@ extension RequestTableView {
                 ("client", String(localized: "Client", bundle: RockxyLocalization.bundle)),
                 ("method", String(localized: "Method", bundle: RockxyLocalization.bundle)),
                 ("state", String(localized: "Status", bundle: RockxyLocalization.bundle)),
-                ("code", String(localized: "Code", bundle: RockxyLocalization.bundle)),
+                ("code", String(localized: "Compact HTTP status code", bundle: RockxyLocalization.bundle)),
                 ("time", String(localized: "Time", bundle: RockxyLocalization.bundle)),
                 ("duration", String(localized: "Duration", bundle: RockxyLocalization.bundle)),
                 ("requestSize", String(localized: "Request", bundle: RockxyLocalization.bundle)),
