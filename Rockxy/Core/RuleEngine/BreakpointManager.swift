@@ -62,23 +62,40 @@ final class BreakpointManager {
             queryName: Self.queryName(from: data),
             method: data.method,
             statusCode: data.phase == .response ? data.statusCode : nil,
-            matchedRuleName: nil,
+            matchedRuleName: data.matchedRuleName,
             createdAt: Date(),
             editableDraft: data
         )
 
-        return await withCheckedContinuation { continuation in
-            continuations[itemId] = continuation
-            let wasEmpty = pausedItems.isEmpty
-            pausedItems.append(item)
-            if !hasValidSelection {
-                selectedItemId = itemId
+        // Bridge the proxy handler's Task cancellation (fired when the downstream
+        // client disconnects or the proxy stops) into a deterministic queue drain:
+        // the paused row is removed and the continuation resumes exactly once with
+        // `.cancel` and the original draft. `.cancel` keeps the existing public
+        // semantics — the handler forwards the original only while still connected.
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                // Cancelled before the pause could register (client already gone):
+                // resume immediately without ever queuing a row.
+                guard !Task.isCancelled else {
+                    continuation.resume(returning: (.cancel, data))
+                    return
+                }
+                continuations[itemId] = continuation
+                let wasEmpty = pausedItems.isEmpty
+                pausedItems.append(item)
+                if !hasValidSelection {
+                    selectedItemId = itemId
+                }
+                Self.logger.info("Breakpoint paused")
+                // Auto-raise the queue window once per burst: notify only on the
+                // empty → non-empty transition, not on every subsequent hit.
+                if wasEmpty {
+                    NotificationCenter.default.post(name: .breakpointHit, object: self)
+                }
             }
-            Self.logger.info("Breakpoint paused")
-            // Auto-raise the queue window once per burst: notify only on the
-            // empty → non-empty transition, not on every subsequent hit.
-            if wasEmpty {
-                NotificationCenter.default.post(name: .breakpointHit, object: nil)
+        } onCancel: {
+            Task { @MainActor in
+                self.cancelPausedItem(id: itemId, originalDraft: data)
             }
         }
     }
@@ -223,6 +240,24 @@ final class BreakpointManager {
             return ""
         }
         return operationName
+    }
+
+    /// Removes a single paused item whose waiting Task was cancelled and resumes its
+    /// continuation exactly once with `.cancel` and the original draft. Other queued
+    /// items are left untouched, and selection repairs the same way as `resolve`.
+    /// A no-op if the item was already resolved (its continuation is gone).
+    private func cancelPausedItem(id: UUID, originalDraft: BreakpointRequestData) {
+        guard let continuation = continuations.removeValue(forKey: id) else {
+            return
+        }
+        if let index = pausedItems.firstIndex(where: { $0.id == id }) {
+            pausedItems.remove(at: index)
+            if selectedItemId == id {
+                selectedItemId = pausedItems.isEmpty ? nil : pausedItems[min(index, pausedItems.count - 1)].id
+            }
+        }
+        continuation.resume(returning: (.cancel, originalDraft))
+        Self.logger.info("Breakpoint cancelled (client disconnected)")
     }
 
     private func selectAdjacentItem(offset: Int) {

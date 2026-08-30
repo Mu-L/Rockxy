@@ -52,6 +52,13 @@
   <a href="https://trendshift.io/repositories/26380?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-26380" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/26380/daily?language=Swift" alt="RockxyApp/Rockxy | Trendshift" width="250" height="55" /></a>
 </p>
 
+> [!TIP]
+> Translation improvements are welcome in every language. Found wording that is
+> awkward, inaccurate, culturally inappropriate, truncated, or too literal? Open
+> a [translation issue](https://github.com/RockxyApp/Rockxy/issues/new?template=4-Translation_Improvement.md)
+> or send a focused PR. Small repairs can be made without Xcode. See the
+> [localization guide](docs/development/localization.mdx) for both repair and new-language workflows.
+
 > [!IMPORTANT]
 > This repository contains the public Rockxy Community source edition under
 > AGPL-3.0-or-later. Builds made solely from this repository are AGPL builds.

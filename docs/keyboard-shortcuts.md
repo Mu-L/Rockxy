@@ -33,6 +33,7 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | `⌘E` | Edit and Repeat the selected request |
 | `⌘R` | Replay the selected request |
 | `⌘B` | Add a Breakpoint rule for the selected request URL |
+| `⇧⌘B` | Open Breakpoint Rules |
 | `⇧⌘[` / `⇧⌘]` | Switch workspace tabs |
 
 ## Compose
@@ -52,7 +53,7 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 
 | Shortcut | Action |
 |---|---|
-| `⌘↩` | Execute the selected paused item |
+| `⌘↩` | Apply changes and continue the selected paused item |
 | `⌘.` | Abort the selected paused item |
 | `Esc` | Close the queue window; queued items remain paused |
 | `⌘[` / `⌘]` | Move to the previous or next queued item |
@@ -65,9 +66,22 @@ Rockxy follows the same shortcut pattern across the main capture window, rule ed
 | `⌥⌘D` | Compare Selected |
 | `⌥⌘S` | Swap Sides |
 
-## Rules Windows
+## Breakpoint Rules
 
-Applies to Map Local, Map Remote, Block List, Allow List, Modify Headers, Network Conditions, Scripting, and Breakpoint Rules where the action exists.
+| Shortcut | Action |
+|---|---|
+| `⌘N` | New Breakpoint rule |
+| `⌘↩` | Edit the selected Breakpoint rule |
+| `⌘D` | Duplicate the selected rule |
+| `⌘⌫` | Delete the selected rule |
+| `⌘F` | Focus the rules search field |
+| `⌘T` | Open Breakpoint Templates |
+
+Use the Enabled checkbox or the **More** menu to enable or disable the selected Breakpoint rule.
+
+## Other Rules Windows
+
+Applies to Map Local, Map Remote, Block List, Allow List, Modify Headers, Network Conditions, and Scripting where the action exists.
 
 | Shortcut | Action |
 |---|---|
@@ -78,7 +92,6 @@ Applies to Map Local, Map Remote, Block List, Allow List, Modify Headers, Networ
 | `⌘⌫` | Delete selected rule |
 | `↵` / `Space` | Toggle selected rule enabled state |
 | `⌘F` | Filter rules |
-| `⌘T` | Open Breakpoint Templates from Breakpoint Rules |
 
 ## Settings
 

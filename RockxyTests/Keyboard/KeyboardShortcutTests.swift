@@ -48,7 +48,7 @@ struct KeyboardShortcutTests {
     @Test("KS_FOCUS_03 Breakpoint Queue documents execute without an extra click")
     func breakpointQueueExecuteFocusIsDocumented() throws {
         let reference = try Self.documentation(named: "keyboard-shortcuts.md")
-        #expect(reference.contains("Execute the selected paused item"))
+        #expect(reference.contains("Apply changes and continue the selected paused item"))
         #expect(reference.contains("`⌘↩`"))
     }
 

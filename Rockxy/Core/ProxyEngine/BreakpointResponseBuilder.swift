@@ -25,14 +25,20 @@ enum BreakpointResponseBuilder {
 
         var headers = HTTPHeaders()
         for header in modifiedData.headers {
-            guard !header.name.isEmpty else {
+            guard BreakpointRequestData.isValidHTTPHeaderName(header.name),
+                  BreakpointRequestData.isValidHTTPHeaderValue(header.value) else
+            {
                 continue
             }
-            headers.add(name: header.name, value: header.value)
+            headers.add(name: header.name.trimmingCharacters(in: .whitespacesAndNewlines), value: header.value)
         }
 
         let body: Data?
-        if !modifiedData.isBodyEditable {
+        if responseMustNotIncludeBody(method: modifiedData.method, statusCode: modifiedData.statusCode) {
+            body = nil
+            headers.remove(name: "Content-Length")
+            headers.remove(name: "Transfer-Encoding")
+        } else if !modifiedData.isBodyEditable {
             body = originalBody
             headers.remove(name: "Transfer-Encoding")
             if let originalBody {
@@ -67,4 +73,12 @@ enum BreakpointResponseBuilder {
         subsystem: RockxyIdentity.current.logSubsystem,
         category: "BreakpointResponseBuilder"
     )
+
+    private static func responseMustNotIncludeBody(method: String, statusCode: Int) -> Bool {
+        method.caseInsensitiveCompare("HEAD") == .orderedSame
+            || (100 ..< 200).contains(statusCode)
+            || statusCode == 204
+            || statusCode == 205
+            || statusCode == 304
+    }
 }

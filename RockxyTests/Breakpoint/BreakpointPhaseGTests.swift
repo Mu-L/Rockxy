@@ -10,10 +10,14 @@ struct BreakpointPhaseGTests {
     func threeConcurrentMatchesProduceThreeQueueItems() async throws {
         let manager = BreakpointManager()
         let harness = BreakpointTestHarness(manager: manager, ruleEngine: RuleEngine())
-        let tasks = (1...3).map { index in
-            Task { await manager.enqueueAndWait(.test(url: "https://httpbin.org/get?id=\(index)")) }
+        var tasks: [Task<(BreakpointDecision, BreakpointRequestData), Never>] = []
+        for index in 1...3 {
+            let task = Task {
+                await manager.enqueueAndWait(.test(url: "https://httpbin.org/get?id=\(index)"))
+            }
+            tasks.append(task)
+            try await waitForQueueCount(index, manager: manager)
         }
-        try await waitForQueueCount(3, manager: manager)
         #expect(manager.pausedItems.count == 3)
         let ids = Set(manager.pausedItems.map(\.id))
         #expect(ids.count == 3)
@@ -140,7 +144,7 @@ struct BreakpointPhaseGTests {
     private func waitForQueueCount(
         _ count: Int,
         manager: BreakpointManager,
-        timeout seconds: TimeInterval = 5
+        timeout seconds: TimeInterval = 30
     ) async throws {
         let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {

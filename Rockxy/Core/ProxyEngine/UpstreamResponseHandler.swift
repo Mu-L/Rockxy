@@ -34,11 +34,13 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
         isHTTPS: Bool = false,
         sourcePort: UInt16? = nil,
         breakpointPhase: BreakpointRulePhase? = nil,
+        breakpointRuleName: String? = nil,
         headerResponseOperations: [HeaderOperation]? = nil,
         networkConditionProfile: NetworkConditionProfile? = nil,
         scriptPluginManager: ScriptPluginManager? = nil,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
             nil,
+        breakpointBridgeTracker: BreakpointBridgeTracker? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onChannelClosed: @escaping @Sendable () -> Void = {}
     ) {
@@ -51,10 +53,12 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
         self.isHTTPS = isHTTPS
         self.sourcePort = sourcePort
         self.breakpointPhase = breakpointPhase
+        self.breakpointRuleName = breakpointRuleName
         self.headerResponseOperations = headerResponseOperations
         self.networkConditionProfile = networkConditionProfile
         self.scriptPluginManager = scriptPluginManager
         self.onBreakpointHit = onBreakpointHit
+        self.breakpointBridgeTracker = breakpointBridgeTracker
         self.onTransactionComplete = onTransactionComplete
         self.onChannelClosed = onChannelClosed
         if let scriptPluginManager {
@@ -144,7 +148,15 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
 
         // Close upstream channel when the client disconnects to prevent FD leaks
         clientContext.channel.closeFuture.whenComplete { [weak self] _ in
-            guard let self, !self.completed else {
+            guard let self else {
+                return
+            }
+            // A response breakpoint sets `completed` at `.end` before pausing, so the
+            // guard below would otherwise skip a paused item. Cancel it here first so
+            // the queue drains; its resolution gate then suppresses relay/build because
+            // the client channel is already inactive.
+            self.cancelPendingResponseBreakpoint()
+            guard !self.completed else {
                 return
             }
             self.completed = true
@@ -315,6 +327,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     private let isHTTPS: Bool
     private let sourcePort: UInt16?
     private let breakpointPhase: BreakpointRulePhase?
+    private let breakpointRuleName: String?
     private let headerResponseOperations: [HeaderOperation]?
     private let networkConditionProfile: NetworkConditionProfile?
     private let scriptPluginManager: ScriptPluginManager?
@@ -323,6 +336,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
         BreakpointDecision,
         BreakpointRequestData
     ))?
+    private let breakpointBridgeTracker: BreakpointBridgeTracker?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onChannelClosed: @Sendable () -> Void
 
@@ -334,6 +348,12 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     private var firstByteTime: DispatchTime?
     private var completed = false
     private var readTimeoutTask: Scheduled<Void>?
+    /// The unstructured Task bridging an in-flight response breakpoint to the
+    /// @MainActor queue. Retained so a downstream-client disconnect can cancel it and
+    /// drain the paused item instead of leaking the row and its continuation. Only the
+    /// client `closeFuture` cancels it — an upstream close after a full response is a
+    /// normal end-of-stream and must not disturb a legitimately paused breakpoint.
+    private var pendingResponseBreakpointTask: Task<Void, Never>?
     private var downloadReadyAtNanos: UInt64?
     private var downloadTailFuture: EventLoopFuture<Void>?
 
@@ -360,6 +380,11 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
 
         let nsError = error as NSError
         return nsError.domain == "NIOSSL.NIOSSLErrorDomain" && nsError.code == 12
+    }
+
+    nonisolated private func cancelPendingResponseBreakpoint() {
+        pendingResponseBreakpointTask?.cancel()
+        pendingResponseBreakpointTask = nil
     }
 
     // MARK: - Client Relay
@@ -553,18 +578,31 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
             body: bodyProjection.text,
             statusCode: Int(head.status.code),
             phase: .response,
-            isBodyEditable: bodyProjection.isEditable
+            isBodyEditable: bodyProjection.isEditable,
+            matchedRuleName: breakpointRuleName
         )
 
         let eventLoop = context.eventLoop
         let promise = eventLoop.makePromise(of: (BreakpointDecision, BreakpointRequestData).self)
 
-        promise.completeWithTask {
+        let bridgeLease = breakpointBridgeTracker?.begin()
+        pendingResponseBreakpointTask = promise.completeWithTask {
             await onBreakpointHit(breakpointData)
         }
+        clientContext.channel.probeBreakpointClientLiveness()
 
         promise.futureResult.whenComplete { [weak self] result in
+            defer { bridgeLease?.finish() }
             guard let self else {
+                return
+            }
+            self.pendingResponseBreakpointTask = nil
+            // If the downstream client disconnected during the pause, do not relay the
+            // response or build a (duplicate) completed transaction — just release the
+            // upstream channel.
+            guard self.clientContext.channel.isActive else {
+                upstreamLogger.debug("Response breakpoint resolved after client disconnect; dropping relay")
+                context.close(promise: nil)
                 return
             }
             switch result {
@@ -648,12 +686,22 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
                 self?.clientContext.close(promise: nil)
             }
 
+            let responseData = HTTPResponseData(
+                statusCode: 503,
+                statusMessage: "Service Unavailable",
+                headers: [HTTPHeader(name: "Connection", value: "close")]
+            )
             let transaction = HTTPTransaction(
                 request: requestData,
-                response: HTTPResponseData(statusCode: 503, statusMessage: "Service Unavailable", headers: []),
-                state: .failed
+                response: responseData,
+                state: .failed,
+                timingInfo: buildTimingInfo(endTime: .now()),
+                graphQLInfo: graphQLInfo,
+                web3RPCInfo: Web3RPCDetector.detect(request: requestData, response: responseData),
+                x402Info: X402Detector.detect(request: requestData, response: responseData)
             )
             transaction.sourcePort = sourcePort
+            transaction.clientApp = Self.extractAppFromUserAgent(requestData.headers)
             onTransactionComplete(transaction)
             context.close(promise: nil)
         }

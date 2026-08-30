@@ -11,11 +11,204 @@ nonisolated(unsafe) private let proxyServerLogger = Logger(
     category: "ProxyServer"
 )
 
+// MARK: - BreakpointClientLivenessProbeHandler
+
+/// Provides a one-shot transport read while an HTTP response is intentionally
+/// withheld by a breakpoint. NIO's pipelining helper normally pauses socket reads
+/// until the response finishes; without this probe, a peer FIN cannot reach the
+/// breakpoint handler and its queued item would remain paused.
+private final class BreakpointClientLivenessProbeHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = NIOAny
+}
+
+extension Channel {
+    /// Requests one transport-level read from the handler positioned before the HTTP
+    /// pipelining helper. The read stays bounded to a single socket read and therefore
+    /// preserves the helper's back-pressure for pipelined requests.
+    nonisolated func probeBreakpointClientLiveness() {
+        let pipeline = self.pipeline
+        eventLoop.execute {
+            pipeline.context(handlerType: BreakpointClientLivenessProbeHandler.self).whenSuccess { context in
+                context.read()
+            }
+        }
+    }
+}
+
+// MARK: - Proxy shutdown coordination
+
+/// Tracks accepted client channels so proxy shutdown can close and await every live
+/// connection before its event-loop group is torn down.
+final class ProxyChildChannelRegistry: @unchecked Sendable {
+    func prepareForStart() async {
+        var staleChannelCount = 0
+        while true {
+            let staleChannels = beginShutdown()
+            staleChannelCount += staleChannels.count
+            await close(staleChannels)
+            await waitUntilEmpty()
+            guard finishPreparingForStartIfEmpty() else {
+                continue
+            }
+            break
+        }
+        if staleChannelCount > 0 {
+            proxyServerLogger.warning("Closed \(staleChannelCount) stale client channels before proxy restart")
+        }
+    }
+
+    func register(_ channel: Channel) {
+        let identifier = ObjectIdentifier(channel)
+        lock.lock()
+        let shouldClose = isShuttingDown
+        channels[identifier] = channel
+        lock.unlock()
+
+        channel.closeFuture.whenComplete { [weak self] _ in
+            self?.remove(identifier)
+        }
+        if shouldClose {
+            channel.close(promise: nil)
+        }
+    }
+
+    func closeAllAndWait() async {
+        let snapshot = beginShutdown()
+        await close(snapshot)
+        await waitUntilEmpty()
+    }
+
+    private let lock = NSLock()
+    private var channels: [ObjectIdentifier: Channel] = [:]
+    private var isShuttingDown = false
+    private var emptyWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func beginShutdown() -> [Channel] {
+        lock.lock()
+        isShuttingDown = true
+        let snapshot = Array(channels.values)
+        lock.unlock()
+        return snapshot
+    }
+
+    private func close(_ channels: [Channel]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for channel in channels {
+                group.addTask {
+                    try? await channel.close().get()
+                }
+            }
+        }
+    }
+
+    private func finishPreparingForStartIfEmpty() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard channels.isEmpty else {
+            return false
+        }
+        isShuttingDown = false
+        return true
+    }
+
+    private func remove(_ identifier: ObjectIdentifier) {
+        let waiters: [CheckedContinuation<Void, Never>]
+        lock.lock()
+        channels.removeValue(forKey: identifier)
+        if channels.isEmpty {
+            waiters = emptyWaiters
+            emptyWaiters.removeAll()
+        } else {
+            waiters = []
+        }
+        lock.unlock()
+        waiters.forEach { $0.resume() }
+    }
+
+    private func waitUntilEmpty() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if channels.isEmpty {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                emptyWaiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+}
+
+/// Counts breakpoint Task-to-NIO promise bridges. Shutdown waits for their promise
+/// completion callbacks while the event loops are still alive.
+final class BreakpointBridgeTracker: @unchecked Sendable {
+    final class Lease: @unchecked Sendable {
+        fileprivate init(owner: BreakpointBridgeTracker) {
+            self.owner = owner
+        }
+
+        func finish() {
+            lock.lock()
+            guard !isFinished else {
+                lock.unlock()
+                return
+            }
+            isFinished = true
+            lock.unlock()
+            owner?.finish()
+            owner = nil
+        }
+
+        private let lock = NSLock()
+        private var owner: BreakpointBridgeTracker?
+        private var isFinished = false
+    }
+
+    func begin() -> Lease {
+        lock.lock()
+        activeCount += 1
+        lock.unlock()
+        return Lease(owner: self)
+    }
+
+    func waitUntilIdle() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if activeCount == 0 {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                idleWaiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    private let lock = NSLock()
+    private var activeCount = 0
+    private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private func finish() {
+        let waiters: [CheckedContinuation<Void, Never>]
+        lock.lock()
+        precondition(activeCount > 0, "Breakpoint bridge tracker underflow")
+        activeCount -= 1
+        if activeCount == 0 {
+            waiters = idleWaiters
+            idleWaiters.removeAll()
+        } else {
+            waiters = []
+        }
+        lock.unlock()
+        waiters.forEach { $0.resume() }
+    }
+}
+
 // MARK: - ConnectionLogger
 
-/// Logs when a new client TCP connection is accepted or closed. Added as the first
-/// handler in each child channel so connection lifecycle is visible even when
-/// subsequent handlers fail or swallow errors.
+/// Logs when a new client TCP connection is accepted or closed. Added near the start
+/// of each child pipeline so connection lifecycle remains visible even when later
+/// handlers fail or swallow errors.
 private final class ConnectionLogger: ChannelInboundHandler, @unchecked Sendable {
     typealias InboundIn = NIOAny
 
@@ -113,11 +306,12 @@ actor ProxyServer {
     }
 
     func start() async throws {
-        guard serverChannel == nil else {
-            Self.logger.warning("Proxy server is already running")
+        guard serverChannel == nil, !isStopping else {
+            Self.logger.warning("Proxy server is already running or stopping")
             return
         }
 
+        await childChannelRegistry.prepareForStart()
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         self.eventLoopGroup = group
 
@@ -128,6 +322,8 @@ actor ProxyServer {
         let callback = onTransactionComplete
         let captureProvider = captureContextProvider
         let breakpointHit = onBreakpointHit
+        let childRegistry = childChannelRegistry
+        let bridgeTracker = breakpointBridgeTracker
         refreshUpstreamProxySnapshot()
         let upstreamProxyProvider: @Sendable () -> UpstreamProxyResolvedConfiguration? = {
             self.currentUpstreamProxyConfiguration()
@@ -151,7 +347,10 @@ actor ProxyServer {
             .serverChannelOption(.backlog, value: 256)
             .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                channel.pipeline.addHandler(ConnectionTimeoutHandler(timeout: .seconds(300))).flatMap {
+                childRegistry.register(channel)
+                return channel.pipeline.addHandler(BreakpointClientLivenessProbeHandler()).flatMap {
+                    channel.pipeline.addHandler(ConnectionTimeoutHandler(timeout: .seconds(300)))
+                }.flatMap {
                     channel.pipeline.addHandler(ConnectionLogger())
                 }.flatMap {
                     channel.pipeline.configureHTTPServerPipeline()
@@ -164,7 +363,8 @@ actor ProxyServer {
                         upstreamProxySnapshotProvider: upstreamProxyProvider,
                         captureContextProvider: captureProvider,
                         onTransactionComplete: callback,
-                        onBreakpointHit: breakpointHit
+                        onBreakpointHit: breakpointHit,
+                        breakpointBridgeTracker: bridgeTracker
                     )
                     return channel.pipeline.addHandler(handler)
                 }
@@ -194,9 +394,11 @@ actor ProxyServer {
     }
 
     func stop() async {
-        guard let channel = serverChannel else {
+        guard let channel = serverChannel, !isStopping else {
             return
         }
+        isStopping = true
+        defer { isStopping = false }
         serverChannel = nil
         if let upstreamProxyObserver {
             NotificationCenter.default.removeObserver(upstreamProxyObserver)
@@ -208,6 +410,9 @@ actor ProxyServer {
         } catch {
             Self.logger.error("Error closing server channel: \(error.localizedDescription)")
         }
+
+        await childChannelRegistry.closeAllAndWait()
+        await breakpointBridgeTracker.waitUntilIdle()
 
         if let group = eventLoopGroup {
             do {
@@ -232,6 +437,8 @@ actor ProxyServer {
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let connectionLimiter = ConnectionLimiter()
+    private let childChannelRegistry = ProxyChildChannelRegistry()
+    private let breakpointBridgeTracker = BreakpointBridgeTracker()
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -240,6 +447,7 @@ actor ProxyServer {
 
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var serverChannel: Channel?
+    private var isStopping = false
     private var upstreamProxyObserver: NSObjectProtocol?
     private let upstreamProxySnapshotLock = NSLock()
     nonisolated(unsafe) private var upstreamProxyConfiguration: UpstreamProxyResolvedConfiguration?
@@ -269,7 +477,7 @@ nonisolated enum ProxyServerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .portInUse(port):
-            "Port \(port) is already in use by another process. Check if another proxy (e.g. Proxyman) is running."
+            "Port \(port) is already in use by another process. Stop the conflicting service or choose another port."
         }
     }
 }

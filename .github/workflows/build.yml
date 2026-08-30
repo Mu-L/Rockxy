@@ -38,7 +38,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
         with:
           persist-credentials: false
-      - name: Validate string catalogs (JSON, zh-Hans coverage, placeholder parity, compile)
+      - name: Test localization validator
+        run: python3 -m unittest discover -s .github/tools/tests -p 'test_validate_xcstrings.py'
+      - name: Validate string catalogs (JSON, locale coverage, project regions, placeholders, compile)
         run: python3 .github/tools/validate_xcstrings.py
 
   lint:

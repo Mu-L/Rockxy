@@ -13,8 +13,6 @@ import Testing
 struct StringCatalogCoverageTests {
     // MARK: Internal
 
-    static let requiredLanguages = ["zh-Hans"]
-
     @Test("Localizable.xcstrings is well-formed and fully covered")
     func localizableCatalog() throws {
         try validateCatalog(named: "Localizable.xcstrings")
@@ -23,6 +21,24 @@ struct StringCatalogCoverageTests {
     @Test("InfoPlist.xcstrings is well-formed and fully covered")
     func infoPlistCatalog() throws {
         try validateCatalog(named: "InfoPlist.xcstrings")
+    }
+
+    @Test("Locale discovery ignores empty and source localization keys")
+    func localeDiscoveryIgnoresInvalidKeys() {
+        let catalog: [String: Any] = [
+            "sourceLanguage": "en",
+            "strings": [
+                "Start Proxy": [
+                    "localizations": [
+                        "": [String: Any](),
+                        "en": [String: Any](),
+                        "de": [String: Any](),
+                    ],
+                ],
+            ],
+        ]
+
+        #expect(Self.catalogLanguages(in: catalog) == ["de"])
     }
 
     // MARK: Private
@@ -35,6 +51,35 @@ struct StringCatalogCoverageTests {
             .deletingLastPathComponent() // <repo>/
             .appendingPathComponent("Rockxy")
             .appendingPathComponent(fileName)
+    }
+
+    private static func requiredLanguages() throws -> [String] {
+        var languages: Set = ["zh-Hans"]
+        for fileName in ["Localizable.xcstrings", "InfoPlist.xcstrings"] {
+            let data = try Data(contentsOf: catalogURL(fileName))
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let catalog = try #require(root, "\(fileName): not a JSON object")
+            languages.formUnion(catalogLanguages(in: catalog))
+        }
+        return languages.sorted()
+    }
+
+    private static func catalogLanguages(in catalog: [String: Any]) -> Set<String> {
+        guard let strings = catalog["strings"] as? [String: Any] else {
+            return []
+        }
+        let sourceLanguage = catalog["sourceLanguage"] as? String
+        var languages: Set<String> = []
+        for rawEntry in strings.values {
+            guard let entry = rawEntry as? [String: Any],
+                  entry["shouldTranslate"] as? Bool != false,
+                  let localizations = entry["localizations"] as? [String: Any] else
+            {
+                continue
+            }
+            languages.formUnion(localizations.keys.filter { !$0.isEmpty && $0 != sourceLanguage })
+        }
+        return languages
     }
 
     private static func sourceUnits(key: String, entry: [String: Any]) -> [String: String] {
@@ -105,6 +150,7 @@ struct StringCatalogCoverageTests {
         #expect(catalog["sourceLanguage"] as? String == "en", "\(fileName): sourceLanguage must be en")
 
         let strings = try #require(catalog["strings"] as? [String: Any], "\(fileName): missing strings object")
+        let requiredLanguages = try Self.requiredLanguages()
 
         for (key, rawEntry) in strings {
             guard let entry = rawEntry as? [String: Any] else {
@@ -117,7 +163,7 @@ struct StringCatalogCoverageTests {
             let localizations = entry["localizations"] as? [String: Any] ?? [:]
             let expectedUnits = Self.sourceUnits(key: key, entry: entry)
 
-            for language in Self.requiredLanguages {
+            for language in requiredLanguages {
                 guard let node = localizations[language] as? [String: Any] else {
                     Issue.record("\(fileName): \(key) missing \(language) translation")
                     continue

@@ -77,14 +77,41 @@ Before opening, check:
 - [ ] No SwiftLint/SwiftFormat violations
 - [ ] If the change touches helper packaging, release scripts, or platform compatibility claims, Intel + Apple Silicon validation was updated or re-run
 
+Mark checklist items that do not apply in the PR description. A translation-only
+PR does not need Swift tests, SwiftLint, SwiftFormat, or a changelog entry unless it
+also changes Swift code, English source strings, or product behavior.
+
 ## Translations
 
 Rockxy ships native Xcode String Catalogs (`Rockxy/Localizable.xcstrings` and
 `Rockxy/InfoPlist.xcstrings`); the Git-tracked catalogs are canonical and there is
 an app-language picker under **Settings › Appearance › Language**. **System Default**
 follows the macOS language; choosing another bundled language updates Rockxy
-immediately. To add or improve a language, edit the catalogs in Xcode, preserve every
-placeholder and plural/format token, then validate before pushing:
+immediately.
+
+There are three useful ways to contribute:
+
+1. **Report wording:** use the
+   [Translation Improvement issue template](https://github.com/RockxyApp/Rockxy/issues/new?template=4-Translation_Improvement.md)
+   if you know better wording but do not want to edit the catalogs.
+2. **Repair a translation:** a focused PR may update only the affected localized
+   value. Small repairs can be made in GitHub or any text editor; Xcode is optional.
+3. **Add a language:** use Xcode to add the locale to both catalogs, translate all
+   translatable entries, and verify the changed UI in the app.
+
+For a repair, include the locale, affected screen, proposed wording, and a short
+reason the wording is better. Useful evidence can be native-speaker knowledge, a
+platform terminology reference, a screenshot showing context or truncation, or a
+clear explanation of the technical meaning. Do not include private captured traffic
+in screenshots.
+
+Keep non-translatable details unchanged: placeholders, protocol names, header
+names, URLs, file extensions, MIME types, code fragments, product names, and
+keyboard shortcuts. Machine translation may help with a draft, but bulk-generated
+translations must be reviewed by someone fluent in the target language before the
+PR is marked ready.
+
+Preserve every placeholder and plural/format token, then validate before pushing:
 
 ```bash
 python3 .github/tools/validate_xcstrings.py
@@ -92,7 +119,8 @@ python3 .github/tools/validate_xcstrings.py
 
 A maintainer reviews every `.xcstrings` change; this gates review, not authorship.
 See [`docs/development/localization.mdx`](docs/development/localization.mdx) for the
-full workflow, catalog hygiene, and placeholder rules.
+complete GitHub/text-editor workflow, Xcode workflow, language identifiers, runtime
+checks, catalog hygiene, and placeholder rules.
 
 ## Project Layout
 

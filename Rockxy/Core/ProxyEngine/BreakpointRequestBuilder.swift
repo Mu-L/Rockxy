@@ -10,6 +10,8 @@ import NIOHTTP1
 /// Extracted from `HTTPProxyHandler` and `HTTPSProxyRelayHandler` so the URL-reconstruction
 /// and host-pinning behaviour can be unit-tested without a live NIO pipeline.
 enum BreakpointRequestBuilder {
+    // MARK: Internal
+
     struct Result {
         let head: HTTPRequestHead
         let requestData: HTTPRequestData
@@ -30,7 +32,8 @@ enum BreakpointRequestBuilder {
         originalHead: HTTPRequestHead,
         originalRequestData: HTTPRequestData,
         isHTTPS: Bool = false,
-        originalHost: String? = nil
+        originalHost: String? = nil,
+        originalPort: Int? = nil
     )
         -> Result
     {
@@ -41,7 +44,8 @@ enum BreakpointRequestBuilder {
                 // Force the tunnel host even if the user typed a different absolute URL
                 var components = URLComponents(url: parsed, resolvingAgainstBaseURL: false) ?? URLComponents()
                 components.scheme = "https"
-                components.host = host
+                components.host = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+                components.port = originalPort
                 editedURL = components.url ?? originalRequestData.url
             } else {
                 editedURL = parsed
@@ -74,19 +78,35 @@ enum BreakpointRequestBuilder {
         }
 
         // 2. Build headers from the edited list
-        var resolvedHeaders = modifiedData.headers.map {
-            HTTPHeader(name: $0.name, value: $0.value)
+        var resolvedHeaders = modifiedData.headers.compactMap { header -> HTTPHeader? in
+            let name = header.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard BreakpointRequestData.isValidHTTPHeaderName(name),
+                  BreakpointRequestData.isValidHTTPHeaderValue(header.value) else
+            {
+                return nil
+            }
+            return HTTPHeader(name: name, value: header.value)
         }
 
         // 3. For HTTPS, pin the Host header to the tunnel authority
         if isHTTPS, let host = originalHost {
-            if let idx = resolvedHeaders.firstIndex(where: {
+            let authority = ProxyHandlerShared.authority(host: host, port: originalPort, scheme: "https")
+            resolvedHeaders.removeAll {
                 $0.name.caseInsensitiveCompare("Host") == .orderedSame
-            }) {
-                resolvedHeaders[idx] = HTTPHeader(name: "Host", value: host)
-            } else {
-                resolvedHeaders.append(HTTPHeader(name: "Host", value: host))
             }
+            resolvedHeaders.append(HTTPHeader(name: "Host", value: authority))
+        } else if !isHTTPS {
+            // For plain HTTP, reconcile the Host header with the edited URL authority.
+            // An untouched original Host (still pointing at the original authority) must
+            // follow the edited URL — including a non-default explicit port — so a URL
+            // redirect actually reaches the new origin. A Host the user deliberately
+            // changed to something other than the original is a virtual-host override and
+            // is preserved. An absent Host is added from the edited authority.
+            reconcilePlainHTTPHost(
+                in: &resolvedHeaders,
+                editedURL: editedURL,
+                originalRequestData: originalRequestData
+            )
         }
 
         // 4. Build body
@@ -100,14 +120,9 @@ enum BreakpointRequestBuilder {
         if let body, !body.isEmpty {
             resolvedHeaders.removeAll {
                 $0.name.caseInsensitiveCompare("Transfer-Encoding") == .orderedSame
+                    || $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
             }
-            if let idx = resolvedHeaders.firstIndex(where: {
-                $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
-            }) {
-                resolvedHeaders[idx] = HTTPHeader(name: "Content-Length", value: "\(body.count)")
-            } else {
-                resolvedHeaders.append(HTTPHeader(name: "Content-Length", value: "\(body.count)"))
-            }
+            resolvedHeaders.append(HTTPHeader(name: "Content-Length", value: "\(body.count)"))
         } else {
             resolvedHeaders.removeAll {
                 $0.name.caseInsensitiveCompare("Content-Length") == .orderedSame
@@ -118,12 +133,17 @@ enum BreakpointRequestBuilder {
         // 6. Build NIO head
         var head = originalHead
         head.method = HTTPMethod(rawValue: modifiedData.method)
-        let pathComponent = editedURL.path.isEmpty ? "/" : editedURL.path
-        let queryComponent = editedURL.query.map { "?\($0)" } ?? ""
+        let encodedComponents = URLComponents(url: editedURL, resolvingAgainstBaseURL: false)
+        let encodedPath = encodedComponents?.percentEncodedPath ?? editedURL.path
+        let pathComponent = encodedPath.isEmpty ? "/" : encodedPath
+        let queryComponent = encodedComponents?.percentEncodedQuery.map { "?\($0)" } ?? ""
         head.uri = pathComponent + queryComponent
         head.headers = HTTPHeaders(resolvedHeaders.map { ($0.name, $0.value) })
         if isHTTPS, let host = originalHost {
-            head.headers.replaceOrAdd(name: "Host", value: host)
+            head.headers.replaceOrAdd(
+                name: "Host",
+                value: ProxyHandlerShared.authority(host: host, port: originalPort, scheme: "https")
+            )
         }
 
         // 7. Build request data
@@ -133,10 +153,71 @@ enum BreakpointRequestBuilder {
             httpVersion: originalRequestData.httpVersion,
             headers: resolvedHeaders,
             body: body,
-            contentType: originalRequestData.contentType,
+            contentType: ContentTypeDetector.detect(headers: resolvedHeaders, body: body),
             captureContext: originalRequestData.captureContext
         )
 
         return Result(head: head, requestData: requestData)
+    }
+
+    // MARK: Private
+
+    /// Reconciles the Host header of a plain-HTTP request with the edited URL authority.
+    /// See the call site for the untouched-vs-override policy.
+    private static func reconcilePlainHTTPHost(
+        in headers: inout [HTTPHeader],
+        editedURL: URL,
+        originalRequestData: HTTPRequestData
+    ) {
+        guard let editedAuthority = authority(for: editedURL) else {
+            return
+        }
+
+        let originalAuthority = headerHost(in: originalRequestData.headers)
+            ?? authority(for: originalRequestData.url)
+
+        let currentHost = headers.first {
+            $0.name.caseInsensitiveCompare("Host") == .orderedSame
+        }?.value.trimmingCharacters(in: .whitespaces)
+        let isUntouched = originalAuthority.map {
+            currentHost?.caseInsensitiveCompare($0) == .orderedSame
+        } ?? (currentHost?.isEmpty ?? true)
+        let resolvedHost = isUntouched ? editedAuthority : currentHost ?? editedAuthority
+
+        // Host is a singleton routing field. Keeping multiple user-entered values
+        // would make the captured request disagree with what an upstream parser uses.
+        headers.removeAll {
+            $0.name.caseInsensitiveCompare("Host") == .orderedSame
+        }
+        headers.append(HTTPHeader(name: "Host", value: resolvedHost))
+    }
+
+    /// The `host[:port]` authority for a URL, omitting the default port for its scheme.
+    private static func authority(for url: URL) -> String? {
+        guard let rawHost = url.host, !rawHost.isEmpty else {
+            return nil
+        }
+        let host = rawHost.contains(":") && !rawHost.hasPrefix("[") ? "[\(rawHost)]" : rawHost
+        guard let port = url.port, !isDefaultPort(port, scheme: url.scheme) else {
+            return host
+        }
+        return "\(host):\(port)"
+    }
+
+    private static func headerHost(in headers: [HTTPHeader]) -> String? {
+        headers.first {
+            $0.name.caseInsensitiveCompare("Host") == .orderedSame
+        }?.value.trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func isDefaultPort(_ port: Int, scheme: String?) -> Bool {
+        switch scheme?.lowercased() {
+        case "http":
+            port == 80
+        case "https":
+            port == 443
+        default:
+            false
+        }
     }
 }

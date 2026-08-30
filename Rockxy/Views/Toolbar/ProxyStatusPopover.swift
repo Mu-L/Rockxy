@@ -37,7 +37,7 @@ struct CaptureStatusPresentation: Equatable {
         description = displayState.captureDescription
         systemImage = displayState.captureSystemImage
         actionTitle = displayState.captureActionTitle
-        isActionEnabled = displayState != .starting
+        isActionEnabled = displayState != .starting && displayState != .stopping
         listener = Self.listener(address: listenAddress, port: port)
         listenerScope = Self.listenerScope(address: listenAddress)
         https = Self.httpsItem(certReadiness)
@@ -107,6 +107,13 @@ struct CaptureStatusPresentation: Equatable {
                 value: String(localized: "Routing active", bundle: RockxyLocalization.bundle),
                 systemImage: "checkmark.circle.fill",
                 level: .ready
+            )
+        }
+        if displayState == .stopping {
+            return CaptureReadinessItem(
+                value: String(localized: "Restoring routing", bundle: RockxyLocalization.bundle),
+                systemImage: "arrow.triangle.2.circlepath",
+                level: .neutral
             )
         }
         if displayState != .stopped {
@@ -234,7 +241,8 @@ struct ProxyStatusPopover: View {
             Color(nsColor: .systemGreen)
         case .paused:
             Color(nsColor: .systemOrange)
-        case .starting:
+        case .starting,
+             .stopping:
             Color.accentColor
         case .stopped:
             Color(nsColor: .secondaryLabelColor)

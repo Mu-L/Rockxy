@@ -15,6 +15,8 @@ enum RequestListEmptyState: Equatable {
     case emptyCollection(SidebarScope)
     /// The proxy is starting up; requests cannot arrive yet.
     case proxyStarting
+    /// The proxy is closing channels and restoring routing; capture cannot restart yet.
+    case proxyStopping
     /// The proxy is stopped and nothing has been captured.
     case proxyStopped
     /// The proxy is running but recording is paused, so new requests are dropped from view.
@@ -67,6 +69,8 @@ enum RequestListEmptyState: Equatable {
         switch proxyState {
         case .starting:
             return .proxyStarting
+        case .stopping:
+            return .proxyStopping
         case .stopped:
             return .proxyStopped
         case .paused:
@@ -125,6 +129,17 @@ struct RequestListEmptyStateCopy: Equatable {
             systemImage = "hourglass"
             description = String(
                 localized: "Rockxy is starting the proxy. Captured requests will appear here.",
+                bundle: RockxyLocalization.bundle
+            )
+            action = nil
+            actionTitle = nil
+            actionHelp = nil
+
+        case .proxyStopping:
+            title = String(localized: "Stopping Proxy", bundle: RockxyLocalization.bundle)
+            systemImage = "stop.circle"
+            description = String(
+                localized: "Rockxy is closing active connections and restoring system routing.",
                 bundle: RockxyLocalization.bundle
             )
             action = nil

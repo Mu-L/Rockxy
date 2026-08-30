@@ -99,6 +99,48 @@ struct BreakpointPayloadSafetyTests {
         #expect(updated.fixedHTTPSAuthority == "api.example.com")
     }
 
+    @Test("Structured execution rejects malformed routing and header fields")
+    func structuredExecutionValidation() {
+        let missingHost = BreakpointRequestData(
+            method: "GET",
+            url: "http://",
+            headers: [],
+            body: "",
+            statusCode: 200
+        )
+        var invalidHeader = missingHost
+        invalidHeader.url = "http://example.com/path"
+        invalidHeader.headers = [EditableHeader(name: "Bad Header", value: "value")]
+        var injectedValue = invalidHeader
+        injectedValue.headers = [EditableHeader(name: "X-Test", value: "one\r\ntwo")]
+        var nonASCIIHeader = invalidHeader
+        nonASCIIHeader.headers = [EditableHeader(name: "X-Üser", value: "value")]
+        var nonASCIIMethod = invalidHeader
+        nonASCIIMethod.method = "GÉT"
+
+        #expect(missingHost.executionValidationMessage != nil)
+        #expect(invalidHeader.executionValidationMessage != nil)
+        #expect(injectedValue.executionValidationMessage != nil)
+        #expect(nonASCIIHeader.executionValidationMessage != nil)
+        #expect(nonASCIIMethod.executionValidationMessage != nil)
+    }
+
+    @Test("Structured execution accepts absolute and origin-form request targets")
+    func structuredExecutionAcceptsSupportedTargets() {
+        let absolute = BreakpointRequestData(
+            method: "POST",
+            url: "http://127.0.0.1:18080/api/profile.json",
+            headers: [EditableHeader(name: "Content-Type", value: "application/json")],
+            body: #"{"plan":"pro"}"#,
+            statusCode: 200
+        )
+        var originForm = absolute
+        originForm.url = "/api/profile.json?mode=edited"
+
+        #expect(absolute.executionValidationMessage == nil)
+        #expect(originForm.executionValidationMessage == nil)
+    }
+
     private static func projectFile(named path: String) throws -> String {
         let testFile = URL(fileURLWithPath: #filePath)
         let repoRoot = testFile

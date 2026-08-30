@@ -13,7 +13,7 @@ extension MainContentCoordinator {
     // MARK: - Proxy Lifecycle
 
     func startProxy() {
-        guard !isProxyRunning, !isProxyStarting else {
+        guard canStartProxy else {
             return
         }
         proxyError = nil
@@ -132,12 +132,17 @@ extension MainContentCoordinator {
     }
 
     func stopProxy() {
-        guard isProxyRunning else {
+        guard isProxyRunning, !isProxyStopping else {
             return
         }
         isProxyRunning = false
+        isProxyStopping = true
+        let serverToStop = proxyServer
 
         Task {
+            defer {
+                isProxyStopping = false
+            }
             if let evictionObserver {
                 NotificationCenter.default.removeObserver(evictionObserver)
                 self.evictionObserver = nil
@@ -154,7 +159,16 @@ extension MainContentCoordinator {
             readiness.setCaptureActive(false)
             SSLProxyingManager.shared.forceGlobalPassthrough = false
 
-            await proxyServer.stop()
+            // Order matters. Stopping the server closes every downstream channel first,
+            // which fires each handler's `channelInactive`/cancellation path and drains
+            // the paused item with `.cancel`. Only after the channels are inactive do we
+            // run `resolveAll(.cancel)` as a fallback for any item that outlived its
+            // channel: by then the handler's `channel.isActive` gate is false, so the
+            // resolution can never forward the original request to the origin. Resolving
+            // before the stop would complete promises while channels were still active
+            // and initiate exactly that origin work.
+            await serverToStop.stop()
+            breakpointManager.resolveAll(decision: .cancel)
             stopLogCapture()
             stopBandwidthTimer()
             resetInstantaneousSpeeds()

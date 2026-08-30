@@ -1019,6 +1019,8 @@ struct ToolWindowReadabilityTests {
 
         // Fixed search field, native Table, and a separate Enabled column.
         #expect(source.contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
+        #expect(source.contains(#".keyboardShortcut("f", modifiers: .command)"#))
+        #expect(source.contains(".focused($searchIsFocused)"))
         #expect(source.contains("Table(viewModel.filteredBreakpointRules"))
         #expect(source.contains(#"TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle))"#))
 
@@ -1058,7 +1060,7 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("footerButtonLabel"))
         #expect(source.components(separatedBy: "footerButtonLabel(").count - 1 >= 2)
         #expect(source.contains(".keyboardShortcut(.cancelAction)"))
-        #expect(source.contains(".keyboardShortcut(.defaultAction)"))
+        #expect(source.contains(".keyboardShortcut(.return, modifiers: .command)"))
 
         // Exactly one custom caret (menu chevron) in the editor.
         #expect(source.components(separatedBy: "chevron.up.chevron.down").count - 1 == 1)
@@ -1142,6 +1144,8 @@ struct ToolWindowReadabilityTests {
         #expect(editorSource.contains("RoundedRectangle(cornerRadius: 6)"))
         #expect(editorSource.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
         #expect(editorSource.contains(#"String(localized: "Path and query", bundle: RockxyLocalization.bundle)"#))
+        #expect(editorSource.contains(#"String(localized: "Host, path, and query", bundle: RockxyLocalization.bundle)"#))
+        #expect(editorSource.contains("httpSchemePrefix(itemId: itemId)"))
         #expect(editorSource.contains("canApplySelectedChanges = validation.isValid"))
         #expect(editorSource.contains("syncRawMessageFromDraft(itemId: selectedItemId, force: true)"))
         #expect(source.contains("item.editableDraft.isBodyEditable"))
