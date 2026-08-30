@@ -93,7 +93,7 @@ enum KeyboardShortcutCatalog {
             row("compose.reset", "Compose", "Reset to a fresh request", "⌘0", "Compose window", nil, nil),
         ]),
         KeyboardShortcutSection(id: "breakpointQueue", title: "Breakpoint Queue", shortcuts: [
-            row("breakpoint.execute", "Breakpoint Queue", "Execute the selected paused item", "⌘↩", "Selected paused item", nil, nil),
+            row("breakpoint.execute", "Breakpoint Queue", "Apply changes and continue the selected paused item", "⌘↩", "Selected paused item", nil, nil),
             row("breakpoint.abort", "Breakpoint Queue", "Abort the selected paused item", "⌘.", "Selected paused item", nil, nil),
             row("breakpoint.close", "Breakpoint Queue", "Close the queue window; queued items remain paused", "Esc", "Breakpoint Queue window", nil, "Paused item stays queued."),
             row("breakpoint.previous", "Breakpoint Queue", "Move to the previous or next queued item", "⌘[", "Breakpoint Queue selection", nil, nil),
@@ -110,7 +110,7 @@ enum KeyboardShortcutCatalog {
             row("rules.breakpoint.duplicate", "Breakpoint Rules", "Duplicate the selected rule", "⌘D", "Breakpoint Rules window", nil, nil),
             row("rules.breakpoint.delete", "Breakpoint Rules", "Delete the selected rule", "⌘⌫", "Breakpoint Rules window", nil, nil),
             row("rules.breakpoint.filter", "Breakpoint Rules", "Focus the rules search field", "⌘F", "Breakpoint Rules window", nil, nil),
-            row("rules.templates", "Breakpoint Rules", "Open Breakpoint Templates from Breakpoint Rules", "⌘T", "Breakpoint Rules window", nil, nil),
+            row("rules.templates", "Breakpoint Rules", "Open Breakpoint Templates", "⌘T", "Breakpoint Rules window", nil, nil),
             row("rules.new", "Other Rules Windows", "New rule", "⌘N", "Focused non-Breakpoint rules window", nil, nil),
             row("rules.newFolder", "Other Rules Windows", "New folder", "⇧⌘N", "Map Local and Scripting lists", nil, "Unavailable in rule windows without folder support."),
             row("rules.edit", "Other Rules Windows", "Edit selected rule", "⌘E", "Focused non-Breakpoint rules list", nil, nil),
