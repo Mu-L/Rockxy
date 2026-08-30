@@ -6,17 +6,19 @@ canonical catalogs):
 
   * the file is valid JSON with sourceLanguage == "en";
   * every translatable entry has a non-empty translation for each required
-    language (default: zh-Hans) -- this is the coverage gate;
+    language (default: every locale discovered across the canonical catalogs,
+    plus the shipped zh-Hans baseline) -- this is the coverage gate;
   * no translation value is empty or whitespace-only;
   * printf-style placeholders and positional arguments match between the
     source string and each translation (placeholder parity);
+  * locales in the canonical catalogs match the Xcode project's knownRegions;
   * when `xcrun xcstringstool` is available, each catalog compiles cleanly.
 
 The script needs no third-party packages and no secrets, so it is safe to run
 on untrusted fork pull requests. Exit code is non-zero if any check fails.
 
 Usage:
-    python3 .github/tools/validate_xcstrings.py [--require zh-Hans[,de,...]] [catalog ...]
+    python3 .github/tools/validate_xcstrings.py [--require all|zh-Hans[,de,...]] [catalog ...]
 """
 
 from __future__ import annotations
@@ -39,6 +41,8 @@ DEFAULT_CATALOGS = [
     "Rockxy/Localizable.xcstrings",
     "Rockxy/InfoPlist.xcstrings",
 ]
+BASELINE_LANGUAGES = {"zh-Hans"}
+DEFAULT_PROJECT_FILE = Path("Rockxy.xcodeproj/project.pbxproj")
 
 
 def placeholder_multiset(text: str) -> list[str]:
@@ -94,6 +98,88 @@ def source_units(key: str, entry: dict) -> dict[tuple[str, ...], str]:
 
 def is_translatable(entry: dict) -> bool:
     return entry.get("shouldTranslate", True) is not False
+
+
+def catalog_languages(paths: list[Path]) -> list[str]:
+    """Return the union of translated locales across all readable catalogs.
+
+    Invalid files are left to validate_catalog(), which reports actionable errors.
+    """
+    languages: set[str] = set()
+    for path in paths:
+        try:
+            catalog = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        source_language = catalog.get("sourceLanguage")
+        strings = catalog.get("strings")
+        if not isinstance(strings, dict):
+            continue
+        for entry in strings.values():
+            if not isinstance(entry, dict) or not is_translatable(entry):
+                continue
+            localizations = entry.get("localizations")
+            if not isinstance(localizations, dict):
+                continue
+            languages.update(
+                language
+                for language in localizations
+                if isinstance(language, str) and language and language != source_language
+            )
+    return sorted(languages)
+
+
+def discover_languages(paths: list[Path]) -> list[str]:
+    """Return every catalog locale plus the shipped baseline.
+
+    The baseline prevents a pull request from bypassing coverage by deleting the
+    only shipped translation from both catalogs. Taking the union means a locale
+    added to just one catalog becomes required in every catalog in the same run.
+    """
+    return sorted(set(catalog_languages(paths)) | BASELINE_LANGUAGES)
+
+
+def project_languages(path: Path) -> list[str]:
+    """Read translatable locale identifiers from the Xcode knownRegions block."""
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r"\bknownRegions\s*=\s*\((.*?)\);", text, re.DOTALL)
+    if match is None:
+        raise ValueError("missing knownRegions block")
+
+    languages: set[str] = set()
+    for raw_line in match.group(1).splitlines():
+        token = raw_line.split("/*", 1)[0].strip().rstrip(",").strip()
+        if not token:
+            continue
+        if token.startswith('"') and token.endswith('"'):
+            token = json.loads(token)
+        if token not in {"Base", "en"}:
+            languages.add(token)
+    return sorted(languages)
+
+
+def validate_project_languages(paths: list[Path], project_path: Path) -> list[str]:
+    """Require the canonical catalogs and Xcode project to declare the same locales."""
+    try:
+        regions = set(project_languages(project_path))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [f"{project_path}: cannot read knownRegions ({exc})"]
+
+    locales = set(catalog_languages(paths))
+    errors: list[str] = []
+    for language in sorted(locales - regions):
+        errors.append(f"{project_path}: locale {language!r} is present in catalogs but missing from knownRegions")
+    for language in sorted(regions - locales):
+        errors.append(f"{project_path}: knownRegions locale {language!r} is missing from the catalogs")
+    return errors
+
+
+def required_languages(value: str, paths: list[Path]) -> list[str]:
+    """Resolve the --require option into a stable, de-duplicated locale list."""
+    if value.strip().lower() == "all":
+        return discover_languages(paths)
+    return sorted({language.strip() for language in value.split(",") if language.strip()})
 
 
 def validate_catalog(path: Path, required: list[str]) -> list[str]:
@@ -188,8 +274,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate Rockxy .xcstrings catalogs.")
     parser.add_argument(
         "--require",
-        default="zh-Hans",
-        help="Comma-separated languages that must be fully translated (default: zh-Hans).",
+        default="all",
+        help=(
+            "Comma-separated languages that must be fully translated, or 'all' to discover every locale "
+            "across the catalogs (default: all)."
+        ),
     )
     parser.add_argument(
         "--no-compile",
@@ -199,12 +288,17 @@ def main() -> int:
     parser.add_argument("catalogs", nargs="*", default=DEFAULT_CATALOGS)
     args = parser.parse_args()
 
-    required = [lang.strip() for lang in args.require.split(",") if lang.strip()]
     catalogs = args.catalogs or DEFAULT_CATALOGS
+    catalog_paths = [Path(name) for name in catalogs]
+    required = required_languages(args.require, catalog_paths)
+
+    if not required:
+        parser.error("--require must contain at least one locale or 'all'")
 
     all_errors: list[str] = []
-    for name in catalogs:
-        path = Path(name)
+    if catalogs == DEFAULT_CATALOGS:
+        all_errors.extend(validate_project_languages(catalog_paths, DEFAULT_PROJECT_FILE))
+    for path in catalog_paths:
         if not path.exists():
             all_errors.append(f"{path}: catalog not found")
             continue
