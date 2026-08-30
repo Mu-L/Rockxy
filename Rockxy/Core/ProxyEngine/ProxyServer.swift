@@ -40,11 +40,21 @@ extension Channel {
 /// Tracks accepted client channels so proxy shutdown can close and await every live
 /// connection before its event-loop group is torn down.
 final class ProxyChildChannelRegistry: @unchecked Sendable {
-    func prepareForStart() {
-        lock.lock()
-        precondition(channels.isEmpty, "Cannot restart a proxy while client channels are still registered")
-        isShuttingDown = false
-        lock.unlock()
+    func prepareForStart() async {
+        var staleChannelCount = 0
+        while true {
+            let staleChannels = beginShutdown()
+            staleChannelCount += staleChannels.count
+            await close(staleChannels)
+            await waitUntilEmpty()
+            guard finishPreparingForStartIfEmpty() else {
+                continue
+            }
+            break
+        }
+        if staleChannelCount > 0 {
+            proxyServerLogger.warning("Closed \(staleChannelCount) stale client channels before proxy restart")
+        }
     }
 
     func register(_ channel: Channel) {
@@ -64,14 +74,7 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
 
     func closeAllAndWait() async {
         let snapshot = beginShutdown()
-
-        await withTaskGroup(of: Void.self) { group in
-            for channel in snapshot {
-                group.addTask {
-                    try? await channel.close().get()
-                }
-            }
-        }
+        await close(snapshot)
         await waitUntilEmpty()
     }
 
@@ -86,6 +89,26 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
         let snapshot = Array(channels.values)
         lock.unlock()
         return snapshot
+    }
+
+    private func close(_ channels: [Channel]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for channel in channels {
+                group.addTask {
+                    try? await channel.close().get()
+                }
+            }
+        }
+    }
+
+    private func finishPreparingForStartIfEmpty() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard channels.isEmpty else {
+            return false
+        }
+        isShuttingDown = false
+        return true
     }
 
     private func remove(_ identifier: ObjectIdentifier) {
@@ -288,7 +311,7 @@ actor ProxyServer {
             return
         }
 
-        childChannelRegistry.prepareForStart()
+        await childChannelRegistry.prepareForStart()
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         self.eventLoopGroup = group
 

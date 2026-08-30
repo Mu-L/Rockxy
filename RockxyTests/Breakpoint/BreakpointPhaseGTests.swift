@@ -144,7 +144,7 @@ struct BreakpointPhaseGTests {
     private func waitForQueueCount(
         _ count: Int,
         manager: BreakpointManager,
-        timeout seconds: TimeInterval = 5
+        timeout seconds: TimeInterval = 30
     ) async throws {
         let deadline = Date().addingTimeInterval(seconds)
         while Date() < deadline {

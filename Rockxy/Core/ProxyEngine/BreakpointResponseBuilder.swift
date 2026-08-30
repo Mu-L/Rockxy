@@ -78,6 +78,7 @@ enum BreakpointResponseBuilder {
         method.caseInsensitiveCompare("HEAD") == .orderedSame
             || (100 ..< 200).contains(statusCode)
             || statusCode == 204
+            || statusCode == 205
             || statusCode == 304
     }
 }

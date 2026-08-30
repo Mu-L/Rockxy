@@ -78,7 +78,7 @@ struct BreakpointResponseBuilderTests {
         #expect(result.body == nil)
     }
 
-    @Test(arguments: [101, 199, 204, 304])
+    @Test(arguments: [101, 199, 204, 205, 304])
     func bodyForbiddenStatusRemovesBodyAndFraming(statusCode: Int) {
         var originalHead = HTTPResponseHead(version: .http1_1, status: .ok)
         originalHead.headers.add(name: "Content-Length", value: "8")

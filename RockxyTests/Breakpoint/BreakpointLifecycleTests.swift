@@ -65,11 +65,36 @@ struct BreakpointLifecycleTests {
         let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: originURL)
 
         _ = try await harness.awaitNextPause(timeout: 8)
-        await harness.stop()
+        await harness.stopProxyOnly()
 
         #expect(harness.manager.pausedItems.isEmpty)
         #expect(await origin.requestCount() == 0)
+        await harness.stop()
         client.close()
+    }
+
+    @Test("proxy restart closes stale registered client channels")
+    func proxyRestartClosesStaleChannels() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        do {
+            let registry = ProxyChildChannelRegistry()
+            let staleChannel = try await makeActiveChannel(on: eventLoopGroup)
+            registry.register(staleChannel)
+            #expect(staleChannel.isActive)
+
+            await registry.prepareForStart()
+            #expect(!staleChannel.isActive)
+
+            let freshChannel = try await makeActiveChannel(on: eventLoopGroup)
+            registry.register(freshChannel)
+            #expect(freshChannel.isActive)
+            await registry.closeAllAndWait()
+            #expect(!freshChannel.isActive)
+            try await eventLoopGroup.shutdownGracefully()
+        } catch {
+            try? await eventLoopGroup.shutdownGracefully()
+            throw error
+        }
     }
 
     // MARK: Private
@@ -90,6 +115,16 @@ struct BreakpointLifecycleTests {
         Issue.record(
             "Breakpoint queue did not drain after client disconnect (\(harness.manager.pausedItems.count) still paused)."
         )
+    }
+
+    private func makeActiveChannel(on group: EventLoopGroup) async throws -> Channel {
+        try await ServerBootstrap(group: group)
+            .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
+            .childChannelInitializer { channel in
+                channel.eventLoop.makeSucceededVoidFuture()
+            }
+            .bind(host: "127.0.0.1", port: 0)
+            .get()
     }
 }
 
