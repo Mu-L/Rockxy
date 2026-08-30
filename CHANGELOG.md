@@ -35,6 +35,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.37.0] - 2026-08-29
+
+### Added
+
+- Added native toolbar customization with a broader set of workspace actions.
+- Completed the Map Local response workflow for serving local files, directories, and custom responses.
+- Added complete Simplified Chinese localization across Rockxy and Pro workflows, including licensing, advanced inspection, Android automation, Project Cloud Sync, and Workspace login and upload.
+- Added live in-app language switching, with System Default following macOS immediately.
+
+### Fixed
+
+- Prevented side-by-side Diff views from overflowing their window.
+- Refined focus sheets and restored reliable sidebar toggle behavior.
+- Restored localized titles across app and utility windows.
+
 ## [0.36.0] - 2026-08-24
 
 ### Added
