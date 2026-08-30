@@ -36,7 +36,8 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.certificateManager = certificateManager
         self.ruleEngine = ruleEngine
@@ -47,6 +48,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.captureContextProvider = captureContextProvider
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
+        self.breakpointBridgeTracker = breakpointBridgeTracker
     }
 
     // MARK: Internal
@@ -96,12 +98,21 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
 
     nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {
         proxyHandlerLogger.error("Channel error: \(error.localizedDescription)")
+        cancelPendingBreakpoint()
         context.close(promise: nil)
+    }
+
+    nonisolated func channelInactive(context: ChannelHandlerContext) {
+        // Client disconnected while a request breakpoint may still be paused: cancel
+        // the waiting Task so the queue drains and no upstream work is initiated.
+        cancelPendingBreakpoint()
+        context.fireChannelInactive()
     }
 
     nonisolated func handlerRemoved(context: ChannelHandlerContext) {
         pendingThrottleTask?.cancel()
         pendingThrottleTask = nil
+        cancelPendingBreakpoint()
     }
 
     // MARK: Private
@@ -118,8 +129,14 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         BreakpointDecision,
         BreakpointRequestData
     ))?
+    private let breakpointBridgeTracker: BreakpointBridgeTracker?
     private var pendingThrottleTask: Scheduled<Void>?
     private var pendingBreakpointPhase: BreakpointRulePhase?
+    private var pendingBreakpointRuleName: String?
+    /// The unstructured Task bridging an in-flight request breakpoint to the
+    /// @MainActor queue. Retained so a client disconnect / proxy stop can cancel it
+    /// and drain the paused item instead of leaking the row and its continuation.
+    private var pendingBreakpointTask: Task<Void, Never>?
 
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
@@ -160,6 +177,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         head: HTTPRequestHead
     ) {
         pendingBreakpointPhase = nil
+        pendingBreakpointRuleName = nil
 
         if head.uri.count > ProxyLimits.maxURILength {
             proxyHandlerLogger.warning("SECURITY: URI exceeds \(ProxyLimits.maxURILength) chars, rejecting with 414")
@@ -189,7 +207,11 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             let evaluation = try? result.get()
             let breakpointRule = evaluation?.0
             let matchedRule = evaluation?.1
-            let callback = self.makeTransactionCallback(for: matchedRule)
+            let ruleForTransaction = ProxyHandlerShared.transactionRule(
+                breakpointRule: breakpointRule,
+                matchedRule: matchedRule
+            )
+            let callback = self.makeTransactionCallback(for: ruleForTransaction)
 
             // CONNECT policy: only .block is meaningful on tunnel establishment (sends
             // rejection). All other actions either break the TLS handshake or produce
@@ -225,6 +247,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                 return
             }
 
+            self.pendingBreakpointRuleName = breakpointRule?.name
             if let responsePhase = breakpointRule?.action.responseBreakpointPhase {
                 self.pendingBreakpointPhase = responsePhase
             }
@@ -572,18 +595,29 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             body: bodyProjection.text,
             statusCode: 200,
             phase: .request,
-            isBodyEditable: bodyProjection.isEditable
+            isBodyEditable: bodyProjection.isEditable,
+            matchedRuleName: pendingBreakpointRuleName
         )
 
         let eventLoop = context.eventLoop
         let promise = eventLoop.makePromise(of: (BreakpointDecision, BreakpointRequestData).self)
 
-        promise.completeWithTask {
+        let bridgeLease = breakpointBridgeTracker?.begin()
+        pendingBreakpointTask = promise.completeWithTask {
             await onBreakpointHit(breakpointData)
         }
+        context.channel.probeBreakpointClientLiveness()
 
         promise.futureResult.whenComplete { [weak self] result in
+            defer { bridgeLease?.finish() }
             guard let self else {
+                return
+            }
+            self.pendingBreakpointTask = nil
+            // If the downstream client is gone (disconnect / proxy stop), a resolved
+            // breakpoint must not start any origin work or write a response.
+            guard context.channel.isActive else {
+                proxyHandlerLogger.debug("Breakpoint resolved after client disconnect; dropping without upstream work")
                 return
             }
             switch result {
@@ -601,6 +635,11 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
                 self.forwardRequest(context: context, head: head, requestData: requestData, callback: callback)
             }
         }
+    }
+
+    nonisolated private func cancelPendingBreakpoint() {
+        pendingBreakpointTask?.cancel()
+        pendingBreakpointTask = nil
     }
 
     nonisolated private func executeBreakpointDecision(
@@ -671,7 +710,8 @@ extension HTTPProxyHandler {
                 tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
                 onTransactionComplete: self.onTransactionComplete,
-                onBreakpointHit: self.onBreakpointHit
+                onBreakpointHit: self.onBreakpointHit,
+                breakpointBridgeTracker: self.breakpointBridgeTracker
             )
             return context.pipeline.addHandler(tlsHandler)
         }.whenFailure { error in
@@ -817,14 +857,17 @@ extension HTTPProxyHandler {
             clientContext: context,
             sourcePort: clientSourcePort,
             breakpointPhase: pendingBreakpointPhase,
+            breakpointRuleName: pendingBreakpointRuleName,
             headerResponseOperations: responseHeaderOperations,
             networkConditionProfile: networkConditionProfile,
             scriptPluginManager: scriptPluginManager,
             onBreakpointHit: onBreakpointHit,
+            breakpointBridgeTracker: breakpointBridgeTracker,
             onTransactionComplete: callback,
             onChannelClosed: onUpstreamClosed
         )
         pendingBreakpointPhase = nil
+        pendingBreakpointRuleName = nil
 
         clientChannel.pipeline.addHandler(responseHandler).whenComplete { result in
             switch result {

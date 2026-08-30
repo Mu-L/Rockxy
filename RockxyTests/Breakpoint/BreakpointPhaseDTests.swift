@@ -11,7 +11,11 @@ struct BreakpointPhaseDTests {
         let upstream = try await BreakpointLocalHTTPServer.start()
         defer { Task { await upstream.stop() } }
         let harness = try await BreakpointTestHarness.start()
-        await harness.addRule(.breakpointTest(matchingRule: await upstream.matchingRule("headers"), phases: .request))
+        await harness.addRule(.breakpointTest(
+            name: "Request review",
+            matchingRule: await upstream.matchingRule("headers"),
+            phases: .request
+        ))
         let session = try await harness.client()
         async let response = BreakpointTestHarness.dataWithRetry(
             from: await upstream.url("headers"),
@@ -19,6 +23,7 @@ struct BreakpointPhaseDTests {
         )
 
         let item = try await harness.awaitNextPause(timeout: 8)
+        #expect(item.matchedRuleName == "Request review")
         await harness.editDraft(item.id) { draft in
             draft.headers.append(EditableHeader(name: "X-Edited", value: "true"))
         }
@@ -44,11 +49,22 @@ struct BreakpointPhaseDTests {
             session: session
         )
         let item = try await harness.awaitNextPause(timeout: 8)
-        await harness.editDraft(item.id) { $0.method = "GET" }
+        await harness.editDraft(item.id) { draft in
+            draft.method = "POST"
+            draft.url += "?source=breakpoint"
+            draft.headers.append(EditableHeader(name: "Content-Type", value: "application/json"))
+            draft.headers.append(EditableHeader(name: "X-Capture", value: "edited"))
+            draft.body = #"{"edited":true}"#
+        }
         await harness.resolve(item.id, decision: .execute)
         _ = try await response
         let capture = try #require(await harness.lastCapturedRow())
+        #expect(capture.request.method == "POST")
         #expect(capture.request.url.absoluteString.contains(await upstream.matchingRule("headers")))
+        #expect(capture.request.url.query == "source=breakpoint")
+        #expect(capture.request.headers.contains { $0.name == "X-Capture" && $0.value == "edited" })
+        #expect(capture.request.body == Data(#"{"edited":true}"#.utf8))
+        #expect(capture.request.contentType == .json)
         await harness.stop()
     }
 

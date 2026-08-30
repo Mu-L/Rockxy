@@ -65,6 +65,17 @@ struct ProxyDisplayStateTests {
         #expect(coordinator.proxyDisplayState == .stopped)
     }
 
+    @Test("Proxy start remains gated until asynchronous stop cleanup finishes")
+    func startGateIncludesStoppingState() {
+        let coordinator = MainContentCoordinator()
+
+        coordinator.isProxyStopping = true
+
+        #expect(!coordinator.canStartProxy)
+        #expect(coordinator.proxyDisplayState == .stopping)
+        #expect(coordinator.proxyDisplayState.captureActionTitle == "Stopping…")
+    }
+
     @Test("Capture presentation explains wildcard reachability and stopped readiness")
     func stoppedCapturePresentation() {
         let presentation = CaptureStatusPresentation(

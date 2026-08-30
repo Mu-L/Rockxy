@@ -49,7 +49,7 @@ struct BreakpointResponseBuilderTests {
 
         let result = BreakpointResponseBuilder.build(modifiedData: modified, originalHead: originalHead)
 
-        #expect(result.head.headers.first(name: "Transfer-Encoding") == nil)
+        #expect(!result.head.headers.contains(name: "Transfer-Encoding"))
         #expect(result.head.headers.first(name: "Content-Length") == "7")
         #expect(result.body == Data("updated".utf8))
     }
@@ -73,8 +73,49 @@ struct BreakpointResponseBuilderTests {
         let result = BreakpointResponseBuilder.build(modifiedData: modified, originalHead: originalHead)
 
         #expect(result.head.status == .noContent)
-        #expect(result.head.headers.first(name: "Content-Length") == nil)
-        #expect(result.head.headers.first(name: "Transfer-Encoding") == nil)
+        #expect(!result.head.headers.contains(name: "Content-Length"))
+        #expect(!result.head.headers.contains(name: "Transfer-Encoding"))
         #expect(result.body == nil)
+    }
+
+    @Test(arguments: [101, 199, 204, 304])
+    func bodyForbiddenStatusRemovesBodyAndFraming(statusCode: Int) {
+        var originalHead = HTTPResponseHead(version: .http1_1, status: .ok)
+        originalHead.headers.add(name: "Content-Length", value: "8")
+        let modified = BreakpointRequestData(
+            method: "GET",
+            url: "https://api.example.com/data",
+            headers: [
+                EditableHeader(name: "Content-Length", value: "8"),
+                EditableHeader(name: "Transfer-Encoding", value: "chunked"),
+            ],
+            body: "retained",
+            statusCode: statusCode,
+            phase: .response
+        )
+
+        let result = BreakpointResponseBuilder.build(modifiedData: modified, originalHead: originalHead)
+
+        #expect(result.body == nil)
+        #expect(!result.head.headers.contains(name: "Content-Length"))
+        #expect(!result.head.headers.contains(name: "Transfer-Encoding"))
+    }
+
+    @Test("HEAD response removes edited body and framing")
+    func headResponseRemovesBodyAndFraming() {
+        let originalHead = HTTPResponseHead(version: .http1_1, status: .ok)
+        let modified = BreakpointRequestData(
+            method: "HEAD",
+            url: "https://api.example.com/data",
+            headers: [EditableHeader(name: "Content-Length", value: "7")],
+            body: "ignored",
+            statusCode: 200,
+            phase: .response
+        )
+
+        let result = BreakpointResponseBuilder.build(modifiedData: modified, originalHead: originalHead)
+
+        #expect(result.body == nil)
+        #expect(!result.head.headers.contains(name: "Content-Length"))
     }
 }

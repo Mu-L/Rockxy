@@ -40,6 +40,20 @@ struct BreakpointPhaseETests {
         _ = await task.value
     }
 
+    @Test("custom response status validation accepts non-preset HTTP codes")
+    func customResponseStatusValidation() {
+        var draft = BreakpointRequestData.test(statusCode: 200, phase: .response)
+        draft.statusCode = 418
+
+        #expect(draft.executionValidationMessage == nil)
+
+        draft.statusCode = 99
+        #expect(draft.executionValidationMessage != nil)
+
+        draft.statusCode = 600
+        #expect(draft.executionValidationMessage != nil)
+    }
+
     // BP_E3
     @Test("queryTabHiddenInResponsePhase")
     func queryTabHiddenInResponsePhase() {
@@ -51,9 +65,12 @@ struct BreakpointPhaseETests {
 
     // BP_E4
     @Test("templateMenuFiltersToResponseKind")
-    func templateMenuFiltersToResponseKind() {
+    func templateMenuFiltersToResponseKind() throws {
+        let defaults = try #require(
+            UserDefaults(suiteName: "com.amunx.rockxy.tests.bp.e4.\(UUID().uuidString)")
+        )
         let store = BreakpointTemplateStore(
-            defaults: UserDefaults(suiteName: "com.amunx.rockxy.tests.bp.e4.\(UUID().uuidString)")!,
+            defaults: defaults,
             storageKey: "breakpoint.templates.e4",
             seedDefaults: false
         )
@@ -104,13 +121,18 @@ struct BreakpointPhaseETests {
         let upstream = try await BreakpointLocalHTTPServer.start()
         defer { Task { await upstream.stop() } }
         let harness = try await BreakpointTestHarness.start()
-        await harness.addRule(.breakpointTest(matchingRule: await upstream.matchingRule("status/401"), phases: .response))
+        await harness.addRule(.breakpointTest(
+            name: "Response review",
+            matchingRule: await upstream.matchingRule("status/401"),
+            phases: .response
+        ))
         let session = try await harness.client()
         async let response = BreakpointTestHarness.dataWithRetry(
             from: await upstream.url("status/401"),
             session: session
         )
         let item = try await harness.awaitNextPause(timeout: 8)
+        #expect(item.matchedRuleName == "Response review")
         await harness.editDraft(item.id) {
             $0.statusCode = 200
             $0.headers = [EditableHeader(name: "Content-Type", value: "application/json")]
@@ -125,14 +147,186 @@ struct BreakpointPhaseETests {
         await harness.stop()
     }
 
+    @Test("response breakpoint owns inspector rule impact when another rule also matches")
+    func responseBreakpointOwnsCapturedRuleImpact() async throws {
+        let upstream = try await BreakpointLocalHTTPServer.start()
+        defer { Task { await upstream.stop() } }
+        let harness = try await BreakpointTestHarness.start()
+        let matchingRule = await upstream.matchingRule("get")
+        let sharedCondition = ProxyRule.breakpointTest(matchingRule: matchingRule).matchCondition
+        await harness.addRule(ProxyRule(
+            name: "Earlier header rule",
+            matchCondition: sharedCondition,
+            action: .modifyHeader(operations: [
+                HeaderOperation(type: .add, headerName: "X-Earlier", headerValue: "true", phase: .request),
+            ])
+        ))
+        await harness.addRule(.breakpointTest(
+            name: "Response review",
+            matchingRule: matchingRule,
+            phases: .response
+        ))
+        let session = try await harness.client()
+        async let response = BreakpointTestHarness.dataWithRetry(
+            from: await upstream.url("get"),
+            session: session
+        )
+
+        let item = try await harness.awaitNextPause(timeout: 8)
+        #expect(item.matchedRuleName == "Response review")
+        await harness.resolve(item.id, decision: .cancel)
+        _ = try await response
+
+        let capture = try #require(await harness.lastCapturedRow())
+        #expect(capture.matchedRuleName == "Response review")
+        #expect(capture.matchedRuleActionSummary == "Breakpoint (Response)")
+        await harness.stop()
+    }
+
+    @Test("locally consumed traffic keeps the rule that produced its response")
+    func localRuleKeepsTransactionImpact() {
+        let condition = ProxyRule.breakpointTest(matchingRule: "example.com/get").matchCondition
+        let breakpoint = ProxyRule(
+            name: "Response review",
+            matchCondition: condition,
+            action: .breakpoint(phase: .response)
+        )
+        let block = ProxyRule(
+            name: "Block request",
+            matchCondition: condition,
+            action: .block(statusCode: 451)
+        )
+
+        let selected = ProxyHandlerShared.transactionRule(
+            breakpointRule: breakpoint,
+            matchedRule: block
+        )
+
+        #expect(selected?.id == block.id)
+    }
+
     // BP_E7
-    @Test("responseAbortBehaviourDocumented")
-    func responseAbortBehaviourDocumented() {
-        let decision = BreakpointDecision.abort
-        if case .abort = decision {
-            #expect(true)
-        } else {
-            Issue.record("Expected response abort to use the shared abort decision.")
+    @Test("response abort returns 503 and retains capture metadata")
+    func responseAbortRetainsCaptureMetadata() async throws {
+        let upstream = try await BreakpointLocalHTTPServer.start()
+        defer { Task { await upstream.stop() } }
+        let harness = try await BreakpointTestHarness.start()
+        await harness.addRule(.breakpointTest(
+            name: "Abort response review",
+            matchingRule: await upstream.matchingRule("graphql"),
+            method: .post,
+            phases: .response
+        ))
+        let session = try await harness.client()
+        var request = URLRequest(url: await upstream.url("graphql"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("BreakpointAbortTest/1.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = Data(#"{"query":"query Demo { viewer { id } }","operationName":"Demo"}"#.utf8)
+        async let response = session.data(for: request)
+
+        let item = try await harness.awaitNextPause(timeout: 8)
+        #expect(item.matchedRuleName == "Abort response review")
+        await harness.resolve(item.id, decision: .abort)
+
+        let (_, urlResponse) = try await response
+        let httpResponse = try #require(urlResponse as? HTTPURLResponse)
+        #expect(httpResponse.statusCode == 503)
+        let capture = try await waitForCapturedRow(harness, timeout: 8)
+        #expect(capture.response?.statusCode == 503)
+        #expect(capture.state == .failed)
+        #expect(capture.timingInfo != nil)
+        #expect(capture.sourcePort != nil)
+        #expect(capture.clientApp == "BreakpointAbortTest")
+        #expect(capture.graphQLInfo?.operationName == "Demo")
+        #expect(capture.request.httpVersion == "1.1")
+        #expect(capture.matchedRuleName == "Abort response review")
+        await harness.stop()
+    }
+
+    /// BP_E8 — a client that disconnects while the response is paused must drain the queue
+    /// without any user resolution. This exercises UpstreamResponseHandler's client
+    /// `closeFuture` path: the origin response has already arrived and is buffered when the
+    /// downstream client goes away, so the handler must cancel the paused item itself.
+    @Test("client disconnect during a response pause drains the queue without resolution")
+    func responsePauseClientDisconnectDrainsQueue() async throws {
+        let upstream = try await BreakpointLocalHTTPServer.start()
+        defer { Task { await upstream.stop() } }
+        let harness = try await BreakpointTestHarness.start()
+        let matchingRule = await upstream.matchingRule("get")
+        await harness.addRule(.breakpointTest(matchingRule: matchingRule, phases: .response))
+        let proxyPort = try await harness.startProxy()
+        let url = await upstream.url("get")
+
+        // The raw client lets the origin respond immediately, then gives the test an
+        // explicit downstream descriptor to close while the response is buffered.
+        let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: url)
+
+        let paused = try await harness.awaitNextPause(timeout: 8)
+        #expect(paused.phase == .response)
+
+        // Closing the descriptor fires the client channel's closeFuture inside
+        // UpstreamResponseHandler.
+        client.close()
+
+        // The paused queue must drain on its own — no resolve()/resolveAll() is called.
+        try await waitUntilQueueDrains(harness, timeout: 8)
+
+        await harness.stop()
+    }
+
+    @Test("stopping the proxy drains a paused response queue")
+    func stopDrainsResponsePause() async throws {
+        let upstream = try await BreakpointLocalHTTPServer.start()
+        defer { Task { await upstream.stop() } }
+        let harness = try await BreakpointTestHarness.start()
+        let matchingRule = await upstream.matchingRule("get")
+        await harness.addRule(.breakpointTest(matchingRule: matchingRule, phases: .response))
+        let proxyPort = try await harness.startProxy()
+        let client = try BreakpointRawHTTPClient.connect(
+            proxyPort: proxyPort,
+            requestURL: await upstream.url("get")
+        )
+
+        let paused = try await harness.awaitNextPause(timeout: 8)
+        #expect(paused.phase == .response)
+        await harness.stop()
+
+        #expect(harness.manager.pausedItems.isEmpty)
+        client.close()
+    }
+
+    // MARK: Private
+
+    private func waitUntilQueueDrains(
+        _ harness: BreakpointTestHarness,
+        timeout seconds: TimeInterval
+    )
+        async throws
+    {
+        let ticks = Int(seconds / 0.01)
+        for _ in 0 ..< ticks {
+            if harness.manager.pausedItems.isEmpty {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
         }
+        Issue.record(
+            "Response breakpoint queue did not drain after client disconnect (\(harness.manager.pausedItems.count) still paused)."
+        )
+    }
+
+    private func waitForCapturedRow(
+        _ harness: BreakpointTestHarness,
+        timeout seconds: TimeInterval
+    ) async throws -> HTTPTransaction {
+        let ticks = Int(seconds / 0.01)
+        for _ in 0 ..< ticks {
+            if let transaction = await harness.lastCapturedRow() {
+                return transaction
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        throw BreakpointHarnessError.timeout("Timed out waiting for the aborted response capture row.")
     }
 }

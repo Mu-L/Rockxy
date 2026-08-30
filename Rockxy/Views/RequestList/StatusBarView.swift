@@ -489,6 +489,7 @@ struct StatusBarView: View {
     var mapLocalToolEnabled: Bool = true
     var mapRemoteToolEnabled: Bool = true
     var breakpointToolEnabled: Bool = true
+    var pausedBreakpointCount: Int = 0
 
     var onSwitchOffProxyOverride: () -> Void = {}
     var onOpenToolWindow: (String) -> Void = { _ in }
@@ -496,6 +497,7 @@ struct StatusBarView: View {
     var body: some View {
         WorkspaceFooterBar(horizontalPadding: 12) {
             HStack(spacing: 0) {
+                breakpointQueueIndicator
                 quickTools
                     .layoutPriority(0)
                 mutationIndicators
@@ -542,6 +544,42 @@ struct StatusBarView: View {
         QuickToolsLayout.resolved(
             storageRaw: quickToolsLayoutRaw,
             legacyFooterRaw: legacyFooterQuickToolOrder
+        )
+    }
+
+    @ViewBuilder private var breakpointQueueIndicator: some View {
+        if pausedBreakpointCount > 0 {
+            HStack(spacing: 6) {
+                Button {
+                    onOpenToolWindow("breakpoints")
+                } label: {
+                    Label(breakpointQueueSummary, systemImage: "pause.circle.fill")
+                        .font(.system(size: metrics.badgeFontSize, weight: .semibold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                .controlSize(.small)
+                .rockxyGlassButtonStyle(prominent: true)
+                .tint(Color(nsColor: .systemOrange))
+                .help(breakpointQueueSummary)
+                .accessibilityLabel(String(localized: "Breakpoint Queue", bundle: RockxyLocalization.bundle))
+                .accessibilityValue(breakpointQueueSummary)
+
+                Divider()
+                    .frame(height: 12)
+            }
+            .padding(.trailing, 8)
+            .layoutPriority(4)
+        }
+    }
+
+    private var breakpointQueueSummary: String {
+        if pausedBreakpointCount == 1 {
+            return String(localized: "1 item waiting", bundle: RockxyLocalization.bundle)
+        }
+        return String(
+            localized: "\(pausedBreakpointCount) items waiting",
+            bundle: RockxyLocalization.bundle
         )
     }
 

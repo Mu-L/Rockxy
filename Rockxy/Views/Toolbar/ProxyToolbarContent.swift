@@ -22,13 +22,22 @@ struct ProxyToolbarContent: ToolbarContent {
                 }
             } label: {
                 Label(
-                    coordinator.isProxyRunning
+                    coordinator.isProxyStopping
+                        ? String(localized: "Stopping…", bundle: RockxyLocalization.bundle)
+                        : coordinator.isProxyRunning
                         ? String(localized: "Stop", bundle: RockxyLocalization.bundle)
                         : String(localized: "Start", bundle: RockxyLocalization.bundle),
-                    systemImage: coordinator.isProxyRunning ? "stop.fill" : "play.fill"
+                    systemImage: coordinator.isProxyRunning || coordinator.isProxyStopping
+                        ? "stop.fill"
+                        : "play.fill"
                 )
             }
-            .help(coordinator.isProxyRunning ? "Stop proxy" : "Start proxy")
+            .help(
+                coordinator.isProxyStopping
+                    ? String(localized: "Proxy shutdown is in progress", bundle: RockxyLocalization.bundle)
+                    : coordinator.isProxyRunning ? "Stop proxy" : "Start proxy"
+            )
+            .disabled(coordinator.isProxyStarting || coordinator.isProxyStopping)
 
             Button {
                 openWindow(id: "developerSetupHub")

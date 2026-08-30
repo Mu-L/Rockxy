@@ -387,6 +387,12 @@ struct BreakpointRulesWindowView: View {
             minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496),
             minHeight: max(620, toolMetrics.bodyFontSize * 18 + 386)
         )
+        .background {
+            Button("") { searchIsFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .hidden()
+                .accessibilityHidden(true)
+        }
         .task { await viewModel.refreshFromEngine() }
         .onAppear { consumePendingContext() }
         .onReceive(NotificationCenter.default.publisher(for: .openBreakpointRulesWindow)) { _ in
@@ -419,6 +425,7 @@ struct BreakpointRulesWindowView: View {
     @Environment(\.appUIDisplayMetrics) private var appMetrics
     @Environment(\.openWindow) private var openWindow
     @State private var viewModel = BreakpointRulesViewModel()
+    @FocusState private var searchIsFocused: Bool
 
     private var enableDisableLabel: String {
         guard let selectedRule = viewModel.selectedRule else {
@@ -480,8 +487,8 @@ struct BreakpointRulesWindowView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(toolMetrics.font())
                 .frame(width: 240, height: toolMetrics.formControlHeight)
+                .focused($searchIsFocused)
                 .accessibilityLabel(String(localized: "Search Breakpoint rules", bundle: RockxyLocalization.bundle))
-                .keyboardShortcut("f", modifiers: .command)
         }
         .padding(.horizontal, toolMetrics.contentHorizontalPadding)
         .padding(.vertical, toolMetrics.headerTopPadding)

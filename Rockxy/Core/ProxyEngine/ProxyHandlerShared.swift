@@ -257,6 +257,39 @@ enum ProxyHandlerShared {
         return head
     }
 
+    /// Formats an HTTP authority for display and Host routing. IPv6 literals are
+    /// bracketed, and a scheme's default port is omitted.
+    nonisolated static func authority(host: String, port: Int?, scheme: String) -> String {
+        hostHeader(host: host, port: port, scheme: scheme)
+    }
+
+    /// Selects the single rule surfaced by the current transaction model. A
+    /// response breakpoint owns the evidence only when traffic continues to an
+    /// origin response where that breakpoint can actually pause. Locally-consumed
+    /// Block and Map Local results remain attributed to the rule that produced them.
+    nonisolated static func transactionRule(
+        breakpointRule: ProxyRule?,
+        matchedRule: ProxyRule?
+    ) -> ProxyRule? {
+        guard breakpointRule?.action.responseBreakpointPhase != nil else {
+            return matchedRule
+        }
+        guard let matchedRule else {
+            return breakpointRule
+        }
+        switch matchedRule.action {
+        case .block,
+             .mapLocal:
+            return matchedRule
+        case .breakpoint,
+             .mapRemote,
+             .modifyHeader,
+             .networkCondition,
+             .throttle:
+            return breakpointRule
+        }
+    }
+
     // MARK: Private
 
     /// Lowercase set of RFC-defined methods we accept from scripts.

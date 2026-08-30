@@ -122,7 +122,7 @@ struct CoordinatorStartupTests {
         #expect(startCount == 0)
     }
 
-    @Test("startProxyOnLaunchIfNeeded skips while proxy is already running or starting")
+    @Test("startProxyOnLaunchIfNeeded skips while proxy is running, starting, or stopping")
     func startProxyOnLaunchIfNeededSkipsWhenProxyActive() {
         var settings = AppSettings()
         settings.recordOnLaunch = true
@@ -144,5 +144,14 @@ struct CoordinatorStartupTests {
         }
         #expect(!didStartStarting)
         #expect(startingStartCount == 0)
+
+        let stoppingCoordinator = MainContentCoordinator()
+        stoppingCoordinator.isProxyStopping = true
+        var stoppingStartCount = 0
+        let didStartStopping = stoppingCoordinator.startProxyOnLaunchIfNeeded(settings: settings) {
+            stoppingStartCount += 1
+        }
+        #expect(!didStartStopping)
+        #expect(stoppingStartCount == 0)
     }
 }

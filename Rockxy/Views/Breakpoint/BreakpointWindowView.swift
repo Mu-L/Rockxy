@@ -122,7 +122,10 @@ struct BreakpointWindowView: View {
         {
             return false
         }
-        return manager.pausedItems.contains(where: { $0.id == selectedItemId })
+        guard let item = manager.pausedItems.first(where: { $0.id == selectedItemId }) else {
+            return false
+        }
+        return item.editableDraft.executionValidationMessage == nil
     }
 
     private var applyButtonHelp: String {
@@ -143,6 +146,12 @@ struct BreakpointWindowView: View {
                 localized: "Fix or discard the invalid Raw message before applying changes",
                 bundle: RockxyLocalization.bundle
             )
+        }
+        if let selectedItemId = manager.selectedItemId,
+           let item = manager.pausedItems.first(where: { $0.id == selectedItemId }),
+           let message = item.editableDraft.executionValidationMessage
+        {
+            return message
         }
         return String(localized: "Apply the edited message and continue (⌘↩)", bundle: RockxyLocalization.bundle)
     }
