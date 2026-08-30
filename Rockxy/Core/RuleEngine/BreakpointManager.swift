@@ -90,7 +90,7 @@ final class BreakpointManager {
                 // Auto-raise the queue window once per burst: notify only on the
                 // empty → non-empty transition, not on every subsequent hit.
                 if wasEmpty {
-                    NotificationCenter.default.post(name: .breakpointHit, object: nil)
+                    NotificationCenter.default.post(name: .breakpointHit, object: self)
                 }
             }
         } onCancel: {

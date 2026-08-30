@@ -163,7 +163,7 @@ struct BreakpointManagerTests {
         let counter = NotificationCounter()
         let token = NotificationCenter.default.addObserver(
             forName: .breakpointHit,
-            object: nil,
+            object: manager,
             queue: nil
         ) { _ in
             counter.increment()

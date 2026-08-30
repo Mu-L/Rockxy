@@ -112,7 +112,10 @@ actor BreakpointTestHarness {
         }
         return try await withThrowingTaskGroup(of: PausedBreakpointItem.self) { group in
             group.addTask { [manager] in
-                for await _ in NotificationCenter.default.notifications(named: .breakpointHit) {
+                for await notification in NotificationCenter.default.notifications(named: .breakpointHit) {
+                    guard notification.object as AnyObject? === manager else {
+                        continue
+                    }
                     if let item = await MainActor.run(body: { manager.pausedItems.first }) {
                         return item
                     }
