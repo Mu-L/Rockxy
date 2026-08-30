@@ -23,6 +23,24 @@ struct StringCatalogCoverageTests {
         try validateCatalog(named: "InfoPlist.xcstrings")
     }
 
+    @Test("Locale discovery ignores empty and source localization keys")
+    func localeDiscoveryIgnoresInvalidKeys() {
+        let catalog: [String: Any] = [
+            "sourceLanguage": "en",
+            "strings": [
+                "Start Proxy": [
+                    "localizations": [
+                        "": [String: Any](),
+                        "en": [String: Any](),
+                        "de": [String: Any](),
+                    ],
+                ],
+            ],
+        ]
+
+        #expect(Self.catalogLanguages(in: catalog) == ["de"])
+    }
+
     // MARK: Private
 
     private static func catalogURL(_ fileName: String) -> URL {
@@ -41,20 +59,27 @@ struct StringCatalogCoverageTests {
             let data = try Data(contentsOf: catalogURL(fileName))
             let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             let catalog = try #require(root, "\(fileName): not a JSON object")
-            let sourceLanguage = catalog["sourceLanguage"] as? String
-            let strings = try #require(catalog["strings"] as? [String: Any], "\(fileName): missing strings object")
-
-            for rawEntry in strings.values {
-                guard let entry = rawEntry as? [String: Any],
-                      entry["shouldTranslate"] as? Bool != false,
-                      let localizations = entry["localizations"] as? [String: Any] else
-                {
-                    continue
-                }
-                languages.formUnion(localizations.keys.filter { $0 != sourceLanguage })
-            }
+            languages.formUnion(catalogLanguages(in: catalog))
         }
         return languages.sorted()
+    }
+
+    private static func catalogLanguages(in catalog: [String: Any]) -> Set<String> {
+        guard let strings = catalog["strings"] as? [String: Any] else {
+            return []
+        }
+        let sourceLanguage = catalog["sourceLanguage"] as? String
+        var languages: Set<String> = []
+        for rawEntry in strings.values {
+            guard let entry = rawEntry as? [String: Any],
+                  entry["shouldTranslate"] as? Bool != false,
+                  let localizations = entry["localizations"] as? [String: Any] else
+            {
+                continue
+            }
+            languages.formUnion(localizations.keys.filter { !$0.isEmpty && $0 != sourceLanguage })
+        }
+        return languages
     }
 
     private static func sourceUnits(key: String, entry: [String: Any]) -> [String: String] {

@@ -290,9 +290,10 @@ struct BreakpointPhaseETests {
 
         let paused = try await harness.awaitNextPause(timeout: 8)
         #expect(paused.phase == .response)
-        await harness.stop()
+        await harness.stopProxyOnly()
 
         #expect(harness.manager.pausedItems.isEmpty)
+        await harness.stop()
         client.close()
     }
 

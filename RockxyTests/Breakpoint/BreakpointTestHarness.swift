@@ -70,12 +70,16 @@ actor BreakpointTestHarness {
     }
 
     func stop() async {
-        await proxyServer?.stop()
-        proxyServer = nil
-        proxyPort = nil
+        await stopProxyOnly()
         await MainActor.run {
             manager.resolveAll(decision: .cancel)
         }
+    }
+
+    func stopProxyOnly() async {
+        await proxyServer?.stop()
+        proxyServer = nil
+        proxyPort = nil
     }
 
     func client() async throws -> URLSession {
