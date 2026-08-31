@@ -688,7 +688,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@，%2$lld 条活跃规则"
+            "value": "%1$@，%2$lld 条生效中的规则"
           }
         }
       }
@@ -698,7 +698,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@，活跃项目"
+            "value": "%@，当前项目"
           }
         }
       }
@@ -826,7 +826,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条活跃的断点规则。打开断点规则。"
+            "value": "有 %lld 条生效中的断点规则。打开断点规则。"
           }
         }
       }
@@ -836,7 +836,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活跃 Map Local 规则。打开 Map Local。"
+            "value": "%lld 条生效中的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -846,7 +846,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条活跃的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 %lld 条生效中的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -856,7 +856,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活跃的修改标头规则"
+            "value": "%lld 条生效中的修改标头规则"
           }
         }
       }
@@ -866,7 +866,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活跃规则"
+            "value": "%lld 条生效中的规则"
           }
         }
       }
@@ -1852,7 +1852,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活跃断点规则。打开断点规则。"
+            "value": "有 1 条生效中的断点规则。打开断点规则。"
           }
         }
       }
@@ -1862,7 +1862,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活跃的 Map Local 规则。打开 Map Local。"
+            "value": "有 1 条生效中的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -1872,7 +1872,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活跃的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 1 条生效中的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -2491,7 +2491,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活跃项目"
+            "value": "当前项目"
           }
         }
       }
@@ -2501,7 +2501,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活跃项目：%@"
+            "value": "当前项目：%@"
           }
         }
       }
@@ -4269,7 +4269,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动脱敏敏感标头"
+            "value": "自动对敏感标头脱敏"
           }
         }
       }
@@ -4379,7 +4379,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 MCP 客户端前自动脱敏敏感信息。"
+            "value": "发送到 MCP 客户端前自动对敏感信息脱敏。"
           }
         }
       }
@@ -5298,7 +5298,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "取消活跃请求"
+            "value": "取消当前请求"
           }
         }
       }
@@ -7301,7 +7301,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在关闭活跃连接并恢复系统路由。"
+            "value": "正在关闭活动连接并恢复系统路由。"
           }
         }
       }
@@ -7481,7 +7481,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 正在关闭活跃连接并恢复系统路由。"
+            "value": "Rockxy 正在关闭活动连接并恢复系统路由。"
           }
         }
       }
@@ -13609,7 +13609,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "帧捕获已在安全限制处停止；实时连接仍保持活跃。"
+            "value": "帧捕获已在安全限制处停止；实时连接仍保持活动。"
           }
         }
       }
@@ -19607,7 +19607,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无活跃脚本"
+            "value": "无生效中的脚本"
           }
         }
       }
@@ -25182,7 +25182,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "脱敏识别到的敏感数据"
+            "value": "对识别到的敏感数据脱敏"
           }
         }
       }
@@ -25192,7 +25192,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 AI 前脱敏敏感数据"
+            "value": "发送到 AI 前对敏感数据脱敏"
           }
         }
       }
@@ -25202,7 +25202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在脱敏敏感字段"
+            "value": "正在对敏感字段脱敏"
           }
         }
       }
@@ -25242,7 +25242,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上传前会脱敏识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）。此操作会尽力而为，但不作保证。"
+            "value": "上传前会对识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）脱敏。此操作会尽力而为，但不作保证。"
           }
         }
       }
@@ -28314,7 +28314,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 提供手动 Flutter 代码片段和本地捕获检查。该检查确认探针已到达 Rockxy，但不确认是哪个设备、模拟器、仿真器或 Dart 运行时发出的。通过本地 VPN 伴侣应用对 Android Emulator 进行无代码路由不属于此手动流程。"
+            "value": "Rockxy 提供手动 Flutter 代码片段和本地捕获检查。该检查确认探针已到达 Rockxy，但不确认是哪个设备、仿真器、模拟器或 Dart 运行时发出的。通过本地 VPN 伴侣应用对 Android Emulator 进行无代码路由不属于此手动流程。"
           }
         }
       }
@@ -29219,7 +29219,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "运行所选的 %1$@ 本地验证探针，并等待 Rockxy 捕获 GET %2$@。这确认探针已通过代理到达 Rockxy，但不会将该请求归因于特定的应用、进程、设备、仿真器、模拟器或运行时。"
+            "value": "运行所选的 %1$@ 本地验证探针，并等待 Rockxy 捕获 GET %2$@。这确认探针已通过代理到达 Rockxy，但不会将该请求归因于特定的应用、进程、设备、模拟器、仿真器或运行时。"
           }
         }
       }
@@ -29239,7 +29239,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从 Flutter 客户端运行“验证”标签页生成的请求，并在调试更广泛的流程前确认 Rockxy 已捕获该请求。这会验证代理路径，而非发出请求的确切设备、模拟器、仿真器或 Dart 运行时。"
+            "value": "从 Flutter 客户端运行“验证”标签页生成的请求，并在调试更广泛的流程前确认 Rockxy 已捕获该请求。这会验证代理路径，而非发出请求的确切设备、仿真器、模拟器或 Dart 运行时。"
           }
         }
       }
@@ -29695,7 +29695,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理重新启动后，保存的监听器设置才会生效。在此之前，上方的实时端点将保持活跃。"
+            "value": "代理重新启动后，保存的监听器设置才会生效。在此之前，上方的实时端点仍保持可用。"
           }
         }
       }
@@ -30385,7 +30385,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择用于服务匹配请求的本地文件"
+            "value": "选择用于响应匹配请求的本地文件"
           }
         }
       }
@@ -33615,7 +33615,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活跃阻止列表规则的上限。请停用另一条规则后重试。"
+            "value": "已达到生效中的阻止列表规则的上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33625,7 +33625,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活跃断点规则上限。请停用另一条规则后重试。"
+            "value": "已达到生效中的断点规则上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33645,7 +33645,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活跃 Map Local 规则的上限。请停用另一条规则，然后重试。"
+            "value": "已达到生效中的 Map Local 规则的上限。请停用另一条规则，然后重试。"
           }
         }
       }
@@ -33655,7 +33655,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活跃 Map Remote 规则的上限。请停用另一条规则后重试。"
+            "value": "已达到生效中的 Map Remote 规则的上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -38365,7 +38365,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检测到 VPN 或 iCloud 私密转送（%@）。可能无法捕获流量。请停用 VPN/私密转送以使用 Rockxy。"
+            "value": "检测到 VPN 或 iCloud 专用代理（%@）。可能无法捕获流量。请停用 VPN/专用代理以使用 Rockxy。"
           }
         }
       }
@@ -38681,7 +38681,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后将跳过阻止列表规则。其他干预规则仍保持活跃。"
+            "value": "关闭后将跳过阻止列表规则。其他干预规则仍保持生效。"
           }
         }
       }
