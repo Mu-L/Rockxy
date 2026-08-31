@@ -76,6 +76,8 @@ struct DeveloperSetupViewModelTests {
         #expect(SetupTarget.python.automationSupport == .runtimeTerminal)
         #expect(SetupTarget.nodeJS.manualSupport == .availableNow)
         #expect(SetupTarget.nodeJS.automationSupport == .runtimeTerminal)
+        #expect(SetupTarget.javaVMs.manualSupport == .availableNow)
+        #expect(SetupTarget.javaVMs.automationSupport == .runtimeTerminal)
         #expect(SetupTarget.postman.automationSupport == .none)
     }
 
@@ -138,7 +140,7 @@ struct DeveloperSetupViewModelTests {
         #expect(matchingIDs.contains(.python))
         #expect(matchingIDs.contains(.nodeJS))
         #expect(matchingIDs.contains(.curl))
-        #expect(matchingIDs.contains(.javaVMs) == false)
+        #expect(matchingIDs.contains(.javaVMs))
     }
 
     @Test("Source list filter keeps pinned results in sync with the user's pinned set")

@@ -121,9 +121,9 @@ extension SetupTarget {
             category: .runtime,
             iconName: "cup.and.saucer",
             manualSupport: .availableNow,
-            automationSupport: .none,
+            automationSupport: .runtimeTerminal,
             shortSummary: String(
-                localized: "Java/Kotlin ships a manual keystore + HttpClient workflow when a local JDK is installed.",
+                localized: "Java VMs support a scoped Automatic Setup session plus a manual keystore workflow.",
                 bundle: RockxyLocalization.bundle
             ),
             manualSummary: String(
@@ -133,8 +133,11 @@ extension SetupTarget {
                 """, bundle: RockxyLocalization.bundle
             ),
             currentSupportSummary: String(
-                localized: "Rockxy ships a keytool import command and a Java HttpClient sample for a manual capture check on machines with a local JDK.",
-                bundle: RockxyLocalization.bundle
+                localized: """
+                Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the \
+                JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains \
+                trust store and the target host added under SSL Proxying.
+                """, bundle: RockxyLocalization.bundle
             )
         )
     }

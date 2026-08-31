@@ -147,11 +147,34 @@ struct DeveloperSetupProcessRunner: DeveloperSetupProcessRunning {
 // MARK: - RockxySetupScriptContext
 
 struct RockxySetupScriptContext: Equatable {
+    // MARK: Lifecycle
+
+    init(
+        proxyHost: String,
+        proxyPort: Int,
+        certificatePath: String?,
+        generatedAt: Date,
+        appName: String,
+        targetID: SetupTarget.ID = .python
+    ) {
+        self.proxyHost = proxyHost
+        self.proxyPort = proxyPort
+        self.certificatePath = certificatePath
+        self.generatedAt = generatedAt
+        self.appName = appName
+        self.targetID = targetID
+    }
+
+    // MARK: Internal
+
     let proxyHost: String
     let proxyPort: Int
     let certificatePath: String?
     let generatedAt: Date
     let appName: String
+    /// The routed target this script was generated for. Only `.javaVMs` receives
+    /// JVM-specific proxy properties; every other target keeps the shared shell.
+    let targetID: SetupTarget.ID
 }
 
 // MARK: - RockxySetupScriptBuilder
@@ -237,6 +260,10 @@ enum RockxySetupScriptBuilder {
             lines.append("# Export or trust the Rockxy root certificate to enable certificate environment hints.")
         }
 
+        if context.targetID == .javaVMs {
+            lines.append(contentsOf: javaProxyLines(proxyHost: context.proxyHost, proxyPort: context.proxyPort))
+        }
+
         lines.append(contentsOf: [
             "",
             "echo \"\(context.appName) setup session is ready: $HTTP_PROXY\"",
@@ -245,6 +272,28 @@ enum RockxySetupScriptBuilder {
         ])
 
         return lines.joined(separator: "\n")
+    }
+
+    /// JVM proxy properties for the Java VMs target. Re-sourcing removes the
+    /// previous Rockxy block before appending the current one, so user options
+    /// added at any point survive and stale proxy properties never accumulate.
+    static func javaProxyLines(proxyHost: String, proxyPort: Int) -> [String] {
+        let proxyOptions = "-Dhttp.proxyHost=\(proxyHost) -Dhttp.proxyPort=\(proxyPort) " +
+            "-Dhttps.proxyHost=\(proxyHost) -Dhttps.proxyPort=\(proxyPort)"
+        return [
+            "",
+            "# Java VMs: route the JVM through Rockxy while preserving existing JAVA_TOOL_OPTIONS.",
+            "# Remove the previous Rockxy block before appending the current one.",
+            "if [ -n \"${ROCKXY_JAVA_PROXY_OPTS:-}\" ] && [ -n \"${JAVA_TOOL_OPTIONS:-}\" ]; then",
+            "  export JAVA_TOOL_OPTIONS=\"${JAVA_TOOL_OPTIONS//$ROCKXY_JAVA_PROXY_OPTS/}\"",
+            "fi",
+            "export ROCKXY_JAVA_PROXY_OPTS=\(shellDoubleQuoted(proxyOptions))",
+            "if [ -n \"${JAVA_TOOL_OPTIONS:-}\" ]; then",
+            "  export JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS $ROCKXY_JAVA_PROXY_OPTS\"",
+            "else",
+            "  export JAVA_TOOL_OPTIONS=\"$ROCKXY_JAVA_PROXY_OPTS\"",
+            "fi",
+        ]
     }
 
     static func shellSingleQuoted(_ value: String) -> String {
@@ -395,7 +444,7 @@ final class DeveloperSetupSessionSetupViewModel {
         self.pasteboard = pasteboard ?? DeveloperSetupSystemPasteboard()
         self.scriptURL = scriptURL
         self.generatedAt = generatedAt
-        context = Self.makeContext(coordinator: coordinator, generatedAt: generatedAt())
+        context = Self.makeContext(coordinator: coordinator, targetID: targetID, generatedAt: generatedAt())
     }
 
     // MARK: Internal
@@ -457,7 +506,13 @@ final class DeveloperSetupSessionSetupViewModel {
         )
     }
 
-    static func makeContext(coordinator: MainContentCoordinator, generatedAt: Date) -> RockxySetupScriptContext {
+    static func makeContext(
+        coordinator: MainContentCoordinator,
+        targetID: SetupTarget.ID,
+        generatedAt: Date
+    )
+        -> RockxySetupScriptContext
+    {
         let settings = AppSettingsManager.shared.settings
         let port = DeveloperSetupViewModel.resolveSnippetPort(
             isProxyRunning: coordinator.isProxyRunning,
@@ -473,7 +528,8 @@ final class DeveloperSetupSessionSetupViewModel {
             proxyPort: port,
             certificatePath: certificatePath,
             generatedAt: generatedAt,
-            appName: RockxyIdentity.current.displayName
+            appName: RockxyIdentity.current.displayName,
+            targetID: targetID
         )
     }
 
@@ -494,7 +550,7 @@ final class DeveloperSetupSessionSetupViewModel {
     }
 
     func refresh() {
-        context = Self.makeContext(coordinator: coordinator, generatedAt: generatedAt())
+        context = Self.makeContext(coordinator: coordinator, targetID: targetID, generatedAt: generatedAt())
     }
 
     func prepareScript() throws {
@@ -540,6 +596,14 @@ final class DeveloperSetupSessionSetupViewModel {
     }
 
     func openPreparedTerminal() async {
+        guard coordinator.isProxyRunning else {
+            statusMessage = String(
+                localized: "Start the Rockxy proxy before opening a prepared terminal.",
+                bundle: RockxyLocalization.bundle
+            )
+            return
+        }
+
         guard prepareScriptForLaunch() else {
             return
         }

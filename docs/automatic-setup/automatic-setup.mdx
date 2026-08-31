@@ -1,13 +1,13 @@
 ---
 title: Automatic Setup
-description: Open a prepared Rockxy terminal or browser session for runtimes and tools that do not automatically follow the macOS system proxy.
+description: Open a prepared Rockxy terminal session for runtimes and tools that do not automatically follow the macOS system proxy.
 ---
 
 # Automatic Setup
 
-Automatic Setup prepares a scoped session so supported terminals, runtimes, and browsers can send traffic through Rockxy without changing your whole macOS network configuration.
+Automatic Setup prepares a scoped terminal session so supported runtimes and command-line tools can send traffic through Rockxy without changing your whole macOS network configuration.
 
-Use it when the app or script you are debugging runs from a terminal, runtime, browser profile, or local development tool that may ignore the system proxy.
+Use it when the app or script you are debugging runs from a terminal or local runtime that may ignore the system proxy.
 
 ## What it solves
 
@@ -17,7 +17,6 @@ Some developer tools do not automatically use the macOS system proxy. That commo
 - Python scripts and workers
 - Ruby scripts and Rails-style local services
 - Go, Rust, Java, and cURL workflows
-- browser profiles launched outside your normal profile
 - Electron and framework-adjacent local development flows
 
 When those processes do not inherit proxy and certificate settings, Rockxy may be running correctly but still show no traffic from that target.
@@ -28,23 +27,31 @@ Automatic Setup prepares a new session with Rockxy proxy and certificate hints a
 
 For terminal-oriented flows, Rockxy generates a local setup script and launches the selected terminal with that script sourced. The script exports proxy environment variables such as `HTTP_PROXY`, `HTTPS_PROXY`, and related certificate hints for the current session.
 
-For browser-oriented flows, Rockxy opens a prepared browser profile or browser launch mode that points at the active Rockxy proxy.
-
 <Note>
 Automatic Setup is scoped to the launched session. It does not edit your shell profile, permanently change your OS proxy, or make every app on your Mac use Rockxy.
 </Note>
+
+<Warning>
+Automatic Setup only affects the session it launches. An app that is already running keeps its current environment, so a prepared session cannot retrofit proxy settings onto it. Some GUI apps also ignore shell environment variables entirely. For an already-running or GUI client, launch it fresh from the prepared session where that is possible, or fall back to macOS System Proxy or the target's [Manual Setup](/automatic-setup/manual-setup).
+</Warning>
+
+## Java VMs
+
+Java VMs is an Automatic Setup target. In addition to the shared proxy exports, the generated script sets `JAVA_TOOL_OPTIONS` with explicit `-Dhttp.proxyHost`, `-Dhttp.proxyPort`, `-Dhttps.proxyHost`, and `-Dhttps.proxyPort` properties so a JVM started from that session routes through Rockxy. Existing `JAVA_TOOL_OPTIONS` content is preserved, and re-sourcing does not stack the proxy block.
+
+HTTPS interception still requires importing and trusting the Rockxy root CA in the exact JVM or JetBrains trust store and adding the target host under SSL Proxying — the proxy properties handle routing only. See [Java VMs](/setup-guides/java-vms) for the trust-store steps.
 
 ## How to use it
 
 1. Open Rockxy.
 2. Open the Setup menu or Developer Setup Hub.
 3. Choose **Automatic Setup**.
-4. Pick the terminal or browser you want to launch.
-5. Click **Open Prepared Terminal** or **Open Browser**.
+4. Pick the terminal you want to launch.
+5. Click **Open Prepared Terminal**.
 6. Start your server, script, test runner, or client from that prepared session.
 7. Trigger a request and confirm the traffic appears in Rockxy.
 
-<img src="/images/AutomaticSetupRockxy.png" alt="Rockxy Automatic Setup window for prepared terminal and browser sessions" />
+<img src="/images/AutomaticSetupRockxy.png" alt="Rockxy Automatic Setup window for a prepared terminal session" />
 
 ## Supported launch targets
 
@@ -54,13 +61,6 @@ The Automatic Setup window currently models these terminal choices:
 - iTerm2
 - Ghostty
 - My own Terminal
-
-For browsers, Rockxy models:
-
-- Google Chrome with a new prepared profile
-- Google Chrome with the current profile
-- Firefox
-- Brave as a future option
 
 If you choose **My own Terminal**, Rockxy copies the setup command for you so you can paste it into any shell that supports `source`.
 
