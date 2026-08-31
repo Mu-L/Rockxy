@@ -1,6 +1,6 @@
 ---
 title: Automatic Setup Troubleshooting
-description: Fix common Automatic Setup and Manual Setup problems, including missing traffic, HTTPS trust errors, stale sessions, browser profile issues, and localhost routing.
+description: Fix common Automatic Setup and Manual Setup problems, including missing traffic, HTTPS trust errors, stale sessions, GUI-app routing, and localhost routing.
 ---
 
 # Automatic Setup Troubleshooting
@@ -65,6 +65,29 @@ This may not work:
 
 Run the setup command again in each terminal session that starts traffic you want Rockxy to capture.
 
+## An already-running or GUI app shows no traffic
+
+Automatic Setup and Manual Setup only affect the session they prepare. Child processes launched from that session inherit its environment, but each runtime or HTTP library must still honor those proxy variables; anything already running does not.
+
+That means:
+
+- An app or IDE that was already open keeps its previous environment. Quit it and launch it fresh from the prepared session, or point it at Rockxy another way.
+- Some GUI apps ignore shell environment variables completely, so a prepared shell never reaches them.
+
+For those clients, use macOS System Proxy, or the target-specific Manual Setup, instead of relying on inherited shell variables.
+
+## Java or a JetBrains IDE (PyCharm/IntelliJ) shows no traffic
+
+The Java VMs Automatic Setup target sets `JAVA_TOOL_OPTIONS` proxy properties for JVMs launched from the prepared session.
+
+For a JetBrains IDE, those properties route the IDE's JVM traffic. A Python, Node.js, or other non-JVM Run/Debug child must separately honor the inherited `HTTP_PROXY` / `HTTPS_PROXY` variables or use its own proxy configuration. An IDE startup `CONNECT` row alone does not prove that the application being debugged is routed.
+
+If Java traffic still does not appear:
+
+- Launch the JVM or IDE fresh from the prepared session. A JetBrains IDE that was already open keeps its old environment and will not pick up `JAVA_TOOL_OPTIONS` retroactively.
+- For HTTPS, routing alone is not enough: import and trust the Rockxy root CA in the exact JVM or JetBrains trust store, and add the host under SSL Proxying. See [Java VMs](/setup-guides/java-vms).
+- If the IDE has its own proxy setting that ignores the environment, set macOS System Proxy or configure the IDE's proxy manually.
+
 ## AppleScript permission is blocked
 
 Rockxy may need macOS permission to launch or control supported terminal apps for Automatic Setup.
@@ -76,15 +99,6 @@ If macOS blocks that launch:
 - then try Automatic Setup again.
 
 Manual Setup is the reliable fallback because it only asks you to copy and paste the command yourself.
-
-## Browser opens but HTTPS still fails
-
-Browser setup has two parts:
-
-- the browser profile must use Rockxy's proxy,
-- and the browser must trust Rockxy's root certificate for HTTPS inspection.
-
-If the prepared browser opens but HTTPS requests fail, finish certificate trust first. Firefox can use a separate certificate store, so it may need browser-specific certificate trust even when macOS Keychain is already configured.
 
 ## Localhost requests do not appear
 
@@ -107,7 +121,7 @@ If one library fails while another runtime request works:
 
 <CardGroup cols={2}>
   <Card title="Automatic Setup" icon="bolt" href="/automatic-setup/automatic-setup">
-    Review what Rockxy prepares when it launches a terminal or browser session.
+    Review what Rockxy prepares when it launches a terminal session.
   </Card>
   <Card title="Manual Setup" icon="clipboard" href="/automatic-setup/manual-setup">
     Copy the setup command into your own terminal as a fallback.

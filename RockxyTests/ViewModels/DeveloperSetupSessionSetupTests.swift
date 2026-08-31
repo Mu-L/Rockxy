@@ -1,9 +1,11 @@
 import Foundation
-import Testing
 @testable import Rockxy
+import Testing
 
 @Suite("Developer setup session setup")
 struct DeveloperSetupSessionSetupTests {
+    // MARK: Internal
+
     @Test("Generated setup script exports scoped proxy and certificate hints")
     func generatedSetupScriptExportsScopedProxyAndCertificateHints() {
         let context = RockxySetupScriptContext(
@@ -26,13 +28,65 @@ struct DeveloperSetupSessionSetupTests {
         #expect(script.contains("NODE_OPTIONS"))
     }
 
+    @Test("Java VMs script injects JAVA_TOOL_OPTIONS proxy properties once and preserves the base")
+    func javaScriptInjectsProxyPropertiesAndPreservesBase() {
+        let context = RockxySetupScriptContext(
+            proxyHost: "127.0.0.1",
+            proxyPort: 9_090,
+            certificatePath: nil,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appName: "Rockxy",
+            targetID: .javaVMs
+        )
+
+        let script = RockxySetupScriptBuilder.script(context: context)
+
+        #expect(script.contains("-Dhttp.proxyHost=127.0.0.1"))
+        #expect(script.contains("-Dhttp.proxyPort=9090"))
+        #expect(script.contains("-Dhttps.proxyHost=127.0.0.1"))
+        #expect(script.contains("-Dhttps.proxyPort=9090"))
+        #expect(script.contains("export JAVA_TOOL_OPTIONS="))
+        #expect(script.contains("${JAVA_TOOL_OPTIONS//$ROCKXY_JAVA_PROXY_OPTS/}"))
+        // The proxy option string is emitted exactly once so re-sourcing cannot stack it.
+        #expect(script.components(separatedBy: "-Dhttp.proxyHost=127.0.0.1").count - 1 == 1)
+    }
+
+    @Test("Non-Java runtime script never injects JAVA_TOOL_OPTIONS")
+    func nonJavaScriptOmitsJavaProxyProperties() {
+        let context = RockxySetupScriptContext(
+            proxyHost: "127.0.0.1",
+            proxyPort: 9_090,
+            certificatePath: nil,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appName: "Rockxy",
+            targetID: .python
+        )
+
+        let script = RockxySetupScriptBuilder.script(context: context)
+
+        #expect(script.contains("JAVA_TOOL_OPTIONS") == false)
+        #expect(script.contains("-Dhttp.proxyHost") == false)
+    }
+
+    @Test("Sourcing the Java script twice keeps existing JAVA_TOOL_OPTIONS and one proxy block")
+    func javaScriptPreservesExistingOptionsAcrossReSourcing() throws {
+        try assertJavaScriptSourcing(shellPath: "/bin/zsh")
+    }
+
+    @Test("Sourcing the Java script twice in bash keeps existing options and one proxy block")
+    func javaScriptPreservesExistingOptionsAcrossReSourcingBash() throws {
+        try assertJavaScriptSourcing(shellPath: "/bin/bash")
+    }
+
     @Test("Manual source command quotes Application Support paths")
     func manualSourceCommandQuotesApplicationSupportPaths() {
-        let scriptURL = URL(fileURLWithPath: "/Users/stephen/Library/Application Support/Rockxy/setup/rockxy_env_setup.sh")
+        let scriptURL =
+            URL(fileURLWithPath: "/Users/stephen/Library/Application Support/Rockxy/setup/rockxy_env_setup.sh")
 
         let command = RockxySetupScriptBuilder.sourceCommand(scriptURL: scriptURL)
 
-        #expect(command == "set -a 2>/dev/null || true; source \"/Users/stephen/Library/Application Support/Rockxy/setup/rockxy_env_setup.sh\"; set +a 2>/dev/null || true")
+        #expect(command ==
+            "set -a 2>/dev/null || true; source \"/Users/stephen/Library/Application Support/Rockxy/setup/rockxy_env_setup.sh\"; set +a 2>/dev/null || true")
         #expect(!command.contains("__rockxy_setup"))
     }
 
@@ -97,6 +151,13 @@ struct DeveloperSetupSessionSetupTests {
         #expect(userJS.contains("user_pref(\"network.proxy.no_proxies_on\", \"localhost, 127.0.0.1, ::1\");"))
     }
 
+    // MARK: Private
+
+    private struct ShellResult {
+        let exitCode: Int32
+        let output: String
+    }
+
     private func assertGeneratedSetupCommandRuns(shellPath: String) throws {
         try #require(FileManager.default.fileExists(atPath: shellPath))
 
@@ -110,6 +171,47 @@ struct DeveloperSetupSessionSetupTests {
         #expect(result.output.contains("HTTP_PROXY=http://127.0.0.1:9092"))
         #expect(result.output.contains("ROCKXY_SETUP_SESSION=1"))
         #expect(result.output.contains("Rockxy setup session is ready: http://127.0.0.1:9092"))
+    }
+
+    private func assertJavaScriptSourcing(shellPath: String) throws {
+        try #require(FileManager.default.fileExists(atPath: shellPath))
+
+        let scriptURL = try writeTemporaryJavaSetupScript()
+        let sourceCommand = RockxySetupScriptBuilder.sourceCommand(scriptURL: scriptURL)
+        // A harmless value added before the first source and another added between
+        // sources prove both survive while the Rockxy proxy block remains singular.
+        let command = "export JAVA_TOOL_OPTIONS=\"-Dfile.encoding=UTF-8\"; " +
+            "\(sourceCommand); " +
+            "export JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS -Duser.country=VN\"; " +
+            "\(sourceCommand); " +
+            "printf 'JAVA_TOOL_OPTIONS=%s\\n' \"$JAVA_TOOL_OPTIONS\""
+
+        let result = try runShell(shellPath: shellPath, command: command)
+
+        #expect(result.exitCode == 0)
+        #expect(result.output.contains("-Dfile.encoding=UTF-8"))
+        #expect(result.output.contains("-Duser.country=VN"))
+        #expect(result.output.contains("-Dhttp.proxyHost=127.0.0.1"))
+        let proxyBlockCount = result.output.components(separatedBy: "-Dhttp.proxyHost=127.0.0.1").count - 1
+        #expect(proxyBlockCount == 1)
+    }
+
+    private func writeTemporaryJavaSetupScript() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy java setup \(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("Application Support/Rockxy/setup", isDirectory: true)
+        let scriptURL = directory.appendingPathComponent("rockxy_env_setup.sh")
+        let context = RockxySetupScriptContext(
+            proxyHost: "127.0.0.1",
+            proxyPort: 9_093,
+            certificatePath: nil,
+            generatedAt: Date(timeIntervalSince1970: 0),
+            appName: "Rockxy",
+            targetID: .javaVMs
+        )
+
+        try RockxySetupScriptBuilder.writeScript(context: context, scriptURL: scriptURL)
+        return scriptURL
     }
 
     private func assertGeneratedSetupCommandReportsMissingScript(shellPath: String) throws {
@@ -160,10 +262,5 @@ struct DeveloperSetupSessionSetupTests {
         let standardError = String(data: errorData, encoding: .utf8) ?? ""
         let output = standardOutput + standardError
         return ShellResult(exitCode: process.terminationStatus, output: output)
-    }
-
-    private struct ShellResult {
-        let exitCode: Int32
-        let output: String
     }
 }

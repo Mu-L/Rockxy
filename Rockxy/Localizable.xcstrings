@@ -4294,6 +4294,16 @@
         }
       }
     },
+    "Automatic Setup only affects the session it launches. An app that is already running keeps its current environment, and some GUI apps ignore shell variables — use macOS System Proxy or this target's Manual Setup for those.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动设置只影响它启动的会话。已经在运行的应用会保留其当前环境，某些 GUI 应用会忽略 shell 变量——对于这些应用，请使用 macOS 系统代理或该目标的手动设置。"
+          }
+        }
+      }
+    },
     "Automatic Setup can prepare a scoped session for this target; Manual Setup remains available.": {
       "localizations": {
         "zh-Hans": {
@@ -12945,6 +12955,16 @@
         }
       }
     },
+    "For Java, HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store and the target host added under SSL Proxying.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对于 Java，HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 SSL 代理中添加目标主机。"
+          }
+        }
+      }
+    },
     "For example: Checkout API": {
       "localizations": {
         "zh-Hans": {
@@ -16259,12 +16279,12 @@
         }
       }
     },
-    "Java/Kotlin ships a manual keystore + HttpClient workflow when a local JDK is installed.": {
+    "Java VMs support a scoped Automatic Setup session plus a manual keystore workflow.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安装本地 JDK 后，Java/Kotlin 会提供手动密钥库 + HttpClient 工作流。"
+            "value": "Java VMs 支持限定范围的自动设置会话以及手动密钥库工作流。"
           }
         }
       }
@@ -27732,12 +27752,12 @@
         }
       }
     },
-    "Rockxy ships a keytool import command and a Java HttpClient sample for a manual capture check on machines with a local JDK.": {
+    "Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store and the target host added under SSL Proxying.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 提供 keytool 导入命令和 Java HttpClient 示例，用于在装有本地 JDK 的机器上手动检查捕获。"
+            "value": "自动设置会准备一个限定范围的 shell，为 JVM 设置 JAVA_TOOL_OPTIONS 代理属性。HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 SSL 代理中添加目标主机。"
           }
         }
       }
@@ -32180,6 +32200,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "启动代理以通过 Rockxy 路由系统流量。"
+          }
+        }
+      }
+    },
+    "Start the Rockxy proxy before opening a prepared terminal.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开预配置终端前，请先启动 Rockxy 代理。"
           }
         }
       }

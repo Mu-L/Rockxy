@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.
+- Made Java VM Automatic Setup apply explicit JVM proxy properties while preserving existing `JAVA_TOOL_OPTIONS`, and clarified the fresh-launch, trust-store, and SSL Proxying requirements for JetBrains IDEs.
 
 ### Changed
 
