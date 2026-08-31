@@ -105,7 +105,7 @@ struct DiffCandidateTableView: View {
             }
             .width(clientColumnWidth)
 
-            TableColumn(String(localized: "Code", bundle: RockxyLocalization.bundle)) { transaction in
+            TableColumn(String(localized: "Compact HTTP status code", bundle: RockxyLocalization.bundle)) { transaction in
                 if let statusCode = transaction.response?.statusCode {
                     DiffStatusCodeBadge(statusCode: statusCode)
                 } else {

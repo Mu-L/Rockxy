@@ -23,6 +23,42 @@ struct StringCatalogCoverageTests {
         try validateCatalog(named: "InfoPlist.xcstrings")
     }
 
+    @Test("The ambiguous standalone Code key is retired from Localizable.xcstrings")
+    func codeKeyIsRemoved() throws {
+        let data = try Data(contentsOf: Self.catalogURL("Localizable.xcstrings"))
+        let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let catalog = try #require(root)
+        let strings = try #require(catalog["strings"] as? [String: Any])
+        #expect(strings["Code"] == nil, "The context-free \"Code\" key must not return; use a contextual key")
+        #expect(strings["Status code"] != nil, "The HTTP status-code label key must remain")
+        #expect(strings["Compact HTTP status code"] != nil, "Compact status labels need a contextual key")
+    }
+
+    @Test("Localizable.xcstrings honors the Simplified-Chinese terminology glossary")
+    func zhHansGlossary() throws {
+        let data = try Data(contentsOf: Self.catalogURL("Localizable.xcstrings"))
+        let root = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let catalog = try #require(root)
+        let strings = try #require(catalog["strings"] as? [String: Any])
+
+        for (key, rawEntry) in strings {
+            guard let entry = rawEntry as? [String: Any],
+                  entry["shouldTranslate"] as? Bool != false,
+                  let localizations = entry["localizations"] as? [String: Any],
+                  let node = localizations["zh-Hans"] as? [String: Any] else
+            {
+                continue
+            }
+            let expectedUnits = Self.sourceUnits(key: key, entry: entry)
+            for (unitPath, value) in Self.collectUnits(node) {
+                let source = expectedUnits[unitPath] ?? key
+                for issue in Self.zhHansGlossaryIssues(key: key, source: source, value: value) {
+                    Issue.record(Comment(rawValue: "Localizable.xcstrings: \(key) zh-Hans glossary — \(issue)"))
+                }
+            }
+        }
+    }
+
     @Test("Locale discovery ignores empty and source localization keys")
     func localeDiscoveryIgnoresInvalidKeys() {
         let catalog: [String: Any] = [
@@ -42,6 +78,22 @@ struct StringCatalogCoverageTests {
     }
 
     // MARK: Private
+
+    /// Exact English keys whose "token" is an AI model token (never an auth/pairing
+    /// token), mirroring `ZH_HANS_AI_TOKEN_KEYS` in `validate_xcstrings.py`.
+    private static let zhHansAITokenKeys: Set<String> = [
+        "%@ tokens",
+        "%lld input · %lld output tokens",
+        "Context window tokens",
+        "Maximum output tokens",
+        "tokens",
+        "tokens per response",
+        "Compare model, tokens, finish reason, and latency against adjacent retries.",
+        "Check event count, final event, interruption signs, and first-token/overall duration.",
+        "Rockxy can identify this AI app session, but model, tokens, and tools need decrypted API evidence.",
+        "SSE cadence is shown from captured events. Token boundaries stay unavailable unless the provider exposes them.",
+        "Rockxy uses 8,192 tokens by default and limits local inference to 32,768 tokens to avoid excessive memory pressure.",
+    ]
 
     private static func catalogURL(_ fileName: String) -> URL {
         // <repo>/RockxyTests/Localization/StringCatalogCoverageTests.swift → <repo>/Rockxy/<fileName>
@@ -112,6 +164,54 @@ struct StringCatalogCoverageTests {
             }
         }
         return units
+    }
+
+    /// Deterministic Simplified-Chinese forbid-rules, gated on the English source.
+    /// Mirrors `zh_hans_glossary_errors` in `.github/tools/validate_xcstrings.py`.
+    private static func zhHansGlossaryIssues(key: String, source: String, value: String) -> [String] {
+        let lowered = source.lowercased()
+        let semanticContext = "\(key) \(source)".lowercased()
+        let isCertificatePinning = lowered.contains("certificate pinning")
+            || lowered.contains("pins certificate")
+        var issues: [String] = []
+
+        func forbid(_ applies: Bool, _ banned: [String], _ label: String) {
+            guard applies else {
+                return
+            }
+            for term in banned where value.contains(term) {
+                issues.append("\(label) (found \(term))")
+            }
+        }
+
+        forbid(lowered.contains("redact"), ["遮盖", "隐去"], "redaction must use 脱敏/已脱敏")
+        forbid(isCertificatePinning, ["锁定"], "certificate pinning must use 固定")
+        forbid(source.contains("Compose"), ["编写"], "named Compose feature must stay Compose")
+        forbid(
+            lowered.contains("wire format") || lowered.contains("wire-format"),
+            ["线路格式"],
+            "Protobuf wire format must use 线格式"
+        )
+        forbid(zhHansAITokenKeys.contains(key), ["令牌"], "AI model token must use token, not 令牌")
+
+        func require(_ applies: Bool, _ term: String, _ label: String) {
+            guard applies, !value.contains(term) else {
+                return
+            }
+            issues.append("\(label) (missing \(term))")
+        }
+
+        require(semanticContext.contains("status code"), "状态码", "HTTP status code must use 状态码")
+        require(lowered.contains("redact"), "脱敏", "redaction must use 脱敏/已脱敏")
+        require(isCertificatePinning, "固定", "certificate pinning must use 固定")
+        require(source.contains("Compose"), "Compose", "named Compose feature must stay Compose")
+        require(
+            lowered.contains("wire format") || lowered.contains("wire-format"),
+            "线格式",
+            "Protobuf wire format must use 线格式"
+        )
+        require(zhHansAITokenKeys.contains(key), "token", "AI model token must use token")
+        return issues
     }
 
     private static func placeholderTokens(in text: String) -> [String] {

@@ -14,13 +14,13 @@ enum RequestInspectorTab: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .headers: "Headers"
-        case .query: "Query"
-        case .body: "Body"
-        case .cookies: "Cookies"
-        case .raw: "Raw"
-        case .synopsis: "Synopsis"
-        case .comments: "Notes"
+        case .headers: String(localized: "Headers", bundle: RockxyLocalization.bundle)
+        case .query: String(localized: "Query", bundle: RockxyLocalization.bundle)
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
+        case .cookies: String(localized: "Cookies", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
+        case .synopsis: String(localized: "Synopsis", bundle: RockxyLocalization.bundle)
+        case .comments: String(localized: "Notes", bundle: RockxyLocalization.bundle)
         }
     }
 }

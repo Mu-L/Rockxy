@@ -17,12 +17,13 @@ enum InspectorTab: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .headers: "Headers"
-        case .body: "Body"
-        case .cookies: "Cookies"
-        case .timing: "Timing"
-        case .raw: "Raw"
-        case .certificates: "Certs"
+        case .headers: String(localized: "Headers", bundle: RockxyLocalization.bundle)
+        case .body: String(localized: "Body", bundle: RockxyLocalization.bundle)
+        case .cookies: String(localized: "Cookies", bundle: RockxyLocalization.bundle)
+        case .timing: String(localized: "Timing", bundle: RockxyLocalization.bundle)
+        case .raw: String(localized: "Raw", bundle: RockxyLocalization.bundle)
+        case .certificates: String(localized: "Certs", bundle: RockxyLocalization.bundle)
+        // Protocol names render verbatim regardless of language.
         case .websocket: "WebSocket"
         case .graphql: "GraphQL"
         }

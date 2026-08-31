@@ -625,7 +625,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 个令牌"
+            "value": "%@ 个 token"
           }
         }
       }
@@ -1086,7 +1086,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld 个输入令牌 · %2$lld 个输出令牌"
+            "value": "%1$lld 个输入 token · %2$lld 个输出 token"
           }
         }
       }
@@ -1812,7 +1812,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "<保存前已遮盖>"
+            "value": "<保存前已脱敏>"
           }
         }
       }
@@ -3773,7 +3773,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在断点队列的 Raw 标签页中应用模板。有效的请求模板会替换方法、目标、标头和正文；有效的响应模板会替换状态、标头和正文。"
+            "value": "在断点队列的 Raw 标签页中应用模板。有效的请求模板会替换方法、目标、标头和正文；有效的响应模板会替换状态码、标头和正文。"
           }
         }
       }
@@ -4069,7 +4069,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发布到 Gist 前，Authorization、Cookies、Set-Cookies 等内容会被遮盖。"
+            "value": "发布到 Gist 前，Authorization、Cookies、Set-Cookies 等内容会被脱敏。"
           }
         }
       }
@@ -4269,7 +4269,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动遮盖敏感标头"
+            "value": "自动对敏感标头进行脱敏"
           }
         }
       }
@@ -4379,7 +4379,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 MCP 客户端前自动遮盖敏感信息。"
+            "value": "发送到 MCP 客户端前自动对敏感信息进行脱敏。"
           }
         }
       }
@@ -5038,7 +5038,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "断点规则会在传输过程中暂停匹配的请求或响应，让你可以先编辑 URL、标头、正文或状态。"
+            "value": "断点规则会在传输过程中暂停匹配的请求或响应，让你可以先编辑 URL、标头、正文或状态码。"
           }
         }
       }
@@ -5778,7 +5778,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证书锁定仍在阻止拦截"
+            "value": "证书固定仍在阻止拦截"
           }
         }
       }
@@ -5978,7 +5978,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查事件数量、最终事件、中断迹象，以及首个令牌/总时长。"
+            "value": "检查事件数量、最终事件、中断迹象，以及首个 token/总时长。"
           }
         }
       }
@@ -7009,12 +7009,489 @@
         }
       }
     },
-    "Code": {
+    "Auth": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代码"
+            "value": "认证"
+          }
+        }
+      }
+    },
+    "Certs": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证书"
+          }
+        }
+      }
+    },
+    "Client/App": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "客户端/App"
+          }
+        }
+      }
+    },
+    "Compact HTTP status code": {
+      "comment": "Compact HTTP response status-code label used in narrow table columns and fields.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态码"
+          }
+        }
+      }
+    },
+    "Color": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "颜色"
+          }
+        }
+      }
+    },
+    "Content Type": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容类型"
+          }
+        }
+      }
+    },
+    "Cookies": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cookie"
+          }
+        }
+      }
+    },
+    "Custom": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义"
+          }
+        }
+      }
+    },
+    "Custom HTTP response status code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 HTTP 响应状态码"
+          }
+        }
+      }
+    },
+    "Debug": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调试"
+          }
+        }
+      }
+    },
+    "Document": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档"
+          }
+        }
+      }
+    },
+    "Fault": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "故障"
+          }
+        }
+      }
+    },
+    "Font": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字体"
+          }
+        }
+      }
+    },
+    "Form": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表单"
+          }
+        }
+      }
+    },
+    "Media": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "媒体"
+          }
+        }
+      }
+    },
+    "Note": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "备注"
+          }
+        }
+      }
+    },
+    "Notice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "Other": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他"
+          }
+        }
+      }
+    },
+    "Query String": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询字符串"
+          }
+        }
+      }
+    },
+    "Request Header": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求标头"
+          }
+        }
+      }
+    },
+    "Response Header": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "响应标头"
+          }
+        }
+      }
+    },
+    "Status Code": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态码"
+          }
+        }
+      }
+    },
+    "Synopsis": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摘要"
+          }
+        }
+      }
+    },
+    "Timeline": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间线"
+          }
+        }
+      }
+    },
+    "Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量"
+          }
+        }
+      }
+    },
+    "Very Bad Network": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "极差网络"
+          }
+        }
+      }
+    },
+    "Warning": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警告"
+          }
+        }
+      }
+    },
+    "Breakpoint edit error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断点编辑错误"
+          }
+        }
+      }
+    },
+    "Closing active connections and restoring system routing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在关闭活动连接并恢复系统路由。"
+          }
+        }
+      }
+    },
+    "Common HTTP response status": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "常用 HTTP 响应状态码"
+          }
+        }
+      }
+    },
+    "Enter a valid HTTP URL with a host.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入包含主机的有效 HTTP URL。"
+          }
+        }
+      }
+    },
+    "Enter a valid HTTP method.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的 HTTP 方法。"
+          }
+        }
+      }
+    },
+    "Enter a valid HTTP status code.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的 HTTP 状态码。"
+          }
+        }
+      }
+    },
+    "Enter a valid request path.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的请求路径。"
+          }
+        }
+      }
+    },
+    "Header names must use valid HTTP token characters.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头名称只能使用有效的 HTTP token 字符。"
+          }
+        }
+      }
+    },
+    "Header values cannot contain line breaks.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头值不能包含换行符。"
+          }
+        }
+      }
+    },
+    "Host, path, and query": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主机、路径和查询"
+          }
+        }
+      }
+    },
+    "Message editor section": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "消息编辑器部分"
+          }
+        }
+      }
+    },
+    "Proxy shutdown is in progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在关闭代理"
+          }
+        }
+      }
+    },
+    "Remove header": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除标头"
+          }
+        }
+      }
+    },
+    "Remove query parameter": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除查询参数"
+          }
+        }
+      }
+    },
+    "Restoring routing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在恢复路由"
+          }
+        }
+      }
+    },
+    "Stopping": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止"
+          }
+        }
+      }
+    },
+    "Stopping Capture": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止捕获"
+          }
+        }
+      }
+    },
+    "Stopping Proxy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止代理"
+          }
+        }
+      }
+    },
+    "Stopping…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止…"
+          }
+        }
+      }
+    },
+    "Rockxy is closing active connections and restoring system routing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 正在关闭活动连接并恢复系统路由。"
+          }
+        }
+      }
+    },
+    "The scheme is fixed for this cleartext connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此明文连接的协议已固定"
           }
         }
       }
@@ -7190,7 +7667,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请将模型、令牌、结束原因和延迟与相邻的重试进行比较。"
+            "value": "请将模型、token、结束原因和延迟与相邻的重试进行比较。"
           }
         }
       }
@@ -7432,7 +7909,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "编写"
+            "value": "Compose"
           }
         }
       }
@@ -7452,7 +7929,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "编写…"
+            "value": "Compose…"
           }
         }
       }
@@ -7572,7 +8049,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在数据离开这台 Mac 前确认经过遮盖的确切流量。"
+            "value": "请在数据离开这台 Mac 前确认已脱敏流量的具体内容。"
           }
         }
       }
@@ -7582,7 +8059,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开始本地推断前，请确认已遮盖的流量和对话。"
+            "value": "开始本地推断前，请确认已脱敏的流量和对话。"
           }
         }
       }
@@ -7592,7 +8069,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "模型运行前，请确认已隐去敏感信息的流量和对话。"
+            "value": "模型运行前，请确认已脱敏的流量和对话。"
           }
         }
       }
@@ -7856,7 +8333,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上下文窗口令牌数"
+            "value": "上下文窗口 token 数"
           }
         }
       }
@@ -10106,7 +10583,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "域"
+            "value": "域名"
           }
         }
       }
@@ -14215,7 +14692,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "历史记录保留在此 Mac 上。身份验证和 cookie 标头值会被隐去；URL 和正文仍在本地存储。"
+            "value": "历史记录保留在此 Mac 上。身份验证和 cookie 标头值会被脱敏；URL 和正文仍在本地存储。"
           }
         }
       }
@@ -14757,7 +15234,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果应用固定了证书，Rockxy 将无法解密其 HTTPS 流量，除非调试版本放宽固定。"
+            "value": "如果应用启用了证书固定，除非调试版本放宽该策略，否则 Rockxy 无法解密其 HTTPS 流量。"
           }
         }
       }
@@ -14767,7 +15244,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果应用锁定了证书，则在调试版本放宽锁定之前，Rockxy 无法解密该 HTTPS 流量。"
+            "value": "如果应用启用了证书固定，则在调试版本放宽该策略之前，Rockxy 无法解密该 HTTPS 流量。"
           }
         }
       }
@@ -14777,7 +15254,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果应用固定了自己的证书，则在应用以放宽固定的方式构建之前，Rockxy 无法解密其流量。"
+            "value": "如果应用对自己的证书启用了固定，则在构建应用时放宽该策略之前，Rockxy 无法解密其流量。"
           }
         }
       }
@@ -14857,7 +15334,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导入证书和私钥，以便为匹配的主机提供已锁定的服务器身份。"
+            "value": "导入证书和私钥，以便为匹配的主机提供固定的服务器身份。"
           }
         }
       }
@@ -17911,7 +18388,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "最大输出令牌数"
+            "value": "最大输出 token 数"
           }
         }
       }
@@ -21606,7 +22083,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在“编写”中打开"
+            "value": "在 Compose 中打开"
           }
         }
       }
@@ -23099,7 +23576,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在准备已隐去敏感信息的预览…"
+            "value": "正在准备脱敏后的预览…"
           }
         }
       }
@@ -24705,7 +25182,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "遮盖识别到的敏感数据"
+            "value": "对识别到的敏感数据进行脱敏"
           }
         }
       }
@@ -24715,7 +25192,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 AI 前隐去敏感数据"
+            "value": "发送到 AI 前对敏感数据进行脱敏"
           }
         }
       }
@@ -24725,7 +25202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在遮盖敏感字段"
+            "value": "正在对敏感字段进行脱敏"
           }
         }
       }
@@ -24735,7 +25212,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "隐去敏感信息"
+            "value": "脱敏"
           }
         }
       }
@@ -24745,7 +25222,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "遮盖功能已关闭。捕获的标头、URL 和正文将完全按记录内容上传。"
+            "value": "脱敏功能已关闭。捕获的标头、URL 和正文将完全按记录内容上传。"
           }
         }
       }
@@ -24755,7 +25232,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "遮盖清单"
+            "value": "脱敏清单"
           }
         }
       }
@@ -24765,7 +25242,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上传前隐去识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）。此操作会尽力而为，但不作保证。"
+            "value": "上传前会对识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）进行脱敏。此操作会尽力而为，但不作保证。"
           }
         }
       }
@@ -26372,7 +26849,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "响应状态和标头"
+            "value": "响应状态码和标头"
           }
         }
       }
@@ -26382,7 +26859,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "响应状态必须是三位数代码。"
+            "value": "响应状态码必须是三位数。"
           }
         }
       }
@@ -26852,7 +27329,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "复制或共享任何证据前，请审查经过遮盖的确切有效载荷。"
+            "value": "复制或共享任何证据前，请审查经过脱敏的确切有效载荷。"
           }
         }
       }
@@ -27018,7 +27495,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 可以识别此 AI App 会话，但模型、令牌和工具需要解密后的 API 证据。"
+            "value": "Rockxy 可以识别此 AI App 会话，但模型、token 和工具需要解密后的 API 证据。"
           }
         }
       }
@@ -27987,7 +28464,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 将创建可编辑的草稿。只有在“编写”中按下“发送”后才会发送内容。"
+            "value": "Rockxy 将创建可编辑的草稿。只有在 Compose 中按下“发送”后才会发送内容。"
           }
         }
       }
@@ -30518,7 +30995,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送已隐去敏感信息的数据"
+            "value": "发送已脱敏数据"
           }
         }
       }
@@ -30538,7 +31015,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "敏感字段已隐去"
+            "value": "敏感字段已脱敏"
           }
         }
       }
@@ -31966,7 +32443,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SSE 节奏根据已捕获的事件显示。除非提供方公开令牌边界，否则令牌边界不可用。"
+            "value": "SSE 节奏根据已捕获的事件显示。除非提供方公开 token 边界，否则 token 边界不可用。"
           }
         }
       }
@@ -33218,7 +33695,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "应用拒绝了 Rockxy 针对此主机的 TLS 握手。可能存在证书锁定，但自定义信任策略也可能产生相同信号。"
+            "value": "应用拒绝了 Rockxy 针对此主机的 TLS 握手。应用可能启用了证书固定，但自定义信任策略也可能产生相同信号。"
           }
         }
       }
@@ -34120,7 +34597,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "响应正文超过了 %@ MB 的编写限制。"
+            "value": "响应正文超过了 %@ MB 的 Compose 限制。"
           }
         }
       }
@@ -34848,7 +35325,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此帧看起来不是有效的 Protobuf 线路格式有效载荷。"
+            "value": "此帧看起来不是有效的 Protobuf 线格式有效载荷。"
           }
         }
       }
@@ -35551,7 +36028,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "令牌"
+            "value": "token"
           }
         }
       }
@@ -35561,7 +36038,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每次响应的令牌数"
+            "value": "每次响应的 token 数"
           }
         }
       }
@@ -38314,7 +38791,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "线路格式启发式检测"
+            "value": "线格式启发式检测"
           }
         }
       }
@@ -38413,7 +38890,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "处理前，你会看到经过遮盖的确切快照。"
+            "value": "处理前，你会看到经过脱敏的确切快照。"
           }
         }
       }
