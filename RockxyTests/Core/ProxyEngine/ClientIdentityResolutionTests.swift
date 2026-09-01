@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 @testable import Rockxy
 import Testing
@@ -29,6 +30,7 @@ private final class IntBox: @unchecked Sendable {
 
 // MARK: - ClientIdentityResolutionTests
 
+@Suite(.serialized)
 struct ClientIdentityResolutionTests {
     // MARK: Internal
 
@@ -156,6 +158,48 @@ struct ClientIdentityResolutionTests {
         #expect(collections.count() == 2)
     }
 
+    @Test("source-port reuse after a snapshot cannot inherit the previous process identity")
+    func sourcePortReuseResolvesFreshIdentity() async {
+        let collections = IntBox()
+        let nowBox = IntBox()
+        let firstIdentity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.First",
+            displayName: "First"
+        )
+        let secondIdentity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.Second",
+            displayName: "Second"
+        )
+        let snapshots = [
+            [Self.record(pid: 101, command: "first", sourcePort: 54_321)],
+            [Self.record(pid: 202, command: "second", sourcePort: 54_321)],
+        ]
+        let times: [UInt64] = [2_000, 4_000]
+        let resolver = ClientIdentityResolver(
+            connectionTableProvider: { _, _ in
+                snapshots[min(collections.next(), snapshots.count - 1)]
+            },
+            identityProvider: { pid, _ in
+                pid == 101 ? firstIdentity : secondIdentity
+            },
+            now: { DispatchTime(uptimeNanoseconds: times[min(nowBox.next(), times.count - 1)]) },
+            excludePID: 999
+        )
+
+        let first = makeDescriptor(
+            acceptedAt: DispatchTime(uptimeNanoseconds: 1_000),
+            clientHost: "127.0.0.1", clientPort: 54_321, proxyPort: 9_090
+        )
+        let second = makeDescriptor(
+            acceptedAt: DispatchTime(uptimeNanoseconds: 3_000),
+            clientHost: "127.0.0.1", clientPort: 54_321, proxyPort: 9_090
+        )
+
+        #expect(await resolver.resolveIdentity(descriptor: first) == firstIdentity)
+        #expect(await resolver.resolveIdentity(descriptor: second) == secondIdentity)
+        #expect(collections.count() == 2)
+    }
+
     @Test("concurrent accepts coalesce into one bounded connection-table collection")
     func concurrentAcceptsCoalesce() async {
         let collections = IntBox()
@@ -183,6 +227,63 @@ struct ClientIdentityResolutionTests {
         let identities = await [firstIdentity, secondIdentity]
 
         #expect(identities.allSatisfy { $0 == Self.sampleIdentity })
+        #expect(collections.count() == 1)
+    }
+
+    @Test("high-traffic local accepts stay identity-correct while sharing one bounded snapshot")
+    func highTrafficAcceptsStayBounded() async {
+        let connectionCount = 256
+        let collections = IntBox()
+        let records = (0 ..< connectionCount).map { index in
+            Self.record(
+                pid: Int32(10_000 + index),
+                command: "client-\(index)",
+                sourcePort: UInt16(40_000 + index)
+            )
+        }
+        let resolver = ClientIdentityResolver(
+            connectionTableProvider: { _, _ in
+                _ = collections.next()
+                return records
+            },
+            identityProvider: { pid, command in
+                ClientApplicationIdentity.bundle(
+                    identifier: "com.example.\(pid)",
+                    displayName: command
+                )
+            },
+            now: { DispatchTime(uptimeNanoseconds: 1_000_000) },
+            coalescingDelay: .milliseconds(20),
+            excludePID: 999
+        )
+
+        let identities = await withTaskGroup(
+            of: ClientApplicationIdentity?.self,
+            returning: [ClientApplicationIdentity?].self
+        ) { group in
+            for index in 0 ..< connectionCount {
+                let descriptor = makeDescriptor(
+                    acceptedAt: DispatchTime(uptimeNanoseconds: UInt64(index + 1)),
+                    clientHost: "127.0.0.1",
+                    clientPort: UInt16(40_000 + index),
+                    proxyPort: 9_090
+                )
+                group.addTask {
+                    await resolver.resolveIdentity(descriptor: descriptor)
+                }
+            }
+
+            var resolved: [ClientApplicationIdentity?] = []
+            resolved.reserveCapacity(connectionCount)
+            for await identity in group {
+                resolved.append(identity)
+            }
+            return resolved
+        }
+
+        let identifiers = Set(identities.compactMap { $0?.identifier })
+        #expect(identities.count == connectionCount)
+        #expect(identifiers.count == connectionCount)
         #expect(collections.count() == 1)
     }
 
@@ -217,6 +318,35 @@ struct ClientIdentityResolutionTests {
         let resolver = makeResolver(records: [])
         let descriptor = makeDescriptor(clientHost: "127.0.0.1", clientPort: 54_321, proxyPort: 9_090)
         #expect(await resolver.resolveIdentity(descriptor: descriptor) == nil)
+    }
+
+    @Test("production lsof lookup resolves a real local child process")
+    func resolvesRealLocalChildProcess() async throws {
+        let fixture = try LocalChildConnectionFixture.start()
+        defer { fixture.stop() }
+        let descriptor = makeDescriptor(
+            acceptedAt: DispatchTime.now(),
+            clientHost: "127.0.0.1",
+            clientPort: fixture.clientSourcePort,
+            proxyPort: fixture.proxyPort
+        )
+        let resolver = ClientIdentityResolver(
+            connectionTableProvider: { proxyPort, deadline in
+                ProcessResolver.runLsofConnectionTable(proxyPort: proxyPort, deadline: deadline)
+            },
+            identityProvider: { pid, command in
+                ProcessResolver.applicationIdentity(forPID: pid, command: command)
+            },
+            timeout: .seconds(2),
+            excludePID: getpid()
+        )
+
+        let identity = await resolver.resolveIdentity(descriptor: descriptor)
+
+        #expect(identity != nil)
+        #expect(identity?.kind == .executable)
+        #expect(identity?.identifier.hasPrefix("exec:") == true)
+        #expect(identity?.displayName == "nc")
     }
 
     // MARK: - lsof parsing
@@ -275,6 +405,17 @@ struct ClientIdentityResolutionTests {
         displayName: "curl"
     )
 
+    private static func record(pid: Int32, command: String, sourcePort: UInt16) -> ProxyConnectionRecord {
+        ProxyConnectionRecord(
+            pid: pid,
+            command: command,
+            sourceHost: "127.0.0.1",
+            sourcePort: sourcePort,
+            destHost: "127.0.0.1",
+            destPort: 9_090
+        )
+    }
+
     private func makeResolver(records: [ProxyConnectionRecord]) -> ClientIdentityResolver {
         ClientIdentityResolver(
             connectionTableProvider: { _, _ in records },
@@ -312,5 +453,115 @@ struct ClientIdentityResolutionTests {
             ),
             state: .completed
         )
+    }
+}
+
+// MARK: - LocalChildConnectionFixture
+
+private struct LocalChildConnectionFixture {
+    // MARK: Lifecycle
+
+    static func start() throws -> LocalChildConnectionFixture {
+        let listener = socket(AF_INET, SOCK_STREAM, 0)
+        guard listener >= 0 else {
+            throw FixtureError.socket("Unable to create listener socket.")
+        }
+
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = 0
+        address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+        let bindResult = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(listener, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bindResult == 0, listen(listener, 1) == 0 else {
+            Darwin.close(listener)
+            throw FixtureError.socket("Unable to bind local listener socket.")
+        }
+
+        var listenerAddress = sockaddr_in()
+        var listenerLength = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let nameResult = withUnsafeMutablePointer(to: &listenerAddress) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getsockname(listener, $0, &listenerLength)
+            }
+        }
+        guard nameResult == 0 else {
+            Darwin.close(listener)
+            throw FixtureError.socket("Unable to inspect local listener port.")
+        }
+        let proxyPort = Int(UInt16(bigEndian: listenerAddress.sin_port))
+
+        let input = Pipe()
+        let child = Process()
+        child.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        child.arguments = ["127.0.0.1", String(proxyPort)]
+        child.standardInput = input
+        child.standardOutput = Pipe()
+        child.standardError = Pipe()
+        do {
+            try child.run()
+        } catch {
+            Darwin.close(listener)
+            throw error
+        }
+
+        var listenerPoll = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
+        guard Darwin.poll(&listenerPoll, 1, 2_000) > 0 else {
+            child.terminate()
+            child.waitUntilExit()
+            Darwin.close(listener)
+            throw FixtureError.socket("Local child did not connect before the deadline.")
+        }
+
+        var peerAddress = sockaddr_in()
+        var peerLength = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let accepted = withUnsafeMutablePointer(to: &peerAddress) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.accept(listener, $0, &peerLength)
+            }
+        }
+        guard accepted >= 0 else {
+            child.terminate()
+            Darwin.close(listener)
+            throw FixtureError.socket("Unable to accept local child connection.")
+        }
+
+        return LocalChildConnectionFixture(
+            listenerFD: listener,
+            acceptedFD: accepted,
+            child: child,
+            input: input,
+            clientSourcePort: UInt16(bigEndian: peerAddress.sin_port),
+            proxyPort: proxyPort
+        )
+    }
+
+    // MARK: Internal
+
+    let listenerFD: Int32
+    let acceptedFD: Int32
+    let child: Process
+    let input: Pipe
+    let clientSourcePort: UInt16
+    let proxyPort: Int
+
+    func stop() {
+        try? input.fileHandleForWriting.close()
+        if child.isRunning {
+            child.terminate()
+            child.waitUntilExit()
+        }
+        Darwin.close(acceptedFD)
+        Darwin.close(listenerFD)
+    }
+
+    // MARK: Private
+
+    private enum FixtureError: Error {
+        case socket(String)
     }
 }

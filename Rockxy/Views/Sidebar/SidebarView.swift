@@ -817,6 +817,8 @@ struct SidebarView: View {
             }
         }
 
+        SidebarOpenHTTPSDecryptionButton()
+
         if coordinator.isInBypassList(domain) {
             Button {
                 coordinator.removeFromBypassList(domain)
@@ -949,8 +951,7 @@ struct SidebarView: View {
     {
         let model = FavoriteTransactionContextMenuModel(
             transaction: transaction,
-            section: section,
-            isSSLProxyingEnabled: coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+            section: section
         )
 
         Button {
@@ -977,13 +978,12 @@ struct SidebarView: View {
 
         Divider()
 
-        Button {
-            coordinator.toggleSSLProxying(for: transaction)
-        } label: {
-            Label(model.sslProxyingTitle, systemImage: "lock.shield")
-        }
-        .disabled(!model.canToggleSSLProxying)
-        .help(model.sslProxyingDisabledReason ?? "")
+        FavoriteTransactionHTTPSBehaviorMenu(
+            coordinator: coordinator,
+            transaction: transaction,
+            canConfigureHost: model.canConfigureHost,
+            hostConfigurationDisabledReason: model.hostConfigurationDisabledReason
+        )
 
         Menu {
             favoriteTransactionToolsMenu(transaction, options: model.tools)

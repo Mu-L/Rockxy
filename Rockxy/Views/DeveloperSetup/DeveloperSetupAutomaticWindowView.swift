@@ -132,7 +132,8 @@ struct DeveloperSetupAutomaticWindowView: View {
                         String(
                             localized: """
                             For Java, HTTPS interception still needs the Rockxy root CA trusted in the exact \
-                            JVM or JetBrains trust store and the target host added under SSL Proxying.
+                            JVM or JetBrains trust store, plus a Decrypt rule for the target application or \
+                            host under HTTPS Decryption.
                             """,
                             bundle: RockxyLocalization.bundle
                         )

@@ -95,16 +95,14 @@ Applies to Map Local, Map Remote, Block List, Allow List, Modify Headers, Networ
 
 ## Settings
 
-Applies to the SSL Proxying rule list in Settings.
+Applies to the HTTPS Decryption window.
 
 | Shortcut | Action |
 |---|---|
-| `⌘N` | Add app rule |
-| `⇧⌘N` | Add domain rule |
-| `⌘E` | Edit selected SSL proxying rule |
-| `⌘⌫` | Delete selected SSL proxying rule |
-| `↵` / `Space` | Toggle selected SSL proxying rule |
-| `⌘F` | Filter SSL proxying rules |
+| `⌘↩` | Edit selected HTTPS behavior rule |
+| `⌘⌫` | Delete selected HTTPS behavior rule |
+| `Space` | Toggle selected HTTPS behavior rule |
+| `⌘F` | Search HTTPS behavior rules |
 
 ## Script Editor
 

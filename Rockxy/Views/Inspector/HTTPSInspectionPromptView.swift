@@ -262,6 +262,11 @@ struct HTTPSInspectionPromptView: View {
                 .menuIndicator(.visible)
                 .fixedSize()
                 .help(scope.actionDescription)
+                .accessibilityLabel(scope.actionDescription)
+                .accessibilityHint(String(
+                    localized: "Choose Decrypt or Tunnel behavior for new application connections.",
+                    bundle: RockxyLocalization.bundle
+                ))
             } else {
                 Button {
                     onAction(action)

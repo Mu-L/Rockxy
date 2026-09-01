@@ -257,7 +257,7 @@ struct SSLProxyingListView: View {
         }
         return String(
             localized:
-            "This import replaces the current HTTPS rules. The master state and TLS passthrough exceptions remain unchanged.",
+            "This import replaces the current host rules. Application rules, the master state, and TLS passthrough exceptions remain unchanged.",
             bundle: RockxyLocalization.bundle
         )
     }
@@ -367,7 +367,11 @@ struct SSLProxyingListView: View {
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel(String(localized: "Enable \(row.target)", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(
+                    row.isEnabled
+                        ? String(localized: "Disable \(row.target)", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Enable \(row.target)", bundle: RockxyLocalization.bundle)
+                )
             }
             .width(62)
 
@@ -502,6 +506,7 @@ struct SSLProxyingListView: View {
             }
             .buttonStyle(.plain)
             .help(String(localized: "Add Application…", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Add Application…", bundle: RockxyLocalization.bundle))
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -532,6 +537,13 @@ struct SSLProxyingListView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help(String(localized: "Add Rule", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Add Rule", bundle: RockxyLocalization.bundle))
+            .accessibilityHint(
+                String(
+                    localized: "Choose an application, host pattern, or observed hosts.",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
 
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.7))
@@ -549,6 +561,7 @@ struct SSLProxyingListView: View {
             .buttonStyle(.plain)
             .disabled(viewModel.selectedRuleID == nil)
             .help(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
+            .accessibilityLabel(String(localized: "Delete Rule", bundle: RockxyLocalization.bundle))
         }
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 5))

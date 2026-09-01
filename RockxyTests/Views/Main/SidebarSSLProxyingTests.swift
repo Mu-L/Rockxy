@@ -152,6 +152,26 @@ struct SidebarSSLProxyingTests {
         #expect(!manager.isAutoPassthrough(fallbackHost))
     }
 
+    @Test("application behavior toasts use complete localized messages")
+    func applicationBehaviorToastsUseCompleteMessages() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.applicationRules
+        defer { manager.replaceAllApplicationRules(originalRules) }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.ToastApp",
+            displayName: "Toast App"
+        )
+
+        coordinator.setSSLProxyingFromInspector(for: identity, listType: .include)
+        #expect(coordinator.activeToast?.text ==
+            "Set Toast App to decrypt HTTPS on new connections. Reconnect the app.")
+
+        coordinator.setSSLProxyingFromInspector(for: identity, listType: .exclude)
+        #expect(coordinator.activeToast?.text ==
+            "Set Toast App to tunnel HTTPS on new connections. Reconnect the app.")
+    }
+
     @Test("application tunnel action wins over a host decrypt rule")
     func applicationTunnelWinsOverHostDecrypt() {
         let coordinator = MainContentCoordinator()

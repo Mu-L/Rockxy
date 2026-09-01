@@ -360,15 +360,21 @@ extension MainContentCoordinator {
             listType: listType,
             fallbackDomain: fallbackDomain
         )
-        let behavior = listType == .include
-            ? String(localized: "decrypt", bundle: RockxyLocalization.bundle)
-            : String(localized: "tunnel", bundle: RockxyLocalization.bundle)
-        activeToast = ToastMessage(
-            style: .success,
-            text: String(
-                localized: "Set \(application.displayName) to \(behavior) HTTPS on new connections. Reconnect the app.",
+        let message = switch listType {
+        case .include:
+            String(
+                localized: "Set \(application.displayName) to decrypt HTTPS on new connections. Reconnect the app.",
                 bundle: RockxyLocalization.bundle
             )
+        case .exclude:
+            String(
+                localized: "Set \(application.displayName) to tunnel HTTPS on new connections. Reconnect the app.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        activeToast = ToastMessage(
+            style: .success,
+            text: message
         )
     }
 

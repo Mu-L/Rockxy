@@ -161,6 +161,64 @@ struct MCPStatusServiceTests {
         #expect(json["port"] as? Int == 9_090)
     }
 
+    // MARK: - get_ssl_proxying_list
+
+    @Test("Get SSL proxying list exposes legacy fields and application rule arrays")
+    func sslProxyingListApplicationRules() async throws {
+        let manager = SSLProxyingManager.shared
+        // Snapshot and restore so persistent user rule state is unchanged by this test.
+        let originalRules = manager.applicationRules
+        defer { manager.replaceAllApplicationRules(originalRules) }
+
+        let bundleIdentity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.MCPTestApp",
+            displayName: "MCP Test App"
+        )
+        let executableIdentity = ClientApplicationIdentity.executable(
+            normalizedPath: "/Applications/MCPTestTool.app/Contents/MacOS/MCPTestTool",
+            displayName: "MCP Test Tool"
+        )
+        manager.replaceAllApplicationRules([
+            ApplicationSSLProxyingRule(identity: bundleIdentity, listType: .include),
+            ApplicationSSLProxyingRule(identity: executableIdentity, listType: .exclude),
+        ])
+
+        let service = makeService()
+        let result = await service.getSSLProxyingList()
+
+        expectNoError(result)
+        let json = try decodeJSONObject(from: result)
+
+        // Legacy fields remain present and unchanged in shape.
+        #expect(json["is_enabled"] is Bool)
+        #expect(json["include_rules"] is [Any])
+        #expect(json["exclude_rules"] is [Any])
+        #expect(json["bypass_domains"] is String)
+
+        // New application-scoped arrays.
+        let includeRules = try #require(json["application_include_rules"] as? [[String: Any]])
+        let excludeRules = try #require(json["application_exclude_rules"] as? [[String: Any]])
+
+        let bundleRule = try #require(includeRules
+            .first { $0["application_identifier"] as? String == bundleIdentity.identifier })
+        #expect(bundleRule["id"] is String)
+        #expect(bundleRule["display_name"] as? String == "MCP Test App")
+        #expect(bundleRule["is_enabled"] as? Bool == true)
+        #expect(bundleRule["bundle_identifier"] as? String == "com.example.MCPTestApp")
+
+        let executableRule = try #require(excludeRules
+            .first { $0["application_identifier"] as? String == executableIdentity.identifier })
+        // Executable-backed identities key on a sha256 digest, never a raw filesystem path.
+        #expect((executableRule["application_identifier"] as? String)?.hasPrefix("exec:") == true)
+        #expect(executableRule["is_enabled"] as? Bool == true)
+        #expect(executableRule["bundle_identifier"] == nil)
+
+        // No raw executable/machine path leaks anywhere in the serialized payload.
+        let text = try #require(result.content.first?.text)
+        #expect(!text.contains("/Applications/MCPTestTool.app"))
+        #expect(!text.contains("/Contents/MacOS/"))
+    }
+
     // MARK: Private
 
     private func makeService(stateProvider: MockProxyStateProvider? = nil) -> MCPStatusService {
