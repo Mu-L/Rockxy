@@ -121,6 +121,62 @@ struct SidebarSSLProxyingTests {
         #expect(manager.includeRules.first?.isEnabled == true)
     }
 
+    @Test("application behavior replaces the opposite behavior and applies to future hosts")
+    func applicationBehaviorReplacesOpposite() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.applicationRules
+        let originalEnabled = manager.isEnabled
+        let fallbackHost = "issue305-\(UUID().uuidString).invalid"
+        defer {
+            manager.replaceAllApplicationRules(originalRules)
+            manager.setEnabled(originalEnabled)
+            manager.retryInterception(for: fallbackHost)
+        }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+        )
+        manager.replaceAllApplicationRules([
+            ApplicationSSLProxyingRule(identity: identity, listType: .exclude)
+        ])
+        manager.markHostForPassthrough(fallbackHost)
+
+        #expect(coordinator.setSSLProxyingBehaviorForApplication(
+            identity,
+            listType: .include,
+            fallbackDomain: fallbackHost
+        ))
+        #expect(manager.applicationExcludeRules.isEmpty)
+        #expect(coordinator.isSSLProxyingEnabled(for: identity))
+        #expect(!manager.isAutoPassthrough(fallbackHost))
+    }
+
+    @Test("application tunnel action wins over a host decrypt rule")
+    func applicationTunnelWinsOverHostDecrypt() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalHostRules = manager.rules
+        let originalAppRules = manager.applicationRules
+        defer {
+            manager.replaceAllRules(originalHostRules)
+            manager.replaceAllApplicationRules(originalAppRules)
+        }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.microsoft.VSCode",
+            displayName: "Visual Studio Code"
+        )
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "api.example.com", listType: .include)
+        ])
+        manager.replaceAllApplicationRules([])
+
+        coordinator.setSSLProxyingBehaviorForApplication(identity, listType: .exclude)
+
+        #expect(!manager.shouldIntercept(host: "api.example.com", application: identity))
+        #expect(!coordinator.isSSLProxyingEnabled(for: identity))
+    }
+
     // MARK: - disableSSLProxyingForDomain(_:)
 
     @Test("disableSSLProxyingForDomain removes include rules and preserves exclude rules")

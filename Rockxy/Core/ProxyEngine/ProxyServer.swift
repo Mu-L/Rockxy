@@ -35,11 +35,13 @@ extension Channel {
     }
 }
 
-// MARK: - Proxy shutdown coordination
+// MARK: - ProxyChildChannelRegistry
 
 /// Tracks accepted client channels so proxy shutdown can close and await every live
 /// connection before its event-loop group is torn down.
 final class ProxyChildChannelRegistry: @unchecked Sendable {
+    // MARK: Internal
+
     func prepareForStart() async {
         var staleChannelCount = 0
         while true {
@@ -77,6 +79,8 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
         await close(snapshot)
         await waitUntilEmpty()
     }
+
+    // MARK: Private
 
     private let lock = NSLock()
     private var channels: [ObjectIdentifier: Channel] = [:]
@@ -139,13 +143,21 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
     }
 }
 
+// MARK: - BreakpointBridgeTracker
+
 /// Counts breakpoint Task-to-NIO promise bridges. Shutdown waits for their promise
 /// completion callbacks while the event loops are still alive.
 final class BreakpointBridgeTracker: @unchecked Sendable {
+    // MARK: Internal
+
     final class Lease: @unchecked Sendable {
+        // MARK: Lifecycle
+
         fileprivate init(owner: BreakpointBridgeTracker) {
             self.owner = owner
         }
+
+        // MARK: Internal
 
         func finish() {
             lock.lock()
@@ -158,6 +170,8 @@ final class BreakpointBridgeTracker: @unchecked Sendable {
             owner?.finish()
             owner = nil
         }
+
+        // MARK: Private
 
         private let lock = NSLock()
         private var owner: BreakpointBridgeTracker?
@@ -183,6 +197,8 @@ final class BreakpointBridgeTracker: @unchecked Sendable {
             }
         }
     }
+
+    // MARK: Private
 
     private let lock = NSLock()
     private var activeCount = 0
@@ -286,6 +302,8 @@ actor ProxyServer {
         scriptPluginManager: ScriptPluginManager? = nil,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
+        clientIdentityHandleProvider: @escaping @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle? =
+            ProxyServer.defaultClientIdentityHandleProvider,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void = { _ in },
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
     ) {
@@ -295,6 +313,7 @@ actor ProxyServer {
         self.scriptPluginManager = scriptPluginManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
         self.captureContextProvider = captureContextProvider
+        self.clientIdentityHandleProvider = clientIdentityHandleProvider
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
     }
@@ -303,6 +322,55 @@ actor ProxyServer {
 
     var isRunning: Bool {
         serverChannel != nil
+    }
+
+    /// Default provider: resolves every accepted local connection when application rules can
+    /// affect TLS decisions. With no active app rule, a bounded sample keeps the observed-app
+    /// picker useful without adding an lsof lookup to every host-only connection.
+    @Sendable
+    static func defaultClientIdentityHandleProvider(
+        _ descriptor: ProxyConnectionDescriptor
+    )
+        -> ClientIdentityHandle?
+    {
+        guard let clientHost = descriptor.clientHost,
+              ClientConnectionMatcher.isLocalSource(clientHost) else
+        {
+            return nil
+        }
+        let processResolver = ProcessResolver.shared
+        guard SSLProxyingManager.shared.hasEnabledApplicationRules()
+            || processResolver.shouldSampleApplicationIdentity() else
+        {
+            return nil
+        }
+        return ClientIdentityHandle(descriptor: descriptor, resolver: processResolver.identityResolver)
+    }
+
+    /// Wraps a transaction callback so every emitted transaction — raw CONNECT, TLS failure,
+    /// intercepted HTTP, WebSocket — inherits the connection's resolved application identity
+    /// and a matching `clientApp` label. Stamping is a non-blocking read of the retained
+    /// identity; when unresolved, `clientApp` is left for downstream port-map enrichment.
+    static func makeIdentityStampingCallback(
+        handle: ClientIdentityHandle?,
+        downstream: @escaping @Sendable (HTTPTransaction) -> Void
+    )
+        -> @Sendable (HTTPTransaction) -> Void
+    {
+        guard let handle else {
+            return downstream
+        }
+        return { transaction in
+            if let identity = handle.currentIdentity {
+                if transaction.clientApplicationIdentity == nil {
+                    transaction.clientApplicationIdentity = identity
+                }
+                if transaction.clientApp == nil {
+                    transaction.clientApp = identity.displayName
+                }
+            }
+            downstream(transaction)
+        }
     }
 
     func start() async throws {
@@ -324,6 +392,8 @@ actor ProxyServer {
         let breakpointHit = onBreakpointHit
         let childRegistry = childChannelRegistry
         let bridgeTracker = breakpointBridgeTracker
+        let identityProvider = clientIdentityHandleProvider
+        let proxyPort = configuration.port
         refreshUpstreamProxySnapshot()
         let upstreamProxyProvider: @Sendable () -> UpstreamProxyResolvedConfiguration? = {
             self.currentUpstreamProxyConfiguration()
@@ -348,6 +418,21 @@ actor ProxyServer {
             .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
                 childRegistry.register(channel)
+                // Capture an immutable connection descriptor at accept and start identity
+                // resolution concurrently. The decorated callback stamps the resolved
+                // identity onto every emitted transaction for rules and observed-app UI.
+                let descriptor = ProxyConnectionDescriptor(
+                    acceptedAt: DispatchTime.now(),
+                    clientHost: channel.remoteAddress?.ipAddress,
+                    clientPort: channel.remoteAddress?.port.flatMap { UInt16(exactly: $0) },
+                    proxyHost: channel.localAddress?.ipAddress,
+                    proxyPort: proxyPort
+                )
+                let identityHandle = identityProvider(descriptor)
+                let decoratedCallback = ProxyServer.makeIdentityStampingCallback(
+                    handle: identityHandle,
+                    downstream: callback
+                )
                 return channel.pipeline.addHandler(BreakpointClientLivenessProbeHandler()).flatMap {
                     channel.pipeline.addHandler(ConnectionTimeoutHandler(timeout: .seconds(300)))
                 }.flatMap {
@@ -362,7 +447,8 @@ actor ProxyServer {
                         connectionLimiter: limiter,
                         upstreamProxySnapshotProvider: upstreamProxyProvider,
                         captureContextProvider: captureProvider,
-                        onTransactionComplete: callback,
+                        clientIdentityHandle: identityHandle,
+                        onTransactionComplete: decoratedCallback,
                         onBreakpointHit: breakpointHit,
                         breakpointBridgeTracker: bridgeTracker
                     )
@@ -436,6 +522,7 @@ actor ProxyServer {
     private let scriptPluginManager: ScriptPluginManager?
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
+    private let clientIdentityHandleProvider: @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?
     private let connectionLimiter = ConnectionLimiter()
     private let childChannelRegistry = ProxyChildChannelRegistry()
     private let breakpointBridgeTracker = BreakpointBridgeTracker()

@@ -106,16 +106,67 @@ enum SSLHostPatternValidation {
 
 /// View model for the HTTPS Decryption management window.
 ///
-/// Presents every `SSLProxyingRule` in one unified list. Each rule carries an
+/// Presents host and application rules in one unified list. Each rule carries an
 /// explicit behavior derived from its `listType`: `.include` rules mean "Decrypt
 /// HTTPS", `.exclude` rules mean "Tunnel Without Decryption". The underlying
 /// `SSLProxyingManager` semantics, persistence, and import/export formats are
 /// unchanged — this type only owns UI selection, search, and CRUD delegation.
 @MainActor @Observable
 final class SSLProxyingListViewModel {
+    @MainActor enum Row: Identifiable, Equatable {
+        case host(SSLProxyingRule)
+        case application(ApplicationSSLProxyingRule)
+
+        var id: UUID {
+            switch self {
+            case let .host(rule): rule.id
+            case let .application(rule): rule.id
+            }
+        }
+
+        var target: String {
+            switch self {
+            case let .host(rule): rule.domain
+            case let .application(rule): rule.displayName
+            }
+        }
+
+        var targetDetail: String? {
+            switch self {
+            case .host: nil
+            case let .application(rule): rule.bundleIdentifier ?? rule.applicationIdentifier
+            }
+        }
+
+        var scopeLabel: String {
+            switch self {
+            case .host: String(localized: "Host", bundle: RockxyLocalization.bundle)
+            case .application: String(localized: "Application", bundle: RockxyLocalization.bundle)
+            }
+        }
+
+        var isEnabled: Bool {
+            switch self {
+            case let .host(rule): rule.isEnabled
+            case let .application(rule): rule.isEnabled
+            }
+        }
+
+        var listType: SSLProxyingListType {
+            switch self {
+            case let .host(rule): rule.listType
+            case let .application(rule): rule.listType
+            }
+        }
+    }
+
     // MARK: Lifecycle
 
-    init(manager: SSLProxyingManager = .shared) {
+    init() {
+        manager = .shared
+    }
+
+    init(manager: SSLProxyingManager) {
         self.manager = manager
     }
 
@@ -127,8 +178,10 @@ final class SSLProxyingListViewModel {
     var searchText = ""
     var showAddDomainSheet = false
     var showAddAppSheet = false
+    var showAddObservedHostsSheet = false
     var showBypassSheet = false
     var editingRule: SSLProxyingRule?
+    var editingApplicationRule: ApplicationSSLProxyingRule?
 
     var isSSLProxyingEnabled: Bool {
         manager.isEnabled
@@ -146,26 +199,44 @@ final class SSLProxyingListViewModel {
         }
     }
 
+    var filteredRows: [Row] {
+        let rows = manager.applicationRules.map(Row.application) + manager.rules.map(Row.host)
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return rows
+        }
+        return rows.filter { row in
+            row.target.localizedCaseInsensitiveContains(query)
+                || row.targetDetail?.localizedCaseInsensitiveContains(query) == true
+                || row.scopeLabel.localizedCaseInsensitiveContains(query)
+                || Self.behaviorLabel(for: row.listType).localizedCaseInsensitiveContains(query)
+        }
+    }
+
     var ruleCount: Int {
-        manager.rules.count
+        manager.rules.count + manager.applicationRules.count
     }
 
     /// Count of rules that decrypt HTTPS (`.include`).
     var decryptCount: Int {
         manager.rules.count { $0.listType == .include }
+            + manager.applicationRules.count { $0.listType == .include }
     }
 
     /// Count of rules that tunnel without decrypting (`.exclude`).
     var tunnelCount: Int {
         manager.rules.count { $0.listType == .exclude }
+            + manager.applicationRules.count { $0.listType == .exclude }
     }
 
     var enabledDecryptCount: Int {
         manager.rules.count { $0.isEnabled && $0.listType == .include }
+            + manager.applicationRules.count { $0.isEnabled && $0.listType == .include }
     }
 
     var enabledTunnelCount: Int {
         manager.rules.count { $0.isEnabled && $0.listType == .exclude }
+            + manager.applicationRules.count { $0.isEnabled && $0.listType == .exclude }
     }
 
     /// Enable/Disable label for the current selection.
@@ -188,10 +259,10 @@ final class SSLProxyingListViewModel {
 
     /// Row-specific enable/disable label.
     func toggleLabel(for id: UUID) -> String {
-        guard let rule = manager.rules.first(where: { $0.id == id }) else {
+        guard let row = row(withID: id) else {
             return String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
         }
-        return rule.isEnabled
+        return row.isEnabled
             ? String(localized: "Disable Rule", bundle: RockxyLocalization.bundle)
             : String(localized: "Enable Rule", bundle: RockxyLocalization.bundle)
     }
@@ -245,6 +316,39 @@ final class SSLProxyingListViewModel {
         manager.addRules(newRules)
     }
 
+    @discardableResult
+    func addApplicationRule(identity: ClientApplicationIdentity, listType: SSLProxyingListType) -> Bool {
+        guard !applicationRuleExists(identifier: identity.identifier, listType: listType) else {
+            return false
+        }
+        let rule = ApplicationSSLProxyingRule(identity: identity, listType: listType)
+        manager.addApplicationRule(rule)
+        clearObservedAutoPassthrough(for: identity, listType: listType)
+        selectedRuleID = rule.id
+        return true
+    }
+
+    @discardableResult
+    func updateApplicationRule(
+        id: UUID,
+        identity: ClientApplicationIdentity,
+        listType: SSLProxyingListType
+    ) -> Bool {
+        guard !applicationRuleExists(identifier: identity.identifier, listType: listType, excluding: id),
+              var rule = manager.applicationRules.first(where: { $0.id == id }) else
+        {
+            return false
+        }
+        rule.applicationIdentifier = identity.identifier
+        rule.displayName = identity.displayName
+        rule.bundleIdentifier = identity.bundleIdentifier
+        rule.listType = listType
+        manager.updateApplicationRule(rule)
+        clearObservedAutoPassthrough(for: identity, listType: listType)
+        selectedRuleID = id
+        return true
+    }
+
     /// Edits an existing rule's host pattern and/or behavior while preserving its
     /// UUID and enabled state.
     @discardableResult
@@ -271,11 +375,11 @@ final class SSLProxyingListViewModel {
         guard let id = selectedRuleID else {
             return
         }
-        let visible = filteredRules
+        let visible = filteredRows
         let removedIndex = visible.firstIndex { $0.id == id }
-        manager.removeRule(id: id)
+        removeRuleFromManager(id: id)
 
-        let remaining = filteredRules
+        let remaining = filteredRows
         if let removedIndex, !remaining.isEmpty {
             selectedRuleID = remaining[min(removedIndex, remaining.count - 1)].id
         } else {
@@ -284,7 +388,7 @@ final class SSLProxyingListViewModel {
     }
 
     func removeRule(id: UUID) {
-        manager.removeRule(id: id)
+        removeRuleFromManager(id: id)
         if selectedRuleID == id {
             selectedRuleID = nil
         }
@@ -295,28 +399,38 @@ final class SSLProxyingListViewModel {
     }
 
     func toggleRule(id: UUID) {
-        manager.toggleRule(id: id)
+        if manager.rules.contains(where: { $0.id == id }) {
+            manager.toggleRule(id: id)
+        } else {
+            manager.toggleApplicationRule(id: id)
+        }
     }
 
     func setRuleEnabled(id: UUID, enabled: Bool) {
-        manager.setRuleEnabled(id: id, enabled: enabled)
+        if manager.rules.contains(where: { $0.id == id }) {
+            manager.setRuleEnabled(id: id, enabled: enabled)
+        } else {
+            manager.setApplicationRuleEnabled(id: id, enabled: enabled)
+        }
     }
 
     func reconcileSelectionAfterRulesChange() {
         guard let id = selectedRuleID else {
             return
         }
-        if !filteredRules.contains(where: { $0.id == id }) {
+        if !filteredRows.contains(where: { $0.id == id }) {
             selectedRuleID = nil
         }
     }
 
     func presentEditor(for id: UUID) {
-        guard let rule = manager.rules.first(where: { $0.id == id }) else {
-            return
+        if let rule = manager.rules.first(where: { $0.id == id }) {
+            editingRule = rule
+            showAddDomainSheet = true
+        } else if let rule = manager.applicationRules.first(where: { $0.id == id }) {
+            editingApplicationRule = rule
+            showAddAppSheet = true
         }
-        editingRule = rule
-        showAddDomainSheet = true
     }
 
     func presentEditorForSelection() {
@@ -339,6 +453,48 @@ final class SSLProxyingListViewModel {
             $0.id != excludedID
                 && $0.listType == listType
                 && $0.domain.caseInsensitiveCompare(domain) == .orderedSame
+        }
+    }
+
+    private func applicationRuleExists(
+        identifier: String,
+        listType: SSLProxyingListType,
+        excluding excludedID: UUID? = nil
+    ) -> Bool {
+        manager.applicationRules.contains {
+            $0.id != excludedID
+                && $0.listType == listType
+                && $0.applicationIdentifier == identifier
+        }
+    }
+
+    private func row(withID id: UUID) -> Row? {
+        if let rule = manager.rules.first(where: { $0.id == id }) {
+            return .host(rule)
+        }
+        return manager.applicationRules.first(where: { $0.id == id }).map(Row.application)
+    }
+
+    private func removeRuleFromManager(id: UUID) {
+        if manager.rules.contains(where: { $0.id == id }) {
+            manager.removeRule(id: id)
+        } else {
+            manager.removeApplicationRule(id: id)
+        }
+    }
+
+    private func clearObservedAutoPassthrough(
+        for identity: ClientApplicationIdentity,
+        listType: SSLProxyingListType
+    ) {
+        guard listType == .include else {
+            return
+        }
+        let hosts = TrafficDomainSnapshot.shared.appEntries
+            .filter { $0.identity?.identifier == identity.identifier }
+            .flatMap(\.domains)
+        for host in Set(hosts) {
+            manager.retryInterception(for: host)
         }
     }
 }

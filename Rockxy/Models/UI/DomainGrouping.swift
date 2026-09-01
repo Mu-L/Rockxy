@@ -137,20 +137,27 @@ struct AppGroupingIndex {
 
     mutating func add(_ transaction: HTTPTransaction, appName: String? = nil) {
         let name = Self.normalizedAppName(appName ?? transaction.clientApp)
+        let key = transaction.clientApplicationIdentity?.identifier ?? "name:\(name)"
         let host = transaction.request.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        if entries[name] == nil {
-            entries[name] = Entry()
-            insertionOrder.append(name)
+        if entries[key] == nil {
+            entries[key] = Entry(name: name)
+            insertionOrder.append(key)
         }
-        entries[name]?.requestCount += 1
+        entries[key]?.requestCount += 1
+        if let identity = transaction.clientApplicationIdentity {
+            entries[key]?.identity = identity
+        }
         if !host.isEmpty {
-            entries[name]?.domainCounts[host, default: 0] += 1
+            entries[key]?.domainCounts[host, default: 0] += 1
         }
     }
 
     mutating func remove(_ transaction: HTTPTransaction, appName: String?) {
         let name = Self.normalizedAppName(appName)
-        guard var entry = entries[name] else {
+        let key = transaction.clientApplicationIdentity?.identifier
+            ?? insertionOrder.first(where: { entries[$0]?.name == name })
+            ?? "name:\(name)"
+        guard var entry = entries[key] else {
             return
         }
         entry.requestCount = max(0, entry.requestCount - 1)
@@ -165,22 +172,23 @@ struct AppGroupingIndex {
         }
 
         if entry.requestCount == 0 {
-            entries.removeValue(forKey: name)
-            insertionOrder.removeAll { $0 == name }
+            entries.removeValue(forKey: key)
+            insertionOrder.removeAll { $0 == key }
         } else {
-            entries[name] = entry
+            entries[key] = entry
         }
     }
 
     func makeNodes() -> [AppInfo] {
-        insertionOrder.compactMap { name in
-            guard let entry = entries[name] else {
+        insertionOrder.compactMap { key in
+            guard let entry = entries[key] else {
                 return nil
             }
             return AppInfo(
-                name: name,
+                name: entry.name,
                 domains: entry.domainCounts.keys.sorted(),
-                requestCount: entry.requestCount
+                requestCount: entry.requestCount,
+                identity: entry.identity
             )
         }
     }
@@ -188,8 +196,10 @@ struct AppGroupingIndex {
     // MARK: Private
 
     private struct Entry {
+        let name: String
         var requestCount = 0
         var domainCounts: [String: Int] = [:]
+        var identity: ClientApplicationIdentity?
     }
 
     private var entries: [String: Entry] = [:]

@@ -35,8 +35,10 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
+        clientIdentityHandle: ClientIdentityHandle? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.certificateManager = certificateManager
@@ -46,6 +48,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
         self.captureContextProvider = captureContextProvider
+        self.clientIdentityHandle = clientIdentityHandle
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
         self.breakpointBridgeTracker = breakpointBridgeTracker
@@ -124,6 +127,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
+    private let clientIdentityHandle: ClientIdentityHandle?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -695,7 +699,14 @@ extension HTTPProxyHandler {
             context.pipeline.removeHandler(context: context)
         }.flatMap {
             ProxyPipeline.removeHTTPServerPipeline(from: context.pipeline, on: context.eventLoop)
-        }.flatMap {
+        }.flatMap { () -> EventLoopFuture<ClientApplicationIdentity?> in
+            // Await the already-started, bounded identity resolution before the TLS decision.
+            // autoRead is already false so no client bytes are lost while resolving; a
+            // timeout / unresolved identity yields nil and never enables app decryption.
+            context.eventLoop.makeFutureWithTask {
+                await self.clientIdentityHandle?.awaitIdentity()
+            }
+        }.flatMap { clientApplicationIdentity in
             let tlsHandler = TLSInterceptHandler(
                 host: host,
                 port: port,
@@ -709,6 +720,7 @@ extension HTTPProxyHandler {
                 captureContextProvider: self.captureContextProvider,
                 tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
+                clientApplicationIdentity: clientApplicationIdentity,
                 onTransactionComplete: self.onTransactionComplete,
                 onBreakpointHit: self.onBreakpointHit,
                 breakpointBridgeTracker: self.breakpointBridgeTracker

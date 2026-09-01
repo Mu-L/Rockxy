@@ -1246,6 +1246,34 @@ extension RequestTableView {
         }
 
         @objc
+        func handleSSLProxyingAppDecrypt(_ sender: NSMenuItem) {
+            withCoordinator(sender) { coordinator, transaction in
+                guard let identity = transaction.clientApplicationIdentity else {
+                    return
+                }
+                coordinator.setSSLProxyingFromInspector(
+                    for: identity,
+                    listType: .include,
+                    fallbackDomain: transaction.request.host
+                )
+            }
+        }
+
+        @objc
+        func handleSSLProxyingAppTunnel(_ sender: NSMenuItem) {
+            withCoordinator(sender) { coordinator, transaction in
+                guard let identity = transaction.clientApplicationIdentity else {
+                    return
+                }
+                coordinator.setSSLProxyingFromInspector(
+                    for: identity,
+                    listType: .exclude,
+                    fallbackDomain: transaction.request.host
+                )
+            }
+        }
+
+        @objc
         func handleExportHAR(_ sender: NSMenuItem) {
             withCoordinator(sender) { $0.exportTransactionAsHAR($1) }
         }
@@ -1810,13 +1838,7 @@ extension RequestTableView {
             toolsSubmenu.addItem(.separator())
 
             // Group 5: SSL
-            let sslItem = menuItem(
-                String(localized: "SSL Proxying", bundle: RockxyLocalization.bundle),
-                action: #selector(handleSSLProxying(_:)),
-                transaction: transaction
-            )
-            sslItem.image = NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil)
-            toolsSubmenu.addItem(sslItem)
+            toolsSubmenu.addItem(sslProxyingMenuItem(for: transaction))
 
             let toolsItem = NSMenuItem(
                 title: String(localized: "Tools", bundle: RockxyLocalization.bundle),
@@ -1929,11 +1951,55 @@ extension RequestTableView {
             exportItem.submenu = exportSubmenu
             menu.addItem(exportItem)
 
-            menu.addItem(menuItem(
-                String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+            menu.addItem(sslProxyingMenuItem(for: transaction))
+        }
+
+        private func sslProxyingMenuItem(for transaction: HTTPTransaction) -> NSMenuItem {
+            let submenu = NSMenu()
+            if transaction.clientApplicationIdentity != nil {
+                submenu.addItem(menuItem(
+                    String(localized: "Decrypt All HTTPS from This Application", bundle: RockxyLocalization.bundle),
+                    action: #selector(handleSSLProxyingAppDecrypt(_:)),
+                    transaction: transaction
+                ))
+            }
+            let hostItem = menuItem(
+                String(localized: "Decrypt Only This Host", bundle: RockxyLocalization.bundle),
                 action: #selector(handleSSLProxying(_:)),
                 transaction: transaction
-            ))
+            )
+            let hasApplicationTunnel = MainActor.assumeIsolated {
+                guard let identity = transaction.clientApplicationIdentity else {
+                    return false
+                }
+                return SSLProxyingManager.shared.applicationExcludeRules.contains {
+                    $0.isEnabled && $0.applicationIdentifier == identity.identifier
+                }
+            }
+            if hasApplicationTunnel {
+                hostItem.isEnabled = false
+                hostItem.toolTip = String(
+                    localized: "The application Tunnel rule takes priority. Change the application behavior first.",
+                    bundle: RockxyLocalization.bundle
+                )
+            }
+            submenu.addItem(hostItem)
+            if transaction.clientApplicationIdentity != nil {
+                submenu.addItem(menuItem(
+                    String(localized: "Tunnel All HTTPS from This Application", bundle: RockxyLocalization.bundle),
+                    action: #selector(handleSSLProxyingAppTunnel(_:)),
+                    transaction: transaction
+                ))
+            }
+
+            let item = NSMenuItem(
+                title: String(localized: "HTTPS Behavior", bundle: RockxyLocalization.bundle),
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.image = NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil)
+            item.submenu = submenu
+            return item
         }
 
         private func openAPIExportTitle(for transaction: HTTPTransaction) -> String {

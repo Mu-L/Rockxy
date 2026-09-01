@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -24,6 +25,9 @@ struct SSLProxyingListView: View {
         .onChange(of: viewModel.manager.rules) { _, _ in
             viewModel.reconcileSelectionAfterRulesChange()
         }
+        .onChange(of: viewModel.manager.applicationRules) { _, _ in
+            viewModel.reconcileSelectionAfterRulesChange()
+        }
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.reconcileSelectionAfterRulesChange()
         }
@@ -46,6 +50,27 @@ struct SSLProxyingListView: View {
             }
         }
         .sheet(isPresented: $viewModel.showAddAppSheet) {
+            viewModel.editingApplicationRule = nil
+        } content: {
+            AddSSLApplicationSheet(
+                editingRule: viewModel.editingApplicationRule,
+                existingRules: viewModel.manager.applicationRules
+            ) { identity, listType in
+                if let editing = viewModel.editingApplicationRule {
+                    let didUpdate = viewModel.updateApplicationRule(
+                        id: editing.id,
+                        identity: identity,
+                        listType: listType
+                    )
+                    if didUpdate {
+                        viewModel.editingApplicationRule = nil
+                    }
+                    return didUpdate
+                }
+                return viewModel.addApplicationRule(identity: identity, listType: listType)
+            }
+        }
+        .sheet(isPresented: $viewModel.showAddObservedHostsSheet) {
             AddSSLAppDomainSheet(existingRules: viewModel.manager.rules) { domains, listType in
                 viewModel.addRules(domains, listType: listType)
             }
@@ -187,7 +212,7 @@ struct SSLProxyingListView: View {
     private var footerHint: String {
         let countText = isSearching
             ? String(
-                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
+                localized: "\(viewModel.filteredRows.count) of \(viewModel.ruleCount) rules",
                 bundle: RockxyLocalization.bundle
             )
             : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
@@ -273,7 +298,7 @@ struct SSLProxyingListView: View {
                 Text(
                     String(
                         localized:
-                        "Rules decide which HTTPS hosts Rockxy decrypts. Other hosts still pass through Rockxy as opaque TLS tunnels.",
+                "Rules decide which apps and hosts Rockxy decrypts. Other connections remain opaque TLS tunnels.",
                         bundle: RockxyLocalization.bundle
                     )
                 )
@@ -333,50 +358,71 @@ struct SSLProxyingListView: View {
     // MARK: - Table
 
     private var tableContent: some View {
-        Table(viewModel.filteredRules, selection: $viewModel.selectedRuleID) {
-            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { rule in
+        Table(viewModel.filteredRows, selection: $viewModel.selectedRuleID) {
+            TableColumn(String(localized: "Enabled", bundle: RockxyLocalization.bundle)) { row in
                 Toggle("", isOn: Binding(
-                    get: { rule.isEnabled },
-                    set: { viewModel.setRuleEnabled(id: rule.id, enabled: $0) }
+                    get: { row.isEnabled },
+                    set: { viewModel.setRuleEnabled(id: row.id, enabled: $0) }
                 ))
                 .toggleStyle(.checkbox)
                 .labelsHidden()
                 .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel(String(localized: "Enable \(rule.domain)", bundle: RockxyLocalization.bundle))
+                .accessibilityLabel(String(localized: "Enable \(row.target)", bundle: RockxyLocalization.bundle))
             }
             .width(62)
 
-            TableColumn(String(localized: "Host Pattern", bundle: RockxyLocalization.bundle)) { rule in
-                Text(rule.domain)
-                    .font(toolMetrics.font(monospaced: true))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(rule.domain)
-                    .opacity(rule.isEnabled ? 1.0 : 0.5)
+            TableColumn(String(localized: "Target", bundle: RockxyLocalization.bundle)) { row in
+                HStack(spacing: 8) {
+                    rowIcon(row)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.target)
+                            .font(row.scopeLabel == String(localized: "Host", bundle: RockxyLocalization.bundle)
+                                ? toolMetrics.font(monospaced: true)
+                                : toolMetrics.font())
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if let detail = row.targetDetail {
+                            Text(detail)
+                                .font(toolMetrics.metadataFont(monospaced: true))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                .help(row.targetDetail ?? row.target)
+                .opacity(row.isEnabled ? 1.0 : 0.5)
             }
-            .width(min: 220, ideal: 340)
+            .width(min: 230, ideal: 320)
 
-            TableColumn(String(localized: "Behavior", bundle: RockxyLocalization.bundle)) { rule in
+            TableColumn(String(localized: "Scope", bundle: RockxyLocalization.bundle)) { row in
+                Text(row.scopeLabel)
+                    .foregroundStyle(.secondary)
+                    .opacity(row.isEnabled ? 1.0 : 0.5)
+            }
+            .width(92)
+
+            TableColumn(String(localized: "Behavior", bundle: RockxyLocalization.bundle)) { row in
                 HStack(spacing: 6) {
-                    Image(systemName: rule.listType == .include ? "lock.open" : "lock")
+                    Image(systemName: row.listType == .include ? "lock.open" : "lock")
                         .font(toolMetrics.metadataFont())
-                        .foregroundStyle(rule.listType == .include ? Color.accentColor : Color.secondary)
-                    Text(SSLProxyingListViewModel.behaviorLabel(for: rule.listType))
+                        .foregroundStyle(row.listType == .include ? Color.accentColor : Color.secondary)
+                    Text(SSLProxyingListViewModel.behaviorLabel(for: row.listType))
                         .lineLimit(1)
-                    if hasOppositeBehaviorOverlap(for: rule) {
+                    if hasOppositeBehaviorOverlap(for: row) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(toolMetrics.metadataFont())
                             .foregroundStyle(.orange)
                             .help(
                                 String(
                                     localized:
-                                    "This host has both behaviors. Tunnel Without Decryption takes priority.",
+                                    "This target has both behaviors. Tunnel Without Decryption takes priority.",
                                     bundle: RockxyLocalization.bundle
                                 )
                             )
                     }
                 }
-                .opacity(rule.isEnabled ? 1.0 : 0.5)
+                .opacity(row.isEnabled ? 1.0 : 0.5)
             }
             .width(min: 190, ideal: 220)
         }
@@ -388,7 +434,7 @@ struct SSLProxyingListView: View {
             }
         }
         .overlay {
-            if viewModel.filteredRules.isEmpty {
+            if viewModel.filteredRows.isEmpty {
                 ContentUnavailableView(
                     isSearching
                         ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
@@ -397,11 +443,11 @@ struct SSLProxyingListView: View {
                     description: Text(
                         isSearching
                             ? String(
-                                localized: "Try a different host pattern or behavior.",
+                                localized: "Try a different app, host, scope, or behavior.",
                                 bundle: RockxyLocalization.bundle
                             )
                             : String(
-                                localized: "Add a host pattern or observed domains to decrypt their HTTPS.",
+                                localized: "Add an application, host pattern, or observed hosts to decrypt HTTPS.",
                                 bundle: RockxyLocalization.bundle
                             )
                     )
@@ -446,16 +492,23 @@ struct SSLProxyingListView: View {
     private var addRemoveControl: some View {
         HStack(spacing: 0) {
             Menu {
+                Button(String(localized: "Add Application…", bundle: RockxyLocalization.bundle)) {
+                    viewModel.editingApplicationRule = nil
+                    viewModel.showAddAppSheet = true
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
                 Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
                     viewModel.editingRule = nil
                     viewModel.showAddDomainSheet = true
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
 
-                Button(String(localized: "Add Observed Domains…", bundle: RockxyLocalization.bundle)) {
-                    viewModel.showAddAppSheet = true
+                Divider()
+
+                Button(String(localized: "Add Observed Hosts…", bundle: RockxyLocalization.bundle)) {
+                    viewModel.showAddObservedHostsSheet = true
                 }
-                .keyboardShortcut("n", modifiers: .command)
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
@@ -608,11 +661,41 @@ struct SSLProxyingListView: View {
 
     // MARK: - Import / Export
 
-    private func hasOppositeBehaviorOverlap(for rule: SSLProxyingRule) -> Bool {
-        viewModel.manager.rules.contains {
-            $0.id != rule.id
-                && $0.listType != rule.listType
-                && $0.domain.caseInsensitiveCompare(rule.domain) == .orderedSame
+    private func hasOppositeBehaviorOverlap(for row: SSLProxyingListViewModel.Row) -> Bool {
+        viewModel.filteredRows.contains {
+            $0.id != row.id
+                && $0.listType != row.listType
+                && $0.scopeLabel == row.scopeLabel
+                && $0.targetDetail == row.targetDetail
+                && $0.target.caseInsensitiveCompare(row.target) == .orderedSame
+        }
+    }
+
+    @ViewBuilder
+    private func rowIcon(_ row: SSLProxyingListViewModel.Row) -> some View {
+        switch row {
+        case .host:
+            Image(systemName: "network")
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+        case let .application(rule):
+            if let bundleIdentifier = rule.bundleIdentifier,
+               let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+            {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 20, height: 20)
+            } else if let icon = AppIconProvider.applicationIcon(named: rule.displayName, size: 20) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "app.fill")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+            }
         }
     }
 

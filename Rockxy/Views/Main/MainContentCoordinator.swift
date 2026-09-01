@@ -761,8 +761,21 @@ struct AppInfo: Identifiable {
     let name: String
     var domains: [String]
     var requestCount: Int
+    var identity: ClientApplicationIdentity?
+
+    init(
+        name: String,
+        domains: [String],
+        requestCount: Int,
+        identity: ClientApplicationIdentity? = nil
+    ) {
+        self.name = name
+        self.domains = domains
+        self.requestCount = requestCount
+        self.identity = identity
+    }
 
     var id: String {
-        name
+        identity?.identifier ?? name
     }
 }

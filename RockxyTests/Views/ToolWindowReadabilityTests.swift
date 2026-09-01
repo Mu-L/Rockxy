@@ -1163,7 +1163,9 @@ struct ToolWindowReadabilityTests {
         let tlsExceptionsSource = try readProjectFile("Rockxy/Views/Settings/BypassProxySettingsSheet.swift")
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
 
-        #expect(sslSource.contains("Table(viewModel.filteredRules"))
+        #expect(sslSource.contains("Table(viewModel.filteredRows"))
+        #expect(sslSource.contains(#"TableColumn(String(localized: "Target", bundle: RockxyLocalization.bundle))"#))
+        #expect(sslSource.contains(#"TableColumn(String(localized: "Scope", bundle: RockxyLocalization.bundle))"#))
         #expect(sslSource.contains(#"TableColumn(String(localized: "Behavior", bundle: RockxyLocalization.bundle))"#))
         #expect(sslViewModelSource.contains(#"String(localized: "Decrypt HTTPS", bundle: RockxyLocalization.bundle)"#))
         #expect(sslViewModelSource

@@ -383,6 +383,97 @@ struct SSLProxyingListViewModelTests {
         #expect(vm.selectedRuleID == nil)
     }
 
+    // MARK: - Application Rules
+
+    @Test("unified rows include application and host scopes")
+    func unifiedRowsIncludeBothScopes() {
+        let (vm, tempURL) = makeViewModel()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+        )
+
+        #expect(vm.addApplicationRule(identity: identity, listType: .include))
+        #expect(vm.addRule(domain: "api.example.com", listType: .exclude))
+
+        #expect(vm.filteredRows.count == 2)
+        #expect(Set(vm.filteredRows.map(\.scopeLabel)) == ["Application", "Host"])
+        #expect(vm.ruleCount == 2)
+        #expect(vm.decryptCount == 1)
+        #expect(vm.tunnelCount == 1)
+    }
+
+    @Test("application search matches name and stable identifier")
+    func applicationSearch() {
+        let (vm, tempURL) = makeViewModel()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.microsoft.VSCode",
+            displayName: "Visual Studio Code"
+        )
+        vm.addApplicationRule(identity: identity, listType: .include)
+
+        vm.searchText = "visual"
+        #expect(vm.filteredRows.map(\.target) == ["Visual Studio Code"])
+        vm.searchText = "microsoft"
+        #expect(vm.filteredRows.map(\.target) == ["Visual Studio Code"])
+    }
+
+    @Test("application CRUD preserves stable identity and routes selection actions")
+    func applicationCRUD() {
+        let (vm, tempURL) = makeViewModel()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.apple.Safari",
+            displayName: "Safari"
+        )
+        #expect(vm.addApplicationRule(identity: identity, listType: .include))
+        let id = vm.manager.applicationRules[0].id
+
+        vm.toggleRule(id: id)
+        #expect(vm.manager.applicationRules.first?.isEnabled == false)
+        #expect(vm.updateApplicationRule(id: id, identity: identity, listType: .exclude))
+        #expect(vm.manager.applicationRules.first?.listType == .exclude)
+
+        vm.presentEditor(for: id)
+        #expect(vm.editingApplicationRule?.id == id)
+        #expect(vm.showAddAppSheet)
+
+        vm.removeSelected()
+        #expect(vm.manager.applicationRules.isEmpty)
+    }
+
+    @Test("adding app decrypt retries observed hosts in auto passthrough")
+    func applicationDecryptRetriesObservedHosts() {
+        let (vm, tempURL) = makeViewModel()
+        defer {
+            try? FileManager.default.removeItem(at: tempURL)
+            TrafficDomainSnapshot.shared.reset()
+        }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+        )
+        TrafficDomainSnapshot.shared.update(
+            appNodes: [
+                AppInfo(
+                    name: identity.displayName,
+                    domains: ["pinned.example"],
+                    requestCount: 1,
+                    identity: identity
+                ),
+            ],
+            domainTree: []
+        )
+        vm.manager.markHostForPassthrough("pinned.example")
+        #expect(vm.manager.isAutoPassthrough("pinned.example"))
+
+        vm.addApplicationRule(identity: identity, listType: .include)
+
+        #expect(!vm.manager.isAutoPassthrough("pinned.example"))
+    }
+
     // MARK: - Host Pattern Validation
 
     @Test("host pattern validation accepts matcher-compatible patterns")

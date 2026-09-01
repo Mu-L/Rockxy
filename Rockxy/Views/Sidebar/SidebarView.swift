@@ -1052,9 +1052,13 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func appContextMenu(_ app: AppInfo) -> some View {
-        let item = SidebarItem.app(name: app.name, bundleId: nil)
+        let item = SidebarItem.app(name: app.name, bundleId: app.identity?.bundleIdentifier)
         let isPinned = coordinator.isFavorite(item)
-        let isSSLProxyingEnabledForApp = coordinator.isSSLProxyingFullyEnabled(forAppNamed: app.name)
+        let hasApplicationRule = app.identity.map { identity in
+            SSLProxyingManager.shared.applicationRules.contains {
+                $0.applicationIdentifier == identity.identifier
+            }
+        } ?? false
 
         Button {
             coordinator.toggleSidebarFavorite(item)
@@ -1084,21 +1088,49 @@ struct SidebarView: View {
 
         Divider()
 
-        if isSSLProxyingEnabledForApp {
-            Button {
-                coordinator.disableSSLProxyingForApp(app)
+        if let identity = app.identity {
+            Menu {
+                Button {
+                    coordinator.setSSLProxyingFromInspector(for: identity, listType: .include)
+                } label: {
+                    Label(
+                        String(localized: "Decrypt All HTTPS", bundle: RockxyLocalization.bundle),
+                        systemImage: "lock.open"
+                    )
+                }
+
+                Button {
+                    coordinator.setSSLProxyingFromInspector(for: identity, listType: .exclude)
+                } label: {
+                    Label(
+                        String(localized: "Tunnel All HTTPS", bundle: RockxyLocalization.bundle),
+                        systemImage: "lock"
+                    )
+                }
+
+                if hasApplicationRule {
+                    Divider()
+                    Button {
+                        coordinator.disableSSLProxyingForApp(app)
+                    } label: {
+                        Label(
+                            String(localized: "Remove Application Rule", bundle: RockxyLocalization.bundle),
+                            systemImage: "trash"
+                        )
+                    }
+                }
             } label: {
                 Label(
-                    String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    String(localized: "HTTPS Behavior", bundle: RockxyLocalization.bundle),
                     systemImage: "lock.shield"
                 )
             }
         } else {
             Button {
-                coordinator.enableSSLProxyingForApp(app)
+                coordinator.enableSSLProxyingForObservedHosts(app)
             } label: {
                 Label(
-                    String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    String(localized: "Decrypt Observed Hosts", bundle: RockxyLocalization.bundle),
                     systemImage: "lock.shield"
                 )
             }

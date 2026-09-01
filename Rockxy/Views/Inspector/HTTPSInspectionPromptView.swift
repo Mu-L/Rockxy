@@ -248,22 +248,38 @@ struct HTTPSInspectionPromptView: View {
     @ViewBuilder
     private func scopeActionButton(_ scope: HTTPSInspectionScopePresentation) -> some View {
         if let action = scope.action, let controlTitle = scope.controlTitle {
-            Button {
-                onAction(action)
-            } label: {
-                Text(controlTitle)
-                    .lineLimit(1)
-                    .frame(minWidth: promptActionLabelWidth)
+            if let secondaryAction = scope.secondaryAction,
+               let secondaryControlTitle = scope.secondaryControlTitle
+            {
+                Menu {
+                    Button(controlTitle) { onAction(action) }
+                    Button(secondaryControlTitle) { onAction(secondaryAction) }
+                } label: {
+                    Text(String(localized: "Choose Behavior", bundle: RockxyLocalization.bundle))
+                        .lineLimit(1)
+                        .frame(minWidth: promptActionLabelWidth)
+                }
+                .menuIndicator(.visible)
+                .fixedSize()
+                .help(scope.actionDescription)
+            } else {
+                Button {
+                    onAction(action)
+                } label: {
+                    Text(controlTitle)
+                        .lineLimit(1)
+                        .frame(minWidth: promptActionLabelWidth)
+                }
+                .rockxyGlassButtonStyle()
+                .controlSize(.small)
+                .fixedSize()
+                .help(scope.actionDescription)
+                .accessibilityLabel(scope.actionDescription)
+                .accessibilityHint(String(
+                    localized: "The current captured response is unchanged",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
-            .rockxyGlassButtonStyle()
-            .controlSize(.small)
-            .fixedSize()
-            .help(scope.actionDescription)
-            .accessibilityLabel(scope.actionDescription)
-            .accessibilityHint(String(
-                localized: "The current captured response is unchanged",
-                bundle: RockxyLocalization.bundle
-            ))
         }
     }
 }
@@ -287,6 +303,28 @@ struct HTTPSInspectionScopePresentation: Equatable {
         case appHosts
     }
 
+    init(
+        kind: Kind,
+        value: String,
+        state: State,
+        control: Control,
+        action: HTTPSInspectionPromptAction?,
+        controlTitle: String?,
+        actionDescription: String,
+        secondaryAction: HTTPSInspectionPromptAction? = nil,
+        secondaryControlTitle: String? = nil
+    ) {
+        self.kind = kind
+        self.value = value
+        self.state = state
+        self.control = control
+        self.action = action
+        self.controlTitle = controlTitle
+        self.actionDescription = actionDescription
+        self.secondaryAction = secondaryAction
+        self.secondaryControlTitle = secondaryControlTitle
+    }
+
     let kind: Kind
     let value: String
     let state: State
@@ -294,6 +332,8 @@ struct HTTPSInspectionScopePresentation: Equatable {
     let action: HTTPSInspectionPromptAction?
     let controlTitle: String?
     let actionDescription: String
+    let secondaryAction: HTTPSInspectionPromptAction?
+    let secondaryControlTitle: String?
 
     static func host(
         value: String,
@@ -370,6 +410,26 @@ struct HTTPSInspectionScopePresentation: Equatable {
                 localized: "Turn on HTTPS decryption for other known hosts used by \(name)",
                 bundle: RockxyLocalization.bundle
             )
+        )
+    }
+
+    static func application(
+        identity: ClientApplicationIdentity,
+        isDecryptReady: Bool
+    ) -> HTTPSInspectionScopePresentation {
+        HTTPSInspectionScopePresentation(
+            kind: .appHosts,
+            value: identity.displayName,
+            state: isDecryptReady ? .ready : .available,
+            control: .button,
+            action: .setApplication(identity, .include),
+            controlTitle: String(localized: "Decrypt App", bundle: RockxyLocalization.bundle),
+            actionDescription: String(
+                localized: "Choose how Rockxy handles HTTPS from this application on new connections",
+                bundle: RockxyLocalization.bundle
+            ),
+            secondaryAction: .setApplication(identity, .exclude),
+            secondaryControlTitle: String(localized: "Tunnel App", bundle: RockxyLocalization.bundle)
         )
     }
 }

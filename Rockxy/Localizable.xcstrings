@@ -4,6 +4,342 @@
     "": {
       "shouldTranslate": false
     },
+    "A rule with this application and behavior already exists.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已存在具有此应用和行为的规则。"
+          }
+        }
+      }
+    },
+    "Add an application, host pattern, or observed hosts to decrypt HTTPS.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用、主机模式或已观察主机以解密 HTTPS。"
+          }
+        }
+      }
+    },
+    "Add Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用"
+          }
+        }
+      }
+    },
+    "Add Application…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用…"
+          }
+        }
+      }
+    },
+    "Add Observed Hosts…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加已观察主机…"
+          }
+        }
+      }
+    },
+    "Applies to new connections after the app reconnects.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用重新连接后，此规则将应用于新连接。"
+          }
+        }
+      }
+    },
+    "Capture new traffic from a local app, then return here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从本地应用捕获新流量，然后返回此处。"
+          }
+        }
+      }
+    },
+    "Choose an observed local app. The rule follows its stable identity across every HTTPS host it uses.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择已观察到的本地应用。该规则使用稳定身份，适用于其访问的所有 HTTPS 主机。"
+          }
+        }
+      }
+    },
+    "Choose Behavior": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择行为"
+          }
+        }
+      }
+    },
+    "Choose how Rockxy handles HTTPS from this application on new connections": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 Rockxy 如何处理此应用的新 HTTPS 连接"
+          }
+        }
+      }
+    },
+    "Decrypt All HTTPS": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Decrypt All HTTPS from This Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密此应用的所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Decrypt Observed Hosts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密已观察主机"
+          }
+        }
+      }
+    },
+    "Decrypt Only This Host": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅解密此主机"
+          }
+        }
+      }
+    },
+    "Decrypting an entire app can expose sensitive traffic and use more CPU and memory. Add Tunnel rules for exceptions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密整个应用可能暴露敏感流量并使用更多 CPU 和内存。可添加隧道规则作为例外。"
+          }
+        }
+      }
+    },
+    "decrypt": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密"
+          }
+        }
+      }
+    },
+    "Edit Application Rule": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑应用规则"
+          }
+        }
+      }
+    },
+    "HTTPS Behavior": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTPS 行为"
+          }
+        }
+      }
+    },
+    "No Local Applications Observed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未观察到本地应用"
+          }
+        }
+      }
+    },
+    "No Matching Applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的应用"
+          }
+        }
+      }
+    },
+    "Remove Application Rule": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除应用规则"
+          }
+        }
+      }
+    },
+    "Rules decide which apps and hosts Rockxy decrypts. Other connections remain opaque TLS tunnels.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "规则决定 Rockxy 解密哪些应用和主机。其他连接仍为不透明的 TLS 隧道。"
+          }
+        }
+      }
+    },
+    "Search applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索应用"
+          }
+        }
+      }
+    },
+    "Set %@ to %@ HTTPS on new connections. Reconnect the app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Set %1$@ to %2$@ HTTPS on new connections. Reconnect the app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将 %1$@ 的新 HTTPS 连接设为%2$@。请重新连接应用。"
+          }
+        }
+      }
+    },
+    "Target": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "This target has both behaviors. Tunnel Without Decryption takes priority.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此目标同时具有两种行为。不解密隧道优先。"
+          }
+        }
+      }
+    },
+    "The application Tunnel rule takes priority. Change the application behavior first.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用隧道规则优先。请先更改应用行为。"
+          }
+        }
+      }
+    },
+    "Try a different app, host, scope, or behavior.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尝试其他应用、主机、范围或行为。"
+          }
+        }
+      }
+    },
+    "Try a different app, identifier, or host.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尝试其他应用、标识符或主机。"
+          }
+        }
+      }
+    },
+    "Tunnel All HTTPS": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Tunnel All HTTPS from This Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输此应用的所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Tunnel App": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输应用"
+          }
+        }
+      }
+    },
+    "tunnel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输"
+          }
+        }
+      }
+    },
     "  •  %lld evicted": {
       "localizations": {
         "zh-Hans": {

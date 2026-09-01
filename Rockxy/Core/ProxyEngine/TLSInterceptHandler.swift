@@ -102,8 +102,10 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
+        clientApplicationIdentity: ClientApplicationIdentity? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
@@ -119,6 +121,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         self.captureContextProvider = captureContextProvider
         self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
+        self.clientApplicationIdentity = clientApplicationIdentity
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
         self.breakpointBridgeTracker = breakpointBridgeTracker
@@ -248,7 +251,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     nonisolated static func initialTunnelMode(
         host: String,
         sslProxyingManager: SSLProxyingManager,
-        bypassProxyManager: BypassProxyManager
+        bypassProxyManager: BypassProxyManager,
+        application: ClientApplicationIdentity? = nil
     )
         -> InitialTunnelMode
     {
@@ -256,7 +260,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
             return .rawTunnel(.bypassProxyList)
         }
 
-        if !sslProxyingManager.shouldIntercept(host) {
+        if !sslProxyingManager.shouldIntercept(host: host, application: application) {
             return .rawTunnel(.noSSLProxyingRule)
         }
 
@@ -295,6 +299,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?
+    private let clientApplicationIdentity: ClientApplicationIdentity?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -313,7 +318,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         switch Self.initialTunnelMode(
             host: host,
             sslProxyingManager: sslProxyingManager,
-            bypassProxyManager: bypassProxyManager
+            bypassProxyManager: bypassProxyManager,
+            application: clientApplicationIdentity
         ) {
         case .rawTunnel(.bypassProxyList):
             tlsLogger.info("Bypass proxy list matched \(host), passing through as raw tunnel")
@@ -559,7 +565,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
