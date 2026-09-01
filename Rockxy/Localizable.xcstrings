@@ -2102,7 +2102,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检测到 5 字节的 gRPC 前缀"
+            "value": "可见 5 字节的 gRPC 前缀"
           }
         }
       }
