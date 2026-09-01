@@ -203,7 +203,6 @@ struct RockxyApp: App {
             }
         }
         .commandsRemoved()
-        .commands { SSLProxyingCommands() }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .windowToolbarStyle(.unifiedCompact)

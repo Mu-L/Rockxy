@@ -142,13 +142,6 @@ struct SSLProxyingListView: View {
         .onDeleteCommand {
             viewModel.removeSelected()
         }
-        .focusedSceneValue(
-            \.sslProxyingCommandActions,
-            SSLProxyingCommandActions(
-                addApplication: presentAddApplicationRule,
-                addHost: presentAddHostRule
-            )
-        )
         .background {
             Button("") {
                 isSearchFocused = true
@@ -518,12 +511,10 @@ struct SSLProxyingListView: View {
                 Button(String(localized: "Add Application…", bundle: RockxyLocalization.bundle)) {
                     presentAddApplicationRule()
                 }
-                .keyboardShortcut("n", modifiers: .command)
 
                 Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
                     presentAddHostRule()
                 }
-                .keyboardShortcut("n", modifiers: [.command, .option])
 
                 Divider()
 
@@ -797,64 +788,6 @@ struct SSLProxyingListView: View {
         case let .failure(error):
             importError = error.localizedDescription
         }
-    }
-}
-
-// MARK: - SSLProxyingCommandActions
-
-struct SSLProxyingCommandActions {
-    let addApplication: () -> Void
-    let addHost: () -> Void
-}
-
-// MARK: - SSLProxyingCommands
-
-struct SSLProxyingCommands: Commands {
-    // MARK: Internal
-
-    var body: some Commands {
-        CommandMenu(String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle)) {
-            SSLProxyingNewItemCommands(actions: actions)
-        }
-    }
-
-    // MARK: Private
-
-    @FocusedValue(\.sslProxyingCommandActions) private var actions
-}
-
-// MARK: - SSLProxyingNewItemCommands
-
-struct SSLProxyingNewItemCommands: View {
-    let actions: SSLProxyingCommandActions?
-
-    var body: some View {
-        if let actions {
-            Button(String(localized: "Add Application…", bundle: RockxyLocalization.bundle)) {
-                actions.addApplication()
-            }
-            .keyboardShortcut("n", modifiers: .command)
-
-            Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
-                actions.addHost()
-            }
-            .keyboardShortcut("n", modifiers: [.command, .option])
-
-            Divider()
-        }
-    }
-}
-
-// MARK: - SSLProxyingCommandActionsKey
-
-private struct SSLProxyingCommandActionsKey: FocusedValueKey {
-    typealias Value = SSLProxyingCommandActions
-}
-
-extension FocusedValues {
-    var sslProxyingCommandActions: SSLProxyingCommandActions? {
-        get { self[SSLProxyingCommandActionsKey.self] }
-        set { self[SSLProxyingCommandActionsKey.self] = newValue }
     }
 }
 

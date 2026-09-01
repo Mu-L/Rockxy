@@ -1119,6 +1119,17 @@ struct SidebarView: View {
                         )
                     }
                 }
+
+                Divider()
+
+                Button {
+                    NotificationCenter.default.post(name: .openSSLProxyingList, object: nil)
+                } label: {
+                    Label(
+                        String(localized: "Open HTTPS Decryption", bundle: RockxyLocalization.bundle),
+                        systemImage: "slider.horizontal.3"
+                    )
+                }
             } label: {
                 Label(
                     String(localized: "HTTPS Behavior", bundle: RockxyLocalization.bundle),

@@ -1274,6 +1274,11 @@ extension RequestTableView {
         }
 
         @objc
+        func handleOpenSSLProxyingList(_ sender: NSMenuItem) {
+            NotificationCenter.default.post(name: .openSSLProxyingList, object: nil)
+        }
+
+        @objc
         func handleExportHAR(_ sender: NSMenuItem) {
             withCoordinator(sender) { $0.exportTransactionAsHAR($1) }
         }
@@ -1991,6 +1996,13 @@ extension RequestTableView {
                     transaction: transaction
                 ))
             }
+
+            submenu.addItem(.separator())
+            submenu.addItem(menuItem(
+                String(localized: "Open HTTPS Decryption", bundle: RockxyLocalization.bundle),
+                action: #selector(handleOpenSSLProxyingList(_:)),
+                transaction: transaction
+            ))
 
             let item = NSMenuItem(
                 title: String(localized: "HTTPS Behavior", bundle: RockxyLocalization.bundle),
