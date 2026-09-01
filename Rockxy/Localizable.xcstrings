@@ -688,7 +688,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@，%2$lld 条生效中的规则"
+            "value": "%1$@，%2$lld 条生效规则"
           }
         }
       }
@@ -826,7 +826,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条生效中的断点规则。打开断点规则。"
+            "value": "有 %lld 条生效的断点规则。打开断点规则。"
           }
         }
       }
@@ -836,7 +836,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条生效中的 Map Local 规则。打开 Map Local。"
+            "value": "%lld 条生效的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -846,7 +846,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条生效中的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 %lld 条生效的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -856,7 +856,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条生效中的修改标头规则"
+            "value": "%lld 条生效的修改标头规则"
           }
         }
       }
@@ -866,7 +866,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条生效中的规则"
+            "value": "%lld 条生效规则"
           }
         }
       }
@@ -1852,7 +1852,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条生效中的断点规则。打开断点规则。"
+            "value": "有 1 条生效的断点规则。打开断点规则。"
           }
         }
       }
@@ -1862,7 +1862,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条生效中的 Map Local 规则。打开 Map Local。"
+            "value": "有 1 条生效的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -1872,7 +1872,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条生效中的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 1 条生效的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -6794,7 +6794,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 “+” 或按下 ⌘N 以添加新条目"
+            "value": "点按“+”或按 ⌘N 以添加新条目"
           }
         }
       }
@@ -6804,7 +6804,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 “+” 或按 ⌘N 以添加定义。"
+            "value": "点按“+”或按 ⌘N 以添加定义。"
           }
         }
       }
@@ -6814,7 +6814,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 “+” 或按 ⌘N 以创建配置。"
+            "value": "点按“+”或按 ⌘N 以创建配置。"
           }
         }
       }
@@ -6824,7 +6824,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 “+” 或按 ⌘N 创建规则。"
+            "value": "点按“+”或按 ⌘N 创建规则。"
           }
         }
       }
@@ -6834,7 +6834,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 “+” 或按 ⌘N 以导入 .proto 文件。"
+            "value": "点按“+”或按 ⌘N 以导入 .proto 文件。"
           }
         }
       }
@@ -6854,7 +6854,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 + 或按 ⌘N 以创建脚本。"
+            "value": "点按 + 或按 ⌘N 以创建脚本。"
           }
         }
       }
@@ -6864,7 +6864,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击或拖移以滚动正文文本"
+            "value": "点按或拖移以滚动正文文本"
           }
         }
       }
@@ -6884,7 +6884,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击候选项上的 R 列以完成此基础比较。"
+            "value": "点按候选项上的 R 列以完成此基础比较。"
           }
         }
       }
@@ -19607,7 +19607,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无生效中的脚本"
+            "value": "无生效脚本"
           }
         }
       }
@@ -33615,7 +33615,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到生效中的阻止列表规则的上限。请停用另一条规则后重试。"
+            "value": "已达到阻止列表规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33625,7 +33625,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到生效中的断点规则上限。请停用另一条规则后重试。"
+            "value": "已达到断点规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33645,7 +33645,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到生效中的 Map Local 规则的上限。请停用另一条规则，然后重试。"
+            "value": "已达到 Map Local 规则的启用上限。请停用另一条规则，然后重试。"
           }
         }
       }
@@ -33655,7 +33655,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到生效中的 Map Remote 规则的上限。请停用另一条规则后重试。"
+            "value": "已达到 Map Remote 规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
