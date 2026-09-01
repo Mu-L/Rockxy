@@ -142,6 +142,13 @@ struct SSLProxyingListView: View {
         .onDeleteCommand {
             viewModel.removeSelected()
         }
+        .focusedSceneValue(
+            \.sslProxyingCommandActions,
+            SSLProxyingCommandActions(
+                addApplication: presentAddApplicationRule,
+                addHost: presentAddHostRule
+            )
+        )
         .background {
             Button("") {
                 isSearchFocused = true
@@ -491,18 +498,32 @@ struct SSLProxyingListView: View {
 
     private var addRemoveControl: some View {
         HStack(spacing: 0) {
+            Button {
+                presentAddApplicationRule()
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(String(localized: "Add Application…", bundle: RockxyLocalization.bundle))
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.7))
+                .frame(width: 1, height: 18)
+
             Menu {
                 Button(String(localized: "Add Application…", bundle: RockxyLocalization.bundle)) {
-                    viewModel.editingApplicationRule = nil
-                    viewModel.showAddAppSheet = true
+                    presentAddApplicationRule()
                 }
                 .keyboardShortcut("n", modifiers: .command)
 
                 Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
-                    viewModel.editingRule = nil
-                    viewModel.showAddDomainSheet = true
+                    presentAddHostRule()
                 }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .keyboardShortcut("n", modifiers: [.command, .option])
 
                 Divider()
 
@@ -510,10 +531,10 @@ struct SSLProxyingListView: View {
                     viewModel.showAddObservedHostsSheet = true
                 }
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: toolMetrics.compactIconFontSize, weight: .regular))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: toolMetrics.smallIconFontSize, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .frame(width: toolMetrics.compactButtonSize - 5, height: toolMetrics.compactButtonSize - 5)
+                    .frame(width: toolMetrics.compactButtonSize - 9, height: toolMetrics.compactButtonSize - 5)
                     .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
@@ -544,7 +565,10 @@ struct SSLProxyingListView: View {
             RoundedRectangle(cornerRadius: 5)
                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
         }
-        .frame(width: toolMetrics.compactButtonSize * 2 + 1, height: toolMetrics.footerControlHeight)
+        .frame(
+            width: toolMetrics.compactButtonSize * 3 - 3,
+            height: toolMetrics.footerControlHeight
+        )
     }
 
     private var moreMenu: some View {
@@ -659,18 +683,6 @@ struct SSLProxyingListView: View {
         }
     }
 
-    // MARK: - Import / Export
-
-    private func hasOppositeBehaviorOverlap(for row: SSLProxyingListViewModel.Row) -> Bool {
-        viewModel.filteredRows.contains {
-            $0.id != row.id
-                && $0.listType != row.listType
-                && $0.scopeLabel == row.scopeLabel
-                && $0.targetDetail == row.targetDetail
-                && $0.target.caseInsensitiveCompare(row.target) == .orderedSame
-        }
-    }
-
     @ViewBuilder
     private func rowIcon(_ row: SSLProxyingListViewModel.Row) -> some View {
         switch row {
@@ -696,6 +708,28 @@ struct SSLProxyingListView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 20, height: 20)
             }
+        }
+    }
+
+    // MARK: - Import / Export
+
+    private func presentAddApplicationRule() {
+        viewModel.editingApplicationRule = nil
+        viewModel.showAddAppSheet = true
+    }
+
+    private func presentAddHostRule() {
+        viewModel.editingRule = nil
+        viewModel.showAddDomainSheet = true
+    }
+
+    private func hasOppositeBehaviorOverlap(for row: SSLProxyingListViewModel.Row) -> Bool {
+        viewModel.filteredRows.contains {
+            $0.id != row.id
+                && $0.listType != row.listType
+                && $0.scopeLabel == row.scopeLabel
+                && $0.targetDetail == row.targetDetail
+                && $0.target.caseInsensitiveCompare(row.target) == .orderedSame
         }
     }
 
@@ -763,6 +797,64 @@ struct SSLProxyingListView: View {
         case let .failure(error):
             importError = error.localizedDescription
         }
+    }
+}
+
+// MARK: - SSLProxyingCommandActions
+
+struct SSLProxyingCommandActions {
+    let addApplication: () -> Void
+    let addHost: () -> Void
+}
+
+// MARK: - SSLProxyingCommands
+
+struct SSLProxyingCommands: Commands {
+    // MARK: Internal
+
+    var body: some Commands {
+        CommandMenu(String(localized: "HTTPS Decryption", bundle: RockxyLocalization.bundle)) {
+            SSLProxyingNewItemCommands(actions: actions)
+        }
+    }
+
+    // MARK: Private
+
+    @FocusedValue(\.sslProxyingCommandActions) private var actions
+}
+
+// MARK: - SSLProxyingNewItemCommands
+
+struct SSLProxyingNewItemCommands: View {
+    let actions: SSLProxyingCommandActions?
+
+    var body: some View {
+        if let actions {
+            Button(String(localized: "Add Application…", bundle: RockxyLocalization.bundle)) {
+                actions.addApplication()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+
+            Button(String(localized: "Add Host Pattern…", bundle: RockxyLocalization.bundle)) {
+                actions.addHost()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .option])
+
+            Divider()
+        }
+    }
+}
+
+// MARK: - SSLProxyingCommandActionsKey
+
+private struct SSLProxyingCommandActionsKey: FocusedValueKey {
+    typealias Value = SSLProxyingCommandActions
+}
+
+extension FocusedValues {
+    var sslProxyingCommandActions: SSLProxyingCommandActions? {
+        get { self[SSLProxyingCommandActionsKey.self] }
+        set { self[SSLProxyingCommandActionsKey.self] = newValue }
     }
 }
 

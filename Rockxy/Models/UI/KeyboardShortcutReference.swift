@@ -121,7 +121,7 @@ enum KeyboardShortcutCatalog {
         ]),
         KeyboardShortcutSection(id: "settings", title: "Settings", shortcuts: [
             row("settings.ssl.newApp", "SSL Proxying Settings", "Add app rule", "⌘N", "SSL Proxying list", nil, nil),
-            row("settings.ssl.newDomain", "SSL Proxying Settings", "Add domain rule", "⇧⌘N", "SSL Proxying list", nil, nil),
+            row("settings.ssl.newDomain", "SSL Proxying Settings", "Add domain rule", "⌥⌘N", "SSL Proxying list", nil, nil),
             row("settings.ssl.edit", "SSL Proxying Settings", "Edit selected SSL proxying rule", "⌘E", "SSL Proxying list", nil, nil),
             row("settings.ssl.delete", "SSL Proxying Settings", "Delete selected SSL proxying rule", "⌘⌫", "SSL Proxying list", nil, nil),
             row("settings.ssl.toggle", "SSL Proxying Settings", "Toggle selected SSL proxying rule", "↵ / Space", "SSL Proxying list", nil, nil),

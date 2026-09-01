@@ -6,6 +6,8 @@ import SwiftUI
 /// Adds a stable application-scoped HTTPS behavior from apps observed in this live capture.
 /// Remote clients are intentionally absent because Rockxy cannot resolve their local process identity.
 struct AddSSLApplicationSheet: View {
+    // MARK: Lifecycle
+
     init(
         editingRule: ApplicationSSLProxyingRule? = nil,
         existingRules: [ApplicationSSLProxyingRule],
@@ -17,6 +19,8 @@ struct AddSSLApplicationSheet: View {
         _selectedIdentifier = State(initialValue: editingRule?.applicationIdentifier)
         _listType = State(initialValue: editingRule?.listType ?? .include)
     }
+
+    // MARK: Internal
 
     let editingRule: ApplicationSSLProxyingRule?
     let existingRules: [ApplicationSSLProxyingRule]
@@ -40,7 +44,10 @@ struct AddSSLApplicationSheet: View {
                 .opacity(0)
                 .accessibilityHidden(true)
         }
+        .onAppear { isSearchFocused = true }
     }
+
+    // MARK: Private
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appUIDisplayMetrics) private var appMetrics
@@ -125,7 +132,7 @@ struct AddSSLApplicationSheet: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             TextField(
                 String(localized: "Search applications", bundle: RockxyLocalization.bundle),
                 text: $searchText
@@ -133,46 +140,54 @@ struct AddSSLApplicationSheet: View {
             .textFieldStyle(.roundedBorder)
             .focused($isSearchFocused)
 
-            Picker(String(localized: "Behavior", bundle: RockxyLocalization.bundle), selection: $listType) {
-                Text(SSLProxyingListViewModel.behaviorLabel(for: .include)).tag(SSLProxyingListType.include)
-                Text(SSLProxyingListViewModel.behaviorLabel(for: .exclude)).tag(SSLProxyingListType.exclude)
+            HStack(spacing: toolMetrics.controlSpacing) {
+                Text(String(localized: "Behavior", bundle: RockxyLocalization.bundle))
+                    .foregroundStyle(.secondary)
+
+                Picker("", selection: $listType) {
+                    Text(SSLProxyingListViewModel.behaviorLabel(for: .include))
+                        .tag(SSLProxyingListType.include)
+                    Text(SSLProxyingListViewModel.behaviorLabel(for: .exclude))
+                        .tag(SSLProxyingListType.exclude)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .accessibilityLabel(String(localized: "Rule behavior", bundle: RockxyLocalization.bundle))
             }
-            .labelsHidden()
-            .fixedSize()
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
     }
 
     private var applicationList: some View {
-        List(applications, selection: $selectedIdentifier) { app in
-            if let identity = app.identity {
-                HStack(spacing: 10) {
-                    applicationIcon(for: identity, name: app.name)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(app.name)
-                            .lineLimit(1)
-                        Text(identity.bundleIdentifier ?? identity.identifier)
-                            .font(toolMetrics.metadataFont(monospaced: true))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        if !app.domains.isEmpty {
-                            Text(app.domains.prefix(3).joined(separator: ", "))
-                                .font(toolMetrics.metadataFont())
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
+        List(selection: $selectedIdentifier) {
+            ForEach(applications) { app in
+                if let identity = app.identity {
+                    if app.domains.isEmpty {
+                        applicationRow(app, identity: identity)
+                            .tag(identity.identifier)
+                    } else {
+                        DisclosureGroup {
+                            ForEach(app.domains, id: \.self) { domain in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "network")
+                                        .font(toolMetrics.secondaryFont())
+                                        .foregroundStyle(.tertiary)
+                                    Text(domain)
+                                        .font(toolMetrics.secondaryFont(monospaced: true))
+                                        .lineLimit(1)
+                                }
+                                .padding(.leading, 42)
+                            }
+                        } label: {
+                            applicationRow(app, identity: identity)
+                                .tag(identity.identifier)
                         }
                     }
-                    Spacer()
-                    Text(String(localized: "\(app.domains.count) hosts", bundle: RockxyLocalization.bundle))
-                        .font(toolMetrics.metadataFont())
-                        .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 3)
-                .tag(identity.identifier)
             }
         }
+        .listStyle(.sidebar)
         .overlay {
             if applications.isEmpty {
                 ContentUnavailableView(
@@ -182,8 +197,14 @@ struct AddSSLApplicationSheet: View {
                     systemImage: searchText.isEmpty ? "app.dashed" : "magnifyingglass",
                     description: Text(
                         searchText.isEmpty
-                            ? String(localized: "Capture new traffic from a local app, then return here.", bundle: RockxyLocalization.bundle)
-                            : String(localized: "Try a different app, identifier, or host.", bundle: RockxyLocalization.bundle)
+                            ? String(
+                                localized: "Capture new traffic from a local app, then return here.",
+                                bundle: RockxyLocalization.bundle
+                            )
+                            : String(
+                                localized: "Try a different app, identifier, or host.",
+                                bundle: RockxyLocalization.bundle
+                            )
                     )
                 )
             }
@@ -241,9 +262,30 @@ struct AddSSLApplicationSheet: View {
                 }
             }
             .keyboardShortcut(.defaultAction)
+            .rockxyGlassButtonStyle(prominent: true)
             .disabled(selectedIdentity == nil)
         }
         .padding(12)
+    }
+
+    private func applicationRow(_ app: AppInfo, identity: ClientApplicationIdentity) -> some View {
+        HStack(spacing: 10) {
+            applicationIcon(for: identity, name: app.name)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name)
+                    .lineLimit(1)
+                Text(identity.bundleIdentifier ?? identity.identifier)
+                    .font(toolMetrics.metadataFont(monospaced: true))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Text(String(localized: "\(app.domains.count) hosts", bundle: RockxyLocalization.bundle))
+                .font(toolMetrics.metadataFont())
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 3)
     }
 
     @ViewBuilder

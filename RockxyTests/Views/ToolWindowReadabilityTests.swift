@@ -1159,6 +1159,7 @@ struct ToolWindowReadabilityTests {
     func httpsDecryptionAndFullProxyBypassUseApprovedStructure() throws {
         let sslSource = try readProjectFile("Rockxy/Views/Settings/SSLProxyingListView.swift")
         let sslViewModelSource = try readProjectFile("Rockxy/Views/Settings/SSLProxyingListViewModel.swift")
+        let sslApplicationSheetSource = try readProjectFile("Rockxy/Views/Settings/AddSSLApplicationSheet.swift")
         let bypassSource = try readProjectFile("Rockxy/Views/Settings/BypassProxyListView.swift")
         let tlsExceptionsSource = try readProjectFile("Rockxy/Views/Settings/BypassProxySettingsSheet.swift")
         let appSource = try readProjectFile("Rockxy/RockxyApp.swift")
@@ -1174,9 +1175,27 @@ struct ToolWindowReadabilityTests {
         #expect(sslSource.contains("row order does not affect matching"))
         #expect(sslSource.contains("PASSTHROUGH ACTIVE"))
         #expect(sslSource.contains(#".keyboardShortcut("f", modifiers: .command)"#))
+        #expect(sslSource.contains(".focusedSceneValue("))
+        #expect(sslSource.contains(#"\.sslProxyingCommandActions"#))
+        #expect(appSource.contains(".commands { SSLProxyingCommands() }"))
+        #expect(sslSource.contains(#"CommandMenu(String(localized: "HTTPS Decryption""#))
+        #expect(sslSource.contains("actions.addApplication()"))
+        #expect(sslSource.contains("actions.addHost()"))
+        #expect(sslSource.contains(#".keyboardShortcut("n", modifiers: [.command, .option])"#))
         #expect(sslSource.contains("Replace existing HTTPS decryption settings?"))
         #expect(!sslSource.contains("Include List"))
         #expect(!sslSource.contains("Exclude List"))
+
+        #expect(sslApplicationSheetSource.contains("List(selection: $selectedIdentifier)"))
+        #expect(sslApplicationSheetSource.contains("DisclosureGroup"))
+        #expect(sslApplicationSheetSource.contains(
+            "} label: {\n                            applicationRow(app, identity: identity)"
+        ))
+        #expect(sslApplicationSheetSource.contains(#"ForEach(app.domains, id: \.self)"#))
+        #expect(sslApplicationSheetSource
+            .contains(#"String(localized: "Behavior", bundle: RockxyLocalization.bundle)"#))
+        #expect(sslApplicationSheetSource.contains(".pickerStyle(.segmented)"))
+        #expect(sslApplicationSheetSource.contains(".rockxyGlassButtonStyle(prominent: true)"))
 
         #expect(bypassSource.contains("Table(filteredDomains"))
         #expect(bypassSource.contains("System-proxy clients matching these patterns connect directly"))
