@@ -345,7 +345,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "  •  已逐出 %lld 项"
+            "value": "  •  已淘汰 %lld 项"
           }
         }
       }
@@ -396,7 +396,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法读取\"%1$@\"。\n\n%2$@"
+            "value": "无法读取“%1$@”。\n\n%2$@"
           }
         }
       }
@@ -502,7 +502,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@\n\nRockxy 已从当前 App 包中重新注册辅助工具。您仍需在系统设置 > 登录项中批准它。"
+            "value": "%@\n\nRockxy 已从当前 App 包中重新注册辅助工具。你仍需在系统设置 > 登录项中批准它。"
           }
         }
       }
@@ -522,7 +522,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@\n\nRockxy 已重新安装 Helper，但其协议版本与此 App 构建不兼容。"
+            "value": "%@\n\nRockxy 已重新安装辅助工具，但其协议版本与此 App 构建不兼容。"
           }
         }
       }
@@ -552,7 +552,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@\n\nRockxy 已重新安装 Helper，但安装的 Helper 看起来仍旧早于此 App 构建。"
+            "value": "%@\n\nRockxy 已重新安装辅助工具，但安装的辅助工具看起来仍旧早于此 App 构建。"
           }
         }
       }
@@ -799,7 +799,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 在此 Mac 上不可用。"
+            "value": "%@ 在这台 Mac 上不可用。"
           }
         }
       }
@@ -1024,7 +1024,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@，%2$lld 条活动规则"
+            "value": "%1$@，%2$lld 条生效规则"
           }
         }
       }
@@ -1034,7 +1034,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@，活跃项目"
+            "value": "%@，当前项目"
           }
         }
       }
@@ -1162,7 +1162,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条活跃的断点规则。打开断点规则。"
+            "value": "有 %lld 条生效的断点规则。打开断点规则。"
           }
         }
       }
@@ -1172,7 +1172,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活动 Map Local 规则。打开 Map Local。"
+            "value": "%lld 条生效的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -1182,7 +1182,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 %lld 条活动的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 %lld 条生效的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -1192,7 +1192,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活跃的修改标头规则"
+            "value": "%lld 条生效的修改标头规则"
           }
         }
       }
@@ -1202,7 +1202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条活动规则"
+            "value": "%lld 条生效规则"
           }
         }
       }
@@ -1232,7 +1232,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "缺少 %lld 个基准请求标头"
+            "value": "缺少 %lld 个基线请求标头"
           }
         }
       }
@@ -1390,7 +1390,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已包括 %1$lld 个 · 已跳过 %2$lld 个"
+            "value": "已包含 %1$lld 个 · 已跳过 %2$lld 个"
           }
         }
       }
@@ -1682,7 +1682,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 处重叠；Tunnel Without Decryption 优先"
+            "value": "%lld 处重叠；“不解密隧道”优先"
           }
         }
       }
@@ -2002,7 +2002,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "^[%lld 台主机](inflect: true)"
+            "value": "^[%lld 个主机](inflect: true)"
           }
         }
       }
@@ -2188,7 +2188,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活动断点规则。打开“断点规则”。"
+            "value": "有 1 条生效的断点规则。打开断点规则。"
           }
         }
       }
@@ -2198,7 +2198,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活动的 Map Local 规则。打开 Map Local。"
+            "value": "有 1 条生效的 Map Local 规则。打开 Map Local。"
           }
         }
       }
@@ -2208,7 +2208,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 1 条活跃的 Map Remote 规则。打开 Map Remote。"
+            "value": "有 1 条生效的 Map Remote 规则。打开 Map Remote。"
           }
         }
       }
@@ -2541,7 +2541,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此 App 捆绑了更新版本的 Helper。"
+            "value": "此 App 捆绑了更新版本的辅助工具。"
           }
         }
       }
@@ -2581,7 +2581,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请求必须匹配您设置的每个条件。空字段可匹配任意值。"
+            "value": "请求必须匹配你设置的每个条件。空字段可匹配任意值。"
           }
         }
       }
@@ -2827,7 +2827,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活动项目"
+            "value": "当前项目"
           }
         }
       }
@@ -2837,7 +2837,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活动项目：%@"
+            "value": "当前项目：%@"
           }
         }
       }
@@ -2937,7 +2937,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加包括或排除条件以预览匹配项"
+            "value": "添加包含或排除条件以预览匹配项"
           }
         }
       }
@@ -3283,7 +3283,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "添加这个已启用的配置将禁用当前启用的配置。"
+            "value": "添加这个已启用的配置将停用当前启用的配置。"
           }
         }
       }
@@ -3293,7 +3293,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅将被 Focus 或 Noise 隐藏的 %lld 个请求添加到本次审查。你的 Focus 和 Noise 设置不会更改。"
+            "value": "仅将被焦点或噪声隐藏的 %lld 个请求添加到本次审查。你的焦点和噪声设置不会更改。"
           }
         }
       }
@@ -3616,7 +3616,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "允许列表已开启，但没有可匹配的有效已启用规则。在启用规则前，Rockxy 不会记录流量。"
+            "value": "允许列表已启用，但没有可匹配的有效已启用规则。在启用规则前，Rockxy 不会记录流量。"
           }
         }
       }
@@ -4169,7 +4169,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请在“系统设置 > 登录项”中批准 Helper 工具以完成安装。"
+            "value": "请在“系统设置 > 登录项”中批准辅助工具以完成安装。"
           }
         }
       }
@@ -4259,7 +4259,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 Rockxy Assistant 询问所选内容…"
+            "value": "向 Rockxy AI 助手询问所选内容…"
           }
         }
       }
@@ -4485,7 +4485,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启动时自动开始录制流量"
+            "value": "启动时自动开始记录流量"
           }
         }
       }
@@ -4605,7 +4605,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动对敏感标头进行脱敏"
+            "value": "自动对敏感标头脱敏"
           }
         }
       }
@@ -4715,7 +4715,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 MCP 客户端前自动对敏感信息进行脱敏。"
+            "value": "发送到 MCP 客户端前自动对敏感信息脱敏。"
           }
         }
       }
@@ -4818,7 +4818,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "适用于调试和面向工具提示的均衡本地模型"
+            "value": "适用于调试和工具调用类提示词的均衡本地模型"
           }
         }
       }
@@ -4968,7 +4968,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "二进制负载"
+            "value": "二进制有效载荷"
           }
         }
       }
@@ -4978,7 +4978,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已省略二进制载荷"
+            "value": "已省略二进制有效载荷"
           }
         }
       }
@@ -5088,7 +5088,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "阻止列表是一种网络干预。已启用的规则会参与 Rockxy 的全局首次匹配运行时顺序。"
+            "value": "阻止列表是一种网络干预。已启用的规则会参与 Rockxy 的全局首个匹配运行时顺序。"
           }
         }
       }
@@ -5168,7 +5168,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正文编辑不可用。应用元数据更改或继续原始流量都会保留正文的每个字节。"
+            "value": "正文编辑不可用。应用元数据更改或继续发送原始流量都会保留正文的每个字节。"
           }
         }
       }
@@ -5634,7 +5634,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "取消活动请求"
+            "value": "取消当前请求"
           }
         }
       }
@@ -6034,7 +6034,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证书已安装并在您的钥匙串中受信任。"
+            "value": "证书已安装并在你的钥匙串中受信任。"
           }
         }
       }
@@ -6044,7 +6044,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证书已安装并受信任。请再次发出请求以检查 HTTPS 内容。"
+            "value": "证书已安装并受信任。请再次发送请求以检查 HTTPS 内容。"
           }
         }
       }
@@ -6064,7 +6064,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "证书已安装但不受信任。请返回并再次尝试 \"安装并信任\"。"
+            "value": "证书已安装但不受信任。请返回并再次尝试 “安装并信任”。"
           }
         }
       }
@@ -6354,7 +6354,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查提供商的错误正文、请求 id、身份验证、速率限制标头和重试时间。"
+            "value": "检查提供商的错误正文、请求 ID、身份验证、速率限制标头和重试时机。"
           }
         }
       }
@@ -6364,7 +6364,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查提供方的错误代码/消息、请求 ID、身份验证标头以及重试时机。"
+            "value": "检查提供商的错误代码/消息、请求 ID、身份验证标头以及重试时机。"
           }
         }
       }
@@ -6374,7 +6374,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查原始交易/签名、钱包签名者状态、nonce、gas 以及提供方拒绝详情。"
+            "value": "检查原始交易/签名、钱包签名者状态、nonce、gas 以及提供商拒绝详情。"
           }
         }
       }
@@ -6774,7 +6774,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择与您的运行时匹配的 Go HTTP 客户端，然后复制代码片段。"
+            "value": "选择与你的运行时匹配的 Go HTTP 客户端，然后复制代码片段。"
           }
         }
       }
@@ -6854,7 +6854,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择要保存到此 HAR 归档中的已捕获事务。"
+            "value": "选择要保存到此 HAR 文件中的已捕获事务。"
           }
         }
       }
@@ -7130,7 +7130,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点按 \"+\" 或按下 ⌘N 以添加新条目"
+            "value": "点按“+”或按 ⌘N 以添加新条目"
           }
         }
       }
@@ -7140,7 +7140,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点按 \"+\" 或按下 ⌘N 以添加定义。"
+            "value": "点按“+”或按 ⌘N 以添加定义。"
           }
         }
       }
@@ -7150,7 +7150,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点按 \"+\" 或按下 ⌘N 以创建配置。"
+            "value": "点按“+”或按 ⌘N 以创建配置。"
           }
         }
       }
@@ -7160,7 +7160,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击 \"+\" 或按 ⌘N 创建规则。"
+            "value": "点按“+”或按 ⌘N 创建规则。"
           }
         }
       }
@@ -7170,7 +7170,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点按 \"+\" 或按下 ⌘N 以导入 .proto 文件。"
+            "value": "点按“+”或按 ⌘N 以导入 .proto 文件。"
           }
         }
       }
@@ -7190,7 +7190,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点按 + 或按下 ⌘N 以创建脚本。"
+            "value": "点按 + 或按 ⌘N 以创建脚本。"
           }
         }
       }
@@ -8345,7 +8345,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将 Rockxy 配置为本地代理，并在 Go 客户端中载入导出的根证书。"
+            "value": "将 Rockxy 配置为本地代理，并在 Go 客户端中加载导出的根证书。"
           }
         }
       }
@@ -8395,7 +8395,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开始本地推断前，请确认已脱敏的流量和对话。"
+            "value": "开始本地推理前，请确认已脱敏的流量和对话。"
           }
         }
       }
@@ -8481,7 +8481,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将此 Mac 连接到 Wi-Fi 或以太网，以公开可访问的 LAN IP。"
+            "value": "将这台 Mac 连接到 Wi-Fi 或以太网，以获取可访问的局域网 IP。"
           }
         }
       }
@@ -9181,7 +9181,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法导入 \"%1$@\"。\n\n%2$@"
+            "value": "无法导入 “%1$@”。\n\n%2$@"
           }
         }
       }
@@ -9197,7 +9197,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法导入 \"%1$@\"。\n\n该文件可能不是有效的 HAR 归档。%2$@"
+            "value": "无法导入 “%1$@”。\n\n该文件可能不是有效的 HAR 文件。%2$@"
           }
         }
       }
@@ -9223,7 +9223,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法读取 \"%1$@\"。\n\n%2$@"
+            "value": "无法读取 “%1$@”。\n\n%2$@"
           }
         }
       }
@@ -9363,7 +9363,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "创建 Focus 集"
+            "value": "创建焦点集"
           }
         }
       }
@@ -9373,7 +9373,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "创建 Rockxy 的本地证书颁发机构以进行 HTTPS 检查。"
+            "value": "创建 Rockxy 的本地证书颁发机构，用于检查 HTTPS。"
           }
         }
       }
@@ -10543,7 +10543,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此 Mac 之外的设备无法访问仅本地主机模式。请关闭“仅监听本地主机”，然后重启代理。"
+            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请关闭“仅监听本地主机”，然后重启代理。"
           }
         }
       }
@@ -10636,7 +10636,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "禁用"
+            "value": "停用"
           }
         }
       }
@@ -10666,7 +10666,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "禁用缓存（No-Cache 标头）"
+            "value": "停用缓存（No-Cache 标头）"
           }
         }
       }
@@ -10686,7 +10686,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "禁用规则"
+            "value": "停用规则"
           }
         }
       }
@@ -10696,7 +10696,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "禁用脚本"
+            "value": "停用脚本"
           }
         }
       }
@@ -10726,7 +10726,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已禁用"
+            "value": "已停用"
           }
         }
       }
@@ -10756,7 +10756,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在支持的情况下禁用"
+            "value": "在支持的情况下停用"
           }
         }
       }
@@ -10889,7 +10889,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您在此处看到了认证问题吗？"
+            "value": "你在此处看到了认证问题吗？"
           }
         }
       }
@@ -11293,7 +11293,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "编辑 Focus 集"
+            "value": "编辑焦点集"
           }
         }
       }
@@ -11823,7 +11823,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为 %@ 启用 SSL 代理。请再次发出请求以进行检查。"
+            "value": "已为 %@ 启用 SSL 代理。请再次发送请求以检查它。"
           }
         }
       }
@@ -14858,7 +14858,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "隐藏的筛选器处于活动状态"
+            "value": "当前有隐藏的筛选器生效"
           }
         }
       }
@@ -14978,7 +14978,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从 Focus 集中隐藏此域名及其子域名。"
+            "value": "从焦点集中隐藏此域名及其子域名。"
           }
         }
       }
@@ -15028,7 +15028,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "历史记录保留在此 Mac 上。身份验证和 cookie 标头值会被脱敏；URL 和正文仍在本地存储。"
+            "value": "历史记录保留在这台 Mac 上。身份验证和 cookie 标头值会被脱敏；URL 和正文仍在本地存储。"
           }
         }
       }
@@ -15118,7 +15118,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此处的主机会跳过解密，但仍通过 Rockxy 传输。这绝不会禁用 Rockxy 代理。"
+            "value": "此处的主机会跳过解密，但仍通过 Rockxy 传输。这绝不会停用 Rockxy 代理。"
           }
         }
       }
@@ -15164,7 +15164,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "来自提供方的 HTTP %lld"
+            "value": "来自提供商的 HTTP %lld"
           }
         }
       }
@@ -15194,7 +15194,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "HTTP 429 和附近的重复请求支持此推断；应用程序策略仍未知。"
+            "value": "HTTP 429 和附近的重复请求支持此假设；应用程序策略仍未知。"
           }
         }
       }
@@ -15600,7 +15600,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "如果您更喜欢使用“终端”，请导出公共 PEM，然后为已准备的模拟器运行 xcrun simctl keychain <udid> add-root-cert <path-to-pem>。"
+            "value": "如果你更喜欢使用“终端”，请导出公开 PEM，然后为已准备的模拟器运行 xcrun simctl keychain <udid> add-root-cert <path-to-pem>。"
           }
         }
       }
@@ -16098,7 +16098,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "推断使用已配置的本地端点"
+            "value": "推理使用已配置的本地端点"
           }
         }
       }
@@ -16208,7 +16208,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "检查响应负载以及向该主机发出的邻近请求。"
+            "value": "检查响应有效载荷以及向该主机发出的邻近请求。"
           }
         }
       }
@@ -16398,7 +16398,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在此 Mac 上安装证书…"
+            "value": "在这台 Mac 上安装证书…"
           }
         }
       }
@@ -16488,7 +16488,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "验证此手动流程前，请先在此 Mac 上安装所选的运行时、工具链或客户端。"
+            "value": "验证此手动流程前，请先在这台 Mac 上安装所选的运行时、工具链或客户端。"
           }
         }
       }
@@ -16578,7 +16578,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已安装的 Helper 版本已过时，应进行更新。"
+            "value": "已安装的辅助工具版本已过时，应进行更新。"
           }
         }
       }
@@ -16894,7 +16894,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "匹配规则 '%1$@' 无效：%2$@"
+            "value": "匹配规则 ‘%1$@’ 无效：%2$@"
           }
         }
       }
@@ -17226,7 +17226,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将 Android 信任保持为仅调试"
+            "value": "将 Android 的证书信任限制为仅调试构建"
           }
         }
       }
@@ -17502,7 +17502,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启动您的 App 或访问域名，即可在列表中看到它"
+            "value": "启动你的 App 或访问域名，即可在列表中看到它"
           }
         }
       }
@@ -17712,7 +17712,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在 Safari 中加载一个 HTTPS 页面，或运行一次目标应用的登录流程，并确认 Rockxy 捕获到该请求。VPN 可能会绕过 Wi-Fi 代理，因此请在验证时将其禁用。"
+            "value": "在 Safari 中加载一个 HTTPS 页面，或运行一次目标应用的登录流程，并确认 Rockxy 捕获到该请求。VPN 可能会绕过 Wi-Fi 代理，因此请在验证时将其停用。"
           }
         }
       }
@@ -17762,7 +17762,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在载入发布说明…"
+            "value": "正在加载发布说明…"
           }
         }
       }
@@ -17852,7 +17852,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地调查始终可用。向已配置的模型发送提示需要明确确认“审查数据”。"
+            "value": "本地调查始终可用。向已配置的模型发送提示词需要明确确认“审查数据”。"
           }
         }
       }
@@ -17972,7 +17972,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅限此 Mac 的本地连接"
+            "value": "仅限这台 Mac 的本地连接"
           }
         }
       }
@@ -18062,7 +18062,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "macOS 系统代理已禁用"
+            "value": "macOS 系统代理已停用"
           }
         }
       }
@@ -18212,7 +18212,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "常见 HTTP 技术栈支持手动配置 Golang。"
+            "value": "支持为常见 HTTP 技术栈手动配置 Golang。"
           }
         }
       }
@@ -18252,7 +18252,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "常见 HTTP 客户端示例支持手动配置 Ruby。"
+            "value": "支持手动配置 Ruby，并提供常见 HTTP 客户端示例。"
           }
         }
       }
@@ -18385,7 +18385,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Map Local 遵循 Rockxy 的全局首个匹配规则顺序。可从“更多”菜单重新排序规则；不可用的本地目标会安全回退到源站。"
+            "value": "Map Local 遵循 Rockxy 的全局首个匹配规则顺序。可从“更多”菜单重新排序规则；不可用的本地目标会安全回退到源服务器。"
           }
         }
       }
@@ -18395,7 +18395,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Map Local 从本地文件提供匹配请求的响应，你可以设置状态码、标头和正文，从而模拟端点。"
+            "value": "Map Local 会为匹配的请求从本地文件提供响应，你可以设置状态码、标头和正文，从而模拟端点。"
           }
         }
       }
@@ -18694,7 +18694,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "匹配规则 '%1$@' 超过 %2$lld 个字符。"
+            "value": "匹配规则 ‘%1$@’ 超过 %2$lld 个字符。"
           }
         }
       }
@@ -19023,7 +19023,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通过此本地端点，模型和已审查流量都会保留在此 Mac 上。"
+            "value": "通过此本地端点，模型和已审查流量都会保留在这台 Mac 上。"
           }
         }
       }
@@ -19457,7 +19457,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "网络条件会限制带宽并增加延迟，帮助您重现 App 在慢速连接下的表现。"
+            "value": "网络条件会限制带宽并增加延迟，帮助你重现 App 在慢速连接下的表现。"
           }
         }
       }
@@ -19933,7 +19933,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "没有活动筛选条件"
+            "value": "当前没有生效的筛选器"
           }
         }
       }
@@ -19943,7 +19943,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无活动脚本"
+            "value": "无生效脚本"
           }
         }
       }
@@ -20403,7 +20403,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此交换未证实任何故障。仅当你想检查标头、时序或有效载荷时才打开“详细信息”。"
+            "value": "此次交互未证实任何故障。仅当你想检查标头、时序或有效载荷时才打开“详细信息”。"
           }
         }
       }
@@ -20483,7 +20483,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "没有活动的隐藏筛选器"
+            "value": "当前没有生效的隐藏筛选器"
           }
         }
       }
@@ -20853,7 +20853,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活动筛选器中没有符合 OpenAPI 条件的请求"
+            "value": "当前筛选器中没有符合 OpenAPI 条件的请求"
           }
         }
       }
@@ -20953,7 +20953,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无固定的请求"
+            "value": "无置顶请求"
           }
         }
       }
@@ -21033,7 +21033,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未找到可访问的 Wi-Fi 或以太网 IPv4 地址。请将此 Mac 连接到与设备相同的网络，然后重试。"
+            "value": "未找到可访问的 Wi-Fi 或以太网 IPv4 地址。请将这台 Mac 连接到与设备相同的网络，然后重试。"
           }
         }
       }
@@ -22066,7 +22066,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "只能启用一个配置。它遵循 Rockxy 的全局首次匹配规则顺序，并应用于拦截的 HTTP 和 HTTPS 流量。"
+            "value": "只能启用一个配置。它遵循 Rockxy 的全局首个匹配规则顺序，并应用于拦截的 HTTP 和 HTTPS 流量。"
           }
         }
       }
@@ -22969,7 +22969,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "原始载荷已受保护"
+            "value": "原始有效载荷已受保护"
           }
         }
       }
@@ -23019,7 +23019,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "覆盖 %@。其他组件保留自请求。"
+            "value": "覆盖 %@。其他组件取自原请求。"
           }
         }
       }
@@ -23071,7 +23071,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通过本地网络将 Babylon 调试客户端与此 Mac 配对。"
+            "value": "通过本地网络将 Babylon 调试客户端与这台 Mac 配对。"
           }
         }
       }
@@ -23202,7 +23202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将 Rockxy 的主机和端口粘贴到 Firefox 网络设置中，将根证书导入浏览器的证书颁发机构存储，然后载入页面进行确认。"
+            "value": "将 Rockxy 的主机和端口粘贴到 Firefox 网络设置中，将根证书导入浏览器的证书颁发机构存储，然后加载页面进行确认。"
           }
         }
       }
@@ -23452,7 +23452,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有效负载编码"
+            "value": "有效载荷编码"
           }
         }
       }
@@ -23462,7 +23462,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "负载传输占请求时长的大部分。"
+            "value": "有效载荷传输占请求时长的大部分。"
           }
         }
       }
@@ -23472,7 +23472,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "负载视图"
+            "value": "有效载荷视图"
           }
         }
       }
@@ -23482,7 +23482,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "载荷已截断"
+            "value": "有效载荷已截断"
           }
         }
       }
@@ -23592,7 +23592,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "固定"
+            "value": "置顶"
           }
         }
       }
@@ -23612,7 +23612,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "固定证据"
+            "value": "置顶证据"
           }
         }
       }
@@ -23632,7 +23632,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已固定"
+            "value": "已置顶"
           }
         }
       }
@@ -24318,7 +24318,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "项目尚未就绪。请先重试载入目录。"
+            "value": "项目尚未就绪。请先重试加载项目目录。"
           }
         }
       }
@@ -24328,7 +24328,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "项目存储在此 Mac 本地。"
+            "value": "项目存储在这台 Mac 本地。"
           }
         }
       }
@@ -24388,7 +24388,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法载入项目。在项目修复之前，流量标签页和过滤器的更改不会被保存。"
+            "value": "无法加载项目。在项目修复之前，流量标签页和过滤器的更改不会被保存。"
           }
         }
       }
@@ -24408,7 +24408,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "项目会保存标签页名称、筛选器和布局。每个项目分别保留独立的内存中流量。"
+            "value": "项目会保存标签页名称、筛选器和布局。每个项目在内存中分别保留独立的流量。"
           }
         }
       }
@@ -24504,7 +24504,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提供方 API 基础 URL"
+            "value": "提供商 API 基础 URL"
           }
         }
       }
@@ -24514,7 +24514,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提供方数据和 API 文档"
+            "value": "提供商数据和 API 文档"
           }
         }
       }
@@ -24574,7 +24574,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提供方、链或节点基准"
+            "value": "提供商、链或节点基线"
           }
         }
       }
@@ -25072,7 +25072,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Raw 包含请求行或状态行以及标头。其他格式侧重于正文内容，当选定的有效负载不匹配时可能显示为不可用状态。"
+            "value": "Raw 包含请求行或状态行以及标头。其他格式侧重于正文内容，当选定的有效载荷不匹配时可能显示为不可用状态。"
           }
         }
       }
@@ -25338,7 +25338,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已准备好进行 HTTPS 拦截"
+            "value": "HTTPS 拦截已就绪"
           }
         }
       }
@@ -25468,7 +25468,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在录制"
+            "value": "正在记录"
           }
         }
       }
@@ -25488,7 +25488,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "录制已暂停"
+            "value": "记录已暂停"
           }
         }
       }
@@ -25518,7 +25518,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "对识别到的敏感数据进行脱敏"
+            "value": "对识别到的敏感数据脱敏"
           }
         }
       }
@@ -25528,7 +25528,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送到 AI 前对敏感数据进行脱敏"
+            "value": "发送到 AI 前对敏感数据脱敏"
           }
         }
       }
@@ -25538,7 +25538,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在对敏感字段进行脱敏"
+            "value": "正在对敏感字段脱敏"
           }
         }
       }
@@ -25578,7 +25578,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上传前会对识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）进行脱敏。此操作会尽力而为，但不作保证。"
+            "value": "上传前会对识别出的敏感标头、URL 和正文值（Authorization、Cookie、API 密钥）脱敏。此操作会尽力而为，但不作保证。"
           }
         }
       }
@@ -25791,7 +25791,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅在你选择加入时才会包括相关请求。"
+            "value": "仅在你选择加入时才会包含相关请求。"
           }
         }
       }
@@ -25891,7 +25891,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "远程模型端点必须使用 HTTPS。仅允许在此 Mac 上使用纯 HTTP。"
+            "value": "远程模型端点必须使用 HTTPS。仅允许在这台 Mac 上使用纯 HTTP。"
           }
         }
       }
@@ -26835,7 +26835,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重置后台项目"
+            "value": "重置后台项"
           }
         }
       }
@@ -27315,7 +27315,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "恢复录制"
+            "value": "恢复记录"
           }
         }
       }
@@ -27575,7 +27575,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "审阅并共享…"
+            "value": "审查并共享…"
           }
         }
       }
@@ -27745,7 +27745,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将匹配的请求改写到其他主机、端口、路径或查询。"
+            "value": "将匹配的请求重写到其他主机、端口、路径或查询。"
           }
         }
       }
@@ -27841,7 +27841,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 可通过临时本地链接共享此 Mac 的公开根 CA，而 Android 仍需手动配置代理、用户 CA 和调试信任；发布构建通常不会信任用户 CA。"
+            "value": "Rockxy 可通过临时本地链接共享这台 Mac 的公开根 CA，而 Android 仍需手动配置代理、用户 CA 和调试信任；发布构建通常不会信任用户 CA。"
           }
         }
       }
@@ -27971,7 +27971,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 无法包括已排除的流量。审查的数据未发生变化。"
+            "value": "Rockxy 无法包含已排除的流量。审查的数据未发生变化。"
           }
         }
       }
@@ -27981,7 +27981,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 无法载入默认根证书的详细信息。"
+            "value": "Rockxy 无法加载默认根证书的详细信息。"
           }
         }
       }
@@ -28131,7 +28131,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 不收集分析或崩溃报告。捕获的流量会留在你的设备上，除非你明确导出、共享或发布。"
+            "value": "Rockxy 不收集分析或崩溃报告。捕获的流量会留在你这台 Mac 上，除非你明确导出、共享或发布。"
           }
         }
       }
@@ -28191,7 +28191,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 会生成本地根证书颁发机构 (CA)，以便为每个主机创建证书并拦截 HTTPS 流量。必须在 macOS 钥匙串中安装并信任根 CA。任何证书数据都不会离开你的设备。"
+            "value": "Rockxy 会生成本地根证书颁发机构 (CA)，以便为每个主机创建证书并拦截 HTTPS 流量。必须在 macOS 钥匙串中安装并信任根 CA。任何证书数据都不会离开这台 Mac。"
           }
         }
       }
@@ -28234,7 +28234,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 正在此 Mac 上捕获流量。"
+            "value": "Rockxy 正在这台 Mac 上捕获流量。"
           }
         }
       }
@@ -28350,7 +28350,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "由于 %@，Rockxy 正在直接更改 macOS 代理。如果 Rockxy 或 Xcode 意外停止，你的 Mac 可能会一直使用失效的代理，直到 Rockxy 将其恢复。请安装或修复 Helper 工具，以便更安全地自动清理。"
+            "value": "由于 %@，Rockxy 正在直接更改 macOS 代理。如果 Rockxy 或 Xcode 意外停止，你的 Mac 可能会一直使用失效的代理，直到 Rockxy 将其恢复。请安装或修复辅助工具，以便更安全地自动清理。"
           }
         }
       }
@@ -28390,7 +28390,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 通过将此主机返回到受保护的加密隧道，使应用保持连接。"
+            "value": "Rockxy 通过将此主机重新置于受保护的加密隧道，使应用保持连接。"
           }
         }
       }
@@ -28420,7 +28420,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 需要根 CA 证书才能检查 HTTPS 流量。此向导将生成本地证书，将其安装到您的 macOS 钥匙串，并验证设置。任何证书数据都不会离开您的设备。"
+            "value": "Rockxy 需要根 CA 证书才能检查 HTTPS 流量。此向导将生成本地证书，将其安装到你的 macOS 钥匙串，并验证设置。任何证书数据都不会离开这台 Mac。"
           }
         }
       }
@@ -28500,7 +28500,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 已移除过时的 Helper 文件，并请求 macOS 重置登录项和后台项目数据。"
+            "value": "Rockxy 已移除过时的辅助工具文件，并请求 macOS 重置登录项和后台项数据。"
           }
         }
       }
@@ -28550,7 +28550,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 提供动态路由处理程序以及下一个开发环境块，其中包括 NODE_USE_ENV_PROXY，以便服务器端 fetch 随后可通过 Rockxy 路由。"
+            "value": "Rockxy 提供动态路由处理程序以及 next dev 环境配置块，其中包含 NODE_USE_ENV_PROXY，以便服务器端 fetch 随后可通过 Rockxy 路由。"
           }
         }
       }
@@ -28560,7 +28560,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 提供 Firefox 设置片段和 cURL 预检步骤，以便您在更改浏览器前确认代理路径。"
+            "value": "Rockxy 提供 Firefox 设置片段和 cURL 预检步骤，以便你在更改浏览器前确认代理路径。"
           }
         }
       }
@@ -28700,7 +28700,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 提供一个 shell 启动命令和一个主进程 session.setProxy 片段，两者都指向活动端口上的 127.0.0.1。"
+            "value": "Rockxy 提供一个 shell 启动命令和一个主进程 session.setProxy 片段，两者都指向当前端口上的 127.0.0.1。"
           }
         }
       }
@@ -28896,7 +28896,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 将停止捕获、请求管理员批准、移除过时的 Helper 文件和注册状态，然后从此应用重新安装 Helper。\n\n当“安装”、“重试”、“更新”或“重新安装”都无法恢复 Helper 时，请使用此功能。"
+            "value": "Rockxy 将停止捕获、请求管理员批准、移除过时的辅助工具文件和注册状态，然后从此应用重新安装辅助工具。\n\n当“安装”、“重试”、“更新”或“重新安装”都无法恢复辅助工具时，请使用此功能。"
           }
         }
       }
@@ -28916,7 +28916,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 将使用 networksetup，并可能要求您输入密码。"
+            "value": "Rockxy 将使用 networksetup，并可能要求你输入密码。"
           }
         }
       }
@@ -28936,7 +28936,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 所有的响应文件可用"
+            "value": "有由 Rockxy 生成的响应文件可用"
           }
         }
       }
@@ -29575,7 +29575,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从 Flutter 客户端运行“验证”标签页生成的请求，并在调试更广泛的流程前确认 Rockxy 已捕获该请求。这会验证代理路径，而非发出请求的确切设备、模拟器、仿真器或 Dart 运行时。"
+            "value": "从 Flutter 客户端运行“验证”标签页生成的请求，并在调试更广泛的流程前确认 Rockxy 已捕获该请求。这会验证代理路径，而非发出请求的确切设备、仿真器、模拟器或 Dart 运行时。"
           }
         }
       }
@@ -29751,7 +29751,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请保存完整的提供方配置以启用模型访问。"
+            "value": "请保存完整的提供商配置以启用模型访问。"
           }
         }
       }
@@ -29921,7 +29921,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将公共 Rockxy 根 CA 保存为 PEM 文件"
+            "value": "将公开 Rockxy 根 CA 保存为 PEM 文件"
           }
         }
       }
@@ -30031,7 +30031,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理重新启动后，保存的监听器设置才会生效。在此之前，上方的实时端点将保持活动。"
+            "value": "代理重新启动后，保存的监听器设置才会生效。在此之前，上方的实时端点仍保持可用。"
           }
         }
       }
@@ -30091,7 +30091,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已保存，但脚本载入失败"
+            "value": "已保存，但脚本加载失败"
           }
         }
       }
@@ -30101,7 +30101,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已保存，但已达到启用 10 个脚本的配额。请禁用其他脚本以激活此脚本。"
+            "value": "已保存，但已达到启用 10 个脚本的配额。请停用其他脚本以激活此脚本。"
           }
         }
       }
@@ -30281,7 +30281,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "脚本功能已关闭。已启用的脚本会保留，但在您开启脚本功能前不会运行。"
+            "value": "脚本功能已关闭。已启用的脚本会保留，但在你开启脚本功能前不会运行。"
           }
         }
       }
@@ -30691,7 +30691,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择一个帧以检查其载荷。"
+            "value": "选择一个帧以检查其有效载荷。"
           }
         }
       }
@@ -30721,7 +30721,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择要为匹配请求提供的本地文件"
+            "value": "选择用于响应匹配请求的本地文件"
           }
         }
       }
@@ -30821,7 +30821,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择一个运行时事件以检查其标识符、时间和元数据。"
+            "value": "选择一个运行时事件以检查其标识符、时序和元数据。"
           }
         }
       }
@@ -30901,7 +30901,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择一个请求以检查有效载荷和计时详细信息。"
+            "value": "选择一个请求以检查有效载荷和时序详细信息。"
           }
         }
       }
@@ -30911,7 +30911,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择一个请求以检查原始载荷，或恰好选择两个请求进行比较。"
+            "value": "选择一个请求以检查原始有效载荷，或恰好选择两个请求进行比较。"
           }
         }
       }
@@ -31011,7 +31011,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择两个请求并选取 \"比较所选项\"，即可开始基本本地比较。"
+            "value": "选择两个请求并选取 “比较所选项”，即可开始基本本地比较。"
           }
         }
       }
@@ -31361,7 +31361,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "敏感标头、查询值和正文字段会在“审阅数据”之前被脱敏。"
+            "value": "敏感标头、查询值和正文字段会在“审查数据”之前被脱敏。"
           }
         }
       }
@@ -31854,7 +31854,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从此 Mac 以临时本地 QR 码和链接的形式共享公开的 Rockxy 根 CA，然后在设备或模拟器上完成平台信任步骤。"
+            "value": "从这台 Mac 以临时本地 QR 码和链接的形式共享公开的 Rockxy 根 CA，然后在设备或模拟器上完成平台信任步骤。"
           }
         }
       }
@@ -32779,7 +32779,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SSE 节奏根据已捕获的事件显示。除非提供方公开 token 边界，否则 token 边界不可用。"
+            "value": "SSE 节奏根据已捕获的事件显示。除非提供商公开 token 边界，否则 token 边界不可用。"
           }
         }
       }
@@ -32812,7 +32812,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为 %@ 启用 SSL 代理。请再次发出请求以进行检查。"
+            "value": "已为 %@ 启用 SSL 代理。请再次发送请求以检查它。"
           }
         }
       }
@@ -32922,7 +32922,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在此 Mac 上启动 Ollama，然后再次检查。（%@）"
+            "value": "在这台 Mac 上启动 Ollama，然后再次检查。（%@）"
           }
         }
       }
@@ -32992,7 +32992,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "更改录制状态前，请先启动代理。⌥⌘R"
+            "value": "更改记录状态前，请先启动代理。⌥⌘R"
           }
         }
       }
@@ -33202,7 +33202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "状态、时间、负载和规则检查看起来正常。"
+            "value": "状态、时序、有效载荷和规则检查看起来正常。"
           }
         }
       }
@@ -33332,7 +33332,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将 .proto 源文件存储在此 Mac 上。"
+            "value": "将 .proto 源文件存储在这台 Mac 上。"
           }
         }
       }
@@ -33951,7 +33951,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活动阻止列表规则的上限。请禁用另一条规则后重试。"
+            "value": "已达到阻止列表规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33961,7 +33961,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活动断点规则上限。请禁用另一条规则后重试。"
+            "value": "已达到断点规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -33971,7 +33971,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "活动筛选器没有匹配任何请求"
+            "value": "当前筛选器没有匹配任何请求"
           }
         }
       }
@@ -33981,7 +33981,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活跃 Map Local 规则的上限。请停用另一条规则，然后重试。"
+            "value": "已达到 Map Local 规则的启用上限。请停用另一条规则，然后重试。"
           }
         }
       }
@@ -33991,7 +33991,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到活动 Map Remote 规则的上限。请禁用另一条规则后重试。"
+            "value": "已达到 Map Remote 规则的启用上限。请停用另一条规则后重试。"
           }
         }
       }
@@ -34081,7 +34081,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "阻止列表会对匹配请求返回 403 或断开连接，让您可以模拟端点不可用的情况。"
+            "value": "阻止列表会对匹配请求返回 403 或断开连接，让你可以模拟端点不可用的情况。"
           }
         }
       }
@@ -34111,7 +34111,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "捕获的请求已不再可供审阅。"
+            "value": "捕获的请求已不再可供审查。"
           }
         }
       }
@@ -34211,7 +34211,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已配置的提供商正在处理已审阅的请求上下文。"
+            "value": "已配置的提供商正在处理已审查的请求上下文。"
           }
         }
       }
@@ -34221,7 +34221,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "CONNECT 交换会建立隧道；应用程序 HTTPS 有效载荷属于该隧道内的流量。"
+            "value": "CONNECT 交互会建立隧道；应用程序 HTTPS 有效载荷属于该隧道内的流量。"
           }
         }
       }
@@ -34407,7 +34407,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gist 负载为 %@，超过了 25 MB 的限制。"
+            "value": "Gist 有效载荷为 %@，超过了 25 MB 的限制。"
           }
         }
       }
@@ -34427,7 +34427,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Helper 已注册，但 Rockxy 无法与其连接。"
+            "value": "辅助工具已注册，但 Rockxy 无法与其连接。"
           }
         }
       }
@@ -34437,7 +34437,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法使用 Helper 工具"
+            "value": "无法使用辅助工具"
           }
         }
       }
@@ -34477,7 +34477,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "需要更新 Helper 工具"
+            "value": "需要更新辅助工具"
           }
         }
       }
@@ -34507,7 +34507,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "辅助工具将被移除。Rockxy 将使用 networksetup，并可能要求您输入密码。"
+            "value": "辅助工具将被移除。Rockxy 将使用 networksetup，并可能要求你输入密码。"
           }
         }
       }
@@ -34527,7 +34527,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Host 标头会保持原始请求发送时的值。目标主机、DNS 查询和 TLS 服务器名称仍使用上方改写后的主机。"
+            "value": "Host 标头会保持原始请求发送时的值。目标主机、DNS 查询和 TLS 服务器名称仍使用上方重写后的主机。"
           }
         }
       }
@@ -34567,7 +34567,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已安装的 Helper 与此 Rockxy 副本不匹配，请重新安装后再继续"
+            "value": "已安装的辅助工具与此 Rockxy 副本不匹配，请重新安装后再继续"
           }
         }
       }
@@ -34587,7 +34587,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "安装的 Helper 与此版本的 Rockxy 不兼容。"
+            "value": "安装的辅助工具与此版本的 Rockxy 不兼容。"
           }
         }
       }
@@ -34617,7 +34617,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "监听器正在此 Mac 上接受本地网络连接。"
+            "value": "监听器正在这台 Mac 上接受本地网络连接。"
           }
         }
       }
@@ -34777,7 +34777,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "该提供方凭据无法访问此模型或端点。"
+            "value": "该提供商凭据无法访问此模型或端点。"
           }
         }
       }
@@ -34787,7 +34787,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "缺少提供方凭据。请在设置中替换它。"
+            "value": "缺少提供商凭据。请在设置中替换它。"
           }
         }
       }
@@ -34797,7 +34797,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到提供方速率限制。请在 %lld 秒后重试。"
+            "value": "已达到提供商速率限制。请在 %lld 秒后重试。"
           }
         }
       }
@@ -34827,7 +34827,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提供方拒绝了已保存的凭据。"
+            "value": "提供商拒绝了已保存的凭据。"
           }
         }
       }
@@ -34873,7 +34873,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提供方返回了 HTTP %1$lld：%2$@"
+            "value": "提供商返回了 HTTP %1$lld：%2$@"
           }
         }
       }
@@ -34883,7 +34883,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理 Helper 工具将被移除。更改代理设置时，系统可能会提示你输入密码。"
+            "value": "代理辅助工具将被移除。更改代理设置时，系统可能会提示你输入密码。"
           }
         }
       }
@@ -34913,7 +34913,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "协调后的项目结构无效，未被应用。"
+            "value": "合并整理后的项目结构无效，未被应用。"
           }
         }
       }
@@ -35439,7 +35439,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这些映射定义存储在此 Mac 本地。此版本仅使用启发式方法解码 Protobuf — 已保存的映射和架构不会应用于已捕获的流量。"
+            "value": "这些映射定义存储在这台 Mac 本地。此版本仅使用启发式方法解码 Protobuf — 已保存的映射和架构不会应用于已捕获的流量。"
           }
         }
       }
@@ -35671,7 +35671,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此 gRPC 消息已压缩。Rockxy 会保留帧边界，但尚未解码压缩的消息负载。"
+            "value": "此 gRPC 消息已压缩。Rockxy 会保留帧边界，但尚未解码压缩的消息有效载荷。"
           }
         }
       }
@@ -35731,7 +35731,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此链接仅从这台 Mac 提供您的公共 Rockxy 根 CA。它会自动过期。请勿安装来源不明的证书。"
+            "value": "此链接仅从这台 Mac 提供你的公开 Rockxy 根 CA。它会自动过期。请勿安装来源不明的证书。"
           }
         }
       }
@@ -35741,7 +35741,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此 Mac 和本地网络"
+            "value": "这台 Mac 和本地网络"
           }
         }
       }
@@ -35781,7 +35781,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此提供方需要使用其原生适配器。请选择 OpenAI、Anthropic、Gemini、OpenAI 兼容端点或 Ollama。"
+            "value": "此提供商需要使用其原生适配器。请选择 OpenAI、Anthropic、Gemini、OpenAI 兼容端点或 Ollama。"
           }
         }
       }
@@ -35851,7 +35851,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这会从此 Mac 移除存储的 %@ 文件。"
+            "value": "这会从这台 Mac 移除存储的 %@ 文件。"
           }
         }
       }
@@ -35951,7 +35951,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此审阅仅限于所选请求。其他流量将不会被包含。"
+            "value": "此审查仅限于所选请求。其他流量将不会被包含。"
           }
         }
       }
@@ -35961,7 +35961,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此 Rockxy App 包不完整，因此无法安装辅助工具。请重新安装最新的 Rockxy 版本。如果您通过 Homebrew 安装了 Rockxy，请在修复版本发布后重新安装。"
+            "value": "此 Rockxy App 包不完整，因此无法安装辅助工具。请重新安装最新的 Rockxy 版本。如果你通过 Homebrew 安装了 Rockxy，请在修复版本发布后重新安装。"
           }
         }
       }
@@ -35971,7 +35971,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此行旨在提供如实指引；目前不要期待耳机会支持一键配对或自动安装证书。"
+            "value": "此行旨在提供如实指引；目前不要期待头显会支持一键配对或自动安装证书。"
           }
         }
       }
@@ -35981,7 +35981,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法保存此规则。请禁用另一条断点规则后重试。"
+            "value": "无法保存此规则。请停用另一条断点规则后重试。"
           }
         }
       }
@@ -36001,7 +36001,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这会在移除 Rockxy 辅助工具文件后运行 sfltool resetbtm。它可能会重置其他 App 的后台项目状态，因此仅应在正常强制重置无法恢复 Rockxy 时使用。"
+            "value": "这会在移除 Rockxy 辅助工具文件后运行 sfltool resetbtm。它可能会重置其他 App 的后台项状态，因此仅应在正常强制重置无法恢复 Rockxy 时使用。"
           }
         }
       }
@@ -36101,7 +36101,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这会将根证书安装到您的 macOS 钥匙串并标记为受信任。macOS 会提示您输入密码以授权此更改。"
+            "value": "这会将根证书安装到你的 macOS 钥匙串并标记为受信任。macOS 会提示你输入密码以授权此更改。"
           }
         }
       }
@@ -36161,7 +36161,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "计时"
+            "value": "时序"
           }
         }
       }
@@ -36454,7 +36454,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "捕获的载荷总字节数"
+            "value": "捕获的有效载荷总字节数"
           }
         }
       }
@@ -36514,7 +36514,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "追踪状态、响应标头、时间和附近的故障。"
+            "value": "追踪状态、响应标头、时序和附近的故障。"
           }
         }
       }
@@ -37039,7 +37039,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "尝试重置后台项目"
+            "value": "尝试重置后台项"
           }
         }
       }
@@ -37069,7 +37069,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "为连接到 %@ 的新连接开启 HTTPS 解密"
+            "value": "为连接到 %@ 的新连接启用 HTTPS 解密"
           }
         }
       }
@@ -37202,7 +37202,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "意外的 '='。"
+            "value": "意外的 ‘=’。"
           }
         }
       }
@@ -37212,7 +37212,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "意外字符 '%@'。"
+            "value": "意外字符 ‘%@’。"
           }
         }
       }
@@ -37442,7 +37442,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "取消固定证据"
+            "value": "取消置顶证据"
           }
         }
       }
@@ -37462,7 +37462,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从当前会话中取消固定所选请求。"
+            "value": "从当前会话中取消置顶所选请求。"
           }
         }
       }
@@ -38245,7 +38245,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在比较应用调用之前，将其用作提供方/链的基准。"
+            "value": "在比较应用调用之前，将其用作提供商/链的基线。"
           }
         }
       }
@@ -39017,7 +39017,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后将跳过阻止列表规则。其他干预规则仍保持活动。"
+            "value": "关闭后将跳过阻止列表规则。其他干预规则仍保持生效。"
           }
         }
       }
@@ -39206,7 +39206,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您可以随时取消此检查。"
+            "value": "你可以随时取消此检查。"
           }
         }
       }
@@ -39236,7 +39236,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您：%@"
+            "value": "你：%@"
           }
         }
       }
@@ -39266,7 +39266,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当前录制的请求/响应数据将丢失。Rockxy 将停止捕获，并在退出前恢复 macOS 代理设置。"
+            "value": "当前记录的请求/响应数据将丢失。Rockxy 将停止捕获，并在退出前恢复 macOS 代理设置。"
           }
         }
       }
