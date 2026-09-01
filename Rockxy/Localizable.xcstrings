@@ -4,6 +4,378 @@
     "": {
       "shouldTranslate": false
     },
+    "A rule with this application and behavior already exists.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已存在具有此应用和行为的规则。"
+          }
+        }
+      }
+    },
+    "Add an application, host pattern, or observed hosts to decrypt HTTPS.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用、主机模式或已观察主机以解密 HTTPS。"
+          }
+        }
+      }
+    },
+    "Add Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用"
+          }
+        }
+      }
+    },
+    "Add Application…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加应用…"
+          }
+        }
+      }
+    },
+    "Add Observed Hosts…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加已观察主机…"
+          }
+        }
+      }
+    },
+    "Applies to new connections after the app reconnects.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用重新连接后，此规则将应用于新连接。"
+          }
+        }
+      }
+    },
+    "Capture new traffic from a local app, then return here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从本地应用捕获新流量，然后返回此处。"
+          }
+        }
+      }
+    },
+    "Choose an application, host pattern, or observed hosts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择应用、主机模式或已观察主机。"
+          }
+        }
+      }
+    },
+    "Choose an observed local app. The rule follows its stable identity across every HTTPS host it uses.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择已观察到的本地应用。该规则使用稳定身份，适用于其访问的所有 HTTPS 主机。"
+          }
+        }
+      }
+    },
+    "Choose Behavior": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择行为"
+          }
+        }
+      }
+    },
+    "Choose Decrypt or Tunnel behavior for new application connections.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为应用的新连接选择解密或隧道传输行为。"
+          }
+        }
+      }
+    },
+    "Choose how Rockxy handles HTTPS from this application on new connections": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择 Rockxy 如何处理此应用的新 HTTPS 连接"
+          }
+        }
+      }
+    },
+    "Decrypt All HTTPS": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Decrypt All HTTPS from This Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密此应用的所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Decrypt Observed Hosts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密已观察主机"
+          }
+        }
+      }
+    },
+    "Decrypt Only This Host": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅解密此主机"
+          }
+        }
+      }
+    },
+    "Decrypting an entire app can expose sensitive traffic and use more CPU and memory. Add Tunnel rules for exceptions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密整个应用可能暴露敏感流量并使用更多 CPU 和内存。可添加隧道规则作为例外。"
+          }
+        }
+      }
+    },
+    "decrypt": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密"
+          }
+        }
+      }
+    },
+    "Edit Application Rule": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑应用规则"
+          }
+        }
+      }
+    },
+    "HTTPS Behavior": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTPS 行为"
+          }
+        }
+      }
+    },
+    "No Local Applications Observed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未观察到本地应用"
+          }
+        }
+      }
+    },
+    "No Matching Applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的应用"
+          }
+        }
+      }
+    },
+    "Remove Application Rule": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除应用规则"
+          }
+        }
+      }
+    },
+    "Rules decide which apps and hosts Rockxy decrypts. Other connections remain opaque TLS tunnels.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "规则决定 Rockxy 解密哪些应用和主机。其他连接仍为不透明的 TLS 隧道。"
+          }
+        }
+      }
+    },
+    "Search applications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索应用"
+          }
+        }
+      }
+    },
+    "Set %@ to decrypt HTTPS on new connections. Reconnect the app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Set %1$@ to decrypt HTTPS on new connections. Reconnect the app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将 %1$@ 的新 HTTPS 连接设为解密。请重新连接应用。"
+          }
+        }
+      }
+    },
+    "Set %@ to tunnel HTTPS on new connections. Reconnect the app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Set %1$@ to tunnel HTTPS on new connections. Reconnect the app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将 %1$@ 的新 HTTPS 连接设为隧道传输。请重新连接应用。"
+          }
+        }
+      }
+    },
+    "Target": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标"
+          }
+        }
+      }
+    },
+    "This target has both behaviors. Tunnel Without Decryption takes priority.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此目标同时具有两种行为。不解密隧道优先。"
+          }
+        }
+      }
+    },
+    "The application Tunnel rule takes priority. Change the application behavior first.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用隧道规则优先。请先更改应用行为。"
+          }
+        }
+      }
+    },
+    "Try a different app, host, scope, or behavior.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尝试其他应用、主机、范围或行为。"
+          }
+        }
+      }
+    },
+    "Try a different app, identifier, or host.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请尝试其他应用、标识符或主机。"
+          }
+        }
+      }
+    },
+    "Tunnel All HTTPS": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Tunnel All HTTPS from This Application": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输此应用的所有 HTTPS"
+          }
+        }
+      }
+    },
+    "Tunnel App": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输应用"
+          }
+        }
+      }
+    },
+    "tunnel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输"
+          }
+        }
+      }
+    },
     "  •  %lld evicted": {
       "localizations": {
         "zh-Hans": {
@@ -13432,12 +13804,12 @@
         }
       }
     },
-    "For Java, HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store and the target host added under SSL Proxying.": {
+    "For Java, HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store, plus a Decrypt rule for the target application or host under HTTPS Decryption.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "对于 Java，HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 SSL 代理中添加目标主机。"
+            "value": "对于 Java，HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 HTTPS 解密中为目标应用或主机添加解密规则。"
           }
         }
       }
@@ -14975,12 +15347,12 @@
         }
       }
     },
-    "HTTPS Decryption enables TLS interception per domain so Rockxy can read otherwise-encrypted bodies (its root certificate must be trusted first).": {
+    "HTTPS Decryption lets you decrypt traffic from an application or a specific host, or keep it tunneled. Trust Rockxy's root certificate before decrypting.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "HTTPS 解密会按域启用 TLS 拦截，让 Rockxy 能够读取原本加密的正文（必须先信任其根证书）。"
+            "value": "HTTPS 解密可让你解密来自某个应用或特定主机的流量，也可以保持隧道传输。解密前请先信任 Rockxy 的根证书。"
           }
         }
       }
@@ -28229,12 +28601,12 @@
         }
       }
     },
-    "Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store and the target host added under SSL Proxying.": {
+    "Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store, plus a Decrypt rule for the target application or host under HTTPS Decryption.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动设置会准备一个限定范围的 shell，为 JVM 设置 JAVA_TOOL_OPTIONS 代理属性。HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 SSL 代理中添加目标主机。"
+            "value": "自动设置会准备一个限定范围的 shell，为 JVM 设置 JAVA_TOOL_OPTIONS 代理属性。HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 HTTPS 解密中为目标应用或主机添加解密规则。"
           }
         }
       }
@@ -35380,12 +35752,12 @@
         }
       }
     },
-    "This import replaces the current HTTPS rules. The master state and TLS passthrough exceptions remain unchanged.": {
+    "This import replaces the current host rules. Application rules, the master state, and TLS passthrough exceptions remain unchanged.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此次导入将替换当前 HTTPS 规则。主开关状态和 TLS 直通例外保持不变。"
+            "value": "此次导入将替换当前主机规则。应用规则、主开关状态和 TLS 直通例外保持不变。"
           }
         }
       }

@@ -45,12 +45,28 @@ final class SSLProxyingManager {
         }
     }
 
+    /// Application-scoped rules. Include = Decrypt, Exclude = Tunnel, mirroring host rules but
+    /// matched against a resolved `ClientApplicationIdentity`.
+    private(set) var applicationRules: [ApplicationSSLProxyingRule] = [] {
+        didSet {
+            rebuildApplicationCache()
+        }
+    }
+
     var includeRules: [SSLProxyingRule] {
         rules.filter { $0.listType == .include }
     }
 
     var excludeRules: [SSLProxyingRule] {
         rules.filter { $0.listType == .exclude }
+    }
+
+    var applicationIncludeRules: [ApplicationSSLProxyingRule] {
+        applicationRules.filter { $0.listType == .include }
+    }
+
+    var applicationExcludeRules: [ApplicationSSLProxyingRule] {
+        applicationRules.filter { $0.listType == .exclude }
     }
 
     /// When true, all CONNECT requests pass through as raw tunnels without interception.
@@ -160,13 +176,81 @@ final class SSLProxyingManager {
         Self.logger.info("Replaced all SSL proxying rules (\(newRules.count) rules)")
     }
 
+    // MARK: - Application Rule CRUD
+
+    func addApplicationRule(_ rule: ApplicationSSLProxyingRule) {
+        applicationRules.append(rule)
+        save()
+    }
+
+    func addApplicationRules(_ newRules: [ApplicationSSLProxyingRule]) {
+        applicationRules.append(contentsOf: newRules)
+        save()
+    }
+
+    func removeApplicationRule(id: UUID) {
+        applicationRules.removeAll { $0.id == id }
+        save()
+    }
+
+    func removeApplicationRules(ids: Set<UUID>) {
+        applicationRules.removeAll { ids.contains($0.id) }
+        save()
+    }
+
+    func toggleApplicationRule(id: UUID) {
+        guard let index = applicationRules.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        applicationRules[index].isEnabled.toggle()
+        save()
+    }
+
+    func setApplicationRuleEnabled(id: UUID, enabled: Bool) {
+        guard let index = applicationRules.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        guard applicationRules[index].isEnabled != enabled else {
+            return
+        }
+        applicationRules[index].isEnabled = enabled
+        save()
+    }
+
+    func updateApplicationRule(_ rule: ApplicationSSLProxyingRule) {
+        guard let index = applicationRules.firstIndex(where: { $0.id == rule.id }) else {
+            return
+        }
+        applicationRules[index] = rule
+        save()
+    }
+
+    func replaceAllApplicationRules(_ newRules: [ApplicationSSLProxyingRule]) {
+        applicationRules = newRules
+        save()
+        Self.logger.info("Replaced all application SSL proxying rules (\(newRules.count) rules)")
+    }
+
     /// Thread-safe check usable from NIO event loops.
     /// Decision chain: enabled → global passthrough → bypass → exclude → include.
     nonisolated func shouldIntercept(_ host: String) -> Bool {
+        shouldIntercept(host: host, application: nil)
+    }
+
+    /// Combined host + application interception decision, table-order independent.
+    ///
+    /// Deterministic order: global disabled/passthrough/bypass ⇒ tunnel; any matching enabled
+    /// host **or** application Tunnel (exclude) ⇒ tunnel; any matching enabled host **or**
+    /// application Decrypt (include) ⇒ intercept; otherwise tunnel. Application rules
+    /// participate only for a non-nil resolved identity — a nil (remote/unresolved) identity
+    /// can never enable application decryption.
+    nonisolated func shouldIntercept(host: String, application: ClientApplicationIdentity?) -> Bool {
         lock.lock()
         let enabled = cachedIsEnabled
         let includeSnapshot = cachedEnabledIncludeRules
         let excludeSnapshot = cachedEnabledExcludeRules
+        let appIncludeSnapshot = cachedEnabledAppIncludeRules
+        let appExcludeSnapshot = cachedEnabledAppExcludeRules
         lock.unlock()
 
         if !enabled {
@@ -186,15 +270,31 @@ final class SSLProxyingManager {
             return false
         }
 
+        // Tunnel (exclude) wins across both host and application scopes.
         if excludeSnapshot.contains(where: { $0.matches(host) }) {
             return false
         }
-
-        if includeSnapshot.isEmpty {
+        if let application, appExcludeSnapshot.contains(where: { $0.matches(application) }) {
             return false
         }
 
-        return includeSnapshot.contains { $0.matches(host) }
+        // Decrypt (include) enables interception, including for never-before-seen hosts.
+        if includeSnapshot.contains(where: { $0.matches(host) }) {
+            return true
+        }
+        if let application, appIncludeSnapshot.contains(where: { $0.matches(application) }) {
+            return true
+        }
+
+        return false
+    }
+
+    /// Whether resolving a per-connection application identity could change any TLS decision.
+    /// Nonisolated + thread-safe so the proxy accept path can consult it without hopping actors.
+    nonisolated func hasEnabledApplicationRules() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cachedIsEnabled && (!cachedEnabledAppIncludeRules.isEmpty || !cachedEnabledAppExcludeRules.isEmpty)
     }
 
     /// Called from PostHandshakeHandler when a client rejects our intercepted certificate.
@@ -268,6 +368,7 @@ final class SSLProxyingManager {
                     isEnabled = storage.isEnabled
                     bypassDomains = storage.bypassDomains
                     rules = storage.rules
+                    applicationRules = storage.applicationRules ?? []
                     rebuildCache()
                     Self.logger
                         .info("Loaded v\(storage.schemaVersion) SSL proxying settings (\(self.rules.count) rules)")
@@ -276,6 +377,7 @@ final class SSLProxyingManager {
                     isEnabled = true
                     bypassDomains = Self.defaultBypassDomains
                     rules = legacyRules
+                    applicationRules = []
                     rebuildCache()
                     Self.logger.info("Migrated \(legacyRules.count) legacy SSL proxying rules to v2")
                     save()
@@ -296,10 +398,11 @@ final class SSLProxyingManager {
             let dir = url.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let storage = SSLProxyingStorage(
-                schemaVersion: 2,
+                schemaVersion: 3,
                 isEnabled: isEnabled,
                 bypassDomains: bypassDomains,
-                rules: rules
+                rules: rules,
+                applicationRules: applicationRules
             )
             let data = try JSONEncoder().encode(storage)
             try data.write(to: url, options: .atomic)
@@ -314,10 +417,11 @@ final class SSLProxyingManager {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let storage = SSLProxyingStorage(
-            schemaVersion: 2,
+            schemaVersion: 3,
             isEnabled: isEnabled,
             bypassDomains: bypassDomains,
-            rules: rules
+            rules: rules,
+            applicationRules: applicationRules
         )
         return try? encoder.encode(storage)
     }
@@ -329,12 +433,14 @@ final class SSLProxyingManager {
             isEnabled = storage.isEnabled
             bypassDomains = storage.bypassDomains
             rebuildBypassCache()
+            applicationRules = storage.applicationRules ?? []
             replaceAllRules(storage.rules)
         } else {
             let decoded = try JSONDecoder().decode([SSLProxyingRule].self, from: data)
             isEnabled = true
             bypassDomains = Self.defaultBypassDomains
             rebuildBypassCache()
+            applicationRules = []
             replaceAllRules(decoded)
         }
     }
@@ -393,6 +499,8 @@ final class SSLProxyingManager {
     private let lock = NSLock()
     nonisolated(unsafe) private var cachedEnabledIncludeRules: [SSLProxyingRule]
     nonisolated(unsafe) private var cachedEnabledExcludeRules: [SSLProxyingRule]
+    nonisolated(unsafe) private var cachedEnabledAppIncludeRules: [ApplicationSSLProxyingRule] = []
+    nonisolated(unsafe) private var cachedEnabledAppExcludeRules: [ApplicationSSLProxyingRule] = []
     nonisolated(unsafe) private var cachedIsEnabled: Bool = true
 
     private let passthroughLock = NSLock()
@@ -415,6 +523,15 @@ final class SSLProxyingManager {
         cachedEnabledIncludeRules = enabledInclude
         cachedEnabledExcludeRules = enabledExclude
         cachedIsEnabled = isEnabled
+        lock.unlock()
+    }
+
+    private func rebuildApplicationCache() {
+        let enabledInclude = applicationRules.filter { $0.isEnabled && $0.listType == .include }
+        let enabledExclude = applicationRules.filter { $0.isEnabled && $0.listType == .exclude }
+        lock.lock()
+        cachedEnabledAppIncludeRules = enabledInclude
+        cachedEnabledAppExcludeRules = enabledExclude
         lock.unlock()
     }
 
@@ -549,9 +666,14 @@ final class SSLProxyingManager {
 // MARK: - SSLProxyingStorage
 
 /// Versioned envelope for persisting SSL proxying settings.
+///
+/// `applicationRules` is an optional sibling introduced in schema v3. It is omitted from
+/// older payloads (v2), and older builds — whose model lacks the key — decode v3 by ignoring
+/// it while preserving host `rules`, so the format degrades gracefully in both directions.
 private struct SSLProxyingStorage: Codable {
     let schemaVersion: Int
     let isEnabled: Bool
     let bypassDomains: String
     let rules: [SSLProxyingRule]
+    let applicationRules: [ApplicationSSLProxyingRule]?
 }

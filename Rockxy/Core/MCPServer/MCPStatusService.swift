@@ -112,11 +112,16 @@ struct MCPStatusService {
             ]))
         }
 
+        let applicationIncludeRules = state.applicationIncludeRules.map(applicationRuleJSON)
+        let applicationExcludeRules = state.applicationExcludeRules.map(applicationRuleJSON)
+
         let result: MCPJSONValue = .object([
             "is_enabled": .bool(state.isEnabled),
             "include_rules": .array(includeRules),
             "exclude_rules": .array(excludeRules),
             "bypass_domains": .string(state.bypassDomains),
+            "application_include_rules": .array(applicationIncludeRules),
+            "application_exclude_rules": .array(applicationExcludeRules),
         ])
 
         return jsonResult(result)
@@ -138,6 +143,8 @@ struct MCPStatusService {
         let includeRules: [SSLProxyingRule]
         let excludeRules: [SSLProxyingRule]
         let bypassDomains: String
+        let applicationIncludeRules: [ApplicationSSLProxyingRule]
+        let applicationExcludeRules: [ApplicationSSLProxyingRule]
     }
 
     private static let dateFormatter: ISO8601DateFormatter = {
@@ -175,8 +182,29 @@ struct MCPStatusService {
             isEnabled: manager.isEnabled,
             includeRules: manager.includeRules,
             excludeRules: manager.excludeRules,
-            bypassDomains: manager.bypassDomains
+            bypassDomains: manager.bypassDomains,
+            applicationIncludeRules: manager.applicationIncludeRules,
+            applicationExcludeRules: manager.applicationExcludeRules
         )
+    }
+
+    /// Builds the wire representation of an application-scoped rule. Only the stable
+    /// `applicationIdentifier` (a bundle id or `exec:<sha256>` digest) and non-path
+    /// metadata are emitted; `bundle_identifier` appears only when the identity carries one,
+    /// and raw executable/machine paths are never exposed.
+    private func applicationRuleJSON(_ rule: ApplicationSSLProxyingRule) -> MCPJSONValue {
+        var fields: [String: MCPJSONValue] = [
+            "id": .string(rule.id.uuidString),
+            "application_identifier": .string(rule.applicationIdentifier),
+            "display_name": .string(rule.displayName),
+            "is_enabled": .bool(rule.isEnabled),
+        ]
+
+        if let bundleIdentifier = rule.bundleIdentifier {
+            fields["bundle_identifier"] = .string(bundleIdentifier)
+        }
+
+        return .object(fields)
     }
 
     private func readinessString(_ readiness: CertReadiness) -> String {

@@ -195,7 +195,9 @@ enum MCPToolDefinitions {
 
     static let getSSLProxyingList = MCPToolDefinition(
         name: "get_ssl_proxying_list",
-        description: "Get the SSL proxying domain list including include/exclude rules and bypass domains",
+        description: "Get the SSL proxying configuration: host Decrypt/Tunnel rules (include_rules/exclude_rules), "
+            + "application-scoped Decrypt/Tunnel rules (application_include_rules/application_exclude_rules), and "
+            + "bypass domains",
         inputSchema: .object([
             "type": "object",
             "properties": .object([:]),

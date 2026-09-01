@@ -105,6 +105,23 @@ struct DomainGroupingTests {
         #expect(index.makeNodes().isEmpty)
     }
 
+    @Test("App grouping retains the stable application identity for rule pickers")
+    func appGroupingRetainsIdentity() throws {
+        var index = AppGroupingIndex()
+        let request = transaction("https://api.example.com/one", sequence: 0)
+        request.clientApp = "Google Chrome"
+        request.clientApplicationIdentity = .bundle(
+            identifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+        )
+
+        index.add(request)
+
+        let node = try #require(index.makeNodes().first)
+        #expect(node.identity == request.clientApplicationIdentity)
+        #expect(node.id == "com.google.Chrome")
+    }
+
     // MARK: Private
 
     private func transaction(_ url: String, sequence: Int, statusCode: Int = 200) -> HTTPTransaction {

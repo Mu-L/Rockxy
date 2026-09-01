@@ -93,7 +93,16 @@ struct ResponseInspectorView: View {
             return HTTPSInspectionAppScope(
                 name: appName,
                 knownHostCount: domains.count,
-                enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:))
+                enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:)),
+                identity: transaction.clientApplicationIdentity,
+                isApplicationDecryptReady: transaction.clientApplicationIdentity.map {
+                    coordinator.isSSLProxyingEnabled(for: $0)
+                } ?? false,
+                isApplicationTunnelActive: transaction.clientApplicationIdentity.map { identity in
+                    SSLProxyingManager.shared.applicationExcludeRules.contains {
+                        $0.isEnabled && $0.applicationIdentifier == identity.identifier
+                    }
+                } ?? false
             )
         }()
 
@@ -528,6 +537,12 @@ struct ResponseInspectorView: View {
             coordinator.retrySSLProxyingFromInspector(for: domain)
         case let .enableApp(appName, fallbackDomain):
             coordinator.enableSSLProxyingFromInspector(forAppNamed: appName, fallbackDomain: fallbackDomain)
+        case let .setApplication(identity, listType):
+            coordinator.setSSLProxyingFromInspector(
+                for: identity,
+                listType: listType,
+                fallbackDomain: transaction.request.host
+            )
         case .openSSLProxyingList:
             onOpenToolWindow("sslProxyingList")
         }
@@ -686,6 +701,7 @@ enum HTTPSInspectionPromptAction: Equatable {
     case enableDomain(String)
     case retryDomain(String)
     case enableApp(String, fallbackDomain: String?)
+    case setApplication(ClientApplicationIdentity, SSLProxyingListType)
     case openSSLProxyingList
 }
 
@@ -695,6 +711,25 @@ struct HTTPSInspectionAppScope: Equatable {
     let name: String
     let knownHostCount: Int
     let enabledHostCount: Int
+    var identity: ClientApplicationIdentity?
+    var isApplicationDecryptReady: Bool
+    var isApplicationTunnelActive: Bool
+
+    init(
+        name: String,
+        knownHostCount: Int,
+        enabledHostCount: Int,
+        identity: ClientApplicationIdentity? = nil,
+        isApplicationDecryptReady: Bool = false,
+        isApplicationTunnelActive: Bool = false
+    ) {
+        self.name = name
+        self.knownHostCount = knownHostCount
+        self.enabledHostCount = enabledHostCount
+        self.identity = identity
+        self.isApplicationDecryptReady = isApplicationDecryptReady
+        self.isApplicationTunnelActive = isApplicationTunnelActive
+    }
 }
 
 // MARK: - HTTPSInspectionPromptModel
@@ -751,16 +786,22 @@ struct HTTPSInspectionPromptModel: Equatable {
                 statusCode: response.statusCode
             ),
             certificateAction: nil,
-            hostScope: .host(
+            hostScope: appScope?.isApplicationTunnelActive == true ? nil : .host(
                 value: host,
                 isReady: domainRuleEnabled,
                 requiresRetry: hasTLSRejectionEvidence
             ),
-            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap {
-                .appHosts(
-                    name: $0.name,
-                    enabledHostCount: $0.enabledHostCount,
-                    knownHostCount: $0.knownHostCount,
+            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap { scope in
+                if let identity = scope.identity {
+                    return .application(
+                        identity: identity,
+                        isDecryptReady: scope.isApplicationDecryptReady
+                    )
+                }
+                return .appHosts(
+                    name: scope.name,
+                    enabledHostCount: scope.enabledHostCount,
+                    knownHostCount: scope.knownHostCount,
                     currentHostEnabled: domainRuleEnabled,
                     fallbackDomain: host
                 )

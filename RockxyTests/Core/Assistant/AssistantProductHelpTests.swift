@@ -80,7 +80,20 @@ struct AssistantProductHelpTests {
         let grounding = AssistantProductHelpCatalog.shared.groundingText()
         #expect(grounding.contains("Map Local"))
         #expect(grounding.contains("HTTPS Decryption"))
+        #expect(grounding.localizedCaseInsensitiveContains("application or host"))
         #expect(!grounding.contains("api.example.com"))
+    }
+
+    @Test("HTTPS Decryption help explains application and host scopes")
+    func httpsDecryptionAnswerExplainsBothScopes() {
+        let response = AssistantProductHelpCatalog.shared.deterministicResponse(
+            for: "How do I decrypt HTTPS?"
+        )
+
+        #expect(response.handoff == .httpsDecryption)
+        #expect(response.text.localizedCaseInsensitiveContains("application"))
+        #expect(response.text.localizedCaseInsensitiveContains("host"))
+        #expect(response.text.localizedCaseInsensitiveContains("root certificate"))
     }
 
     @Test("The product-help request carries the question and grounding but no traffic")

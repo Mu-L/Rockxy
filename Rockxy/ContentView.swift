@@ -463,6 +463,9 @@ private struct ContentWindowNotificationHandlers: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .openBreakpointRulesWindow)) { _ in
                 openWindow(id: "breakpointRules")
             }
+            .onReceive(NotificationCenter.default.publisher(for: .openSSLProxyingList)) { _ in
+                openWindow(id: "sslProxyingList")
+            }
     }
 }
 

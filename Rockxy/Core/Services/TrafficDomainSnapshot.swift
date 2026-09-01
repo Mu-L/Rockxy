@@ -27,7 +27,7 @@ final class TrafficDomainSnapshot {
     }
 
     func update(appNodes: [AppInfo], domainTree: [DomainNode]) {
-        appEntries = appNodes.sorted {
+        appEntries = Self.mergeNameOnlyEntries(appNodes).sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
         var seen = Set<String>()
@@ -41,8 +41,73 @@ final class TrafficDomainSnapshot {
         domains = []
     }
 
+    // MARK: Private
+
     private static func flattenDomains(from node: DomainNode) -> [String] {
         let ownValue = node.kind == .path ? [] : [node.selectionDomain]
         return ownValue + node.children.flatMap(flattenDomains)
+    }
+
+    /// Folds anonymous, name-only app buckets into the stable-identity bucket that shares their
+    /// display name — but only when that name resolves to exactly one distinct identity. When two
+    /// different identities share a display name the anonymous traffic cannot be attributed, so the
+    /// name-only bucket is preserved untouched (fail closed; no guessed attribution).
+    private static func mergeNameOnlyEntries(_ appNodes: [AppInfo]) -> [AppInfo] {
+        var identifiersByName: [String: Set<String>] = [:]
+        for entry in appNodes {
+            guard let identifier = entry.identity?.identifier else {
+                continue
+            }
+            identifiersByName[normalizedName(entry.name), default: []].insert(identifier)
+        }
+
+        var result: [AppInfo] = []
+        var indexByIdentifier: [String: Int] = [:]
+        var pendingMerges: [(identifier: String, entry: AppInfo)] = []
+
+        for entry in appNodes {
+            if let identifier = entry.identity?.identifier {
+                indexByIdentifier[identifier] = result.count
+                result.append(entry)
+                continue
+            }
+            let key = normalizedName(entry.name)
+            if let identifiers = identifiersByName[key],
+               identifiers.count == 1,
+               let identifier = identifiers.first
+            {
+                pendingMerges.append((identifier, entry))
+            } else {
+                result.append(entry)
+            }
+        }
+
+        for pending in pendingMerges {
+            guard let index = indexByIdentifier[pending.identifier] else {
+                result.append(pending.entry)
+                continue
+            }
+            result[index] = merge(result[index], absorbing: pending.entry)
+        }
+        return result
+    }
+
+    private static func merge(_ base: AppInfo, absorbing other: AppInfo) -> AppInfo {
+        var seen = Set<String>()
+        var combinedDomains: [String] = []
+        for domain in base.domains + other.domains where seen.insert(domain.lowercased()).inserted {
+            combinedDomains.append(domain)
+        }
+        combinedDomains.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return AppInfo(
+            name: base.name,
+            domains: combinedDomains,
+            requestCount: base.requestCount + other.requestCount,
+            identity: base.identity
+        )
+    }
+
+    private static func normalizedName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }

@@ -22,8 +22,7 @@ struct FavoriteTransactionContextMenuTests {
 
         let model = FavoriteTransactionContextMenuModel(
             transaction: transaction,
-            section: .pinned,
-            isSSLProxyingEnabled: false
+            section: .pinned
         )
 
         #expect(model.tools.map(\.action) == FavoriteTransactionToolAction.allCases)
@@ -32,7 +31,7 @@ struct FavoriteTransactionContextMenuTests {
         #expect(allExportsEnabled)
         #expect(!model.exports.map(\.title).contains { $0.localizedCaseInsensitiveContains("CSV") })
         #expect(!model.exports.map(\.title).contains { $0.localizedCaseInsensitiveContains("Postman") })
-        #expect(model.sslProxyingTitle == "Enable SSL Proxying")
+        #expect(model.canConfigureHost)
     }
 
     @Test("Menu model disables unavailable actions clearly")
@@ -45,8 +44,7 @@ struct FavoriteTransactionContextMenuTests {
 
         let model = FavoriteTransactionContextMenuModel(
             transaction: transaction,
-            section: .saved,
-            isSSLProxyingEnabled: true
+            section: .saved
         )
 
         let raw = model.exports.first { $0.action == .rawRequestAndResponse }
@@ -54,13 +52,38 @@ struct FavoriteTransactionContextMenuTests {
         let responseBody = model.exports.first { $0.action == .responseBody }
 
         #expect(model.deleteTitle == "Delete")
-        #expect(model.sslProxyingTitle == "Disable SSL Proxying")
+        #expect(model.canConfigureHost)
+        #expect(model.hostConfigurationDisabledReason == nil)
         #expect(raw?.isEnabled == false)
         #expect(raw?.disabledReason?.isEmpty == false)
         #expect(requestBody?.isEnabled == false)
         #expect(requestBody?.disabledReason?.isEmpty == false)
         #expect(responseBody?.isEnabled == false)
         #expect(responseBody?.disabledReason?.isEmpty == false)
+    }
+
+    @Test("HTTPS host action is unavailable when a favorite has no host")
+    func httpsHostActionRequiresHost() {
+        let transaction = TestFixtures.makeTransaction(url: "file:///no-host")
+
+        let model = FavoriteTransactionContextMenuModel(
+            transaction: transaction,
+            section: .pinned
+        )
+
+        #expect(!model.canConfigureHost)
+        #expect(model.hostConfigurationDisabledReason == "This request has no host.")
+    }
+
+    @Test("Application Tunnel disables the favorite transaction host decrypt action")
+    func applicationTunnelBlocksHostDecryptAction() {
+        let state = FavoriteTransactionHTTPSBehaviorState(
+            canConfigureHost: true,
+            hasApplicationTunnel: true
+        )
+
+        #expect(!state.canDecryptHost)
+        #expect(state.blocker == .applicationTunnel)
     }
 
     @Test("Deleting from Pinned only clears pinned membership and keeps original request")

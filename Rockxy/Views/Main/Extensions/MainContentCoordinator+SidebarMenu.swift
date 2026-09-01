@@ -20,6 +20,21 @@ extension MainContentCoordinator {
         return SSLProxyingManager.shared.includeRules.contains { $0.isEnabled && $0.matches(domain) }
     }
 
+    func isSSLProxyingEnabled(for application: ClientApplicationIdentity) -> Bool {
+        guard SSLProxyingManager.shared.isEnabled else {
+            return false
+        }
+        let hasTunnel = SSLProxyingManager.shared.applicationExcludeRules.contains {
+            $0.isEnabled && $0.applicationIdentifier == application.identifier
+        }
+        guard !hasTunnel else {
+            return false
+        }
+        return SSLProxyingManager.shared.applicationIncludeRules.contains {
+            $0.isEnabled && $0.applicationIdentifier == application.identifier
+        }
+    }
+
     @discardableResult
     func enableSSLProxyingForDomain(_ domain: String, refreshPresentation: Bool = true) -> Bool {
         guard !domain.isEmpty else {
@@ -73,6 +88,18 @@ extension MainContentCoordinator {
 
     @discardableResult
     func enableSSLProxyingForApp(_ app: AppInfo, refreshPresentation: Bool = true) -> Bool {
+        if let identity = app.identity {
+            return setSSLProxyingBehaviorForApplication(
+                identity,
+                listType: .include,
+                refreshPresentation: refreshPresentation
+            )
+        }
+        return enableSSLProxyingForObservedHosts(app, refreshPresentation: refreshPresentation)
+    }
+
+    @discardableResult
+    func enableSSLProxyingForObservedHosts(_ app: AppInfo, refreshPresentation: Bool = true) -> Bool {
         var didChange = false
         if !SSLProxyingManager.shared.isEnabled {
             SSLProxyingManager.shared.setEnabled(true)
@@ -89,10 +116,90 @@ extension MainContentCoordinator {
 
     @discardableResult
     func disableSSLProxyingForApp(_ app: AppInfo, refreshPresentation: Bool = true) -> Bool {
+        if let identity = app.identity {
+            let matchingIDs = Set(
+                SSLProxyingManager.shared.applicationRules
+                    .filter { $0.applicationIdentifier == identity.identifier }
+                    .map(\.id)
+            )
+            guard !matchingIDs.isEmpty else {
+                return false
+            }
+            SSLProxyingManager.shared.removeApplicationRules(ids: matchingIDs)
+            if refreshPresentation {
+                refreshSSLProxyingPresentation()
+            }
+            return true
+        }
+        return disableSSLProxyingForObservedHosts(app, refreshPresentation: refreshPresentation)
+    }
+
+    @discardableResult
+    func disableSSLProxyingForObservedHosts(_ app: AppInfo, refreshPresentation: Bool = true) -> Bool {
         var didChange = false
         for domain in app.domains where isSSLProxyingEnabled(for: domain) {
             didChange = disableSSLProxyingForDomain(domain, refreshPresentation: false) || didChange
         }
+        if didChange, refreshPresentation {
+            refreshSSLProxyingPresentation()
+        }
+        return didChange
+    }
+
+    @discardableResult
+    func setSSLProxyingBehaviorForApplication(
+        _ identity: ClientApplicationIdentity,
+        listType: SSLProxyingListType,
+        fallbackDomain: String? = nil,
+        refreshPresentation: Bool = true
+    ) -> Bool {
+        var didChange = false
+        if listType == .include, !SSLProxyingManager.shared.isEnabled {
+            SSLProxyingManager.shared.setEnabled(true)
+            didChange = true
+        }
+
+        let oppositeIDs = Set(
+            SSLProxyingManager.shared.applicationRules
+                .filter {
+                    $0.applicationIdentifier == identity.identifier && $0.listType != listType
+                }
+                .map(\.id)
+        )
+        if !oppositeIDs.isEmpty {
+            SSLProxyingManager.shared.removeApplicationRules(ids: oppositeIDs)
+            didChange = true
+        }
+
+        if let existing = SSLProxyingManager.shared.applicationRules.first(where: {
+            $0.applicationIdentifier == identity.identifier && $0.listType == listType
+        }) {
+            if !existing.isEnabled {
+                SSLProxyingManager.shared.setApplicationRuleEnabled(id: existing.id, enabled: true)
+                didChange = true
+            }
+        } else {
+            SSLProxyingManager.shared.addApplicationRule(
+                ApplicationSSLProxyingRule(identity: identity, listType: listType)
+            )
+            didChange = true
+        }
+
+        if listType == .include {
+            var hosts = Set(observedDomainsForApp(named: identity.displayName, fallbackDomain: fallbackDomain))
+            for app in appNodes where app.identity?.identifier == identity.identifier {
+                hosts.formUnion(app.domains)
+            }
+            for app in TrafficDomainSnapshot.shared.appEntries
+                where app.identity?.identifier == identity.identifier
+            {
+                hosts.formUnion(app.domains)
+            }
+            for host in hosts {
+                SSLProxyingManager.shared.retryInterception(for: host)
+            }
+        }
+
         if didChange, refreshPresentation {
             refreshSSLProxyingPresentation()
         }
@@ -137,6 +244,9 @@ extension MainContentCoordinator {
     }
 
     func isSSLProxyingFullyEnabled(forAppNamed appName: String, fallbackDomain: String? = nil) -> Bool {
+        if let identity = appNodes.first(where: { $0.name == appName })?.identity {
+            return isSSLProxyingEnabled(for: identity)
+        }
         let domains = observedDomainsForApp(named: appName, fallbackDomain: fallbackDomain)
         guard !domains.isEmpty else {
             return false
@@ -237,6 +347,34 @@ extension MainContentCoordinator {
                 localized: "Enabled SSL Proxying for domains from \(appName). Make the request again to inspect them.",
                 bundle: RockxyLocalization.bundle
             )
+        )
+    }
+
+    func setSSLProxyingFromInspector(
+        for application: ClientApplicationIdentity,
+        listType: SSLProxyingListType,
+        fallbackDomain: String? = nil
+    ) {
+        setSSLProxyingBehaviorForApplication(
+            application,
+            listType: listType,
+            fallbackDomain: fallbackDomain
+        )
+        let message = switch listType {
+        case .include:
+            String(
+                localized: "Set \(application.displayName) to decrypt HTTPS on new connections. Reconnect the app.",
+                bundle: RockxyLocalization.bundle
+            )
+        case .exclude:
+            String(
+                localized: "Set \(application.displayName) to tunnel HTTPS on new connections. Reconnect the app.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        activeToast = ToastMessage(
+            style: .success,
+            text: message
         )
     }
 

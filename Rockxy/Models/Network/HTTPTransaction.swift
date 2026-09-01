@@ -54,6 +54,11 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     var x402Info: X402Info?
     var sourcePort: UInt16?
     var clientApp: String?
+
+    /// Runtime-only owning application identity resolved from the accepted connection. Used
+    /// for application-scoped SSL proxying attribution. Portable session files intentionally
+    /// omit this — it is local to a live capture and never persisted or exported.
+    var clientApplicationIdentity: ClientApplicationIdentity?
     var comment: String?
     var highlightColor: HighlightColor?
     var isPinned: Bool = false
