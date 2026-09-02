@@ -123,7 +123,8 @@ struct MapRemoteModelTests {
                 matchCondition: RuleMatchCondition(urlPattern: "https://blocked.example.com/.*"),
                 action: .block(statusCode: 403)
             )
-            vm.allRules = [mapRemote, block]
+            await RuleEngine.shared.replaceAll([mapRemote, block])
+            await vm.refreshFromEngine()
             vm.selectedRuleIDs = [mapRemote.id]
 
             vm.removeSelectedRules()

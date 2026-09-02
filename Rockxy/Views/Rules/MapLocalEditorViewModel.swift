@@ -381,6 +381,17 @@ final class MapLocalEditorViewModel {
         )
     }
 
+    /// After a brand-new rule's save fails to persist, the optimistically-added rule
+    /// already lives in `RuleEngine` under `rule.id`. Adopting that identity flips the
+    /// next Save from add-new to update-existing semantics so a retry updates the same
+    /// rule instead of appending a duplicate under a fresh UUID. The editor stays open
+    /// with the failure visible; no engine rollback is performed, so a concurrent
+    /// mutation cannot be erased.
+    func adoptFailedAddIdentity(_ rule: ProxyRule) {
+        existingID = rule.id
+        originalRule = rule
+    }
+
     func urlPatternForSaving() -> String {
         let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard matchType == .wildcard else {

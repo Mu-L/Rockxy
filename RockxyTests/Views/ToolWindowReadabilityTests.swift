@@ -448,6 +448,7 @@ struct ToolWindowReadabilityTests {
         let files = [
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
+            "Rockxy/Views/Rules/MapLocalEditorWindowView.swift",
             "Rockxy/Views/Rules/BlockListWindowView.swift",
             "Rockxy/Views/Rules/AllowListWindowView.swift",
             "Rockxy/Views/Rules/AddAllowListRuleSheet.swift",
@@ -556,8 +557,9 @@ struct ToolWindowReadabilityTests {
     @Test("Block and Allow List retain readable table rhythm")
     func blockAndAllowListRetainReadableTableRhythm() throws {
         let blockListFile = "Rockxy/Views/Rules/BlockListWindowView.swift"
+        let blockListTableFile = "Rockxy/Views/Rules/BlockListTableView.swift"
         let allowListFile = "Rockxy/Views/Rules/AllowListWindowView.swift"
-        let files = [blockListFile, allowListFile]
+        let files = [blockListTableFile, allowListFile]
         let forbiddenSnippets = [
             ".frame(width: 1_200, height: 642)",
             ".controlSize(.large)",
@@ -615,6 +617,7 @@ struct ToolWindowReadabilityTests {
             "Rockxy/Views/Rules/ModifyHeaderWindowView.swift",
             "Rockxy/Views/Rules/ModifyHeaderEditorView.swift",
             "Rockxy/Views/Rules/MapLocalWindowView.swift",
+            "Rockxy/Views/Rules/MapLocalEditorWindowView.swift",
             "Rockxy/Views/Rules/MapRemoteWindowView.swift",
             "Rockxy/Views/Rules/NetworkConditionsWindowView.swift",
             "Rockxy/Views/Rules/ProtobufSettingsWindowView.swift",
@@ -892,7 +895,9 @@ struct ToolWindowReadabilityTests {
 
     @Test("Map Local uses the approved native window and editor structure")
     func mapLocalUsesApprovedNativeStructure() throws {
-        let source = try readProjectFile("Rockxy/Views/Rules/MapLocalWindowView.swift")
+        let windowSource = try readProjectFile("Rockxy/Views/Rules/MapLocalWindowView.swift")
+        let editorSource = try readProjectFile("Rockxy/Views/Rules/MapLocalEditorWindowView.swift")
+        let source = windowSource + "\n" + editorSource
 
         #expect(source.contains(#"TextField(String(localized: "Search rules", bundle: RockxyLocalization.bundle)"#))
         #expect(source.contains("minWidth: max(860, toolMetrics.bodyFontSize * 28 + 496)"))

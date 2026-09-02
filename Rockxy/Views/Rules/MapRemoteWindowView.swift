@@ -133,8 +133,10 @@ final class MapRemoteWindowViewModel {
         }
         allRules.removeAll { idsToRemove.contains($0.id) }
         selectedRuleIDs.removeAll()
-        let updated = allRules
-        pendingRuleSyncTask = Task { await RulePolicyGate.shared.replaceAllRules(updated) }
+        pendingRuleSyncTask = Task {
+            await RulePolicyGate.shared.removeRules(ids: idsToRemove)
+            allRules = await RuleEngine.shared.allRules
+        }
     }
 
     func removeRule(id: UUID) {

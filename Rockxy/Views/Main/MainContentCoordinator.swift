@@ -599,15 +599,19 @@ final class MainContentCoordinator {
     }
 
     func loadInitialRules() {
-        guard ruleLoadTask == nil else {
+        guard ruleLoadTask == nil, !rulesLoaded else {
             return
         }
         ruleLoadTask = Task { [weak self] in
-            await RuleSyncService.loadFromDisk()
+            // Route through the shared idempotent loader so this and any rule tool
+            // window (e.g. Map Local) share a single disk load and load-state.
+            let outcome = await RuleSyncService.ensureLoaded()
             guard let self else {
                 return
             }
-            self.rulesLoaded = true
+            if outcome.isLoaded {
+                self.rulesLoaded = true
+            }
             self.ruleLoadTask = nil
         }
     }
@@ -621,11 +625,13 @@ final class MainContentCoordinator {
             return
         }
         let task = Task { [weak self] in
-            await RuleSyncService.loadFromDisk()
+            let outcome = await RuleSyncService.ensureLoaded()
             guard let self else {
                 return
             }
-            self.rulesLoaded = true
+            if outcome.isLoaded {
+                self.rulesLoaded = true
+            }
             self.ruleLoadTask = nil
         }
         ruleLoadTask = task

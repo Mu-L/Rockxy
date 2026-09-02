@@ -11,6 +11,13 @@ struct RuleStore {
         fileURL = RockxyIdentity.current.appSupportPath("rules.json")
     }
 
+    /// Test/injection seam: persist and load rules at an explicit file URL so the
+    /// real production save/load path can be exercised against a temporary
+    /// directory without touching the app's shared rules file.
+    init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
     // MARK: Internal
 
     // MARK: - Errors
@@ -32,7 +39,11 @@ struct RuleStore {
     }
 
     func loadRules() throws -> [ProxyRule] {
-        guard FileManager.default.fileExists(atPath: fileURL.path()) else {
+        // `URL.path()` is percent-encoded (for example, "Application%20Support"),
+        // which `FileManager` treats as a different literal filesystem path. Use
+        // the decoded file path so production rules stored under Application
+        // Support are actually discovered after relaunch.
+        guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) else {
             return []
         }
         let data = try Data(contentsOf: fileURL)
