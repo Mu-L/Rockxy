@@ -28737,12 +28737,12 @@
         }
       }
     },
-    "Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains trust store, plus a Decrypt rule for the target application or host under HTTPS Decryption.": {
+    "Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the JVM. For HTTPS interception, import the Rockxy root CA into the exact JVM or JetBrains trust store with keytool, add a Decrypt rule for the target application or host, then run the HttpClient sample to confirm capture.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动设置会准备一个限定范围的 shell，为 JVM 设置 JAVA_TOOL_OPTIONS 代理属性。HTTPS 拦截仍需要在对应的 JVM 或 JetBrains 信任库中信任 Rockxy 根 CA，并在 HTTPS 解密中为目标应用或主机添加解密规则。"
+            "value": "自动设置会准备一个限定范围的 shell，为 JVM 设置 JAVA_TOOL_OPTIONS 代理属性。要拦截 HTTPS，请使用 keytool 将 Rockxy 根 CA 导入对应的 JVM 或 JetBrains 信任库，为目标应用或主机添加解密规则，然后运行 HttpClient 示例确认流量已被捕获。"
           }
         }
       }
