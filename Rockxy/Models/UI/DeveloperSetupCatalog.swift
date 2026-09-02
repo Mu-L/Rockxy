@@ -135,8 +135,9 @@ extension SetupTarget {
             currentSupportSummary: String(
                 localized: """
                 Automatic Setup prepares a scoped shell that sets JAVA_TOOL_OPTIONS proxy properties for the \
-                JVM. HTTPS interception still needs the Rockxy root CA trusted in the exact JVM or JetBrains \
-                trust store, plus a Decrypt rule for the target application or host under HTTPS Decryption.
+                JVM. For HTTPS interception, import the Rockxy root CA into the exact JVM or JetBrains trust \
+                store with keytool, add a Decrypt rule for the target application or host, then run the \
+                HttpClient sample to confirm capture.
                 """, bundle: RockxyLocalization.bundle
             )
         )
