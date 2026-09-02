@@ -85,12 +85,19 @@ extension MainContentCoordinator {
             return .insecure
         }
 
-        let host = transaction.request.host
-        guard !host.isEmpty else {
-            return .secureTunneled
+        // Capture truth wins over current policy: a CONNECT tunnel that was passed through raw
+        // stays tunneled even after the host's rule is later enabled, and genuinely decrypted
+        // traffic stays intercepted.
+        if let capture = transaction.sslCapture {
+            return capture == .intercepted ? .secureIntercepted : .secureTunneled
         }
 
-        return SSLProxyingManager.shared.shouldIntercept(host) ? .secureIntercepted : .secureTunneled
+        // Legacy / reloaded / imported rows carry no recorded disposition. Derive it from the
+        // record's own shape — never from current host policy, which would make a historical row
+        // flip meaning when a rule is toggled. A secure CONNECT row is a tunnel record and stays
+        // tunneled; any captured non-CONNECT HTTPS/WSS transaction is decrypted application
+        // traffic (a raw tunnel never yields per-request records) and is intercepted.
+        return transaction.request.method == "CONNECT" ? .secureTunneled : .secureIntercepted
     }
 
     // MARK: - Filtered Transactions

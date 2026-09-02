@@ -69,12 +69,19 @@ struct ResponseInspectorView: View {
         }
         let canInterceptHTTPS = coordinator.readiness.canInterceptHTTPS
         let domainRuleEnabled = coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+        let resolvedApplicationIdentity = transaction.clientApplicationIdentity
+            ?? normalizedClientAppName.flatMap(coordinator.observedApplicationIdentity(named:))
+        let hostDecryptBlockedReason = coordinator.sslProxyingHostDecryptBlockedReason(
+            for: transaction.request.host,
+            application: resolvedApplicationIdentity
+        )
         let hasRecentTLSRejection = SSLProxyingManager.shared.isAutoPassthrough(transaction.request.host)
         let promptWithoutAppScope = HTTPSInspectionPromptModel.make(
             transaction: transaction,
             canInterceptHTTPS: canInterceptHTTPS,
             domainRuleEnabled: domainRuleEnabled,
             hasRecentTLSRejection: hasRecentTLSRejection,
+            hostDecryptBlockedReason: hostDecryptBlockedReason,
             appScope: nil
         )
         guard let promptWithoutAppScope,
@@ -94,11 +101,11 @@ struct ResponseInspectorView: View {
                 name: appName,
                 knownHostCount: domains.count,
                 enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:)),
-                identity: transaction.clientApplicationIdentity,
-                isApplicationDecryptReady: transaction.clientApplicationIdentity.map {
+                identity: resolvedApplicationIdentity,
+                isApplicationDecryptReady: resolvedApplicationIdentity.map {
                     coordinator.isSSLProxyingEnabled(for: $0)
                 } ?? false,
-                isApplicationTunnelActive: transaction.clientApplicationIdentity.map { identity in
+                isApplicationTunnelActive: resolvedApplicationIdentity.map { identity in
                     SSLProxyingManager.shared.applicationExcludeRules.contains {
                         $0.isEnabled && $0.applicationIdentifier == identity.identifier
                     }
@@ -111,6 +118,7 @@ struct ResponseInspectorView: View {
             canInterceptHTTPS: canInterceptHTTPS,
             domainRuleEnabled: domainRuleEnabled,
             hasRecentTLSRejection: hasRecentTLSRejection,
+            hostDecryptBlockedReason: hostDecryptBlockedReason,
             appScope: appScope
         )
     }
@@ -750,6 +758,7 @@ struct HTTPSInspectionPromptModel: Equatable {
         canInterceptHTTPS: Bool,
         domainRuleEnabled: Bool,
         hasRecentTLSRejection: Bool = false,
+        hostDecryptBlockedReason: String? = nil,
         appScope: HTTPSInspectionAppScope?
     )
         -> HTTPSInspectionPromptModel?
@@ -789,7 +798,8 @@ struct HTTPSInspectionPromptModel: Equatable {
             hostScope: appScope?.isApplicationTunnelActive == true ? nil : .host(
                 value: host,
                 isReady: domainRuleEnabled,
-                requiresRetry: hasTLSRejectionEvidence
+                requiresRetry: hasTLSRejectionEvidence,
+                decryptBlockedReason: hostDecryptBlockedReason
             ),
             appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap { scope in
                 if let identity = scope.identity {

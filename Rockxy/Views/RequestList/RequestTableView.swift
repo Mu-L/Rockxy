@@ -1248,7 +1248,9 @@ extension RequestTableView {
         @objc
         func handleSSLProxyingAppDecrypt(_ sender: NSMenuItem) {
             withCoordinator(sender) { coordinator, transaction in
-                guard let identity = transaction.clientApplicationIdentity else {
+                guard let identity = transaction.clientApplicationIdentity
+                    ?? transaction.clientApp.flatMap(coordinator.observedApplicationIdentity(named:)) else
+                {
                     return
                 }
                 coordinator.setSSLProxyingFromInspector(
@@ -1262,7 +1264,9 @@ extension RequestTableView {
         @objc
         func handleSSLProxyingAppTunnel(_ sender: NSMenuItem) {
             withCoordinator(sender) { coordinator, transaction in
-                guard let identity = transaction.clientApplicationIdentity else {
+                guard let identity = transaction.clientApplicationIdentity
+                    ?? transaction.clientApp.flatMap(coordinator.observedApplicationIdentity(named:)) else
+                {
                     return
                 }
                 coordinator.setSSLProxyingFromInspector(
@@ -1961,7 +1965,11 @@ extension RequestTableView {
 
         private func sslProxyingMenuItem(for transaction: HTTPTransaction) -> NSMenuItem {
             let submenu = NSMenu()
-            if transaction.clientApplicationIdentity != nil {
+            let applicationIdentity = MainActor.assumeIsolated {
+                transaction.clientApplicationIdentity
+                    ?? transaction.clientApp.flatMap { mainCoordinator?.observedApplicationIdentity(named: $0) }
+            }
+            if applicationIdentity != nil {
                 submenu.addItem(menuItem(
                     String(localized: "Decrypt All HTTPS from This Application", bundle: RockxyLocalization.bundle),
                     action: #selector(handleSSLProxyingAppDecrypt(_:)),
@@ -1973,23 +1981,18 @@ extension RequestTableView {
                 action: #selector(handleSSLProxying(_:)),
                 transaction: transaction
             )
-            let hasApplicationTunnel = MainActor.assumeIsolated {
-                guard let identity = transaction.clientApplicationIdentity else {
-                    return false
-                }
-                return SSLProxyingManager.shared.applicationExcludeRules.contains {
-                    $0.isEnabled && $0.applicationIdentifier == identity.identifier
-                }
-            }
-            if hasApplicationTunnel {
-                hostItem.isEnabled = false
-                hostItem.toolTip = String(
-                    localized: "The application Tunnel rule takes priority. Change the application behavior first.",
-                    bundle: RockxyLocalization.bundle
+            let hostDecryptBlockedReason = MainActor.assumeIsolated {
+                mainCoordinator?.sslProxyingHostDecryptBlockedReason(
+                    for: transaction.request.host,
+                    application: applicationIdentity
                 )
             }
+            if let hostDecryptBlockedReason {
+                hostItem.isEnabled = false
+                hostItem.toolTip = hostDecryptBlockedReason
+            }
             submenu.addItem(hostItem)
-            if transaction.clientApplicationIdentity != nil {
+            if applicationIdentity != nil {
                 submenu.addItem(menuItem(
                     String(localized: "Tunnel All HTTPS from This Application", bundle: RockxyLocalization.bundle),
                     action: #selector(handleSSLProxyingAppTunnel(_:)),

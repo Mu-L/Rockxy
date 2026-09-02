@@ -44,7 +44,17 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
         self.captureContextProvider = captureContextProvider
         self.clientSourcePort = clientSourcePort
-        self.onTransactionComplete = onTransactionComplete
+        // Every transaction this handler emits was decrypted inside an intercepted tunnel, so
+        // stamp capture truth once at the single delivery seam. The request list then reports
+        // it as intercepted regardless of how the host policy later changes. The stamp runs on
+        // the event loop before the downstream callback hands the transaction off, preserving
+        // the existing happens-before ordering used for other pre-delivery fields.
+        self.onTransactionComplete = { transaction in
+            if transaction.sslCapture == nil {
+                transaction.sslCapture = .intercepted
+            }
+            onTransactionComplete(transaction)
+        }
         self.onBreakpointHit = onBreakpointHit
         self.breakpointBridgeTracker = breakpointBridgeTracker
     }
