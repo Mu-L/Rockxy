@@ -166,6 +166,42 @@ struct TLSInterceptHandlerTests {
         #expect(transaction.isTLSFailure == true)
     }
 
+    @Test("raw tunnel capture is tagged tunneled")
+    func rawTunnelCaptureModeTunneled() {
+        let transaction = TLSInterceptHandler.makeTunnelTransaction(
+            host: "example.com",
+            port: 443,
+            statusCode: 200,
+            statusMessage: "Connection Established",
+            state: .completed,
+            sourcePort: 54_321,
+            sslCapture: .tunneled
+        )
+
+        #expect(transaction.sslCapture == .tunneled)
+    }
+
+    @Test("non-TLS raw fallback records a tunneled CONNECT")
+    func protocolDetectorRawFallbackIsTunneled() {
+        let recorded = RecordedTransactionBox()
+        let handler = PostHandshakeHandler(
+            host: "api.example.com",
+            port: 443,
+            ruleEngine: RuleEngine(),
+            scriptPluginManager: nil,
+            connectionLimiter: ConnectionLimiter(),
+            sslProxyingManager: .shared,
+            clientSourcePort: 60_123,
+            onTransactionComplete: { transaction in
+                recorded.record(transaction)
+            }
+        )
+
+        handler.recordSuccessfulTunnel()
+
+        #expect(recorded.transaction?.sslCapture == .tunneled)
+    }
+
     @Test("post-handshake helper builds successful CONNECT transaction")
     func postHandshakeSuccessfulTunnelTransaction() {
         let handler = PostHandshakeHandler(

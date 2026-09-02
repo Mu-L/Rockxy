@@ -50,7 +50,7 @@ struct FavoriteTransactionHTTPSBehaviorMenu: View {
                     systemImage: "globe"
                 )
             }
-            .disabled(!hostActionState.canDecryptHost)
+            .disabled(!hostActionState.canDecryptHost || policyBlockedReason != nil)
             .help(hostActionHelp)
 
             if let applicationIdentity {
@@ -81,6 +81,7 @@ struct FavoriteTransactionHTTPSBehaviorMenu: View {
 
     private var applicationIdentity: ClientApplicationIdentity? {
         transaction.clientApplicationIdentity
+            ?? transaction.clientApp.flatMap(coordinator.observedApplicationIdentity(named:))
     }
 
     private var hasApplicationTunnel: Bool {
@@ -100,6 +101,9 @@ struct FavoriteTransactionHTTPSBehaviorMenu: View {
     }
 
     private var hostActionHelp: String {
+        if let policyBlockedReason {
+            return policyBlockedReason
+        }
         switch hostActionState.blocker {
         case .applicationTunnel:
             return String(
@@ -111,5 +115,12 @@ struct FavoriteTransactionHTTPSBehaviorMenu: View {
         case nil:
             return ""
         }
+    }
+
+    private var policyBlockedReason: String? {
+        coordinator.sslProxyingHostDecryptBlockedReason(
+            for: transaction.request.host,
+            application: applicationIdentity
+        )
     }
 }

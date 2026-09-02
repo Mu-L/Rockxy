@@ -78,6 +78,27 @@ struct SidebarSSLProxyingTests {
         #expect(coordinator.isSSLProxyingEnabled(for: "api.example.com"))
     }
 
+    @Test("matching Tunnel rule prevents the sidebar from claiming Decrypt is enabled")
+    func tunnelOverlapIsNotReportedAsDecrypt() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "*.example.com", listType: .include),
+            SSLProxyingRule(domain: "api.example.com", listType: .exclude),
+        ])
+
+        #expect(!coordinator.isSSLProxyingEnabled(for: "api.example.com"))
+        #expect(coordinator.isSSLProxyingEnabled(for: "cdn.example.com"))
+    }
+
     @Test("global SSL proxying off reports domain as disabled")
     func globalToggleOffReportsDisabled() {
         let coordinator = MainContentCoordinator()
@@ -119,6 +140,78 @@ struct SidebarSSLProxyingTests {
         #expect(manager.isEnabled)
         #expect(manager.includeRules.count == 1)
         #expect(manager.includeRules.first?.isEnabled == true)
+    }
+
+    @Test("one-host Decrypt replaces only an exact Tunnel rule")
+    func decryptHostReplacesExactTunnel() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalEnabled = manager.isEnabled
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setEnabled(originalEnabled)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "api.example.com", listType: .exclude)
+        ])
+        manager.setEnabled(true)
+
+        #expect(coordinator.enableSSLProxyingForDomain(" API.EXAMPLE.COM "))
+        #expect(manager.excludeRules.isEmpty)
+        #expect(manager.includeRules.count == 1)
+        #expect(manager.includeRules[0].domain == "api.example.com")
+        #expect(coordinator.isSSLProxyingEnabled(for: "api.example.com"))
+    }
+
+    @Test("one-host Decrypt never removes or overrides a broader Tunnel rule")
+    func decryptHostPreservesBroaderTunnel() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        let wildcardTunnel = SSLProxyingRule(domain: "*.example.com", listType: .exclude)
+        manager.replaceAllRules([wildcardTunnel])
+
+        #expect(!coordinator.enableSSLProxyingForDomain("api.example.com"))
+        #expect(manager.rules == [wildcardTunnel])
+        #expect(coordinator.sslProxyingHostDecryptBlockedReason(for: "api.example.com")?.contains("*.example.com") == true)
+    }
+
+    @Test("one-host Decrypt does not re-enable a disabled wildcard rule")
+    func decryptHostDoesNotReenableDisabledWildcard() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        let disabledWildcard = SSLProxyingRule(
+            domain: "*.example.com",
+            isEnabled: false,
+            listType: .include
+        )
+        manager.replaceAllRules([disabledWildcard])
+
+        #expect(coordinator.enableSSLProxyingForDomain("api.example.com"))
+        #expect(manager.rules.first(where: { $0.id == disabledWildcard.id })?.isEnabled == false)
+        #expect(manager.includeRules.contains {
+            $0.domain == "api.example.com" && $0.isEnabled
+        })
     }
 
     @Test("application behavior replaces the opposite behavior and applies to future hosts")
@@ -164,12 +257,90 @@ struct SidebarSSLProxyingTests {
         )
 
         coordinator.setSSLProxyingFromInspector(for: identity, listType: .include)
+        #expect(coordinator.activeToast?.style == .success)
         #expect(coordinator.activeToast?.text ==
-            "Set Toast App to decrypt HTTPS on new connections. Reconnect the app.")
+            "Set Toast App to decrypt HTTPS. Matching tunneled connections reset automatically — if one stays tunneled, reconnect the app.")
 
         coordinator.setSSLProxyingFromInspector(for: identity, listType: .exclude)
         #expect(coordinator.activeToast?.text ==
             "Set Toast App to tunnel HTTPS on new connections. Reconnect the app.")
+    }
+
+    @Test("app Decrypt inspector warns when the current host stays tunneled but keeps the app rule")
+    func appDecryptInspectorWarnsWhenHostBlocked() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalAppRules = manager.applicationRules
+        let originalEnabled = manager.isEnabled
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.replaceAllApplicationRules(originalAppRules)
+            manager.setEnabled(originalEnabled)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.BlockedHostApp",
+            displayName: "Blocked Host App"
+        )
+        manager.setBypassDomains("")
+        // A broader host Tunnel rule outranks the application Decrypt for the current host.
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "*.example.com", listType: .exclude)
+        ])
+        manager.replaceAllApplicationRules([])
+        manager.setEnabled(true)
+
+        coordinator.setSSLProxyingFromInspector(
+            for: identity,
+            listType: .include,
+            fallbackDomain: "api.example.com"
+        )
+
+        #expect(coordinator.activeToast?.style == .warning)
+        #expect(coordinator.activeToast?.text.contains("api.example.com") == true)
+        #expect(coordinator.activeToast?.text.contains("*.example.com") == true)
+        // The application-wide rule is still installed — a blocked current host does not reject it.
+        #expect(coordinator.isSSLProxyingEnabled(for: identity))
+    }
+
+    @Test("app Decrypt inspector also warns when an exact host Tunnel remains in force")
+    func appDecryptInspectorWarnsForExactHostTunnel() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalAppRules = manager.applicationRules
+        let originalEnabled = manager.isEnabled
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.replaceAllApplicationRules(originalAppRules)
+            manager.setEnabled(originalEnabled)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+        let identity = ClientApplicationIdentity.bundle(
+            identifier: "com.example.ExactTunnelApp",
+            displayName: "Exact Tunnel App"
+        )
+        manager.setBypassDomains("")
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "api.example.com", listType: .exclude)
+        ])
+        manager.replaceAllApplicationRules([])
+        manager.setEnabled(true)
+
+        coordinator.setSSLProxyingFromInspector(
+            for: identity,
+            listType: .include,
+            fallbackDomain: "api.example.com"
+        )
+
+        #expect(coordinator.activeToast?.style == .warning)
+        #expect(coordinator.activeToast?.text.contains("api.example.com") == true)
+        #expect(coordinator.activeToast?.text.contains("Change that host behavior") == true)
+        #expect(coordinator.isSSLProxyingEnabled(for: identity))
+        #expect(!manager.isDecryptionConfigured(host: "api.example.com", application: identity))
     }
 
     @Test("application tunnel action wins over a host decrypt rule")
@@ -233,6 +404,27 @@ struct SidebarSSLProxyingTests {
         #expect(manager.rules.contains(where: { $0.id == excludeRule.id }))
     }
 
+    @Test("one-host Tunnel preserves wildcard Decrypt for sibling hosts")
+    func tunnelHostPreservesWildcardDecrypt() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        let wildcardDecrypt = SSLProxyingRule(domain: "*.example.com", listType: .include)
+        manager.replaceAllRules([wildcardDecrypt])
+
+        #expect(coordinator.disableSSLProxyingForDomain("api.example.com"))
+        #expect(manager.rules.contains(where: { $0.id == wildcardDecrypt.id }))
+        #expect(!manager.isDecryptionConfigured(host: "api.example.com"))
+        #expect(manager.isDecryptionConfigured(host: "cdn.example.com"))
+    }
+
     @Test("observedDomainsForApp falls back to matching transactions and current host")
     func observedDomainsForAppFallsBackToTransactions() {
         let coordinator = MainContentCoordinator()
@@ -259,6 +451,32 @@ struct SidebarSSLProxyingTests {
         )
 
         #expect(domains == ["api.example.com", "cdn.example.com"])
+    }
+
+    @Test("name-only inspector scope reuses one unambiguous observed application identity")
+    func observedApplicationIdentityIsFailClosed() {
+        let coordinator = MainContentCoordinator()
+        let chrome = ClientApplicationIdentity.bundle(
+            identifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+        )
+        let lookalike = ClientApplicationIdentity.bundle(
+            identifier: "com.example.Chrome",
+            displayName: "Google Chrome"
+        )
+        TrafficDomainSnapshot.shared.reset()
+        defer { TrafficDomainSnapshot.shared.reset() }
+
+        coordinator.appNodes = [
+            AppInfo(name: "Google Chrome", domains: ["api.example.com"], requestCount: 1),
+            AppInfo(name: "Google Chrome", domains: ["cdn.example.com"], requestCount: 1, identity: chrome),
+        ]
+        #expect(coordinator.observedApplicationIdentity(named: " google chrome ") == chrome)
+
+        coordinator.appNodes.append(
+            AppInfo(name: "Google Chrome", domains: ["other.example.com"], requestCount: 1, identity: lookalike)
+        )
+        #expect(coordinator.observedApplicationIdentity(named: "Google Chrome") == nil)
     }
 
     @Test("enableSSLProxyingFromInspector for app enables fallback host when cache is empty")
@@ -288,7 +506,7 @@ struct SidebarSSLProxyingTests {
         #expect(coordinator.isSSLProxyingEnabled(for: "api.example.com"))
         #expect(
             coordinator.activeToast?.text ==
-                "Enabled SSL Proxying for domains from Google Chrome. Make the request again to inspect them."
+                "Added host Decrypt rules for domains observed from Google Chrome. These rules apply to every application."
         )
     }
 
@@ -342,7 +560,7 @@ struct SidebarSSLProxyingTests {
         #expect(!coordinator.isSSLProxyingEnabled(for: "api.example.com"))
         #expect(
             coordinator.activeToast?.text ==
-                "Disabled SSL Proxying for domains from Google Chrome. Requests from it will stay tunneled."
+                "Set domains observed from Google Chrome to Tunnel. These host rules apply to every application."
         )
     }
 
@@ -350,9 +568,10 @@ struct SidebarSSLProxyingTests {
     func disableFromInspectorForDomainShowsToast() {
         let coordinator = MainContentCoordinator()
         let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
         let rule = SSLProxyingRule(domain: "api.example.com", listType: .include)
         manager.addRule(rule)
-        defer { manager.removeRule(id: rule.id) }
+        defer { manager.replaceAllRules(originalRules) }
 
         coordinator.disableSSLProxyingFromInspector(for: "api.example.com")
 
@@ -361,5 +580,28 @@ struct SidebarSSLProxyingTests {
             coordinator.activeToast?.text ==
                 "Disabled SSL Proxying for api.example.com. Requests to it will stay tunneled."
         )
+    }
+
+    @Test("inspector warns instead of claiming success under a broader Tunnel rule")
+    func inspectorWarnsForBroaderTunnel() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalBypassDomains = manager.bypassDomains
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setBypassDomains(originalBypassDomains)
+        }
+
+        manager.setBypassDomains("")
+        manager.replaceAllRules([
+            SSLProxyingRule(domain: "*.example.com", listType: .exclude)
+        ])
+
+        coordinator.enableSSLProxyingFromInspector(for: "api.example.com")
+
+        #expect(coordinator.activeToast?.style == .warning)
+        #expect(coordinator.activeToast?.text.contains("*.example.com") == true)
+        #expect(manager.includeRules.isEmpty)
     }
 }

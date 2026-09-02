@@ -154,9 +154,24 @@ struct SSLProxyingManagerTests {
     @Test("shouldIntercept returns false when forceGlobalPassthrough is set")
     func interceptGlobalPassthrough() {
         let manager = makeManager()
+        manager.addRule(SSLProxyingRule(domain: "anything.com", listType: .include))
         manager.forceGlobalPassthrough = true
         #expect(!manager.shouldIntercept("anything.com"))
+        #expect(manager.isDecryptionConfigured(host: "anything.com"))
         manager.forceGlobalPassthrough = false
+        #expect(manager.shouldIntercept("anything.com"))
+    }
+
+    @Test("TLS bypass query exposes the reason a matching Decrypt rule is ineffective")
+    func tlsBypassQuery() {
+        let manager = makeManager()
+        manager.setBypassDomains("ocsp.example.com,*.private.example")
+        manager.addRule(SSLProxyingRule(domain: "ocsp.example.com", listType: .include))
+
+        #expect(manager.isHostInTLSBypassList("OCSP.EXAMPLE.COM"))
+        #expect(manager.isHostInTLSBypassList("api.private.example"))
+        #expect(!manager.isHostInTLSBypassList("public.example"))
+        #expect(!manager.shouldIntercept("ocsp.example.com"))
     }
 
     @Test("adding include rule clears matching auto passthrough host")

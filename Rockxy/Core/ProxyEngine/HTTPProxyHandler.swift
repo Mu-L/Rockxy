@@ -32,10 +32,14 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         ruleEngine: RuleEngine,
         scriptPluginManager: ScriptPluginManager? = nil,
         connectionLimiter: ConnectionLimiter,
+        sslProxyingManager: SSLProxyingManager,
+        bypassProxyManager: BypassProxyManager,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientIdentityHandle: ClientIdentityHandle? = nil,
+        clientConnectionDescriptor: ProxyConnectionDescriptor? = nil,
+        liveTunnelRegistry: LiveTunnelRegistry? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
             nil,
@@ -45,10 +49,14 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.ruleEngine = ruleEngine
         self.scriptPluginManager = scriptPluginManager
         self.connectionLimiter = connectionLimiter
+        self.sslProxyingManager = sslProxyingManager
+        self.bypassProxyManager = bypassProxyManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
         self.captureContextProvider = captureContextProvider
         self.clientIdentityHandle = clientIdentityHandle
+        self.clientConnectionDescriptor = clientConnectionDescriptor
+        self.liveTunnelRegistry = liveTunnelRegistry
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
         self.breakpointBridgeTracker = breakpointBridgeTracker
@@ -124,10 +132,14 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private let ruleEngine: RuleEngine
     private let scriptPluginManager: ScriptPluginManager?
     private let connectionLimiter: ConnectionLimiter
+    private let sslProxyingManager: SSLProxyingManager
+    private let bypassProxyManager: BypassProxyManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let clientIdentityHandle: ClientIdentityHandle?
+    private let clientConnectionDescriptor: ProxyConnectionDescriptor?
+    private let liveTunnelRegistry: LiveTunnelRegistry?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -714,13 +726,16 @@ extension HTTPProxyHandler {
                 ruleEngine: self.ruleEngine,
                 scriptPluginManager: self.scriptPluginManager,
                 connectionLimiter: self.connectionLimiter,
-                bypassProxyManager: .shared,
+                sslProxyingManager: self.sslProxyingManager,
+                bypassProxyManager: self.bypassProxyManager,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
                 captureContextProvider: self.captureContextProvider,
                 tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
                 clientApplicationIdentity: clientApplicationIdentity,
+                clientConnectionDescriptor: self.clientConnectionDescriptor,
+                liveTunnelRegistry: self.liveTunnelRegistry,
                 onTransactionComplete: self.onTransactionComplete,
                 onBreakpointHit: self.onBreakpointHit,
                 breakpointBridgeTracker: self.breakpointBridgeTracker

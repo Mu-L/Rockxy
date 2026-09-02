@@ -237,6 +237,16 @@ final class SSLProxyingManager {
         shouldIntercept(host: host, application: nil)
     }
 
+    /// Whether the host is covered by the TLS-only bypass patterns configured in HTTPS
+    /// Decryption. Exposed separately from `shouldIntercept` so quick actions can explain why a
+    /// Decrypt request cannot take effect instead of silently adding an overridden rule.
+    nonisolated func isHostInTLSBypassList(_ host: String) -> Bool {
+        passthroughLock.lock()
+        let patterns = cachedBypassPatterns
+        passthroughLock.unlock()
+        return matchesBypassPattern(host, patterns: patterns)
+    }
+
     /// Combined host + application interception decision, table-order independent.
     ///
     /// Deterministic order: global disabled/passthrough/bypass ⇒ tunnel; any matching enabled
@@ -245,6 +255,28 @@ final class SSLProxyingManager {
     /// participate only for a non-nil resolved identity — a nil (remote/unresolved) identity
     /// can never enable application decryption.
     nonisolated func shouldIntercept(host: String, application: ClientApplicationIdentity?) -> Bool {
+        guard isDecryptionConfigured(host: host, application: application) else {
+            return false
+        }
+
+        passthroughLock.lock()
+        let globalPassthrough = _forceGlobalPassthrough
+        passthroughLock.unlock()
+
+        return !globalPassthrough
+    }
+
+    /// Whether the persisted HTTPS policy selects Decrypt for this host/application pair.
+    ///
+    /// This intentionally excludes the temporary certificate-readiness fallback
+    /// (`forceGlobalPassthrough`) and per-host auto-passthrough state. Settings, sidebar menus,
+    /// and inspectors use it to present the configured rule accurately even while Rockxy is
+    /// temporarily unable to intercept. The proxy pipeline must continue to call
+    /// `shouldIntercept(host:application:)`, which layers runtime readiness on top.
+    nonisolated func isDecryptionConfigured(
+        host: String,
+        application: ClientApplicationIdentity? = nil
+    ) -> Bool {
         lock.lock()
         let enabled = cachedIsEnabled
         let includeSnapshot = cachedEnabledIncludeRules
@@ -258,13 +290,8 @@ final class SSLProxyingManager {
         }
 
         passthroughLock.lock()
-        let globalPassthrough = _forceGlobalPassthrough
         let bypassPatterns = cachedBypassPatterns
         passthroughLock.unlock()
-
-        if globalPassthrough {
-            return false
-        }
 
         if matchesBypassPattern(host, patterns: bypassPatterns) {
             return false
@@ -308,10 +335,21 @@ final class SSLProxyingManager {
 
     nonisolated func clearAutoPassthrough() {
         passthroughLock.lock()
+        let hadEntries = !autoPassthroughHosts.isEmpty
         autoPassthroughHosts.removeAll()
         passthroughLock.unlock()
         persistPassthroughHosts()
         Self.logger.info("Cleared all auto-passthrough hosts")
+
+        guard hadEntries else {
+            return
+        }
+
+        // Certificate readiness clears `forceGlobalPassthrough` before it clears these per-host
+        // fallbacks. The first state notification therefore still sees the hosts as passthrough.
+        // Notify again after the fallback state is actually gone so any live raw tunnel whose
+        // host is now interceptable is reset before the browser reuses it.
+        NotificationCenter.default.post(name: .sslProxyingStateDidChange, object: nil)
     }
 
     /// Clears the protection fallback for one host so its next connection can retry TLS interception.
@@ -337,6 +375,12 @@ final class SSLProxyingManager {
         }
 
         persistPassthroughHosts()
+        // Clearing the auto-passthrough fallback can make this host interceptable again while a
+        // raw `.autoPassthrough` tunnel is still live (the inspector retry path may not touch any
+        // rule, so `save()` never fires). Post the policy-change notification so the live-tunnel
+        // observer resets that tunnel and the next request enters interception. Posted only on a
+        // real state change — the no-match early return above never reaches here.
+        NotificationCenter.default.post(name: .sslProxyingStateDidChange, object: nil)
         return true
     }
 

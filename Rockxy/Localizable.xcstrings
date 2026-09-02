@@ -4,6 +4,116 @@
     "": {
       "shouldTranslate": false
     },
+    "Added host Decrypt rules for domains observed from %@. These rules apply to every application.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已为从 %@ 观察到的域名添加主机解密规则。这些规则适用于所有应用程序。"
+          }
+        }
+      }
+    },
+    "Configured %lld of %lld observed hosts. Review Tunnel or bypass rules for the remaining hosts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已配置 %lld 个观察主机（共 %lld 个）。请检查其余主机的隧道或绕过规则。"
+          }
+        }
+      }
+    },
+    "Creates host rules that apply to these domains in every application.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建适用于每个应用程序中这些域名的主机规则。"
+          }
+        }
+      }
+    },
+    "Decrypt This Host": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密此主机"
+          }
+        }
+      }
+    },
+    "Review Rules": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查规则"
+          }
+        }
+      }
+    },
+    "Set domains observed from %@ to Tunnel. These host rules apply to every application.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将从 %@ 观察到的域名设为隧道传输。这些主机规则适用于所有应用程序。"
+          }
+        }
+      }
+    },
+    "The host is unavailable.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主机不可用。"
+          }
+        }
+      }
+    },
+    "This host is in Full Proxy Bypass. Remove that bypass entry before decrypting it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此主机位于完整代理绕过列表中。请先移除该绕过条目，再进行解密。"
+          }
+        }
+      }
+    },
+    "This host is in the HTTPS TLS Bypass list. Remove that bypass pattern before decrypting it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此主机位于 HTTPS TLS 绕过列表中。请先移除该绕过模式，再进行解密。"
+          }
+        }
+      }
+    },
+    "Tunnel rule %@ takes priority. Review that broader rule before decrypting this host.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道规则 %@ 优先。解密此主机前，请检查该范围更广的规则。"
+          }
+        }
+      }
+    },
+    "Tunnel This Host": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道传输此主机"
+          }
+        }
+      }
+    },
     "A rule with this application and behavior already exists.": {
       "localizations": {
         "zh-Hans": {
@@ -254,18 +364,44 @@
         }
       }
     },
-    "Set %@ to decrypt HTTPS on new connections. Reconnect the app.": {
+    "Set %@ to decrypt HTTPS. %@ stays tunneled: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Set %1$@ to decrypt HTTPS on new connections. Reconnect the app."
+            "value": "Set %1$@ to decrypt HTTPS. %2$@ stays tunneled: %3$@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已将 %1$@ 的新 HTTPS 连接设为解密。请重新连接应用。"
+            "value": "已将 %1$@ 设为解密 HTTPS。但 %2$@ 仍以隧道传输：%3$@"
+          }
+        }
+      }
+    },
+    "Set %@ to decrypt HTTPS. Matching tunneled connections reset automatically — if one stays tunneled, reconnect the app.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Set %1$@ to decrypt HTTPS. Matching tunneled connections reset automatically — if one stays tunneled, reconnect the app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将 %1$@ 设为解密 HTTPS。匹配的实时连接将自动重置——如仍以隧道传输，请重新连接应用。"
+          }
+        }
+      }
+    },
+    "Tunnel rule %@ takes priority. Change that host behavior before decrypting it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道规则 %@ 优先。请先更改该主机行为，再进行解密。"
           }
         }
       }
@@ -37110,12 +37246,12 @@
         }
       }
     },
-    "Turn on HTTPS decryption for other known hosts used by %@": {
+    "Add host decryption rules for other known hosts used by %@; these rules apply to every application": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "为 %@ 使用的其他已知主机启用 HTTPS 解密"
+            "value": "为 %@ 使用的其他已知主机添加主机解密规则；这些规则适用于所有应用程序"
           }
         }
       }

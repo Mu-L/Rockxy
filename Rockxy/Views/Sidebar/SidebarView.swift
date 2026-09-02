@@ -802,7 +802,7 @@ struct SidebarView: View {
                 coordinator.disableSSLProxyingForDomain(domain)
             } label: {
                 Label(
-                    String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    String(localized: "Tunnel This Host", bundle: RockxyLocalization.bundle),
                     systemImage: "lock.shield"
                 )
             }
@@ -811,10 +811,12 @@ struct SidebarView: View {
                 coordinator.enableSSLProxyingForDomain(domain)
             } label: {
                 Label(
-                    String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle),
+                    String(localized: "Decrypt This Host", bundle: RockxyLocalization.bundle),
                     systemImage: "lock.shield"
                 )
             }
+            .disabled(coordinator.sslProxyingHostDecryptBlockedReason(for: domain) != nil)
+            .help(coordinator.sslProxyingHostDecryptBlockedReason(for: domain) ?? "")
         }
 
         SidebarOpenHTTPSDecryptionButton()
@@ -1145,6 +1147,10 @@ struct SidebarView: View {
                     systemImage: "lock.shield"
                 )
             }
+            .help(String(
+                localized: "Creates host rules that apply to these domains in every application.",
+                bundle: RockxyLocalization.bundle
+            ))
         }
 
         Button {

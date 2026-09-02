@@ -14,10 +14,73 @@ extension MainContentCoordinator {
     // MARK: - SSL Proxying
 
     func isSSLProxyingEnabled(for domain: String) -> Bool {
-        guard SSLProxyingManager.shared.isEnabled else {
+        let normalizedDomain = normalizedSSLHost(domain)
+        guard !normalizedDomain.isEmpty,
+              !BypassProxyManager.shared.isHostBypassed(normalizedDomain) else
+        {
             return false
         }
-        return SSLProxyingManager.shared.includeRules.contains { $0.isEnabled && $0.matches(domain) }
+        return SSLProxyingManager.shared.isDecryptionConfigured(host: normalizedDomain)
+    }
+
+    /// Returns a user-facing reason when a one-host Decrypt shortcut cannot safely override the
+    /// current policy. Exact host Tunnel rules are intentionally omitted: selecting Decrypt for
+    /// that same host replaces the exact opposite behavior. Broader Tunnel and bypass rules must
+    /// be reviewed explicitly because removing them would affect other traffic.
+    func sslProxyingHostDecryptBlockedReason(
+        for domain: String,
+        application: ClientApplicationIdentity? = nil,
+        allowReplacingExactTunnel: Bool = true
+    ) -> String? {
+        let normalizedDomain = normalizedSSLHost(domain)
+        guard !normalizedDomain.isEmpty else {
+            return String(localized: "The host is unavailable.", bundle: RockxyLocalization.bundle)
+        }
+
+        if let application,
+           SSLProxyingManager.shared.applicationExcludeRules.contains(where: {
+               $0.isEnabled && $0.applicationIdentifier == application.identifier
+           })
+        {
+            return String(
+                localized: "The application Tunnel rule takes priority. Change the application behavior first.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+
+        if BypassProxyManager.shared.isHostBypassed(normalizedDomain) {
+            return String(
+                localized: "This host is in Full Proxy Bypass. Remove that bypass entry before decrypting it.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+
+        if SSLProxyingManager.shared.isHostInTLSBypassList(normalizedDomain) {
+            return String(
+                localized: "This host is in the HTTPS TLS Bypass list. Remove that bypass pattern before decrypting it.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+
+        if let rule = SSLProxyingManager.shared.excludeRules.first(where: {
+            guard $0.isEnabled, $0.matches(normalizedDomain) else {
+                return false
+            }
+            return !allowReplacingExactTunnel || !sslHostPatternsAreEqual($0.domain, normalizedDomain)
+        }) {
+            if sslHostPatternsAreEqual(rule.domain, normalizedDomain) {
+                return String(
+                    localized: "Tunnel rule \(rule.domain) takes priority. Change that host behavior before decrypting it.",
+                    bundle: RockxyLocalization.bundle
+                )
+            }
+            return String(
+                localized: "Tunnel rule \(rule.domain) takes priority. Review that broader rule before decrypting this host.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+
+        return nil
     }
 
     func isSSLProxyingEnabled(for application: ClientApplicationIdentity) -> Bool {
@@ -37,7 +100,10 @@ extension MainContentCoordinator {
 
     @discardableResult
     func enableSSLProxyingForDomain(_ domain: String, refreshPresentation: Bool = true) -> Bool {
-        guard !domain.isEmpty else {
+        let normalizedDomain = normalizedSSLHost(domain)
+        guard !normalizedDomain.isEmpty,
+              sslProxyingHostDecryptBlockedReason(for: normalizedDomain) == nil else
+        {
             return false
         }
 
@@ -48,42 +114,82 @@ extension MainContentCoordinator {
             didChange = true
         }
 
-        if let existing = SSLProxyingManager.shared.includeRules.first(where: { $0.matches(domain) }) {
-            if !existing.isEnabled {
+        // An already-effective wildcard Decrypt rule needs no exact duplicate.
+        if isSSLProxyingEnabled(for: normalizedDomain) {
+            if didChange, refreshPresentation {
+                refreshSSLProxyingPresentation()
+            }
+            return didChange
+        }
+
+        let exactTunnelIDs = Set(SSLProxyingManager.shared.excludeRules.filter {
+            sslHostPatternsAreEqual($0.domain, normalizedDomain)
+        }.map(\.id))
+        if !exactTunnelIDs.isEmpty {
+            SSLProxyingManager.shared.removeRules(ids: exactTunnelIDs)
+            didChange = true
+        }
+
+        let exactDecryptRules = SSLProxyingManager.shared.includeRules.filter {
+            sslHostPatternsAreEqual($0.domain, normalizedDomain)
+        }
+        if exactDecryptRules.isEmpty {
+            let rule = SSLProxyingRule(domain: normalizedDomain, listType: .include)
+            SSLProxyingManager.shared.addRule(rule)
+            didChange = true
+        } else {
+            for existing in exactDecryptRules where !existing.isEnabled {
                 SSLProxyingManager.shared.setRuleEnabled(id: existing.id, enabled: true)
                 didChange = true
             }
-        } else {
-            let rule = SSLProxyingRule(domain: domain, listType: .include)
-            SSLProxyingManager.shared.addRule(rule)
-            didChange = true
         }
 
         if didChange, refreshPresentation {
             refreshSSLProxyingPresentation()
         }
-        Self.logger.info("Enabled SSL proxying for domain: \(domain)")
+        Self.logger.info("Enabled SSL proxying for exact host: \(normalizedDomain)")
         return didChange
     }
 
     @discardableResult
     func disableSSLProxyingForDomain(_ domain: String, refreshPresentation: Bool = true) -> Bool {
-        guard !domain.isEmpty else {
+        let normalizedDomain = normalizedSSLHost(domain)
+        guard !normalizedDomain.isEmpty else {
             return false
         }
-        let matchingIncludeIDs = SSLProxyingManager.shared.includeRules
-            .filter { $0.matches(domain) }
-            .map(\.id)
-        let idSet = Set(matchingIncludeIDs)
-        if !idSet.isEmpty {
-            SSLProxyingManager.shared.removeRules(ids: idSet)
-            if refreshPresentation {
-                refreshSSLProxyingPresentation()
-            }
-            Self.logger.info("Disabled SSL proxying for domain: \(domain)")
-            return true
+
+        var didChange = false
+        // Only replace the exact host behavior. Removing a matching wildcard Decrypt rule would
+        // unexpectedly disable decryption for sibling hosts; an exact Tunnel exception safely
+        // overrides it instead.
+        let exactDecryptIDs = Set(SSLProxyingManager.shared.includeRules.filter {
+            sslHostPatternsAreEqual($0.domain, normalizedDomain)
+        }.map(\.id))
+        if !exactDecryptIDs.isEmpty {
+            SSLProxyingManager.shared.removeRules(ids: exactDecryptIDs)
+            didChange = true
         }
-        return false
+
+        let exactTunnelRules = SSLProxyingManager.shared.excludeRules.filter {
+            sslHostPatternsAreEqual($0.domain, normalizedDomain)
+        }
+        if exactTunnelRules.isEmpty {
+            SSLProxyingManager.shared.addRule(
+                SSLProxyingRule(domain: normalizedDomain, listType: .exclude)
+            )
+            didChange = true
+        } else {
+            for existing in exactTunnelRules where !existing.isEnabled {
+                SSLProxyingManager.shared.setRuleEnabled(id: existing.id, enabled: true)
+                didChange = true
+            }
+        }
+
+        if didChange, refreshPresentation {
+            refreshSSLProxyingPresentation()
+        }
+        Self.logger.info("Set exact host to tunnel without decryption: \(normalizedDomain)")
+        return didChange
     }
 
     @discardableResult
@@ -243,8 +349,30 @@ extension MainContentCoordinator {
         return orderedDomains.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    /// Returns a stable identity only when every observed identity with this display name agrees.
+    /// Name-only transactions can then inherit a previously observed Chrome/Safari identity for
+    /// the inspector action, while same-name applications remain ambiguous and fail closed.
+    func observedApplicationIdentity(named appName: String) -> ClientApplicationIdentity? {
+        let normalizedName = appName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedName.isEmpty else {
+            return nil
+        }
+
+        let candidates = (appNodes + TrafficDomainSnapshot.shared.appEntries).compactMap { app -> ClientApplicationIdentity? in
+            guard app.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedName else {
+                return nil
+            }
+            return app.identity
+        }
+        let identitiesByIdentifier = Dictionary(candidates.map { ($0.identifier, $0) }) { first, _ in first }
+        guard identitiesByIdentifier.count == 1 else {
+            return nil
+        }
+        return identitiesByIdentifier.values.first
+    }
+
     func isSSLProxyingFullyEnabled(forAppNamed appName: String, fallbackDomain: String? = nil) -> Bool {
-        if let identity = appNodes.first(where: { $0.name == appName })?.identity {
+        if let identity = observedApplicationIdentity(named: appName) {
             return isSSLProxyingEnabled(for: identity)
         }
         let domains = observedDomainsForApp(named: appName, fallbackDomain: fallbackDomain)
@@ -259,17 +387,13 @@ extension MainContentCoordinator {
             return
         }
 
-        if !SSLProxyingManager.shared.isEnabled {
-            SSLProxyingManager.shared.setEnabled(true)
+        if let blockedReason = sslProxyingHostDecryptBlockedReason(for: domain) {
+            activeToast = ToastMessage(style: .warning, text: blockedReason)
+            return
         }
 
-        let existing = SSLProxyingManager.shared.includeRules.first { $0.matches(domain) }
-        let alreadyEnabled = existing?.isEnabled == true
-        if let existing, !existing.isEnabled {
-            SSLProxyingManager.shared.setRuleEnabled(id: existing.id, enabled: true)
-        } else if existing == nil {
-            enableSSLProxyingForDomain(domain)
-        }
+        let alreadyEnabled = isSSLProxyingEnabled(for: domain)
+        enableSSLProxyingForDomain(domain)
 
         activeToast = ToastMessage(
             style: .success,
@@ -287,6 +411,11 @@ extension MainContentCoordinator {
 
     func retrySSLProxyingFromInspector(for domain: String) {
         guard !domain.isEmpty else {
+            return
+        }
+
+        if let blockedReason = sslProxyingHostDecryptBlockedReason(for: domain) {
+            activeToast = ToastMessage(style: .warning, text: blockedReason)
             return
         }
 
@@ -341,13 +470,24 @@ extension MainContentCoordinator {
             )
         )
 
-        activeToast = ToastMessage(
-            style: .success,
-            text: String(
-                localized: "Enabled SSL Proxying for domains from \(appName). Make the request again to inspect them.",
-                bundle: RockxyLocalization.bundle
+        let enabledCount = domains.count(where: isSSLProxyingEnabled(for:))
+        if enabledCount == domains.count {
+            activeToast = ToastMessage(
+                style: .success,
+                text: String(
+                    localized: "Added host Decrypt rules for domains observed from \(appName). These rules apply to every application.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
-        )
+        } else {
+            activeToast = ToastMessage(
+                style: .warning,
+                text: String(
+                    localized: "Configured \(enabledCount) of \(domains.count) observed hosts. Review Tunnel or bypass rules for the remaining hosts.",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
+        }
     }
 
     func setSSLProxyingFromInspector(
@@ -355,27 +495,54 @@ extension MainContentCoordinator {
         listType: SSLProxyingListType,
         fallbackDomain: String? = nil
     ) {
+        // Configure the application-wide rule first. It applies to every host the application
+        // uses regardless of whether the currently inspected host can decrypt, so feedback is
+        // derived only after the rule is installed.
         setSSLProxyingBehaviorForApplication(
             application,
             listType: listType,
             fallbackDomain: fallbackDomain
         )
-        let message = switch listType {
+
+        switch listType {
         case .include:
-            String(
-                localized: "Set \(application.displayName) to decrypt HTTPS on new connections. Reconnect the app.",
-                bundle: RockxyLocalization.bundle
-            )
+            // App Decrypt is application-wide, but the supplied current host can still be pinned
+            // to Tunnel by a broader host Tunnel rule, Full Proxy Bypass, or the HTTPS TLS Bypass
+            // list. Warn truthfully in that case instead of claiming the current host will decrypt.
+            if let fallbackDomain,
+               !fallbackDomain.isEmpty,
+               let blockedReason = sslProxyingHostDecryptBlockedReason(
+                   for: fallbackDomain,
+                   allowReplacingExactTunnel: false
+               )
+            {
+                activeToast = ToastMessage(
+                    style: .warning,
+                    text: String(
+                        localized: "Set \(application.displayName) to decrypt HTTPS. \(fallbackDomain) stays tunneled: \(blockedReason)",
+                        bundle: RockxyLocalization.bundle
+                    )
+                )
+            } else {
+                activeToast = ToastMessage(
+                    style: .success,
+                    text: String(
+                        localized: "Set \(application.displayName) to decrypt HTTPS. Matching tunneled connections reset automatically — if one stays tunneled, reconnect the app.",
+                        bundle: RockxyLocalization.bundle
+                    )
+                )
+            }
         case .exclude:
-            String(
-                localized: "Set \(application.displayName) to tunnel HTTPS on new connections. Reconnect the app.",
-                bundle: RockxyLocalization.bundle
+            // Tunnel keeps new-connection semantics: already intercepted connections are not
+            // tracked as live raw tunnels, so they are not reset.
+            activeToast = ToastMessage(
+                style: .success,
+                text: String(
+                    localized: "Set \(application.displayName) to tunnel HTTPS on new connections. Reconnect the app.",
+                    bundle: RockxyLocalization.bundle
+                )
             )
         }
-        activeToast = ToastMessage(
-            style: .success,
-            text: message
-        )
     }
 
     func disableSSLProxyingFromInspector(forAppNamed appName: String, fallbackDomain: String? = nil) {
@@ -399,7 +566,7 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Disabled SSL Proxying for domains from \(appName). Requests from it will stay tunneled.",
+                localized: "Set domains observed from \(appName) to Tunnel. These host rules apply to every application.",
                 bundle: RockxyLocalization.bundle
             )
         )
@@ -516,6 +683,14 @@ extension MainContentCoordinator {
 
     private func normalizedObservedHost(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedSSLHost(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func sslHostPatternsAreEqual(_ lhs: String, _ rhs: String) -> Bool {
+        normalizedSSLHost(lhs) == normalizedSSLHost(rhs)
     }
 
     // MARK: - Bypass Proxy List

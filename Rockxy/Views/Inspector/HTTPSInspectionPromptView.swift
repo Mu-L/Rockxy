@@ -343,10 +343,23 @@ struct HTTPSInspectionScopePresentation: Equatable {
     static func host(
         value: String,
         isReady: Bool,
-        requiresRetry: Bool = false
+        requiresRetry: Bool = false,
+        decryptBlockedReason: String? = nil
     )
         -> HTTPSInspectionScopePresentation
     {
+        if let decryptBlockedReason {
+            return HTTPSInspectionScopePresentation(
+                kind: .host,
+                value: value,
+                state: .available,
+                control: .button,
+                action: .openSSLProxyingList,
+                controlTitle: String(localized: "Review Rules", bundle: RockxyLocalization.bundle),
+                actionDescription: decryptBlockedReason
+            )
+        }
+
         if requiresRetry {
             return HTTPSInspectionScopePresentation(
                 kind: .host,
@@ -410,9 +423,13 @@ struct HTTPSInspectionScopePresentation: Equatable {
             state: state,
             control: .button,
             action: .enableApp(name, fallbackDomain: fallbackDomain),
-            controlTitle: String(localized: "Decrypt App", bundle: RockxyLocalization.bundle),
+            // A name-only transaction has no stable application identity. This action expands
+            // the app's observed domains into host rules, which apply to every client. Do not
+            // label it "Decrypt App" — that would imply application-scoped isolation and can
+            // unexpectedly decrypt the same hosts in Safari or another application.
+            controlTitle: String(localized: "Decrypt Observed Hosts", bundle: RockxyLocalization.bundle),
             actionDescription: String(
-                localized: "Turn on HTTPS decryption for other known hosts used by \(name)",
+                localized: "Add host decryption rules for other known hosts used by \(name); these rules apply to every application",
                 bundle: RockxyLocalization.bundle
             )
         )
