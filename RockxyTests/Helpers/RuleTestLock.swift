@@ -70,10 +70,26 @@ actor RuleTestLock {
 struct SharedPolicyStateTrait: SuiteTrait, TestScoping {
     let isRecursive = false
 
+#if compiler(>=6.2)
     func provideScope(
         for _: Test,
         testCase _: Test.Case?,
         performing function: @concurrent @Sendable () async throws -> Void
+    ) async throws {
+        try await withSharedPolicyState(performing: function)
+    }
+#else
+    func provideScope(
+        for _: Test,
+        testCase _: Test.Case?,
+        performing function: @Sendable () async throws -> Void
+    ) async throws {
+        try await withSharedPolicyState(performing: function)
+    }
+#endif
+
+    private func withSharedPolicyState(
+        performing function: @Sendable () async throws -> Void
     ) async throws {
         await RuleTestLock.shared.acquire()
         do {
