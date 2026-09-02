@@ -141,20 +141,19 @@ actor RuleEngine {
             }
             return true
         }
-        var capped = importedBlockRules
+        rules = retained + importedBlockRules
+        compilePatterns()
         var activeBlockCount = 0
-        for index in capped.indices {
-            guard case .block = capped[index].action, capped[index].isEnabled else {
+        for index in rules.indices {
+            guard case .block = rules[index].action, rules[index].isEnabled else {
                 continue
             }
             if activeBlockCount < maxPerCategory {
                 activeBlockCount += 1
             } else {
-                capped[index].isEnabled = false
+                rules[index].isEnabled = false
             }
         }
-        rules = retained + capped
-        compilePatterns()
     }
 
     /// Reorders only Modify Header rules within their existing global slots.

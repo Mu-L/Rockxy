@@ -178,8 +178,10 @@ Several English words carry more than one meaning in Rockxy, so the correct
 Simplified Chinese depends on the **English source context**, not the word alone.
 Never blanket-replace a Chinese term across the catalog — decide per entry, guided
 by the English key. The validator enforces the high-confidence rules below as
-deterministic forbid-checks (see `zh_hans_glossary_errors` in
+deterministic forbidden- and required-term checks (see `zh_hans_glossary_errors` in
 `.github/tools/validate_xcstrings.py`, mirrored in `StringCatalogCoverageTests`).
+Required terms include `状态码`, `脱敏`, and `token` where the English source context
+selects those meanings.
 
 | English context | Use | Not | Notes |
 |---|---|---|---|

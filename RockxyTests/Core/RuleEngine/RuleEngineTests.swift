@@ -589,6 +589,36 @@ struct RuleEngineTests {
         #expect(await engine.evaluate(method: "GET", url: url, headers: []) == nil)
     }
 
+    @Test("Invalid imported Block regex does not consume the active quota")
+    func invalidImportedBlockRegexDoesNotConsumeQuota() async {
+        let engine = RuleEngine()
+        let invalid = ProxyRule(
+            name: "Broken Block Regex",
+            matchCondition: RuleMatchCondition(
+                urlPattern: "https://api.example.com/[]",
+                sourceURLPattern: "https://api.example.com/[]",
+                matchType: .regex
+            ),
+            action: .block(statusCode: 403)
+        )
+        let valid = ProxyRule(
+            name: "Valid Block Regex",
+            matchCondition: RuleMatchCondition(
+                urlPattern: ".*valid\\.example\\.com.*",
+                sourceURLPattern: ".*valid\\.example\\.com.*",
+                matchType: .regex
+            ),
+            action: .block(statusCode: 403)
+        )
+
+        await engine.replaceBlockRules([invalid, valid], maxPerCategory: 1)
+
+        let rules = await engine.allRules
+        #expect(rules.count == 2)
+        #expect(rules[0].isEnabled == false)
+        #expect(rules[1].isEnabled == true)
+    }
+
     @Test("Add rule and evaluate successfully")
     func addRuleAndEvaluate() async throws {
         let engine = RuleEngine()

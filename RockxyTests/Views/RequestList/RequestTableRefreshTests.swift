@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @MainActor
+@Suite(.serialized, .sharedPolicyState)
 struct RequestTableRefreshTests {
     // MARK: - RefreshToken
 

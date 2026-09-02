@@ -8,7 +8,7 @@ import Testing
 /// `MainContentCoordinator+SidebarMenu.swift`. Each test seeds
 /// `SSLProxyingManager.shared` with known state, calls the coordinator
 /// method under test, then cleans up to avoid cross-test pollution.
-@Suite(.serialized)
+@Suite(.serialized, .sharedPolicyState)
 @MainActor
 struct SidebarSSLProxyingTests {
     @Test("Stale toast dismissal keeps the replacement notification visible")
