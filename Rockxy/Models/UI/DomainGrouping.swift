@@ -155,6 +155,7 @@ struct AppGroupingIndex {
     mutating func remove(_ transaction: HTTPTransaction, appName: String?) {
         let name = Self.normalizedAppName(appName)
         let key = transaction.clientApplicationIdentity?.identifier
+            ?? (entries["name:\(name)"] == nil ? nil : "name:\(name)")
             ?? insertionOrder.first(where: { entries[$0]?.name == name })
             ?? "name:\(name)"
         guard var entry = entries[key] else {

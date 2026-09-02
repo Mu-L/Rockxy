@@ -16,7 +16,7 @@ final class MockProxyStateProvider: MCPProxyStateProvider {
 // MARK: - MCPStatusServiceTests
 
 @MainActor
-@Suite("MCP Status Service")
+@Suite("MCP Status Service", .serialized, .sharedPolicyState)
 struct MCPStatusServiceTests {
     // MARK: Internal
 

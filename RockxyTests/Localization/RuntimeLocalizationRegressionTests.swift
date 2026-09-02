@@ -139,19 +139,28 @@ struct RuntimeLocalizationRegressionTests {
     @Test("HTTP status-code table and breakpoint call sites use a contextual compact key, not Code")
     func statusCodeCallSitesUseStatusCodeKey() throws {
         let sites = [
-            "Rockxy/Views/RequestList/RequestTableView.swift",
-            "Rockxy/Views/Diff/DiffCandidateTableView.swift",
-            "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
+            (
+                "Rockxy/Views/RequestList/RequestTableView.swift",
+                "id: \"code\",\n                title: String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle)"
+            ),
+            (
+                "Rockxy/Views/Diff/DiffCandidateTableView.swift",
+                "TableColumn(String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle))"
+            ),
+            (
+                "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
+                "TextField(\n                String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle)"
+            ),
         ]
-        for file in sites {
+        for (file, expectedCallSite) in sites {
             let source = try readProjectFile(file)
             #expect(
                 !source.contains("localized: \"Code\""),
                 "\(file): must not localize the ambiguous \"Code\" key for HTTP status codes"
             )
             #expect(
-                source.contains("localized: \"Compact HTTP status code\""),
-                "\(file): compact HTTP status-code UI must use its contextual localization key"
+                source.contains(expectedCallSite),
+                "\(file): the target status-code call site must use its contextual localization key"
             )
         }
     }
@@ -178,8 +187,23 @@ struct RuntimeLocalizationRegressionTests {
         ]
         for file in files {
             let source = try readProjectFile(file)
+            let displayName = try #require(
+                declaration(named: "var displayName: String", in: source),
+                "\(file): expected a displayName accessor"
+            )
             #expect(
-                source.contains("String(localized:") && source.contains("bundle: RockxyLocalization.bundle"),
+                displayName.contains("String(localized:"),
+                "\(file): displayName must contain at least one localized visible label"
+            )
+            for range in ranges(of: "String(localized:", in: displayName) {
+                let window = callWindow(in: displayName, from: range.upperBound)
+                #expect(
+                    window.contains("bundle: RockxyLocalization.bundle"),
+                    "\(file): every localized displayName case must use RockxyLocalization.bundle"
+                )
+            }
+            #expect(
+                !displayName.contains("String(localized: \"Code\""),
                 "\(file): displayName must resolve visible labels through RockxyLocalization.bundle"
             )
         }
@@ -240,6 +264,29 @@ struct RuntimeLocalizationRegressionTests {
             searchStart = found.upperBound
         }
         return result
+    }
+
+    private func declaration(named signature: String, in source: String) -> String? {
+        guard let signatureRange = source.range(of: signature),
+              let openingBrace = source[signatureRange.upperBound...].firstIndex(of: "{") else
+        {
+            return nil
+        }
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return String(source[signatureRange.lowerBound ... cursor])
+                }
+            default: break
+            }
+            cursor = source.index(after: cursor)
+        }
+        return nil
     }
 
     private func readProjectFile(_ relativePath: String) throws -> String {

@@ -138,6 +138,13 @@ final class SSLProxyingListViewModel {
             }
         }
 
+        var isHost: Bool {
+            if case .host = self {
+                return true
+            }
+            return false
+        }
+
         var scopeLabel: String {
             switch self {
             case .host: String(localized: "Host", bundle: RockxyLocalization.bundle)

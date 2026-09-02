@@ -122,6 +122,29 @@ struct DomainGroupingTests {
         #expect(node.id == "com.google.Chrome")
     }
 
+    @Test("App grouping removes a name-only transaction from its own colliding group")
+    func appGroupingRemovesNameOnlyCollision() throws {
+        var index = AppGroupingIndex()
+        let identified = transaction("https://identified.example.com/one", sequence: 0)
+        identified.clientApp = "Shared Name"
+        identified.clientApplicationIdentity = .bundle(
+            identifier: "com.example.Identified",
+            displayName: "Shared Name"
+        )
+        let nameOnly = transaction("https://name-only.example.com/two", sequence: 1)
+        nameOnly.clientApp = "Shared Name"
+
+        index.add(identified)
+        index.add(nameOnly)
+        index.remove(nameOnly, appName: "Shared Name")
+
+        let node = try #require(index.makeNodes().first)
+        #expect(index.makeNodes().count == 1)
+        #expect(node.id == "com.example.Identified")
+        #expect(node.requestCount == 1)
+        #expect(node.domains == ["identified.example.com"])
+    }
+
     // MARK: Private
 
     private func transaction(_ url: String, sequence: Int, statusCode: Int = 200) -> HTTPTransaction {

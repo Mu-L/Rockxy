@@ -380,7 +380,7 @@ struct SSLProxyingListView: View {
                     rowIcon(row)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.target)
-                            .font(row.scopeLabel == String(localized: "Host", bundle: RockxyLocalization.bundle)
+                            .font(row.isHost
                                 ? toolMetrics.font(monospaced: true)
                                 : toolMetrics.font())
                             .lineLimit(1)

@@ -1110,6 +1110,9 @@ struct NativeWorkspaceSplitViewTests {
             }
             try await Task.sleep(nanoseconds: 1_000_000)
         }
+        if condition() {
+            return
+        }
         throw NativeWorkspaceSplitViewTestTimeout()
     }
 

@@ -304,8 +304,7 @@ actor ProxyServer {
         bypassProxyManager: BypassProxyManager? = nil,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
-        clientIdentityHandleProvider: @escaping @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle? =
-            ProxyServer.defaultClientIdentityHandleProvider,
+        clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)? = nil,
         clientIdentityResolver: @escaping @Sendable (ProxyConnectionDescriptor) async -> ClientApplicationIdentity? = {
             await ProcessResolver.shared.identityResolver.resolveIdentity(descriptor: $0)
         },
@@ -337,22 +336,24 @@ actor ProxyServer {
     /// picker useful without adding an lsof lookup to every host-only connection.
     @Sendable
     static func defaultClientIdentityHandleProvider(
-        _ descriptor: ProxyConnectionDescriptor
+        sslProxyingManager: SSLProxyingManager
     )
-        -> ClientIdentityHandle?
+        -> @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?
     {
-        guard let clientHost = descriptor.clientHost,
-              ClientConnectionMatcher.isLocalSource(clientHost) else
-        {
-            return nil
+        { descriptor in
+            guard let clientHost = descriptor.clientHost,
+                  ClientConnectionMatcher.isLocalSource(clientHost) else
+            {
+                return nil
+            }
+            let processResolver = ProcessResolver.shared
+            guard sslProxyingManager.hasEnabledApplicationRules()
+                || processResolver.shouldSampleApplicationIdentity() else
+            {
+                return nil
+            }
+            return ClientIdentityHandle(descriptor: descriptor, resolver: processResolver.identityResolver)
         }
-        let processResolver = ProcessResolver.shared
-        guard SSLProxyingManager.shared.hasEnabledApplicationRules()
-            || processResolver.shouldSampleApplicationIdentity() else
-        {
-            return nil
-        }
-        return ClientIdentityHandle(descriptor: descriptor, resolver: processResolver.identityResolver)
     }
 
     /// Wraps a transaction callback so every emitted transaction — raw CONNECT, TLS failure,
@@ -400,7 +401,7 @@ actor ProxyServer {
         let breakpointHit = onBreakpointHit
         let childRegistry = childChannelRegistry
         let bridgeTracker = breakpointBridgeTracker
-        let identityProvider = clientIdentityHandleProvider
+        let identityProviderOverride = clientIdentityHandleProvider
         let identityResolver = clientIdentityResolver
         let proxyPort = configuration.port
         let sslManagerOverride = sslProxyingManagerOverride
@@ -428,6 +429,8 @@ actor ProxyServer {
             return (registry, sslProxyingManager, bypassProxyManager)
         }
         let (tunnelRegistry, sslProxyingManager, bypassProxyManager) = policyState
+        let identityProvider = identityProviderOverride
+            ?? Self.defaultClientIdentityHandleProvider(sslProxyingManager: sslProxyingManager)
         liveTunnelRegistry = tunnelRegistry
         refreshUpstreamProxySnapshot()
         let upstreamProxyProvider: @Sendable () -> UpstreamProxyResolvedConfiguration? = {
@@ -589,7 +592,7 @@ actor ProxyServer {
     private let bypassProxyManagerOverride: BypassProxyManager?
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
-    private let clientIdentityHandleProvider: @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?
+    private let clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)?
     private let clientIdentityResolver: @Sendable (ProxyConnectionDescriptor) async -> ClientApplicationIdentity?
     private let connectionLimiter = ConnectionLimiter()
     private let childChannelRegistry = ProxyChildChannelRegistry()

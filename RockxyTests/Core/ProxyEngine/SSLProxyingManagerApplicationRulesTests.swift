@@ -86,6 +86,22 @@ struct SSLProxyingManagerApplicationRulesTests {
         #expect(!manager.hasEnabledApplicationRules())
     }
 
+    @Test("default identity provider uses the effective HTTPS manager")
+    func defaultIdentityProviderUsesEffectiveManager() {
+        let manager = makeManager()
+        manager.addApplicationRule(ApplicationSSLProxyingRule(identity: appA, listType: .include))
+        let provider = ProxyServer.defaultClientIdentityHandleProvider(sslProxyingManager: manager)
+        let descriptor = ProxyConnectionDescriptor(
+            acceptedAt: .now(),
+            clientHost: "127.0.0.1",
+            clientPort: 54_321,
+            proxyHost: "127.0.0.1",
+            proxyPort: 9_090
+        )
+
+        #expect(provider(descriptor) != nil)
+    }
+
     // MARK: - CRUD
 
     @Test("application rule CRUD add/update/remove")

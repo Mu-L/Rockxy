@@ -1,7 +1,8 @@
 import Foundation
 import Darwin
+import Testing
 
-/// Serializes all tests that mutate `RuleEngine.shared` or `RulePolicyGate.shared`.
+/// Serializes all tests that mutate shared rule or HTTPS-decryption policy state.
 ///
 /// Swift Testing's `@Suite(.serialized)` only serializes within a single suite.
 /// When xcodebuild assigns tests from multiple suites to the same process,
@@ -62,4 +63,29 @@ actor RuleTestLock {
         close(fd)
         processLockFileDescriptor = nil
     }
+}
+
+/// Holds `RuleTestLock` around an entire serialized suite so singleton-backed tests in
+/// different suites cannot overwrite one another while an async assertion is suspended.
+struct SharedPolicyStateTrait: SuiteTrait, TestScoping {
+    let isRecursive = false
+
+    func provideScope(
+        for _: Test,
+        testCase _: Test.Case?,
+        performing function: @concurrent @Sendable () async throws -> Void
+    ) async throws {
+        await RuleTestLock.shared.acquire()
+        do {
+            try await function()
+        } catch {
+            await RuleTestLock.shared.release()
+            throw error
+        }
+        await RuleTestLock.shared.release()
+    }
+}
+
+extension SuiteTrait where Self == SharedPolicyStateTrait {
+    static var sharedPolicyState: Self { Self() }
 }

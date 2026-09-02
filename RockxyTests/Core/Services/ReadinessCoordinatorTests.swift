@@ -6,7 +6,7 @@ import Testing
 // MARK: - ReadinessCoordinatorTests
 
 /// Tests use shared singleton state, so must run serially.
-@Suite(.serialized)
+@Suite(.serialized, .sharedPolicyState)
 struct ReadinessCoordinatorTests {
     // MARK: - Warning State Machine (fully deterministic, no machine-state dependency)
 
