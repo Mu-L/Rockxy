@@ -26,6 +26,8 @@ extension Notification.Name {
     static let appearanceDidChange = identity.notificationName("appearanceDidChange")
     static let breakpointHit = identity.notificationName("breakpointHit")
     static let rulesDidChange = identity.notificationName("rulesDidChange")
+    static let rulePersistenceDidFail = identity.notificationName("rulePersistenceDidFail")
+    static let rulesDidFailToLoad = identity.notificationName("rulesDidFailToLoad")
     static let scriptsDidChange = identity.notificationName("scriptsDidChange")
     static let scriptConsoleDidAppend = identity.notificationName("scriptConsoleDidAppend")
     static let openDiffWindow = identity.notificationName("openDiffWindow")

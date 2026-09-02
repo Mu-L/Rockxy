@@ -90,6 +90,19 @@ actor RuleEngine {
         compiledPatterns.removeValue(forKey: id)
     }
 
+    /// Removes only the rules whose IDs are in `ids`, against current engine state.
+    /// Rules absent from `ids` — including concurrent additions from other windows —
+    /// are left untouched, so a stale caller snapshot can never clobber them.
+    func removeRules(ids: Set<UUID>) {
+        guard !ids.isEmpty else {
+            return
+        }
+        rules.removeAll { ids.contains($0.id) }
+        for id in ids {
+            compiledPatterns.removeValue(forKey: id)
+        }
+    }
+
     func toggleRule(id: UUID) {
         guard let index = rules.firstIndex(where: { $0.id == id }) else {
             return
@@ -111,6 +124,36 @@ actor RuleEngine {
 
     func replaceAll(_ newRules: [ProxyRule]) {
         rules = newRules
+        compilePatterns()
+    }
+
+    /// Replaces every Block rule with `importedBlockRules` against current engine
+    /// state, retaining all non-Block rules — including concurrent additions from
+    /// other windows (e.g. Map Local) — in their existing order. The imported set is
+    /// appended after the retained non-Block rules, preserving the import semantic
+    /// that the imported rules become the entire Block category. Enabled imported
+    /// Block rules beyond `maxPerCategory` are disabled so the per-category active
+    /// quota is never exceeded, mirroring the capping applied by a full replace.
+    func replaceBlockRules(_ importedBlockRules: [ProxyRule], maxPerCategory: Int) {
+        let retained = rules.filter { rule in
+            if case .block = rule.action {
+                return false
+            }
+            return true
+        }
+        var capped = importedBlockRules
+        var activeBlockCount = 0
+        for index in capped.indices {
+            guard case .block = capped[index].action, capped[index].isEnabled else {
+                continue
+            }
+            if activeBlockCount < maxPerCategory {
+                activeBlockCount += 1
+            } else {
+                capped[index].isEnabled = false
+            }
+        }
+        rules = retained + capped
         compilePatterns()
     }
 
@@ -302,6 +345,38 @@ actor RuleEngine {
         }
         rules[index].isEnabled = true
         return true
+    }
+
+    /// Bulk enables or disables every Map Local rule against current engine state,
+    /// mutating only Map Local rules and leaving all other categories (and concurrent
+    /// additions) untouched. When enabling, already-enabled rules are preserved first
+    /// and additional rules are enabled in order only while the active Map Local count
+    /// stays below `maxPerCategory`, so the quota is never exceeded.
+    func setMapLocalRulesEnabled(_ enabled: Bool, maxPerCategory: Int) {
+        guard enabled else {
+            for index in rules.indices {
+                if case .mapLocal = rules[index].action {
+                    rules[index].isEnabled = false
+                }
+            }
+            return
+        }
+        var activeCount = rules.filter { rule in
+            guard rule.isEnabled, case .mapLocal = rule.action else {
+                return false
+            }
+            return true
+        }.count
+        for index in rules.indices {
+            guard case .mapLocal = rules[index].action, !rules[index].isEnabled else {
+                continue
+            }
+            guard activeCount < maxPerCategory else {
+                continue
+            }
+            rules[index].isEnabled = true
+            activeCount += 1
+        }
     }
 
     func addNetworkConditionExclusiveIfAllowed(_ rule: ProxyRule, maxPerCategory: Int) -> Bool {

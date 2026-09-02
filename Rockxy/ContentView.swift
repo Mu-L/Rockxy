@@ -143,6 +143,12 @@ struct ContentView: View {
             guard managesLifecycle, !ProcessInfo.processInfo.isTestHost else {
                 return
             }
+            // Rule loading is app-level and must not wait on project hydration —
+            // start the observer and kick off the (idempotent, non-blocking) load
+            // before hydrating so Map Local and other rule tools have their
+            // persisted rules regardless of how long project hydration takes.
+            coordinator.setupRulesObserver()
+            coordinator.loadInitialRules()
             await coordinator.hydrateProjectsOnLaunch()
             if case .failed = coordinator.projectStore.loadState {
                 coordinator.isProjectRecoveryPresented = true
@@ -150,9 +156,7 @@ struct ContentView: View {
                 RockxyWorkspaceWindowManager.shared.projectDidChange(coordinator: coordinator)
             }
             coordinator.readiness.startObserving()
-            coordinator.setupRulesObserver()
             coordinator.setupSSLProxyingObserver()
-            coordinator.loadInitialRules()
             coordinator.refreshProxyOverrideStatus()
             coordinator.startProxyOnLaunchIfNeeded()
             nearbyTransferReceiver.start(coordinator: coordinator)
