@@ -120,12 +120,10 @@ enum KeyboardShortcutCatalog {
             row("rules.filter", "Other Rules Windows", "Filter rules", "⌘F", "Focused non-Breakpoint rules window", nil, nil),
         ]),
         KeyboardShortcutSection(id: "settings", title: "Settings", shortcuts: [
-            row("settings.ssl.newApp", "SSL Proxying Settings", "Add app rule", "⌘N", "SSL Proxying list", nil, nil),
-            row("settings.ssl.newDomain", "SSL Proxying Settings", "Add domain rule", "⇧⌘N", "SSL Proxying list", nil, nil),
-            row("settings.ssl.edit", "SSL Proxying Settings", "Edit selected SSL proxying rule", "⌘E", "SSL Proxying list", nil, nil),
-            row("settings.ssl.delete", "SSL Proxying Settings", "Delete selected SSL proxying rule", "⌘⌫", "SSL Proxying list", nil, nil),
-            row("settings.ssl.toggle", "SSL Proxying Settings", "Toggle selected SSL proxying rule", "↵ / Space", "SSL Proxying list", nil, nil),
-            row("settings.ssl.filter", "SSL Proxying Settings", "Filter SSL proxying rules", "⌘F", "SSL Proxying list", nil, nil),
+            row("settings.ssl.edit", "HTTPS Decryption", "Edit selected HTTPS behavior rule", "⌘↩", "HTTPS Decryption window", nil, nil),
+            row("settings.ssl.delete", "HTTPS Decryption", "Delete selected HTTPS behavior rule", "⌘⌫", "HTTPS Decryption window", nil, nil),
+            row("settings.ssl.toggle", "HTTPS Decryption", "Toggle selected HTTPS behavior rule", "Space", "HTTPS Decryption window", nil, nil),
+            row("settings.ssl.filter", "HTTPS Decryption", "Search HTTPS behavior rules", "⌘F", "HTTPS Decryption window", nil, nil),
         ]),
         KeyboardShortcutSection(id: "scriptEditor", title: "Script Editor", shortcuts: [
             row("script.save", "Script Editor", "Save and activate script", "⌘S", "Script Editor window", nil, nil),

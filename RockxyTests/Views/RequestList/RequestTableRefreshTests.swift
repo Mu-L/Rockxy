@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @MainActor
+@Suite(.serialized, .sharedPolicyState)
 struct RequestTableRefreshTests {
     // MARK: - RefreshToken
 
@@ -252,15 +253,15 @@ struct RequestTableRefreshTests {
         #expect(coordinator.filteredRows.first?.host == "aaa.example.com")
     }
 
-    @Test("SSL proxying changes refresh request rows from tunneled to intercepted")
-    func sslProxyingRefreshesRows() async {
+    @Test("nil-metadata CONNECT row stays tunneled regardless of current host policy")
+    func nilMetadataConnectStaysTunneledAcrossPolicyChanges() async {
         let coordinator = MainContentCoordinator()
         let manager = SSLProxyingManager.shared
         let originalRules = manager.rules
         let originalEnabled = manager.isEnabled
         let originalBypassDomains = manager.bypassDomains
         let originalForceGlobalPassthrough = manager.forceGlobalPassthrough
-        let host = "ssl-refresh.test.rockxy.local"
+        let host = "nil-connect.test.rockxy.local"
         defer {
             manager.replaceAllRules(originalRules)
             manager.setEnabled(originalEnabled)
@@ -276,8 +277,95 @@ struct RequestTableRefreshTests {
         manager.forceGlobalPassthrough = false
         coordinator.setupSSLProxyingObserver()
 
-        let transaction = TestFixtures.makeTransaction(url: "https://\(host)/users")
-        coordinator.transactions = [transaction]
+        // A reloaded/imported CONNECT record: a tunnel record with no recorded disposition.
+        let connect = TestFixtures.makeTransaction(method: "CONNECT", url: "https://\(host):443")
+        #expect(connect.sslCapture == nil)
+        coordinator.transactions = [connect]
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.filteredRows.first?.sslState == .secureTunneled)
+
+        // Enabling interception for the host must not flip a historical tunnel record.
+        coordinator.enableSSLProxyingFromInspector(for: host)
+        await Task.yield()
+
+        #expect(coordinator.filteredRows.first?.sslState == .secureTunneled)
+        #expect(coordinator.sslState(for: connect) == .secureTunneled)
+    }
+
+    @Test("nil-metadata decrypted HTTPS row stays intercepted regardless of current host policy")
+    func nilMetadataDecryptedHTTPSStaysInterceptedAcrossPolicyChanges() async {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalEnabled = manager.isEnabled
+        let originalBypassDomains = manager.bypassDomains
+        let originalForceGlobalPassthrough = manager.forceGlobalPassthrough
+        let host = "nil-decrypted.test.rockxy.local"
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setEnabled(originalEnabled)
+            manager.setBypassDomains(originalBypassDomains)
+            manager.forceGlobalPassthrough = originalForceGlobalPassthrough
+            manager.clearAutoPassthrough()
+        }
+
+        manager.clearAutoPassthrough()
+        manager.replaceAllRules([])
+        manager.setEnabled(true)
+        manager.setBypassDomains("")
+        manager.forceGlobalPassthrough = false
+        coordinator.setupSSLProxyingObserver()
+
+        // A reloaded/imported per-request HTTPS record: decrypted application traffic with no
+        // recorded disposition (a raw tunnel never yields non-CONNECT per-request records).
+        let decrypted = TestFixtures.makeTransaction(url: "https://\(host)/users")
+        #expect(decrypted.sslCapture == nil)
+        coordinator.transactions = [decrypted]
+        coordinator.recomputeFilteredTransactions()
+
+        // Current policy does not intercept this host, yet the row reads intercepted from shape.
+        #expect(!manager.shouldIntercept(host))
+        #expect(coordinator.filteredRows.first?.sslState == .secureIntercepted)
+
+        // Enabling then disabling the host rule must never move a historical decrypted record.
+        coordinator.enableSSLProxyingFromInspector(for: host)
+        await Task.yield()
+        #expect(coordinator.filteredRows.first?.sslState == .secureIntercepted)
+
+        manager.replaceAllRules([])
+        manager.setEnabled(false)
+        #expect(coordinator.sslState(for: decrypted) == .secureIntercepted)
+    }
+
+    @Test("raw CONNECT stays tunneled after its host rule is enabled (capture truth)")
+    func rawConnectStaysTunneledAfterRuleEnabled() async {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalEnabled = manager.isEnabled
+        let originalBypassDomains = manager.bypassDomains
+        let originalForceGlobalPassthrough = manager.forceGlobalPassthrough
+        let host = "raw-connect.test.rockxy.local"
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setEnabled(originalEnabled)
+            manager.setBypassDomains(originalBypassDomains)
+            manager.forceGlobalPassthrough = originalForceGlobalPassthrough
+            manager.clearAutoPassthrough()
+        }
+
+        manager.clearAutoPassthrough()
+        manager.replaceAllRules([])
+        manager.setEnabled(true)
+        manager.setBypassDomains("")
+        manager.forceGlobalPassthrough = false
+        coordinator.setupSSLProxyingObserver()
+
+        // A CONNECT tunnel that was passed through raw at capture time.
+        let connect = TestFixtures.makeTransaction(method: "CONNECT", url: "https://\(host):443")
+        connect.sslCapture = .tunneled
+        coordinator.transactions = [connect]
         coordinator.recomputeFilteredTransactions()
 
         #expect(coordinator.filteredRows.first?.sslState == .secureTunneled)
@@ -285,8 +373,31 @@ struct RequestTableRefreshTests {
         coordinator.enableSSLProxyingFromInspector(for: host)
         await Task.yield()
 
-        #expect(manager.shouldIntercept(host))
-        #expect(coordinator.filteredRows.first?.sslState == .secureIntercepted)
+        // The rule now intercepts the host, but this historical raw CONNECT must not flip.
+        #expect(coordinator.filteredRows.first?.sslState == .secureTunneled)
+    }
+
+    @Test("decrypted traffic stays intercepted even after its host rule is disabled")
+    func decryptedStaysInterceptedAfterRuleDisabled() {
+        let coordinator = MainContentCoordinator()
+        let manager = SSLProxyingManager.shared
+        let originalRules = manager.rules
+        let originalEnabled = manager.isEnabled
+        let host = "decrypted.test.rockxy.local"
+        defer {
+            manager.replaceAllRules(originalRules)
+            manager.setEnabled(originalEnabled)
+        }
+
+        manager.replaceAllRules([])
+        manager.setEnabled(false)
+
+        let decrypted = TestFixtures.makeTransaction(url: "https://\(host)/users")
+        decrypted.sslCapture = .intercepted
+
+        // Current policy would not intercept, but capture truth must win.
+        #expect(!manager.shouldIntercept(host))
+        #expect(coordinator.sslState(for: decrypted) == .secureIntercepted)
     }
 
     @Test("Export preserves capture order unaffected by sort")

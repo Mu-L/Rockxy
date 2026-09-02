@@ -35,11 +35,13 @@ extension Channel {
     }
 }
 
-// MARK: - Proxy shutdown coordination
+// MARK: - ProxyChildChannelRegistry
 
 /// Tracks accepted client channels so proxy shutdown can close and await every live
 /// connection before its event-loop group is torn down.
 final class ProxyChildChannelRegistry: @unchecked Sendable {
+    // MARK: Internal
+
     func prepareForStart() async {
         var staleChannelCount = 0
         while true {
@@ -77,6 +79,8 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
         await close(snapshot)
         await waitUntilEmpty()
     }
+
+    // MARK: Private
 
     private let lock = NSLock()
     private var channels: [ObjectIdentifier: Channel] = [:]
@@ -139,13 +143,21 @@ final class ProxyChildChannelRegistry: @unchecked Sendable {
     }
 }
 
+// MARK: - BreakpointBridgeTracker
+
 /// Counts breakpoint Task-to-NIO promise bridges. Shutdown waits for their promise
 /// completion callbacks while the event loops are still alive.
 final class BreakpointBridgeTracker: @unchecked Sendable {
+    // MARK: Internal
+
     final class Lease: @unchecked Sendable {
+        // MARK: Lifecycle
+
         fileprivate init(owner: BreakpointBridgeTracker) {
             self.owner = owner
         }
+
+        // MARK: Internal
 
         func finish() {
             lock.lock()
@@ -158,6 +170,8 @@ final class BreakpointBridgeTracker: @unchecked Sendable {
             owner?.finish()
             owner = nil
         }
+
+        // MARK: Private
 
         private let lock = NSLock()
         private var owner: BreakpointBridgeTracker?
@@ -183,6 +197,8 @@ final class BreakpointBridgeTracker: @unchecked Sendable {
             }
         }
     }
+
+    // MARK: Private
 
     private let lock = NSLock()
     private var activeCount = 0
@@ -284,8 +300,14 @@ actor ProxyServer {
         certificateManager: CertificateManager = .shared,
         ruleEngine: RuleEngine = RuleEngine(),
         scriptPluginManager: ScriptPluginManager? = nil,
+        sslProxyingManager: SSLProxyingManager? = nil,
+        bypassProxyManager: BypassProxyManager? = nil,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
+        clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)? = nil,
+        clientIdentityResolver: @escaping @Sendable (ProxyConnectionDescriptor) async -> ClientApplicationIdentity? = {
+            await ProcessResolver.shared.identityResolver.resolveIdentity(descriptor: $0)
+        },
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void = { _ in },
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil
     ) {
@@ -293,8 +315,12 @@ actor ProxyServer {
         self.certificateManager = certificateManager
         self.ruleEngine = ruleEngine
         self.scriptPluginManager = scriptPluginManager
+        self.sslProxyingManagerOverride = sslProxyingManager
+        self.bypassProxyManagerOverride = bypassProxyManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
         self.captureContextProvider = captureContextProvider
+        self.clientIdentityHandleProvider = clientIdentityHandleProvider
+        self.clientIdentityResolver = clientIdentityResolver
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
     }
@@ -303,6 +329,57 @@ actor ProxyServer {
 
     var isRunning: Bool {
         serverChannel != nil
+    }
+
+    /// Default provider: resolves every accepted local connection when application rules can
+    /// affect TLS decisions. With no active app rule, a bounded sample keeps the observed-app
+    /// picker useful without adding an lsof lookup to every host-only connection.
+    @Sendable
+    static func defaultClientIdentityHandleProvider(
+        sslProxyingManager: SSLProxyingManager
+    )
+        -> @Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?
+    {
+        { descriptor in
+            guard let clientHost = descriptor.clientHost,
+                  ClientConnectionMatcher.isLocalSource(clientHost) else
+            {
+                return nil
+            }
+            let processResolver = ProcessResolver.shared
+            guard sslProxyingManager.hasEnabledApplicationRules()
+                || processResolver.shouldSampleApplicationIdentity() else
+            {
+                return nil
+            }
+            return ClientIdentityHandle(descriptor: descriptor, resolver: processResolver.identityResolver)
+        }
+    }
+
+    /// Wraps a transaction callback so every emitted transaction — raw CONNECT, TLS failure,
+    /// intercepted HTTP, WebSocket — inherits the connection's resolved application identity
+    /// and a matching `clientApp` label. Stamping is a non-blocking read of the retained
+    /// identity; when unresolved, `clientApp` is left for downstream port-map enrichment.
+    static func makeIdentityStampingCallback(
+        handle: ClientIdentityHandle?,
+        downstream: @escaping @Sendable (HTTPTransaction) -> Void
+    )
+        -> @Sendable (HTTPTransaction) -> Void
+    {
+        guard let handle else {
+            return downstream
+        }
+        return { transaction in
+            if let identity = handle.currentIdentity {
+                if transaction.clientApplicationIdentity == nil {
+                    transaction.clientApplicationIdentity = identity
+                }
+                if transaction.clientApp == nil {
+                    transaction.clientApp = identity.displayName
+                }
+            }
+            downstream(transaction)
+        }
     }
 
     func start() async throws {
@@ -324,6 +401,37 @@ actor ProxyServer {
         let breakpointHit = onBreakpointHit
         let childRegistry = childChannelRegistry
         let bridgeTracker = breakpointBridgeTracker
+        let identityProviderOverride = clientIdentityHandleProvider
+        let identityResolver = clientIdentityResolver
+        let proxyPort = configuration.port
+        let sslManagerOverride = sslProxyingManagerOverride
+        let bypassManagerOverride = bypassProxyManagerOverride
+        // Resolve the UI-owned policy managers on their actor, then capture the stable references
+        // in a registry whose reads use only their explicitly thread-safe, nonisolated methods.
+        // A fresh registry per start also prevents closed-channel state leaking across restarts.
+        let policyState = await MainActor.run {
+            let sslProxyingManager = sslManagerOverride ?? SSLProxyingManager.shared
+            let bypassProxyManager = bypassManagerOverride ?? BypassProxyManager.shared
+            let registry = LiveTunnelRegistry(
+                shouldInterceptNow: { host, application in
+                    TLSInterceptHandler.initialTunnelMode(
+                        host: host,
+                        sslProxyingManager: sslProxyingManager,
+                        bypassProxyManager: bypassProxyManager,
+                        application: application
+                    ) == .intercept
+                },
+                shouldResolveApplicationNow: {
+                    sslProxyingManager.hasEnabledApplicationRules()
+                },
+                resolveApplication: identityResolver
+            )
+            return (registry, sslProxyingManager, bypassProxyManager)
+        }
+        let (tunnelRegistry, sslProxyingManager, bypassProxyManager) = policyState
+        let identityProvider = identityProviderOverride
+            ?? Self.defaultClientIdentityHandleProvider(sslProxyingManager: sslProxyingManager)
+        liveTunnelRegistry = tunnelRegistry
         refreshUpstreamProxySnapshot()
         let upstreamProxyProvider: @Sendable () -> UpstreamProxyResolvedConfiguration? = {
             self.currentUpstreamProxyConfiguration()
@@ -342,12 +450,50 @@ actor ProxyServer {
             }
         }
 
+        // Any SSL-proxying mutation (inspector, settings, import, global enable) routes through
+        // save()/forceGlobalPassthrough and posts this notification. Reset live raw tunnels the
+        // new policy would now intercept so the client's next request is decrypted. The registry
+        // itself is Sendable and thread-safe; the closure captures only it, not self.
+        sslPolicyObserver = NotificationCenter.default.addObserver(
+            forName: .sslProxyingStateDidChange,
+            object: nil,
+            queue: nil
+        ) { _ in
+            tunnelRegistry.invalidateTunnelsNowRequiringInterception()
+        }
+
+        // Bypass-list mutations also feed `initialTunnelMode`: removing a bypass entry can turn a
+        // tracked `.bypassProxyList` raw tunnel into intercept mode while the client is still
+        // connected through Rockxy. Route it through the same invalidation seam.
+        bypassPolicyObserver = NotificationCenter.default.addObserver(
+            forName: .bypassProxyListDidChange,
+            object: nil,
+            queue: nil
+        ) { _ in
+            tunnelRegistry.invalidateTunnelsNowRequiringInterception()
+        }
+
         let bootstrap = ServerBootstrap(group: group)
             // Backlog of 256 pending connections before the OS starts rejecting
             .serverChannelOption(.backlog, value: 256)
             .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
                 childRegistry.register(channel)
+                // Capture an immutable connection descriptor at accept and start identity
+                // resolution concurrently. The decorated callback stamps the resolved
+                // identity onto every emitted transaction for rules and observed-app UI.
+                let descriptor = ProxyConnectionDescriptor(
+                    acceptedAt: DispatchTime.now(),
+                    clientHost: channel.remoteAddress?.ipAddress,
+                    clientPort: channel.remoteAddress?.port.flatMap { UInt16(exactly: $0) },
+                    proxyHost: channel.localAddress?.ipAddress,
+                    proxyPort: proxyPort
+                )
+                let identityHandle = identityProvider(descriptor)
+                let decoratedCallback = ProxyServer.makeIdentityStampingCallback(
+                    handle: identityHandle,
+                    downstream: callback
+                )
                 return channel.pipeline.addHandler(BreakpointClientLivenessProbeHandler()).flatMap {
                     channel.pipeline.addHandler(ConnectionTimeoutHandler(timeout: .seconds(300)))
                 }.flatMap {
@@ -360,9 +506,14 @@ actor ProxyServer {
                         ruleEngine: ruleEng,
                         scriptPluginManager: scriptMgr,
                         connectionLimiter: limiter,
+                        sslProxyingManager: sslProxyingManager,
+                        bypassProxyManager: bypassProxyManager,
                         upstreamProxySnapshotProvider: upstreamProxyProvider,
                         captureContextProvider: captureProvider,
-                        onTransactionComplete: callback,
+                        clientIdentityHandle: identityHandle,
+                        clientConnectionDescriptor: descriptor,
+                        liveTunnelRegistry: tunnelRegistry,
+                        onTransactionComplete: decoratedCallback,
                         onBreakpointHit: breakpointHit,
                         breakpointBridgeTracker: bridgeTracker
                     )
@@ -382,6 +533,11 @@ actor ProxyServer {
         } catch {
             try? await group.shutdownGracefully()
             eventLoopGroup = nil
+            // The observers were installed before `bind`. `stop()` guards on `serverChannel`,
+            // which never got set on a failed start, so it can't clean them — remove them here or
+            // a retry would overwrite the tokens and leak the originals.
+            removePolicyObservers()
+            liveTunnelRegistry = nil
             if let ioError = error as? IOError, ioError.errnoCode == EADDRINUSE {
                 throw ProxyServerError.portInUse(configuration.port)
             }
@@ -400,10 +556,7 @@ actor ProxyServer {
         isStopping = true
         defer { isStopping = false }
         serverChannel = nil
-        if let upstreamProxyObserver {
-            NotificationCenter.default.removeObserver(upstreamProxyObserver)
-            self.upstreamProxyObserver = nil
-        }
+        removePolicyObservers()
 
         do {
             try await channel.close().get()
@@ -413,6 +566,7 @@ actor ProxyServer {
 
         await childChannelRegistry.closeAllAndWait()
         await breakpointBridgeTracker.waitUntilIdle()
+        liveTunnelRegistry = nil
 
         if let group = eventLoopGroup {
             do {
@@ -434,11 +588,19 @@ actor ProxyServer {
     private let certificateManager: CertificateManager
     private let ruleEngine: RuleEngine
     private let scriptPluginManager: ScriptPluginManager?
+    private let sslProxyingManagerOverride: SSLProxyingManager?
+    private let bypassProxyManagerOverride: BypassProxyManager?
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
+    private let clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)?
+    private let clientIdentityResolver: @Sendable (ProxyConnectionDescriptor) async -> ClientApplicationIdentity?
     private let connectionLimiter = ConnectionLimiter()
     private let childChannelRegistry = ProxyChildChannelRegistry()
     private let breakpointBridgeTracker = BreakpointBridgeTracker()
+    /// Tracks live raw CONNECT tunnels so an SSL-policy change can reset exactly the tunnels the
+    /// current effective policy would now intercept. The predicate mirrors the raw/intercept
+    /// selection in `TLSInterceptHandler.initialTunnelMode`, including application-scoped rules.
+    private var liveTunnelRegistry: LiveTunnelRegistry?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -449,8 +611,28 @@ actor ProxyServer {
     private var serverChannel: Channel?
     private var isStopping = false
     private var upstreamProxyObserver: NSObjectProtocol?
+    private var sslPolicyObserver: NSObjectProtocol?
+    private var bypassPolicyObserver: NSObjectProtocol?
     private let upstreamProxySnapshotLock = NSLock()
     nonisolated(unsafe) private var upstreamProxyConfiguration: UpstreamProxyResolvedConfiguration?
+
+    /// Removes every notification observer installed by `start()`. Safe to call on both the clean
+    /// stop path and the failed-start path; each token is niled so a later start reinstalls fresh
+    /// observers without leaking the originals.
+    private func removePolicyObservers() {
+        if let upstreamProxyObserver {
+            NotificationCenter.default.removeObserver(upstreamProxyObserver)
+            self.upstreamProxyObserver = nil
+        }
+        if let sslPolicyObserver {
+            NotificationCenter.default.removeObserver(sslPolicyObserver)
+            self.sslPolicyObserver = nil
+        }
+        if let bypassPolicyObserver {
+            NotificationCenter.default.removeObserver(bypassPolicyObserver)
+            self.bypassPolicyObserver = nil
+        }
+    }
 
     private func refreshUpstreamProxySnapshot() {
         let snapshot = upstreamProxySnapshotProvider()

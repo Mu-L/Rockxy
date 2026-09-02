@@ -126,9 +126,12 @@ struct AssistantProductHelpCatalog: Sendable {
                 "https", "ssl proxying", "ssl proxy", "decrypt", "encrypted traffic", "tls intercept",
                 "see the body", "can't read https", "enable https",
             ],
-            capability: "HTTPS Decryption: enable per-domain TLS interception so encrypted request and response content becomes readable.",
+            capability: "HTTPS Decryption: choose Decrypt or Tunnel behavior for an application or host so encrypted traffic is handled predictably.",
             answer: String(
-                localized: "HTTPS Decryption enables TLS interception per domain so Rockxy can read otherwise-encrypted bodies (its root certificate must be trusted first).",
+                localized: """
+                HTTPS Decryption lets you decrypt traffic from an application or a specific host, or keep it \
+                tunneled. Trust Rockxy's root certificate before decrypting.
+                """,
                 bundle: RockxyLocalization.bundle
             )
         ),

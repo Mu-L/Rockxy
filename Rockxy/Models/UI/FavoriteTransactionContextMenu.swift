@@ -193,18 +193,14 @@ struct FavoriteTransactionContextMenuModel: Hashable {
 
     init(
         transaction: HTTPTransaction,
-        section: FavoriteTransactionSection,
-        isSSLProxyingEnabled: Bool
+        section: FavoriteTransactionSection
     ) {
         self.section = section
         self.deleteTitle = section.deleteTitle
-        self.sslProxyingTitle = isSSLProxyingEnabled
-            ? String(localized: "Disable SSL Proxying", bundle: RockxyLocalization.bundle)
-            : String(localized: "Enable SSL Proxying", bundle: RockxyLocalization.bundle)
 
         let hasHost = !transaction.request.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        self.canToggleSSLProxying = hasHost
-        self.sslProxyingDisabledReason = hasHost ? nil : String(
+        self.canConfigureHost = hasHost
+        self.hostConfigurationDisabledReason = hasHost ? nil : String(
             localized: "This request has no host.",
             bundle: RockxyLocalization.bundle
         )
@@ -261,9 +257,34 @@ struct FavoriteTransactionContextMenuModel: Hashable {
 
     let section: FavoriteTransactionSection
     let deleteTitle: String
-    let sslProxyingTitle: String
-    let canToggleSSLProxying: Bool
-    let sslProxyingDisabledReason: String?
+    let canConfigureHost: Bool
+    let hostConfigurationDisabledReason: String?
     let tools: [FavoriteTransactionMenuOption<FavoriteTransactionToolAction>]
     let exports: [FavoriteTransactionMenuOption<FavoriteTransactionExportFormat>]
+}
+
+// MARK: - FavoriteTransactionHTTPSBehaviorState
+
+struct FavoriteTransactionHTTPSBehaviorState: Equatable {
+    enum HostActionBlocker: Equatable {
+        case missingHost
+        case applicationTunnel
+    }
+
+    let canConfigureHost: Bool
+    let hasApplicationTunnel: Bool
+
+    var canDecryptHost: Bool {
+        blocker == nil
+    }
+
+    var blocker: HostActionBlocker? {
+        if !canConfigureHost {
+            return .missingHost
+        }
+        if hasApplicationTunnel {
+            return .applicationTunnel
+        }
+        return nil
+    }
 }

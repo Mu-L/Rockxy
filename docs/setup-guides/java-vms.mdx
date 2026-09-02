@@ -5,24 +5,41 @@ description: Configure Java and Kotlin HTTP clients to use Rockxy by importing t
 
 # Java VMs
 
-Java and Kotlin use a manual trust-store workflow rather than the simpler proxy-only path many macOS clients use.
+Java and Kotlin need the Rockxy root certificate in the JVM trust store on top of proxy routing, so they use a trust-store workflow rather than the simpler proxy-only path many macOS clients use.
 
 ## Support in Rockxy
 
-- Manual setup available
-- No runtime automation entry point today
+- Automatic Setup available for Java VMs
+- Manual setup available for trust-store work
 - Validation-backed setup
+
+## What Automatic Setup does for Java
+
+Automatic Setup prepares a scoped shell for the Java VMs target. Alongside the shared `HTTP_PROXY` / `HTTPS_PROXY` exports, it sets `JAVA_TOOL_OPTIONS` with explicit JVM proxy properties so a JVM launched from that session routes through Rockxy:
+
+```sh
+-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=<port> -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=<port>
+```
+
+Rockxy preserves any `JAVA_TOOL_OPTIONS` you already set and does not stack the proxy block if you re-source the script.
+
+<Note>
+Automatic Setup only affects the session it launches. A JVM or IDE that is already running keeps its current environment, and GUI apps launched outside that session may ignore shell variables. Launch the JVM (or a JetBrains IDE such as PyCharm/IntelliJ) fresh from the prepared session, or use macOS System Proxy / Manual Setup instead.
+</Note>
+
+For JetBrains IDEs, the JVM properties route the IDE's own JVM traffic. A Python, Node.js, or other non-JVM Run/Debug child only inherits the shared proxy environment; its HTTP client must also honor `HTTP_PROXY` / `HTTPS_PROXY` (or be configured explicitly). Seeing the IDE's startup `CONNECT` request therefore confirms JVM routing, not necessarily the application being debugged.
 
 ## What Rockxy currently provides
 
+- Automatic Setup with `JAVA_TOOL_OPTIONS` JVM proxy properties
 - a `keytool` import path for the Rockxy root certificate
 - a Java `HttpClient` sample
 - Dev Hub guidance for confirming capture on a locally installed JDK
 
 ## What you still need to do
 
-- import the Rockxy root certificate into the active JVM trust store
-- route the Java client through Rockxy's proxy
+- import and trust the Rockxy root certificate in the exact JVM or JetBrains trust store (proxy properties alone do not make HTTPS interception work)
+- add the target host under HTTPS Decryption so Rockxy decrypts its HTTPS traffic
 - validate with one known request before broader debugging
 
 ## Related pages

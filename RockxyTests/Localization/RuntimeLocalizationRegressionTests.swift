@@ -136,6 +136,99 @@ struct RuntimeLocalizationRegressionTests {
         #expect(viewModel.selectedTarget.id == .docker)
     }
 
+    @Test("HTTP status-code table and breakpoint call sites use a contextual compact key, not Code")
+    func statusCodeCallSitesUseStatusCodeKey() throws {
+        let sites = [
+            (
+                "Rockxy/Views/RequestList/RequestTableView.swift",
+                "id: \"code\",\n                title: String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle)"
+            ),
+            (
+                "Rockxy/Views/Diff/DiffCandidateTableView.swift",
+                "TableColumn(String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle))"
+            ),
+            (
+                "Rockxy/Views/Breakpoint/BreakpointEditorView.swift",
+                "TextField(\n                String(localized: \"Compact HTTP status code\", bundle: RockxyLocalization.bundle)"
+            ),
+        ]
+        for (file, expectedCallSite) in sites {
+            let source = try readProjectFile(file)
+            #expect(
+                !source.contains("localized: \"Code\""),
+                "\(file): must not localize the ambiguous \"Code\" key for HTTP status codes"
+            )
+            #expect(
+                source.contains(expectedCallSite),
+                "\(file): the target status-code call site must use its contextual localization key"
+            )
+        }
+    }
+
+    @Test("VS Code Open-with menu renders the app name verbatim, not through localization")
+    func vsCodeLabelIsVerbatim() throws {
+        let source = try readProjectFile("Rockxy/Views/Inspector/ResponseInspectorView.swift")
+        #expect(source.contains("Text(verbatim: \"Code\")"))
+        #expect(!source.contains("Label(\"Code\""))
+        #expect(!source.contains("localized: \"Code\""))
+    }
+
+    @Test("Visible enum displayName owners resolve user-facing labels through the runtime bundle")
+    func enumDisplayNamesResolveThroughRuntimeBundle() throws {
+        let files = [
+            "Rockxy/Models/UI/MainTab.swift",
+            "Rockxy/Models/UI/InspectorTab.swift",
+            "Rockxy/Models/UI/RequestInspectorTab.swift",
+            "Rockxy/Models/UI/ResponseInspectorTab.swift",
+            "Rockxy/Models/UI/ProtocolFilter.swift",
+            "Rockxy/Models/UI/FilterField.swift",
+            "Rockxy/Models/Log/LogLevel.swift",
+            "Rockxy/Models/Rules/NetworkConditionPreset.swift",
+        ]
+        for file in files {
+            let source = try readProjectFile(file)
+            let displayName = try #require(
+                declaration(named: "var displayName: String", in: source),
+                "\(file): expected a displayName accessor"
+            )
+            #expect(
+                displayName.contains("String(localized:"),
+                "\(file): displayName must contain at least one localized visible label"
+            )
+            for range in ranges(of: "String(localized:", in: displayName) {
+                let window = callWindow(in: displayName, from: range.upperBound)
+                #expect(
+                    window.contains("bundle: RockxyLocalization.bundle"),
+                    "\(file): every localized displayName case must use RockxyLocalization.bundle"
+                )
+            }
+            #expect(
+                !displayName.contains("String(localized: \"Code\""),
+                "\(file): displayName must resolve visible labels through RockxyLocalization.bundle"
+            )
+        }
+    }
+
+    @Test("Protocol, header, and app-name tokens stay verbatim in enum displayName")
+    func enumTokensStayVerbatim() {
+        // Verbatim tokens never change with the selected language.
+        #expect(InspectorTab.websocket.displayName == "WebSocket")
+        #expect(InspectorTab.graphql.displayName == "GraphQL")
+        #expect(ResponseInspectorTab.ai.displayName == "AI")
+        #expect(ResponseInspectorTab.setCookie.displayName == "Set-Cookie")
+        #expect(FilterField.url.displayName == "URL")
+        #expect(ProtocolFilter.http.displayName == "HTTP")
+        #expect(ProtocolFilter.grpc.displayName == "gRPC")
+        #expect(NetworkConditionPreset.threeG.displayName == "3G")
+        #expect(NetworkConditionPreset.wifi.displayName == "WiFi")
+        // Localized labels resolve to a non-empty string in any runtime language.
+        #expect(!MainTab.traffic.displayName.isEmpty)
+        #expect(!LogLevel.warning.displayName.isEmpty)
+        #expect(!FilterField.statusCode.displayName.isEmpty)
+        #expect(!NetworkConditionPreset.veryBadNetwork.displayName.isEmpty)
+        #expect(!RequestInspectorTab.synopsis.displayName.isEmpty)
+    }
+
     // MARK: Private
 
     private enum ResolveError: Error {
@@ -171,6 +264,29 @@ struct RuntimeLocalizationRegressionTests {
             searchStart = found.upperBound
         }
         return result
+    }
+
+    private func declaration(named signature: String, in source: String) -> String? {
+        guard let signatureRange = source.range(of: signature),
+              let openingBrace = source[signatureRange.upperBound...].firstIndex(of: "{") else
+        {
+            return nil
+        }
+        var depth = 0
+        var cursor = openingBrace
+        while cursor < source.endIndex {
+            switch source[cursor] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    return String(source[signatureRange.lowerBound ... cursor])
+                }
+            default: break
+            }
+            cursor = source.index(after: cursor)
+        }
+        return nil
     }
 
     private func readProjectFile(_ relativePath: String) throws -> String {

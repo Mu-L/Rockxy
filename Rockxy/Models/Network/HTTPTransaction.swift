@@ -41,6 +41,18 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
 
     // MARK: Internal
 
+    /// Capture-time TLS disposition of a transaction: whether it was passed through raw
+    /// (`.tunneled`) or man-in-the-middled (`.intercepted`) at the moment of capture. The
+    /// request list uses this so a historical row reports capture truth instead of recomputing
+    /// its SSL badge from the *current* host policy — a raw CONNECT must stay tunneled even
+    /// after the host's rule is later enabled. Runtime-only: portable/persisted sessions omit
+    /// it; on reload the badge is derived deterministically from the record's own shape
+    /// (CONNECT → tunneled, decrypted non-CONNECT HTTPS/WSS → intercepted), never from policy.
+    enum SSLCaptureMode: Sendable {
+        case tunneled
+        case intercepted
+    }
+
     let id: UUID
     let timestamp: Date
     var request: HTTPRequestData
@@ -54,11 +66,21 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     var x402Info: X402Info?
     var sourcePort: UInt16?
     var clientApp: String?
+
+    /// Runtime-only owning application identity resolved from the accepted connection. Used
+    /// for application-scoped SSL proxying attribution. Portable session files intentionally
+    /// omit this — it is local to a live capture and never persisted or exported.
+    var clientApplicationIdentity: ClientApplicationIdentity?
     var comment: String?
     var highlightColor: HighlightColor?
     var isPinned: Bool = false
     var isSaved: Bool = false
     var isTLSFailure: Bool = false
+    /// See `SSLCaptureMode`. Live captures always stamp this: raw tunnels record `.tunneled` and
+    /// `HTTPSProxyRelayHandler` stamps every decrypted transaction `.intercepted`. `nil` therefore
+    /// only occurs on legacy/reloaded/imported transactions whose capture disposition was not
+    /// persisted (and on TLS-failure rows, which are never shown in the request list).
+    var sslCapture: SSLCaptureMode?
     var webSocketFrameVersion: Int = 0
     var matchedRuleID: UUID?
     var matchedRuleName: String?

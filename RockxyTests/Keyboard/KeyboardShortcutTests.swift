@@ -36,6 +36,16 @@ struct KeyboardShortcutTests {
         #expect(reference.localizedCaseInsensitiveContains("list has focus"))
     }
 
+    @Test("HTTPS Decryption documents only shortcuts implemented by its window")
+    func httpsDecryptionShortcutsMatchWindow() throws {
+        let reference = try Self.documentation(named: "keyboard-shortcuts.md")
+        let httpsShortcuts = KeyboardShortcutCatalog.allShortcuts.filter { $0.window == "HTTPS Decryption" }
+
+        #expect(Set(httpsShortcuts.map(\.shortcut)) == Set(["⌘↩", "⌘⌫", "Space", "⌘F"]))
+        #expect(!httpsShortcuts.contains { $0.action.localizedCaseInsensitiveContains("add") })
+        #expect(reference.contains("Applies to the HTTPS Decryption window."))
+    }
+
     @Test("KS_FOCUS_02 Compose documents URL autofocus and focus shortcut")
     func composeURLFocusIsDocumented() throws {
         let reference = try Self.documentation(named: "keyboard-shortcuts.md")

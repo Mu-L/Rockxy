@@ -112,6 +112,36 @@ struct DeveloperSetupAutomaticWindowView: View {
                 .font(setupMetrics.font())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+                Text(
+                    String(
+                        localized: """
+                        Automatic Setup only affects the session it launches. An app that is already running \
+                        keeps its current environment, and some GUI apps ignore shell variables — use macOS \
+                        System Proxy or this target's Manual Setup for those.
+                        """,
+                        bundle: RockxyLocalization.bundle
+                    )
+                )
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if viewModel.target.id == .javaVMs {
+                    Text(
+                        String(
+                            localized: """
+                            For Java, HTTPS interception still needs the Rockxy root CA trusted in the exact \
+                            JVM or JetBrains trust store, plus a Decrypt rule for the target application or \
+                            host under HTTPS Decryption.
+                            """,
+                            bundle: RockxyLocalization.bundle
+                        )
+                    )
+                    .font(setupMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

@@ -25,7 +25,12 @@ enum SidebarSearchFilter {
             guard !matchingDomains.isEmpty else {
                 return nil
             }
-            return AppInfo(name: app.name, domains: matchingDomains, requestCount: app.requestCount)
+            return AppInfo(
+                name: app.name,
+                domains: matchingDomains,
+                requestCount: app.requestCount,
+                identity: app.identity
+            )
         }
     }
 

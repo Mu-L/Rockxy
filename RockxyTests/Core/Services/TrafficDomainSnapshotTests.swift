@@ -205,4 +205,45 @@ struct TrafficDomainSnapshotTests {
         #expect(snapshot.domains(forApp: "LiveApp").isEmpty)
         #expect(snapshot.domains(forApp: "HARApp") == ["har-domain.com"])
     }
+
+    // MARK: - Split-Attribution Merge (name-only bucket → stable identity)
+
+    @Test("name-only bucket merges into the sole stable identity sharing its name")
+    func nameOnlyMergesIntoUniqueIdentity() {
+        TrafficDomainSnapshot.shared.reset()
+        let snapshot = TrafficDomainSnapshot.shared
+        let identity = ClientApplicationIdentity.bundle(identifier: "com.example.app", displayName: "Example")
+        let apps = [
+            AppInfo(name: "Example", domains: ["stable.com", "shared.com"], requestCount: 4, identity: identity),
+            AppInfo(name: "Example", domains: ["Shared.com", "anon.com"], requestCount: 3),
+        ]
+        snapshot.update(appNodes: apps, domainTree: [])
+
+        #expect(snapshot.appEntries.count == 1)
+        let merged = snapshot.appEntries[0]
+        #expect(merged.identity?.identifier == "com.example.app")
+        #expect(merged.requestCount == 7)
+        // Unique case-insensitively (Shared.com folded), deterministically sorted.
+        #expect(merged.domains == ["anon.com", "shared.com", "stable.com"])
+    }
+
+    @Test("ambiguous same-name identities keep the name-only bucket separate")
+    func ambiguousIdentitiesFailClosed() {
+        TrafficDomainSnapshot.shared.reset()
+        let snapshot = TrafficDomainSnapshot.shared
+        let first = ClientApplicationIdentity.bundle(identifier: "com.example.first", displayName: "Example")
+        let second = ClientApplicationIdentity.bundle(identifier: "com.example.second", displayName: "Example")
+        let apps = [
+            AppInfo(name: "Example", domains: ["first.com"], requestCount: 2, identity: first),
+            AppInfo(name: "Example", domains: ["second.com"], requestCount: 2, identity: second),
+            AppInfo(name: "Example", domains: ["anon.com"], requestCount: 1),
+        ]
+        snapshot.update(appNodes: apps, domainTree: [])
+
+        #expect(snapshot.appEntries.count == 3)
+        let anon = snapshot.appEntries.first { $0.identity == nil }
+        #expect(anon?.domains == ["anon.com"])
+        #expect(anon?.requestCount == 1)
+        #expect(snapshot.appEntries.filter { $0.identity != nil }.count == 2)
+    }
 }

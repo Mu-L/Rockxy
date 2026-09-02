@@ -11,6 +11,8 @@ canonical catalogs):
   * no translation value is empty or whitespace-only;
   * printf-style placeholders and positional arguments match between the
     source string and each translation (placeholder parity);
+  * direct, non-interpolated Swift String(localized:) keys exist in the app catalog;
+  * high-confidence zh-Hans terminology rules remain contextually correct;
   * locales in the canonical catalogs match the Xcode project's knownRegions;
   * when `xcrun xcstringstool` is available, each catalog compiles cleanly.
 
@@ -43,6 +45,110 @@ DEFAULT_CATALOGS = [
 ]
 BASELINE_LANGUAGES = {"zh-Hans"}
 DEFAULT_PROJECT_FILE = Path("Rockxy.xcodeproj/project.pbxproj")
+DEFAULT_SWIFT_SOURCE_ROOT = Path("Rockxy")
+DIRECT_LOCALIZED_LITERAL_RE = re.compile(r'String\s*\(\s*localized:\s*"([^"\\]*)"', re.MULTILINE)
+
+# Simplified-Chinese glossary gate. Each rule is narrow and deterministic: it
+# fires only when the *English source* proves the meaning, then forbids a term
+# whose use in that context is a known mistranslation. "Code" is intentionally
+# excluded because it is context-dependent (HTTP status vs. the VS Code app);
+# call-site routing handles it, not a value-wide rule.
+#
+# Exact English keys whose "token" is an AI model token (never an auth/pairing
+# token), so the Simplified-Chinese value must keep the English word "token"
+# rather than the auth-only 令牌.
+ZH_HANS_AI_TOKEN_KEYS = frozenset(
+    {
+        "%@ tokens",
+        "%lld input · %lld output tokens",
+        "Context window tokens",
+        "Maximum output tokens",
+        "tokens",
+        "tokens per response",
+        "Compare model, tokens, finish reason, and latency against adjacent retries.",
+        "Check event count, final event, interruption signs, and first-token/overall duration.",
+        "Rockxy can identify this AI app session, but model, tokens, and tools need decrypted API evidence.",
+        "SSE cadence is shown from captured events. Token boundaries stay unavailable unless the provider exposes them.",
+        "Rockxy uses 8,192 tokens by default and limits local inference to 32,768 tokens to avoid excessive memory pressure.",
+    }
+)
+
+
+def zh_hans_glossary_errors(path: Path, key: str, source: str, value: str, unit_path: tuple[str, ...]) -> list[str]:
+    """Deterministic Simplified-Chinese terminology checks proven by the English source.
+
+    Only forbid-rules are applied so unrelated future strings are never coerced;
+    each rule is gated on an unambiguous English trigger.
+    """
+    lowered = source.lower()
+    semantic_context = f"{key} {source}".lower()
+    is_certificate_pinning = "certificate pinning" in lowered or "pins certificate" in lowered
+    checks: list[tuple[bool, tuple[str, ...], str]] = [
+        # redaction/redacted/redact -> 脱敏/已脱敏 (never 遮盖/隐去).
+        ("redact" in lowered, ("遮盖", "隐去"), "redaction must use 脱敏/已脱敏"),
+        # certificate pinning -> 证书固定 (never 锁定).
+        (is_certificate_pinning, ("锁定",), "certificate pinning must use 固定"),
+        # The named Compose feature stays "Compose" (never 编写).
+        ("Compose" in source, ("编写",), "named Compose feature must stay Compose"),
+        # Protobuf wire format -> 线格式 (never 线路格式).
+        ("wire format" in lowered or "wire-format" in lowered, ("线路格式",), "Protobuf wire format must use 线格式"),
+        # AI model token(s) -> token (never the auth-only 令牌).
+        (key in ZH_HANS_AI_TOKEN_KEYS, ("令牌",), "AI model token must use token, not 令牌"),
+    ]
+    errors: list[str] = []
+    for applies, banned, label in checks:
+        if not applies:
+            continue
+        for term in banned:
+            if term in value:
+                errors.append(
+                    f"{path}: {key!r} zh-Hans glossary at {unit_path}: {label} "
+                    f"(found {term!r} in {value!r})"
+                )
+    requirements: list[tuple[bool, str, str]] = [
+        ("status code" in semantic_context, "状态码", "HTTP status code must use 状态码"),
+        ("redact" in lowered, "脱敏", "redaction must use 脱敏/已脱敏"),
+        (is_certificate_pinning, "固定", "certificate pinning must use 固定"),
+        ("Compose" in source, "Compose", "named Compose feature must stay Compose"),
+        (
+            "wire format" in lowered or "wire-format" in lowered,
+            "线格式",
+            "Protobuf wire format must use 线格式",
+        ),
+        (key in ZH_HANS_AI_TOKEN_KEYS, "token", "AI model token must use token"),
+    ]
+    for applies, required, label in requirements:
+        if applies and required not in value:
+            errors.append(
+                f"{path}: {key!r} zh-Hans glossary at {unit_path}: {label} "
+                f"(missing {required!r} in {value!r})"
+            )
+    return errors
+
+
+def validate_swift_literal_coverage(source_root: Path, catalog_path: Path) -> list[str]:
+    """Require direct, non-interpolated String(localized:) keys to exist in the catalog."""
+    try:
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"{catalog_path}: cannot check Swift literal coverage ({exc})"]
+    strings = catalog.get("strings")
+    if not isinstance(strings, dict):
+        return [f"{catalog_path}: cannot check Swift literal coverage (missing strings object)"]
+
+    errors: list[str] = []
+    for source_path in sorted(source_root.rglob("*.swift")):
+        try:
+            source = source_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"{source_path}: cannot read Swift source ({exc})")
+            continue
+        for match in DIRECT_LOCALIZED_LITERAL_RE.finditer(source):
+            key = match.group(1)
+            if key not in strings:
+                line = source.count("\n", 0, match.start()) + 1
+                errors.append(f"{source_path}:{line}: localized key {key!r} is missing from {catalog_path}")
+    return errors
 
 
 def placeholder_multiset(text: str) -> list[str]:
@@ -237,6 +343,10 @@ def validate_catalog(path: Path, required: list[str]) -> list[str]:
                         f"{path}: {key!r} placeholder mismatch for {lang} at {unit_path} "
                         f"(source={src_tokens}, {lang}={translated_tokens})"
                     )
+                if lang == "zh-Hans":
+                    errors.extend(
+                        zh_hans_glossary_errors(path, key, expected_units[unit_path], value, unit_path)
+                    )
     return errors
 
 
@@ -298,6 +408,7 @@ def main() -> int:
     all_errors: list[str] = []
     if catalogs == DEFAULT_CATALOGS:
         all_errors.extend(validate_project_languages(catalog_paths, DEFAULT_PROJECT_FILE))
+        all_errors.extend(validate_swift_literal_coverage(DEFAULT_SWIFT_SOURCE_ROOT, catalog_paths[0]))
     for path in catalog_paths:
         if not path.exists():
             all_errors.append(f"{path}: catalog not found")

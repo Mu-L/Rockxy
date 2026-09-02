@@ -2,14 +2,50 @@ import AppKit
 import Foundation
 import os
 
+// MARK: - ProcessResolver
+
 /// Resolves macOS process names from TCP source ports by querying `lsof`.
 /// Called once per batch in `processBatch()` to map all active connections to
 /// the proxy port → originating app name. Results are cached briefly since
 /// TCP ports are reused slowly.
 final class ProcessResolver: @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init() {
+        identityResolver = ClientIdentityResolver(
+            connectionTableProvider: { proxyPort, deadline in
+                ProcessResolver.runLsofConnectionTable(proxyPort: proxyPort, deadline: deadline)
+            },
+            identityProvider: { pid, command in
+                ProcessResolver.applicationIdentity(forPID: pid, command: command)
+            },
+            excludePID: getpid()
+        )
+    }
+
     // MARK: Internal
 
     static let shared = ProcessResolver()
+
+    /// Per-connection application-identity resolver backed by the live OS connection table.
+    /// Used by the proxy to drive application-scoped SSL proxying decisions.
+    let identityResolver: ClientIdentityResolver
+
+    /// Samples accepted connections for the observed-app picker when no application rules
+    /// are active. TLS decisions resolve every connection once an app rule can affect them;
+    /// discovery-only work is throttled to avoid shelling out on the common host-only path.
+    func shouldSampleApplicationIdentity() -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        observationSampleLock.lock()
+        defer { observationSampleLock.unlock() }
+        guard lastObservationSample == 0
+            || now &- lastObservationSample >= Self.observationSampleIntervalNanoseconds else
+        {
+            return false
+        }
+        lastObservationSample = now
+        return true
+    }
 
     /// Runs a single `lsof` call against the proxy port and returns a mapping of
     /// client source port → human-readable app name. Cached for 2 seconds to avoid
@@ -77,6 +113,10 @@ final class ProcessResolver: @unchecked Sendable {
     // MARK: Private
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "ProcessResolver")
+    private static let observationSampleIntervalNanoseconds: UInt64 = 500_000_000
+
+    private let observationSampleLock = NSLock()
+    private var lastObservationSample: UInt64 = 0
 
     private let lock = NSLock()
     private var cachedResult: [UInt16: String]?
@@ -285,4 +325,189 @@ final class ProcessResolver: @unchecked Sendable {
 
         return command
     }
+}
+
+// MARK: - Connection Table & Identity Resolution
+
+extension ProcessResolver {
+    /// Resolves a pid + command into a stable `ClientApplicationIdentity`. Prefers a bundle
+    /// identity (running application or owning `.app` bundle) and falls back to a
+    /// privacy-preserving executable digest when no bundle identity is available.
+    static func applicationIdentity(forPID pid: Int32, command: String) -> ClientApplicationIdentity? {
+        var pathBuffer = [CChar](repeating: 0, count: 4_096)
+        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+        guard pathLength > 0 else {
+            return nil
+        }
+
+        let path = String(cString: pathBuffer)
+        if let outerBundlePath = ClientApplicationIdentity.outerAppBundlePath(forExecutablePath: path) {
+            let displayName = ClientApplicationIdentity.appName(fromBundlePath: outerBundlePath)
+            if let bundle = Bundle(path: outerBundlePath), let bundleID = bundle.bundleIdentifier {
+                return .bundle(identifier: bundleID, displayName: displayName)
+            }
+            return .executable(normalizedPath: outerBundlePath, displayName: displayName)
+        }
+
+
+        if let running = NSRunningApplication(processIdentifier: pid), let bundleID = running.bundleIdentifier {
+            let name = running.localizedName ?? command
+            return .bundle(identifier: bundleID, displayName: name)
+        }
+
+        let execName = (path as NSString).lastPathComponent
+        return .executable(normalizedPath: path, displayName: execName)
+    }
+
+    /// Collects the live TCP connection table for the proxy port via `lsof`, bounded by a
+    /// watchdog deadline. Reads the pipe on a background queue to avoid a full-pipe deadlock,
+    /// and terminates the process if it overruns the deadline (returning an empty table).
+    static func runLsofConnectionTable(proxyPort: Int, deadline: DispatchTime) -> [ProxyConnectionRecord] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-nP", "-iTCP:\(proxyPort)", "-Fpcn"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+        } catch {
+            Self.logger.warning("Failed to launch lsof for connection table: \(error.localizedDescription)")
+            return []
+        }
+
+        let handle = pipe.fileHandleForReading
+        let outputBox = LsofOutputBox()
+        let completion = DispatchSemaphore(value: 0)
+        Self.lsofReadQueue.async {
+            let data = handle.readDataToEndOfFile()
+            outputBox.set(data)
+            completion.signal()
+        }
+
+        let waitDeadline = deadline > DispatchTime.now() ? deadline : DispatchTime.now()
+        if completion.wait(timeout: waitDeadline) == .timedOut {
+            process.terminate()
+            _ = completion.wait(timeout: .now() + .milliseconds(200))
+            Self.logger.debug("lsof connection table timed out for port \(proxyPort)")
+            return []
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            return []
+        }
+
+        let output = String(data: outputBox.get(), encoding: .utf8) ?? ""
+        return parseConnectionTable(output)
+    }
+
+    /// Parses `lsof -Fpcn` output into directional connection records. Kept pure and internal
+    /// so parsing can be verified deterministically without shelling out.
+    static func parseConnectionTable(_ output: String) -> [ProxyConnectionRecord] {
+        var records: [ProxyConnectionRecord] = []
+        var currentPID: Int32 = 0
+        var currentCommand = ""
+
+        for rawLine in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            let line = String(rawLine)
+            let prefix = line.first
+            let value = String(line.dropFirst())
+
+            switch prefix {
+            case "p":
+                currentPID = Int32(value) ?? 0
+            case "c":
+                currentCommand = value
+            case "n":
+                guard let record = parseConnectionLine(value, pid: currentPID, command: currentCommand) else {
+                    continue
+                }
+                records.append(record)
+            default:
+                break
+            }
+        }
+
+        return records
+    }
+
+    private static let lsofReadQueue = DispatchQueue(label: "rockxy.client-identity.lsof", qos: .utility)
+
+    private static func parseConnectionLine(
+        _ value: String,
+        pid: Int32,
+        command: String
+    )
+        -> ProxyConnectionRecord?
+    {
+        guard value.contains("->") else {
+            return nil
+        }
+        let parts = value.components(separatedBy: "->")
+        guard parts.count == 2,
+              let source = parseEndpoint(parts[0]),
+              let destination = parseEndpoint(parts[1]) else
+        {
+            return nil
+        }
+        return ProxyConnectionRecord(
+            pid: pid,
+            command: command,
+            sourceHost: source.host,
+            sourcePort: source.port,
+            destHost: destination.host,
+            destPort: destination.port
+        )
+    }
+
+    private static func parseEndpoint(_ raw: String) -> (host: String, port: UInt16)? {
+        let endpoint = raw.trimmingCharacters(in: .whitespaces)
+        if endpoint.hasPrefix("[") {
+            guard let closing = endpoint.firstIndex(of: "]") else {
+                return nil
+            }
+            let host = String(endpoint[endpoint.index(after: endpoint.startIndex) ..< closing])
+            let rest = endpoint[endpoint.index(after: closing)...]
+            guard rest.hasPrefix(":"), let port = UInt16(rest.dropFirst()) else {
+                return nil
+            }
+            return (host, port)
+        }
+        guard let lastColon = endpoint.lastIndex(of: ":") else {
+            return nil
+        }
+        let host = String(endpoint[endpoint.startIndex ..< lastColon])
+        guard let port = UInt16(endpoint[endpoint.index(after: lastColon)...]) else {
+            return nil
+        }
+        return (host, port)
+    }
+}
+
+// MARK: - LsofOutputBox
+
+/// Thread-safe container so the background pipe reader and the watchdog thread can exchange
+/// captured `lsof` output without a data race.
+private final class LsofOutputBox: @unchecked Sendable {
+    // MARK: Internal
+
+    func set(_ data: Data) {
+        lock.lock()
+        stored = data
+        lock.unlock()
+    }
+
+    func get() -> Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var stored = Data()
 }

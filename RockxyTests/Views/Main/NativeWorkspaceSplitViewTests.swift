@@ -562,9 +562,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(openCount == 0)
         actionDispatchReturned = true
 
-        for _ in 0 ..< 4 where openCount == 0 {
-            await Task.yield()
-        }
+        try await waitUntil { openCount == 1 }
         #expect(openCount == 1)
     }
 
@@ -602,9 +600,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(openedWindowID == nil)
         actionDispatchReturned = true
 
-        for _ in 0 ..< 4 where openedWindowID == nil {
-            await Task.yield()
-        }
+        try await waitUntil { openedWindowID != nil }
         #expect(openedWindowID == "mapRemote")
     }
 
@@ -638,9 +634,7 @@ struct NativeWorkspaceSplitViewTests {
         #expect(toggleCount == 0)
         actionDispatchReturned = true
 
-        for _ in 0 ..< 4 where toggleCount == 0 {
-            await Task.yield()
-        }
+        try await waitUntil { toggleCount == 1 }
         #expect(toggleCount == 1)
     }
 
@@ -1104,6 +1098,24 @@ struct NativeWorkspaceSplitViewTests {
         NSToolbar.Identifier("NativeWorkspaceSplitViewTests.Toolbar.\(UUID().uuidString)")
     }
 
+    private func waitUntil(
+        attempts: Int = 500,
+        condition: @MainActor () -> Bool
+    )
+        async throws
+    {
+        for _ in 0 ..< attempts {
+            if condition() {
+                return
+            }
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+        if condition() {
+            return
+        }
+        throw NativeWorkspaceSplitViewTestTimeout()
+    }
+
     private func expectNonNegativeArrangedGeometry(_ controller: NativeWorkspaceSplitViewController) {
         for item in controller.splitViewItems {
             let frame = item.viewController.view.frame
@@ -1122,3 +1134,5 @@ struct NativeWorkspaceSplitViewTests {
         UserDefaults.standard.removeObject(forKey: "NSToolbar Configuration \(identifier)")
     }
 }
+
+private struct NativeWorkspaceSplitViewTestTimeout: Error {}

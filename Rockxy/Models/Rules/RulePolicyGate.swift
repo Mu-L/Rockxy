@@ -137,10 +137,56 @@ final class RulePolicyGate: @unchecked Sendable {
         return accepted
     }
 
+    // MARK: - Persistence-Aware Operations
+
+    /// Adds a rule and reports the combined quota + durable-save result so the
+    /// caller can surface a save failure instead of falsely reporting success.
+    func addRulePersisting(_ rule: ProxyRule) async -> RuleMutationResult {
+        let result = await RuleSyncService.addRuleIfAllowedPersisting(
+            rule,
+            maxPerCategory: policy.maxActiveRulesPerTool
+        )
+        if case .quotaExceeded = result {
+            Self.logger.info("Rule quota reached for \(rule.action.toolCategory)")
+        }
+        return result
+    }
+
+    /// Updates a rule and reports whether the change was durably saved.
+    func updateRulePersisting(_ rule: ProxyRule) async -> RulePersistenceOutcome {
+        await RuleSyncService.updateRulePersisting(rule)
+    }
+
     // MARK: - Pass-Through Operations (no quota impact)
 
     func removeRule(id: UUID) async {
         await RuleSyncService.removeRule(id: id)
+    }
+
+    /// Removes only the given rule IDs against current engine state, retaining
+    /// concurrent additions and other categories. No quota impact.
+    func removeRules(ids: Set<UUID>) async {
+        await RuleSyncService.removeRules(ids: ids)
+    }
+
+    /// Bulk enables/disables every Map Local rule against current engine state,
+    /// enforcing the per-category active-rule quota. Other categories and
+    /// concurrent additions are retained.
+    func setMapLocalRulesEnabled(_ enabled: Bool) async {
+        await RuleSyncService.setMapLocalRulesEnabled(
+            enabled,
+            maxPerCategory: policy.maxActiveRulesPerTool
+        )
+    }
+
+    /// Replaces every Block rule with the imported set against current engine state,
+    /// enforcing the per-category active-rule quota. Non-Block rules and concurrent
+    /// additions from other windows are retained.
+    func replaceBlockRules(_ importedBlockRules: [ProxyRule]) async {
+        await RuleSyncService.replaceBlockRules(
+            importedBlockRules,
+            maxPerCategory: policy.maxActiveRulesPerTool
+        )
     }
 
     func updateRule(_ rule: ProxyRule) async {

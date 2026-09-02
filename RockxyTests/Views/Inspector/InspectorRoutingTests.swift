@@ -444,8 +444,9 @@ struct InspectorRoutingTests {
         #expect(prompt?.hostScope?.controlTitle == "Decrypt Host")
         #expect(prompt?.hostScope?.action == .enableDomain("api.example.com"))
         #expect(prompt?.appScope?.control == .button)
-        #expect(prompt?.appScope?.controlTitle == "Decrypt App")
+        #expect(prompt?.appScope?.controlTitle == "Decrypt Observed Hosts")
         #expect(prompt?.appScope?.action == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
+        #expect(prompt?.appScope?.actionDescription.contains("apply to every application") == true)
         #expect(prompt?.requiresCertificateSetup == false)
         #expect(prompt?.insight == .tunnelEstablished(statusCode: 200))
         #expect(prompt?.insight?.title == "Content Not Inspected")
@@ -742,7 +743,7 @@ struct InspectorRoutingTests {
         #expect(prompt?.hostScope?.action == nil)
         #expect(prompt?.appScope?.state == .partial)
         #expect(prompt?.appScope?.control == .button)
-        #expect(prompt?.appScope?.controlTitle == "Decrypt App")
+        #expect(prompt?.appScope?.controlTitle == "Decrypt Observed Hosts")
         #expect(prompt?.appScope?.action == .enableApp("Google Chrome", fallbackDomain: "api.example.com"))
     }
 
@@ -766,7 +767,7 @@ struct InspectorRoutingTests {
         #expect(appHosts?.state == .partial)
         #expect(appHosts?.control == .button)
         #expect(appHosts?.action == .enableApp("Brave Browser Helper", fallbackDomain: "api.example.com"))
-        #expect(appHosts?.controlTitle == "Decrypt App")
+        #expect(appHosts?.controlTitle == "Decrypt Observed Hosts")
 
         let duplicateScope = HTTPSInspectionScopePresentation.appHosts(
             name: "curl",
@@ -785,6 +786,20 @@ struct InspectorRoutingTests {
             fallbackDomain: "client.crisp.chat"
         )
         #expect(equivalentScope == nil)
+    }
+
+    @Test("blocked host Decrypt opens rule review instead of claiming it can enable")
+    func blockedHostDecryptOpensRuleReview() {
+        let blocked = HTTPSInspectionScopePresentation.host(
+            value: "api.example.com",
+            isReady: false,
+            decryptBlockedReason: "Tunnel rule *.example.com takes priority."
+        )
+
+        #expect(blocked.controlTitle == "Review Rules")
+        #expect(blocked.action == .openSSLProxyingList)
+        #expect(blocked.actionDescription == "Tunnel rule *.example.com takes priority.")
+        #expect(blocked.state == .available)
     }
 
     @Test("Plain HTTP response does not show HTTPS prompt")

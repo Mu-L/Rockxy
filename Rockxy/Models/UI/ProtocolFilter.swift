@@ -32,7 +32,27 @@ enum ProtocolFilter: String, CaseIterable, Hashable {
     // MARK: Internal
 
     static var contentFilters: [ProtocolFilter] {
-        [.all, .http, .https, .websocket, .ai, .aiSession, .web3RPC, .rpcError, .json, .xml, .js, .css, .graphql, .grpc, .document, .media, .form, .font, .other]
+        [
+            .all,
+            .http,
+            .https,
+            .websocket,
+            .ai,
+            .aiSession,
+            .web3RPC,
+            .rpcError,
+            .json,
+            .xml,
+            .js,
+            .css,
+            .graphql,
+            .grpc,
+            .document,
+            .media,
+            .form,
+            .font,
+            .other
+        ]
     }
 
     static var statusFilters: [ProtocolFilter] {
@@ -41,25 +61,26 @@ enum ProtocolFilter: String, CaseIterable, Hashable {
 
     var displayName: String {
         switch self {
-        case .all: "All"
+        case .all: String(localized: "All", bundle: RockxyLocalization.bundle)
+        case .ai: String(localized: "AI API", bundle: RockxyLocalization.bundle)
+        case .aiSession: String(localized: "AI Session", bundle: RockxyLocalization.bundle)
+        case .rpcError: String(localized: "RPC Error", bundle: RockxyLocalization.bundle)
+        case .document: String(localized: "Document", bundle: RockxyLocalization.bundle)
+        case .media: String(localized: "Media", bundle: RockxyLocalization.bundle)
+        case .form: String(localized: "Form", bundle: RockxyLocalization.bundle)
+        case .font: String(localized: "Font", bundle: RockxyLocalization.bundle)
+        case .other: String(localized: "Other", bundle: RockxyLocalization.bundle)
+        // Protocol names, content-type acronyms, and HTTP status ranges render verbatim.
         case .http: "HTTP"
         case .https: "HTTPS"
         case .websocket: "WebSocket"
-        case .ai: "AI API"
-        case .aiSession: "AI Session"
         case .web3RPC: "Web3"
-        case .rpcError: "RPC Error"
         case .json: "JSON"
         case .xml: "XML"
         case .js: "JS"
         case .css: "CSS"
         case .graphql: "GraphQL"
         case .grpc: "gRPC"
-        case .document: "Document"
-        case .media: "Media"
-        case .form: "Form"
-        case .font: "Font"
-        case .other: "Other"
         case .status1xx: "1xx"
         case .status2xx: "2xx"
         case .status3xx: "3xx"

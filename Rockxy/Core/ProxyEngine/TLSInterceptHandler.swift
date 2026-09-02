@@ -102,8 +102,12 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
+        clientApplicationIdentity: ClientApplicationIdentity? = nil,
+        clientConnectionDescriptor: ProxyConnectionDescriptor? = nil,
+        liveTunnelRegistry: LiveTunnelRegistry? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
@@ -119,6 +123,9 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         self.captureContextProvider = captureContextProvider
         self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
+        self.clientApplicationIdentity = clientApplicationIdentity
+        self.clientConnectionDescriptor = clientConnectionDescriptor
+        self.liveTunnelRegistry = liveTunnelRegistry
         self.onTransactionComplete = onTransactionComplete
         self.onBreakpointHit = onBreakpointHit
         self.breakpointBridgeTracker = breakpointBridgeTracker
@@ -149,6 +156,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         sourcePort: UInt16?,
         measuredDuration: TimeInterval? = nil,
         isTLSFailure: Bool = false,
+        sslCapture: HTTPTransaction.SSLCaptureMode? = nil,
         captureContext: TrafficCaptureContext? = nil
     )
         -> HTTPTransaction
@@ -175,6 +183,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 sourcePort: sourcePort,
                 measuredDuration: measuredDuration,
                 isTLSFailure: isTLSFailure,
+                sslCapture: sslCapture,
                 captureContext: captureContext
             )
         }
@@ -199,6 +208,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         transaction.measuredDuration = measuredDuration
         transaction.sourcePort = sourcePort
         transaction.isTLSFailure = isTLSFailure
+        transaction.sslCapture = sslCapture
         return transaction
     }
 
@@ -248,7 +258,8 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     nonisolated static func initialTunnelMode(
         host: String,
         sslProxyingManager: SSLProxyingManager,
-        bypassProxyManager: BypassProxyManager
+        bypassProxyManager: BypassProxyManager,
+        application: ClientApplicationIdentity? = nil
     )
         -> InitialTunnelMode
     {
@@ -256,7 +267,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
             return .rawTunnel(.bypassProxyList)
         }
 
-        if !sslProxyingManager.shouldIntercept(host) {
+        if !sslProxyingManager.shouldIntercept(host: host, application: application) {
             return .rawTunnel(.noSSLProxyingRule)
         }
 
@@ -295,6 +306,9 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?
+    private let clientApplicationIdentity: ClientApplicationIdentity?
+    private let clientConnectionDescriptor: ProxyConnectionDescriptor?
+    private let liveTunnelRegistry: LiveTunnelRegistry?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (
         BreakpointDecision,
@@ -310,22 +324,32 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         let host = self.host
         let port = self.port
 
+        // Capture the policy generation BEFORE reading SSL policy, so a mutation racing this
+        // classification is detectable when the raw tunnel is registered (see LiveTunnelRegistry).
+        let decisionGeneration = liveTunnelRegistry?.currentGeneration() ?? 0
+
         switch Self.initialTunnelMode(
             host: host,
             sslProxyingManager: sslProxyingManager,
-            bypassProxyManager: bypassProxyManager
+            bypassProxyManager: bypassProxyManager,
+            application: clientApplicationIdentity
         ) {
-        case .rawTunnel(.bypassProxyList):
-            tlsLogger.info("Bypass proxy list matched \(host), passing through as raw tunnel")
-            setupRawTunnel(context: context, host: host, port: port)
-            return
-        case .rawTunnel(.noSSLProxyingRule):
-            tlsLogger.info("No SSL proxying rule for \(host), passing through as raw tunnel")
-            setupRawTunnel(context: context, host: host, port: port)
-            return
-        case .rawTunnel(.autoPassthrough):
-            tlsLogger.info("Auto-passthrough for \(host) (previous TLS rejection), raw tunnel")
-            setupRawTunnel(context: context, host: host, port: port)
+        case let .rawTunnel(reason):
+            switch reason {
+            case .bypassProxyList:
+                tlsLogger.info("Bypass proxy list matched \(host), passing through as raw tunnel")
+            case .noSSLProxyingRule:
+                tlsLogger.info("No SSL proxying rule for \(host), passing through as raw tunnel")
+            case .autoPassthrough:
+                tlsLogger.info("Auto-passthrough for \(host) (previous TLS rejection), raw tunnel")
+            }
+            setupRawTunnel(
+                context: context,
+                host: host,
+                port: port,
+                trackingReason: reason,
+                decisionGeneration: decisionGeneration
+            )
             return
         case .intercept:
             break
@@ -468,10 +492,19 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         }
     }
 
+    /// Sets up a raw byte tunnel to the upstream.
+    ///
+    /// When `trackingReason` is non-nil the resulting live tunnel is registered with the
+    /// `LiveTunnelRegistry` so a later SSL-policy change that makes this host eligible for
+    /// interception can close it (forcing a fresh, intercepted CONNECT). The cert-failure
+    /// fallbacks from the `.intercept` branch pass `nil` — that host was already classified for
+    /// interception, so a policy change gains nothing and re-closing could loop.
     nonisolated private func setupRawTunnel(
         context: ChannelHandlerContext,
         host: String,
-        port: Int
+        port: Int,
+        trackingReason: RawTunnelReason? = nil,
+        decisionGeneration: UInt64 = 0
     ) {
         guard connectionLimiter.acquire(host: host, port: port) else {
             tlsLogger.warning("Connection limit reached for \(host):\(port), closing")
@@ -502,6 +535,19 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                     prepareClientChannel: context.pipeline.removeHandler(context: context),
                     enableClientAutoRead: true
                 ) {
+                    // Track the live raw tunnel so a later policy change can reset it. The
+                    // registry closes the channel immediately if the raw decision raced a
+                    // mutation that now requires interception.
+                    if let trackingReason {
+                        self.liveTunnelRegistry?.registerRawTunnel(
+                            channel: clientChannel,
+                            host: host,
+                            application: self.clientApplicationIdentity,
+                            connectionDescriptor: self.clientConnectionDescriptor,
+                            reason: trackingReason,
+                            decisionGeneration: decisionGeneration
+                        )
+                    }
                     self.onTransactionComplete(
                         Self.makeTunnelTransaction(
                             host: host,
@@ -511,6 +557,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                             state: .completed,
                             sourcePort: self.clientSourcePort,
                             measuredDuration: self.tunnelElapsedDuration(),
+                            sslCapture: .tunneled,
                             captureContext: self.tunnelCaptureContext
                         )
                     )
@@ -559,7 +606,8 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
@@ -674,6 +722,9 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         tearDownAndPassthrough(context: context)
     }
 
+    /// Builds the CONNECT row for a raw tunnel established after the handshake pipeline was
+    /// torn down (non-TLS data seen inside the tunnel). This is a passthrough, not an
+    /// interception, so it is captured as `.tunneled`.
     nonisolated func makeSuccessfulTunnelTransaction() -> HTTPTransaction {
         TLSInterceptHandler.makeTunnelTransaction(
             host: host,
@@ -683,6 +734,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
             state: .completed,
             sourcePort: clientSourcePort,
             measuredDuration: tunnelElapsedDuration(),
+            sslCapture: .tunneled,
             captureContext: tunnelCaptureContext
         )
     }

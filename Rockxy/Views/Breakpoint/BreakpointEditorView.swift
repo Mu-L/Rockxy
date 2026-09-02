@@ -331,7 +331,7 @@ struct BreakpointEditorView: View {
             .accessibilityLabel(String(localized: "Common HTTP response status", bundle: RockxyLocalization.bundle))
 
             TextField(
-                String(localized: "Code", bundle: RockxyLocalization.bundle),
+                String(localized: "Compact HTTP status code", bundle: RockxyLocalization.bundle),
                 text: Binding(
                     get: { String(draftFor(itemId)?.statusCode ?? 200) },
                     set: { value in

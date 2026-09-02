@@ -14,6 +14,27 @@ private struct FailingProcessRunner: DeveloperSetupProcessRunning {
     }
 }
 
+// MARK: - CapturingProcessRunner
+
+private final class CapturingProcessRunner: DeveloperSetupProcessRunning, @unchecked Sendable {
+    // MARK: Internal
+
+    var wasInvoked: Bool {
+        lock.withLock { invocationCount > 0 }
+    }
+
+    func run(executableURL _: URL, arguments _: [String]) throws {
+        lock.withLock { invocationCount += 1 }
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var invocationCount = 0
+}
+
+// MARK: - CapturingPasteboard
+
 @MainActor
 private final class CapturingPasteboard: DeveloperSetupPasteboardWriting {
     private(set) var string: String?
@@ -53,6 +74,15 @@ struct DeveloperSetupRouteStoreTests {
         #expect(store.consumeAutomaticRoute()?.targetID == .python)
     }
 
+    @Test("Java VMs is an eligible Automatic Setup route target")
+    func automaticRouteAcceptsJavaVMs() {
+        let store = DeveloperSetupRouteStore()
+
+        #expect(SetupTarget.javaVMs.isRuntimeTerminalTarget)
+        #expect(store.requestAutomatic(targetID: .javaVMs) == true)
+        #expect(store.consumeAutomaticRoute()?.targetID == .javaVMs)
+    }
+
     @Test("A newer route wins over an older one by generation")
     func newerRouteWinsByGeneration() {
         let store = DeveloperSetupRouteStore()
@@ -77,6 +107,8 @@ struct DeveloperSetupRouteStoreTests {
 
 @MainActor
 struct DeveloperSetupSessionTargetTests {
+    // MARK: Internal
+
     @Test("Session setup reflects the routed target instead of a generic default")
     func sessionReflectsRoutedTarget() {
         let viewModel = DeveloperSetupSessionSetupViewModel(
@@ -116,6 +148,27 @@ struct DeveloperSetupSessionTargetTests {
         )
 
         #expect(viewModel.targetID == .ruby)
+    }
+
+    @Test("Routing a Java session regenerates the script with JVM proxy properties")
+    func javaSessionGeneratesJVMProxyProperties() {
+        let viewModel = DeveloperSetupSessionSetupViewModel(
+            coordinator: MainContentCoordinator(),
+            targetID: .python
+        )
+
+        viewModel.applyRoute(
+            DeveloperSetupRoute(targetID: .javaVMs, tab: .setup, destination: .automatic, generation: 1),
+            destination: .automatic
+        )
+
+        #expect(viewModel.targetID == .javaVMs)
+        #expect(viewModel.isRuntimeTerminalTarget)
+        #expect(viewModel.context.targetID == .javaVMs)
+
+        let script = RockxySetupScriptBuilder.script(context: viewModel.context)
+        #expect(script.contains("-Dhttps.proxyHost="))
+        #expect(script.contains("export JAVA_TOOL_OPTIONS="))
     }
 
     @Test("Runtime-terminal targets remain terminal-eligible")
@@ -161,12 +214,14 @@ struct DeveloperSetupSessionTargetTests {
     }
 
     @Test("Custom terminal copies the setup command and reports it")
-    func customTerminalCopiesCommand() async throws {
+    func customTerminalCopiesCommand() async {
         let scriptURL = temporaryScriptURL()
         defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
         let pasteboard = CapturingPasteboard()
+        let coordinator = MainContentCoordinator()
+        coordinator.isProxyRunning = true
         let viewModel = DeveloperSetupSessionSetupViewModel(
-            coordinator: MainContentCoordinator(),
+            coordinator: coordinator,
             targetID: .python,
             pasteboard: pasteboard,
             scriptURL: scriptURL
@@ -179,12 +234,41 @@ struct DeveloperSetupSessionTargetTests {
         #expect(pasteboard.string == viewModel.manualSourceCommand)
     }
 
-    @Test("View model surfaces launcher failure instead of a success message")
-    func viewModelReportsLauncherFailure() async throws {
+    @Test("Automatic terminal launch is blocked while the proxy is stopped")
+    func stoppedProxyBlocksAutomaticTerminalLaunch() async {
         let scriptURL = temporaryScriptURL()
         defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
+        let pasteboard = CapturingPasteboard()
+        let processRunner = CapturingProcessRunner()
+        let coordinator = MainContentCoordinator()
+        coordinator.isProxyRunning = false
         let viewModel = DeveloperSetupSessionSetupViewModel(
-            coordinator: MainContentCoordinator(),
+            coordinator: coordinator,
+            targetID: .javaVMs,
+            processRunner: processRunner,
+            pasteboard: pasteboard,
+            scriptURL: scriptURL
+        )
+
+        await viewModel.openPreparedTerminal()
+
+        #expect(viewModel.statusMessage == String(
+            localized: "Start the Rockxy proxy before opening a prepared terminal.",
+            bundle: RockxyLocalization.bundle
+        ))
+        #expect(FileManager.default.fileExists(atPath: scriptURL.path) == false)
+        #expect(processRunner.wasInvoked == false)
+        #expect(pasteboard.string == nil)
+    }
+
+    @Test("View model surfaces launcher failure instead of a success message")
+    func viewModelReportsLauncherFailure() async {
+        let scriptURL = temporaryScriptURL()
+        defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
+        let coordinator = MainContentCoordinator()
+        coordinator.isProxyRunning = true
+        let viewModel = DeveloperSetupSessionSetupViewModel(
+            coordinator: coordinator,
             targetID: .python,
             processRunner: FailingProcessRunner(),
             scriptURL: scriptURL
@@ -197,6 +281,8 @@ struct DeveloperSetupSessionTargetTests {
         #expect(status.localizedCaseInsensitiveContains("could not"))
         #expect(status.localizedCaseInsensitiveContains("opened") == false)
     }
+
+    // MARK: Private
 
     private func temporaryScriptURL() -> URL {
         FileManager.default.temporaryDirectory

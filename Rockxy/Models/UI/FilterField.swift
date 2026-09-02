@@ -25,22 +25,22 @@ enum FilterField: String, CaseIterable, Codable, Hashable {
     var displayName: String {
         switch self {
         case .url: "URL"
-        case .contains: "Contains"
-        case .host: "Host"
-        case .domain: "Domain"
-        case .path: "Path"
-        case .method: "Method"
-        case .statusCode: "Status Code"
-        case .requestHeader: "Request Header"
-        case .responseHeader: "Response Header"
-        case .requestBody: "Request Body"
-        case .responseBody: "Response Body"
-        case .queryString: "Query String"
-        case .cookies: "Cookies"
-        case .clientApp: "Client/App"
-        case .contentType: "Content Type"
-        case .comment: "Note"
-        case .color: "Color"
+        case .contains: String(localized: "Contains", bundle: RockxyLocalization.bundle)
+        case .host: String(localized: "Host", bundle: RockxyLocalization.bundle)
+        case .domain: String(localized: "Domain", bundle: RockxyLocalization.bundle)
+        case .path: String(localized: "Path", bundle: RockxyLocalization.bundle)
+        case .method: String(localized: "Method", bundle: RockxyLocalization.bundle)
+        case .statusCode: String(localized: "Status Code", bundle: RockxyLocalization.bundle)
+        case .requestHeader: String(localized: "Request Header", bundle: RockxyLocalization.bundle)
+        case .responseHeader: String(localized: "Response Header", bundle: RockxyLocalization.bundle)
+        case .requestBody: String(localized: "Request Body", bundle: RockxyLocalization.bundle)
+        case .responseBody: String(localized: "Response Body", bundle: RockxyLocalization.bundle)
+        case .queryString: String(localized: "Query String", bundle: RockxyLocalization.bundle)
+        case .cookies: String(localized: "Cookies", bundle: RockxyLocalization.bundle)
+        case .clientApp: String(localized: "Client/App", bundle: RockxyLocalization.bundle)
+        case .contentType: String(localized: "Content Type", bundle: RockxyLocalization.bundle)
+        case .comment: String(localized: "Note", bundle: RockxyLocalization.bundle)
+        case .color: String(localized: "Color", bundle: RockxyLocalization.bundle)
         }
     }
 }

@@ -69,12 +69,19 @@ struct ResponseInspectorView: View {
         }
         let canInterceptHTTPS = coordinator.readiness.canInterceptHTTPS
         let domainRuleEnabled = coordinator.isSSLProxyingEnabled(for: transaction.request.host)
+        let resolvedApplicationIdentity = transaction.clientApplicationIdentity
+            ?? normalizedClientAppName.flatMap(coordinator.observedApplicationIdentity(named:))
+        let hostDecryptBlockedReason = coordinator.sslProxyingHostDecryptBlockedReason(
+            for: transaction.request.host,
+            application: resolvedApplicationIdentity
+        )
         let hasRecentTLSRejection = SSLProxyingManager.shared.isAutoPassthrough(transaction.request.host)
         let promptWithoutAppScope = HTTPSInspectionPromptModel.make(
             transaction: transaction,
             canInterceptHTTPS: canInterceptHTTPS,
             domainRuleEnabled: domainRuleEnabled,
             hasRecentTLSRejection: hasRecentTLSRejection,
+            hostDecryptBlockedReason: hostDecryptBlockedReason,
             appScope: nil
         )
         guard let promptWithoutAppScope,
@@ -93,7 +100,16 @@ struct ResponseInspectorView: View {
             return HTTPSInspectionAppScope(
                 name: appName,
                 knownHostCount: domains.count,
-                enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:))
+                enabledHostCount: domains.count(where: coordinator.isSSLProxyingEnabled(for:)),
+                identity: resolvedApplicationIdentity,
+                isApplicationDecryptReady: resolvedApplicationIdentity.map {
+                    coordinator.isSSLProxyingEnabled(for: $0)
+                } ?? false,
+                isApplicationTunnelActive: resolvedApplicationIdentity.map { identity in
+                    SSLProxyingManager.shared.applicationExcludeRules.contains {
+                        $0.isEnabled && $0.applicationIdentifier == identity.identifier
+                    }
+                } ?? false
             )
         }()
 
@@ -102,6 +118,7 @@ struct ResponseInspectorView: View {
             canInterceptHTTPS: canInterceptHTTPS,
             domainRuleEnabled: domainRuleEnabled,
             hasRecentTLSRejection: hasRecentTLSRejection,
+            hostDecryptBlockedReason: hostDecryptBlockedReason,
             appScope: appScope
         )
     }
@@ -260,7 +277,11 @@ struct ResponseInspectorView: View {
                 Button {
                     openResponseBody(bundleIdentifier: "com.microsoft.VSCode")
                 } label: {
-                    Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                    Label {
+                        Text(verbatim: "Code")
+                    } icon: {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    }
                 }
 
                 Button {
@@ -524,6 +545,12 @@ struct ResponseInspectorView: View {
             coordinator.retrySSLProxyingFromInspector(for: domain)
         case let .enableApp(appName, fallbackDomain):
             coordinator.enableSSLProxyingFromInspector(forAppNamed: appName, fallbackDomain: fallbackDomain)
+        case let .setApplication(identity, listType):
+            coordinator.setSSLProxyingFromInspector(
+                for: identity,
+                listType: listType,
+                fallbackDomain: transaction.request.host
+            )
         case .openSSLProxyingList:
             onOpenToolWindow("sslProxyingList")
         }
@@ -682,6 +709,7 @@ enum HTTPSInspectionPromptAction: Equatable {
     case enableDomain(String)
     case retryDomain(String)
     case enableApp(String, fallbackDomain: String?)
+    case setApplication(ClientApplicationIdentity, SSLProxyingListType)
     case openSSLProxyingList
 }
 
@@ -691,6 +719,25 @@ struct HTTPSInspectionAppScope: Equatable {
     let name: String
     let knownHostCount: Int
     let enabledHostCount: Int
+    var identity: ClientApplicationIdentity?
+    var isApplicationDecryptReady: Bool
+    var isApplicationTunnelActive: Bool
+
+    init(
+        name: String,
+        knownHostCount: Int,
+        enabledHostCount: Int,
+        identity: ClientApplicationIdentity? = nil,
+        isApplicationDecryptReady: Bool = false,
+        isApplicationTunnelActive: Bool = false
+    ) {
+        self.name = name
+        self.knownHostCount = knownHostCount
+        self.enabledHostCount = enabledHostCount
+        self.identity = identity
+        self.isApplicationDecryptReady = isApplicationDecryptReady
+        self.isApplicationTunnelActive = isApplicationTunnelActive
+    }
 }
 
 // MARK: - HTTPSInspectionPromptModel
@@ -711,6 +758,7 @@ struct HTTPSInspectionPromptModel: Equatable {
         canInterceptHTTPS: Bool,
         domainRuleEnabled: Bool,
         hasRecentTLSRejection: Bool = false,
+        hostDecryptBlockedReason: String? = nil,
         appScope: HTTPSInspectionAppScope?
     )
         -> HTTPSInspectionPromptModel?
@@ -747,16 +795,23 @@ struct HTTPSInspectionPromptModel: Equatable {
                 statusCode: response.statusCode
             ),
             certificateAction: nil,
-            hostScope: .host(
+            hostScope: appScope?.isApplicationTunnelActive == true ? nil : .host(
                 value: host,
                 isReady: domainRuleEnabled,
-                requiresRetry: hasTLSRejectionEvidence
+                requiresRetry: hasTLSRejectionEvidence,
+                decryptBlockedReason: hostDecryptBlockedReason
             ),
-            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap {
-                .appHosts(
-                    name: $0.name,
-                    enabledHostCount: $0.enabledHostCount,
-                    knownHostCount: $0.knownHostCount,
+            appScope: hasTLSRejectionEvidence ? nil : appScope.flatMap { scope in
+                if let identity = scope.identity {
+                    return .application(
+                        identity: identity,
+                        isDecryptReady: scope.isApplicationDecryptReady
+                    )
+                }
+                return .appHosts(
+                    name: scope.name,
+                    enabledHostCount: scope.enabledHostCount,
+                    knownHostCount: scope.knownHostCount,
                     currentHostEnabled: domainRuleEnabled,
                     fallbackDomain: host
                 )

@@ -172,6 +172,37 @@ If a technical token must move to make the sentence natural, use positional
 placeholders so its semantic argument order remains unambiguous; do not change the
 placeholder's conversion type.
 
+## Simplified Chinese terminology
+
+Several English words carry more than one meaning in Rockxy, so the correct
+Simplified Chinese depends on the **English source context**, not the word alone.
+Never blanket-replace a Chinese term across the catalog — decide per entry, guided
+by the English key. The validator enforces the high-confidence rules below as
+deterministic forbidden- and required-term checks (see `zh_hans_glossary_errors` in
+`.github/tools/validate_xcstrings.py`, mirrored in `StringCatalogCoverageTests`).
+Required terms include `状态码`, `脱敏`, and `token` where the English source context
+selects those meanings.
+
+| English context | Use | Not | Notes |
+|---|---|---|---|
+| HTTP status code | `状态码` | `代码` | Compact table/breakpoint labels use **`Compact HTTP status code`**, whose English value stays `Code`. The bare **`Code`** key is retired because it collided with the VS Code app name. |
+| VS Code app name (Open with menu) | `Code` (verbatim) | `代码` | An app/product name. Rendered with `Text(verbatim:)`, never localized. |
+| AI model token(s) — usage, context window, streaming | `token` (verbatim) | `令牌` | Model tokens are counted, not credentials. |
+| Auth / pairing / access / sharing token | `令牌` | `token` | Credentials — keep `令牌`. |
+| The named **Compose** feature | `Compose` (verbatim) | `编写` | A product surface name. “user-authored / user-written” text still translates to `编写`. |
+| redact / redaction / redacted | `脱敏` / `已脱敏` | `遮盖` / `隐去` | One term everywhere for the privacy action. |
+| certificate pinning | `证书固定` | `证书锁定` | The UI action to **pin** a request/favorite still uses `固定`. |
+| Protobuf wire format | `线格式` | `线路格式` | The Protobuf binary encoding. |
+
+The `Code` example is the reason context matters: the same four letters are an HTTP
+status-code column, a text-editor app name, and a source-code noun. Read the English
+source and, when the meaning is genuinely ambiguous, add a translator `comment` to the
+catalog entry rather than guessing.
+
+The validator also checks direct, non-interpolated `String(localized:)` literals in
+`Rockxy/` against `Localizable.xcstrings`. Adding a runtime lookup without its catalog
+entry is therefore a validation error instead of an English fallback in a shipped locale.
+
 ## Runtime review
 
 Catalog validation proves structure and placeholder safety, but it cannot judge
