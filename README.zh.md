@@ -63,20 +63,23 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.37.0** — 2026-08-29
+**v0.38.0** — 2026-09-03
 
 ### Added
 
-- Added native toolbar customization with a broader set of workspace actions.
-- Completed the Map Local response workflow for serving local files, directories, and custom responses.
-- Added complete Simplified Chinese localization across Rockxy and Pro workflows, including licensing, advanced inspection, Android automation, Project Cloud Sync, and Workspace login and upload.
-- Added live in-app language switching, with System Default following macOS immediately.
+- Added application-scoped HTTPS Decrypt and Tunnel rules, with a unified app-and-host rule list and observed-host picker.
 
 ### Fixed
 
-- Prevented side-by-side Diff views from overflowing their window.
-- Refined focus sheets and restored reliable sidebar toggle behavior.
-- Restored localized titles across app and utility windows.
+- Made live HTTPS connections respond safely to decryption policy changes while preserving unrelated and explicitly tunneled connections.
+- Ensured Map Local rules persist across app relaunches.
+- Improved Java VM Automatic Setup by preserving existing `JAVA_TOOL_OPTIONS`, applying explicit proxy settings, and clarifying launch and certificate requirements.
+- Refined Simplified Chinese terminology and translations across updated workflows.
+- Aligned HTTPS actions, Help, Developer Setup, keyboard shortcuts, and local integrations with application-aware decryption.
+
+### Changed
+
+- Strengthened live request and response breakpoint editing with safer lifecycle handling and clearer status feedback.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
