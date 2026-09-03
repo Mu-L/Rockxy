@@ -38,6 +38,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.38.0] - 2026-09-03
+
+### Added
+
+- Added application-scoped HTTPS Decrypt and Tunnel rules, with a unified app-and-host rule list and observed-host picker.
+
+### Fixed
+
+- Made live HTTPS connections respond safely to decryption policy changes while preserving unrelated and explicitly tunneled connections.
+- Ensured Map Local rules persist across app relaunches.
+- Improved Java VM Automatic Setup by preserving existing `JAVA_TOOL_OPTIONS`, applying explicit proxy settings, and clarifying launch and certificate requirements.
+- Refined Simplified Chinese terminology and translations across updated workflows.
+- Aligned HTTPS actions, Help, Developer Setup, keyboard shortcuts, and local integrations with application-aware decryption.
+
+### Changed
+
+- Strengthened live request and response breakpoint editing with safer lifecycle handling and clearer status feedback.
+
 ## [0.37.0] - 2026-08-29
 
 ### Added

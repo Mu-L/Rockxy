@@ -6,31 +6,34 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.37.0 (build 54)</title>
-      <pubDate>Sat, 29 Aug 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-08-29T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.38.0 (build 55)</title>
+      <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-09-03T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.37.0/Rockxy-0.37.0-54.dmg"
-        sparkle:version="54"
-        sparkle:shortVersionString="0.37.0"
-        sparkle:edSignature="XcuS87x7ZGBZeUm5I7grrCSxX06+MxvUIEF/4ZwgJzPH4xWFosql3eNGlw8AmpLRi7KmbaHSOWwzGIjxZKU1BA=="
-        length="38030037"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.38.0/Rockxy-0.38.0-55.dmg"
+        sparkle:version="55"
+        sparkle:shortVersionString="0.38.0"
+        sparkle:edSignature="NYMTYMjeurQQCaNmLsEoSwaa4cer9mWjJZbuOBfcu8xcC5gXPGI5pvpi68iRLvbpGTEtW4uGKl50bMOd+1ROBA=="
+        length="38440089"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.37.0</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.38.0</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Added</h3>
 <ul>
-  <li>Added native toolbar customization with a broader set of workspace actions.</li>
-  <li>Completed the Map Local response workflow for serving local files, directories, and custom responses.</li>
-  <li>Added complete Simplified Chinese localization across Rockxy and Pro workflows, including licensing, advanced inspection, Android automation, Project Cloud Sync, and Workspace login and upload.</li>
-  <li>Added live in-app language switching, with System Default following macOS immediately.</li>
+  <li>Added application-scoped HTTPS Decrypt and Tunnel rules, with a unified app-and-host rule list and observed-host picker.</li>
 </ul>
 <h3>Fixed</h3>
 <ul>
-  <li>Prevented side-by-side Diff views from overflowing their window.</li>
-  <li>Refined focus sheets and restored reliable sidebar toggle behavior.</li>
-  <li>Restored localized titles across app and utility windows.</li>
+  <li>Made live HTTPS connections respond safely to decryption policy changes while preserving unrelated and explicitly tunneled connections.</li>
+  <li>Ensured Map Local rules persist across app relaunches.</li>
+  <li>Improved Java VM Automatic Setup by preserving existing `JAVA_TOOL_OPTIONS`, applying explicit proxy settings, and clarifying launch and certificate requirements.</li>
+  <li>Refined Simplified Chinese terminology and translations across updated workflows.</li>
+  <li>Aligned HTTPS actions, Help, Developer Setup, keyboard shortcuts, and local integrations with application-aware decryption.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>Strengthened live request and response breakpoint editing with safer lifecycle handling and clearer status feedback.</li>
 </ul>
       ]]></description>
     </item>
