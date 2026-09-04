@@ -496,6 +496,25 @@ final class DeveloperSetupSessionSetupViewModel {
         "\(context.proxyHost):\(context.proxyPort)"
     }
 
+    /// JetBrains IDEs install their own proxy selector, so `JAVA_TOOL_OPTIONS` cannot route
+    /// IDE traffic on its own. Rockxy states that plainly rather than implying it can
+    /// override another app's setting, and never edits JetBrains configuration itself.
+    var javaProxyGuidanceText: String? {
+        guard targetID == .javaVMs else {
+            return nil
+        }
+        return String(
+            localized: """
+            JetBrains IDEs replace the JVM proxy selector with their own HTTP Proxy setting, so this session \
+            does not capture IDE traffic by itself. Quit the IDE completely, then set Settings › HTTP Proxy to \
+            Auto-detect while Rockxy's macOS System Proxy is on, or to Manual with \(proxyEndpointText), and \
+            relaunch the IDE from the prepared terminal. Tools and run configurations the IDE starts as child \
+            processes inherit this session's proxy settings.
+            """,
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
     var certificateStatusText: String {
         if context.certificatePath != nil {
             return String(localized: "Certificate environment hints are ready.", bundle: RockxyLocalization.bundle)

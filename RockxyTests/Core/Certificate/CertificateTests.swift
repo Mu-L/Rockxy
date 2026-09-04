@@ -109,10 +109,10 @@ struct HostCertGeneratorTests {
 
 // MARK: - CertificateManagerTests
 
-// Note: CertificateManager.shared tests require Keychain entitlements
-// that are not available in the xcodebuild test runner. The singleton's
-// ensureRootCA() saves to Keychain, which fails with -25303 in test context.
-// These tests are disabled until a testable initializer or Keychain mock is added.
+// Note: root CA private keys are stored as secure generic-password data. The previous
+// kSecClassKey item shape failed with errSecNoSuchAttr (-25303), which is why these tests
+// used to skip silently instead of exercising the real round-trip. Keychain-backed
+// assertions below run for real and fail loudly if storage breaks again.
 
 // MARK: - Test Isolation Helpers
 
@@ -126,6 +126,8 @@ private func installTestOverrides() -> (label: String, storageDir: URL, cleanup:
 
 @Suite(.serialized)
 struct CertificateStoreTests {
+    // MARK: Internal
+
     @Test("ensureDirectoryExists creates path without throwing")
     func ensureDirectoryCreatesPath() throws {
         let overrides = installTestOverrides()
@@ -180,6 +182,69 @@ struct CertificateStoreTests {
 
         try CertificateStore.deleteAll()
     }
+
+    @Test("reload after persistence keeps the exact key and certificate fingerprint")
+    func reloadPreservesKeyAndFingerprint() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        let ca = try RootCAGenerator.generate()
+
+        try CertificateStore.saveRootCAPrivateKey(ca.privateKey)
+        try CertificateStore.saveRootCACertificate(ca.certificate)
+
+        // Simulate a relaunch: nothing is cached in memory, everything comes back from
+        // the Keychain and the certificate PEM on disk.
+        let reloadedKey = try #require(try CertificateStore.loadRootCAPrivateKey())
+        let reloadedCert = try #require(try CertificateStore.loadRootCACertificate())
+
+        let expectedFingerprint = try fingerprint(of: ca.certificate)
+        let reloadedFingerprint = try fingerprint(of: reloadedCert)
+
+        #expect(reloadedKey.rawRepresentation == ca.privateKey.rawRepresentation)
+        #expect(reloadedFingerprint == expectedFingerprint)
+
+        try CertificateStore.deleteAll()
+    }
+
+    @Test("persisting the private key never writes a plaintext key file")
+    func persistingKeyWritesNoPlaintextFile() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        let ca = try RootCAGenerator.generate()
+
+        try CertificateStore.saveRootCAPrivateKey(ca.privateKey)
+        try CertificateStore.saveRootCACertificate(ca.certificate)
+
+        let keyPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCAKeyFilename)
+        let backupPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCABackupFilename)
+
+        #expect(!FileManager.default.fileExists(atPath: keyPath.path))
+        #expect(!FileManager.default.fileExists(atPath: backupPath.path))
+
+        try CertificateStore.deleteAll()
+    }
+
+    @Test("corrupt persisted certificate is treated as recoverable absence")
+    func corruptCertificateReturnsNil() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        try CertificateStore.ensureDirectoryExists()
+        try Data("not a certificate".utf8).write(to: CertificateStore.rootCACertificateURL)
+
+        let loadedCertificate = try CertificateStore.loadRootCACertificate()
+        #expect(loadedCertificate == nil)
+    }
+
+    // MARK: Private
+
+    private func fingerprint(of certificate: Certificate) throws -> String {
+        var serializer = DER.Serializer()
+        try certificate.serialize(into: &serializer)
+        return KeychainHelper.computeFingerprintSHA256(Data(serializer.serializedBytes))
+    }
 }
 
 // MARK: - KeychainPrimaryStorageTests
@@ -190,14 +255,6 @@ struct KeychainPrimaryStorageTests {
     func keychainRoundTrip() throws {
         let overrides = installTestOverrides()
         defer { overrides.cleanup() }
-
-        // Probe keychain availability — skip in sandbox/CI where keychain is inaccessible
-        do {
-            try KeychainHelper.savePrivateKey(Data([0x01]), label: TestIdentity.keychainProbeLabel)
-            try KeychainHelper.deletePrivateKey(label: TestIdentity.keychainProbeLabel)
-        } catch {
-            return
-        }
 
         let ca = try RootCAGenerator.generate()
         let keyData = Data(ca.privateKey.x963Representation)
@@ -210,18 +267,48 @@ struct KeychainPrimaryStorageTests {
         #expect(loadedKey.rawRepresentation == ca.privateKey.rawRepresentation)
     }
 
+    @Test("manually seeded generic-password key is loaded")
+    func seededGenericPasswordKeyLoads() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        let key = P256.Signing.PrivateKey()
+        let keyData = Data(key.x963Representation)
+        try addPrivateKeyFixture(keyData, label: overrides.label)
+
+        let loadedData = try #require(try KeychainHelper.loadPrivateKey(
+            label: overrides.label,
+            isUsable: { (try? P256.Signing.PrivateKey(x963Representation: $0)) != nil }
+        ))
+
+        #expect(loadedData == keyData)
+        #expect(try privateKeyFixture(label: overrides.label) == keyData)
+    }
+
+    @Test("invalid Keychain key recovers from valid disk backup")
+    func corruptKeychainKeyRecoversFromBackup() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        let validKey = P256.Signing.PrivateKey()
+        let validData = Data(validKey.x963Representation)
+        try addPrivateKeyFixture(Data([0x01, 0x02, 0x03]), label: overrides.label)
+        try CertificateStore.ensureDirectoryExists()
+        let backupDocument = PEMDocument(type: "EC PRIVATE KEY", derBytes: Array(validData))
+        let backupPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCABackupFilename)
+        try Data(backupDocument.pemString.utf8).write(to: backupPath)
+
+        let loadedKey = try #require(try CertificateStore.loadRootCAPrivateKey())
+
+        #expect(loadedKey.rawRepresentation == validKey.rawRepresentation)
+        #expect(try privateKeyFixture(label: overrides.label) == validData)
+        #expect(FileManager.default.fileExists(atPath: backupPath.path))
+    }
+
     @Test("migration: disk-only key migrates to Keychain on load")
     func diskToKeychainMigration() throws {
         let overrides = installTestOverrides()
         defer { overrides.cleanup() }
-
-        // Probe keychain availability — skip in sandbox/CI where keychain is inaccessible
-        do {
-            try KeychainHelper.savePrivateKey(Data([0x01]), label: TestIdentity.keychainProbeLabel)
-            try KeychainHelper.deletePrivateKey(label: TestIdentity.keychainProbeLabel)
-        } catch {
-            return
-        }
 
         let ca = try RootCAGenerator.generate()
 
@@ -257,14 +344,6 @@ struct KeychainPrimaryStorageTests {
         let overrides = installTestOverrides()
         defer { overrides.cleanup() }
 
-        // Probe keychain availability — skip in sandbox/CI where keychain is inaccessible
-        do {
-            try KeychainHelper.savePrivateKey(Data([0x01]), label: TestIdentity.keychainProbeLabel)
-            try KeychainHelper.deletePrivateKey(label: TestIdentity.keychainProbeLabel)
-        } catch {
-            return
-        }
-
         let ca = try RootCAGenerator.generate()
 
         // Store key in Keychain directly
@@ -288,14 +367,6 @@ struct KeychainPrimaryStorageTests {
     func bakRecoveryFallback() throws {
         let overrides = installTestOverrides()
         defer { overrides.cleanup() }
-
-        // Probe keychain availability — skip in sandbox/CI where keychain is inaccessible
-        do {
-            try KeychainHelper.savePrivateKey(Data([0x01]), label: TestIdentity.keychainProbeLabel)
-            try KeychainHelper.deletePrivateKey(label: TestIdentity.keychainProbeLabel)
-        } catch {
-            return
-        }
 
         let ca = try RootCAGenerator.generate()
 
@@ -325,5 +396,87 @@ struct KeychainPrimaryStorageTests {
         // Verify key was re-migrated to Keychain
         let keychainData = try KeychainHelper.loadPrivateKey(label: overrides.label)
         #expect(keychainData != nil)
+    }
+
+    @Test("corrupt primary disk key falls through to valid backup")
+    func corruptPrimaryDiskKeyFallsThroughToBackup() throws {
+        let overrides = installTestOverrides()
+        defer { overrides.cleanup() }
+
+        try KeychainHelper.deletePrivateKey(label: overrides.label)
+        try CertificateStore.ensureDirectoryExists()
+
+        let validKey = P256.Signing.PrivateKey()
+        let primaryPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCAKeyFilename)
+        let backupPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCABackupFilename)
+        try Data("not a private key".utf8).write(to: primaryPath)
+        let backupDocument = PEMDocument(
+            type: "EC PRIVATE KEY",
+            derBytes: Array(validKey.x963Representation)
+        )
+        try Data(backupDocument.pemString.utf8).write(to: backupPath)
+
+        let loadedKey = try #require(try CertificateStore.loadRootCAPrivateKey())
+        let directDiskKey = try #require(try CertificateStore.loadRootCAPrivateKeyFromDisk())
+
+        #expect(loadedKey.rawRepresentation == validKey.rawRepresentation)
+        #expect(directDiskKey.rawRepresentation == validKey.rawRepresentation)
+        #expect(FileManager.default.fileExists(atPath: primaryPath.path))
+        #expect(FileManager.default.fileExists(atPath: backupPath.path))
+    }
+
+    @Test("transient Keychain read statuses are never classified as absence")
+    func transientKeychainStatusesRemainFailures() {
+        #expect(KeychainHelper.classifyReadStatus(errSecItemNotFound) == .absent)
+        #expect(KeychainHelper.classifyReadStatus(errSecInteractionNotAllowed) == .failure)
+        #expect(KeychainHelper.classifyReadStatus(errSecAuthFailed) == .failure)
+        #expect(KeychainHelper.classifyReadStatus(errSecNoSuchAttr) == .failure)
+        #expect(
+            KeychainHelper.classifyReadStatus(errSecNoSuchAttr, toleratesMalformedShape: true) == .absent
+        )
+    }
+
+    // MARK: Private
+
+    private var privateKeyAccount: String {
+        "root-ca-private-key"
+    }
+
+    private func addPrivateKeyFixture(
+        _ data: Data,
+        label: String
+    ) throws {
+        var query = privateKeyFixtureQuery(label: label)
+        SecItemDelete(query as CFDictionary)
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw KeychainError.saveFailed(status)
+        }
+    }
+
+    private func privateKeyFixture(label: String) throws -> Data? {
+        var query = privateKeyFixtureQuery(label: label)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound {
+            return nil
+        }
+        guard status == errSecSuccess else {
+            throw KeychainError.loadFailed(status)
+        }
+        return result as? Data
+    }
+
+    private func privateKeyFixtureQuery(label: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: label,
+            kSecAttrAccount as String: privateKeyAccount
+        ]
     }
 }

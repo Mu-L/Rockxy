@@ -278,6 +278,28 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         return .intercept
     }
 
+    /// Builds the CONNECT row for a tunnel that never came up. It is not a TLS handshake
+    /// failure, so it stays visible in the normal request list rather than being filtered
+    /// out as one.
+    nonisolated func makeTunnelFailureTransaction(statusCode: Int, statusMessage: String) -> HTTPTransaction {
+        Self.makeTunnelTransaction(
+            host: host,
+            port: port,
+            statusCode: statusCode,
+            statusMessage: statusMessage,
+            state: .failed,
+            sourcePort: clientSourcePort,
+            measuredDuration: tunnelElapsedDuration(),
+            captureContext: tunnelCaptureContext
+        )
+    }
+
+    /// Reports a tunnel that was rejected or could not connect. Called only from terminal
+    /// paths that close the connection, so a tunnel still reports exactly once.
+    nonisolated func recordTunnelFailure(statusCode: Int, statusMessage: String) {
+        onTransactionComplete(makeTunnelFailureTransaction(statusCode: statusCode, statusMessage: statusMessage))
+    }
+
     nonisolated func handlerAdded(context: ChannelHandlerContext) {
         setupTLSPipeline(context: context)
     }
@@ -508,6 +530,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     ) {
         guard connectionLimiter.acquire(host: host, port: port) else {
             tlsLogger.warning("Connection limit reached for \(host):\(port), closing")
+            recordTunnelFailure(statusCode: 503, statusMessage: "Connection Limit Reached")
             context.close(promise: nil)
             return
         }
@@ -573,6 +596,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 tlsLogger.error(
                     "Raw tunnel connection failed to \(host):\(port): \(error.localizedDescription)"
                 )
+                self.recordTunnelFailure(statusCode: 502, statusMessage: "Upstream Connection Failed")
                 context.close(promise: nil)
             }
         }
@@ -741,6 +765,29 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
 
     nonisolated func recordSuccessfulTunnel() {
         onTransactionComplete(makeSuccessfulTunnelTransaction())
+    }
+
+    /// Builds the CONNECT row for a raw-tunnel fallback that was rejected or could not
+    /// connect. It is not a TLS handshake failure, so it stays visible in the normal
+    /// request list rather than being filtered out as one.
+    nonisolated func makeTunnelFailureTransaction(statusCode: Int, statusMessage: String) -> HTTPTransaction {
+        TLSInterceptHandler.makeTunnelTransaction(
+            host: host,
+            port: port,
+            statusCode: statusCode,
+            statusMessage: statusMessage,
+            state: .failed,
+            sourcePort: clientSourcePort,
+            measuredDuration: tunnelElapsedDuration(),
+            captureContext: tunnelCaptureContext
+        )
+    }
+
+    /// Reports a fallback tunnel that never came up. Called only from terminal paths that
+    /// close the connection, and mutually exclusive with `recordSuccessfulTunnel()`, so a
+    /// tunnel still reports exactly once.
+    nonisolated func recordTunnelFailure(statusCode: Int, statusMessage: String) {
+        onTransactionComplete(makeTunnelFailureTransaction(statusCode: statusCode, statusMessage: statusMessage))
     }
 
     // MARK: Private
@@ -950,6 +997,7 @@ final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHand
 
         guard limiter.acquire(host: host, port: port) else {
             tlsLogger.warning("Connection limit reached for \(host):\(port), closing")
+            postHandshake.recordTunnelFailure(statusCode: 503, statusMessage: "Connection Limit Reached")
             channel.close(promise: nil)
             return
         }
@@ -996,6 +1044,7 @@ final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHand
             case let .failure(error):
                 limiter.release(host: host, port: port)
                 tlsLogger.error("Raw tunnel connection failed to \(host):\(port): \(String(describing: error))")
+                self.postHandshake.recordTunnelFailure(statusCode: 502, statusMessage: "Upstream Connection Failed")
                 channel.close(promise: nil)
             }
         }

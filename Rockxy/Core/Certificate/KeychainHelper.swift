@@ -5,11 +5,23 @@ import Security
 
 // Implements keychain helper behavior for the certificate and trust pipeline.
 
+// MARK: - KeychainReadOutcome
+
+/// How a Keychain read status must be interpreted when looking for the root CA private key.
+/// Only `absent` may advance to the next storage shape or report "no key at all"; every other
+/// failure has to propagate, so a locked or otherwise unavailable Keychain can never be
+/// mistaken for an absent key and silently rotate the root the user already trusted.
+nonisolated enum KeychainReadOutcome: Equatable {
+    case found
+    case absent
+    case failure
+}
+
 // MARK: - KeychainHelper
 
 /// Thin wrapper around Security.framework's keychain APIs for storing the root CA
-/// private key and installing the root CA certificate. Uses `kSecAttrAccessibleWhenUnlocked`
-/// for private keys so they are only available when the user is logged in.
+/// private key and installing the root CA certificate. Root key material is stored as a
+/// generic-password item in the user's login Keychain.
 ///
 /// Certificate trust uses the `.admin` domain (system-wide) so all TLS clients
 /// (Safari, URLSession, system services) honor the trust setting. This requires
@@ -19,71 +31,124 @@ nonisolated enum KeychainHelper {
 
     // MARK: - Private Key Operations
 
-    static func savePrivateKey(_ keyData: Data, label: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationLabel as String: label,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
+    /// Classifies a `SecItemCopyMatching` status for the root CA private key.
+    ///
+    /// Anything that is not an outright "no such item" describes the Keychain's availability
+    /// rather than the key's existence, so it must surface as `failure`. Reading such a status
+    /// as absence is what would silently regenerate a trusted root CA.
+    ///
+    /// - Parameter toleratesMalformedShape: set only for the historical `kSecClassKey` shapes.
+    ///   Security.framework rejects that attribute combination outright on some systems, and
+    ///   that rejection describes the query shape, not the Keychain, so it means "this shape
+    ///   holds nothing".
+    static func classifyReadStatus(
+        _ status: OSStatus,
+        toleratesMalformedShape: Bool = false
+    )
+        -> KeychainReadOutcome
+    {
         if status == errSecSuccess {
-            logger.debug("Saved private key with label: \(label)")
-            return
+            return .found
+        }
+        if status == errSecItemNotFound {
+            return .absent
+        }
+        if toleratesMalformedShape, status == errSecNoSuchAttr || status == errSecParam {
+            return .absent
+        }
+        return .failure
+    }
+
+    /// Stores the serialized root CA private key as generic-password data in the login
+    /// Keychain.
+    ///
+    /// Two earlier shapes are superseded here. A `kSecClassKey` item carrying a raw X9.63 EC
+    /// blob and a string `kSecAttrApplicationLabel` is rejected by Security.framework with
+    /// `errSecNoSuchAttr`, so the root CA key never actually persisted and every relaunch
+    /// generated a new CA. A generic-password item in the login Keychain persists for both
+    /// development and Developer ID builds. Do not opt this item into the Data Protection
+    /// keychain: the shipped non-sandboxed signing configuration receives
+    /// `errSecMissingEntitlement` for that API and would fail certificate initialization.
+    ///
+    /// The service and account are derived from the same label callers already pass, so the
+    /// storage identity stays stable across launches.
+    static func savePrivateKey(_ keyData: Data, label: String) throws {
+        try writePrivateKeyItem(keyData, label: label)
+
+        // Superseded copies are removed only once the new item has been read back and compared
+        // byte for byte. Deleting before that could destroy the only surviving copy of the
+        // root CA private key.
+        guard try readPrivateKeyItem(label: label, shape: .genericPassword) == keyData else {
+            logger.error("Root CA private key readback did not match the value just written")
+            throw KeychainError.readbackMismatch
         }
 
-        if status == errSecDuplicateItem {
-            try updateExistingPrivateKey(keyData, label: label)
-            logger.debug("Updated existing private key with label: \(label)")
-            return
-        }
-
-        logger.error("Failed to save private key: \(status)")
-        throw KeychainError.saveFailed(status)
+        logger.debug("Saved private key for label: \(label)")
+        deleteSupersededPrivateKeyItems(label: label)
     }
 
     static func loadPrivateKey(label: String) throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationLabel as String: label,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        try loadPrivateKey(label: label, isUsable: { !$0.isEmpty })
+    }
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        if status == errSecItemNotFound {
-            return nil
+    /// Reads the root CA private key, preferring generic-password storage and then falling
+    /// through every shape an older build could have written. Anything found in a legacy
+    /// shape is migrated before it is returned, so the next launch has a single source of
+    /// truth.
+    ///
+    /// - Parameter isUsable: rejects blobs that cannot produce a working key. An unusable item
+    ///   is neither adopted nor deleted — the search simply continues with the remaining
+    ///   sources. Reporting `nil` when nothing usable exists lets the caller regenerate exactly
+    ///   once instead of failing on every launch.
+    static func loadPrivateKey(label: String, isUsable: (Data) -> Bool) throws -> Data? {
+        if let data = try readPrivateKeyItem(label: label, shape: .genericPassword) {
+            if isUsable(data) {
+                return data
+            }
+            logger.error("Root CA private key in generic-password storage is unusable — trying recovery sources")
         }
 
-        guard status == errSecSuccess else {
-            logger.error("Failed to load private key: \(status)")
-            throw KeychainError.loadFailed(status)
+        for shape in PrivateKeyShape.migrationSources {
+            guard let data = try readPrivateKeyItem(label: label, shape: shape), isUsable(data) else {
+                continue
+            }
+
+            do {
+                try savePrivateKey(data, label: label)
+                logger.info("Migrated root CA private key (\(shape.rawValue)) into generic-password storage")
+            } catch {
+                // The migration source is untouched, so this launch stays usable and the next
+                // one retries. Never drop a recoverable key just because the copy failed.
+                logger.error("Failed to migrate root CA private key: \(error.localizedDescription)")
+            }
+            return data
         }
 
-        guard let data = result as? Data else {
-            return nil
-        }
-
-        return data
+        return nil
     }
 
     static func deletePrivateKey(label: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationLabel as String: label,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate
-        ]
+        var firstFailure: OSStatus?
+        let shapes = [PrivateKeyShape.genericPassword] + PrivateKeyShape.migrationSources
 
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            logger.error("Failed to delete private key: \(status)")
-            throw KeychainError.deleteFailed(status)
+        // Reset must cover every shape an older build could have written. Attempt them all
+        // even after one failure so a partially cleaned reset cannot resurrect a legacy key
+        // on the next launch, then surface the first real Security.framework failure.
+        for shape in shapes {
+            let status = SecItemDelete(privateKeyQuery(label: label, shape: shape) as CFDictionary)
+            let isAbsent = status == errSecItemNotFound
+                || (shape.toleratesMalformedShape && (status == errSecNoSuchAttr || status == errSecParam))
+            guard status == errSecSuccess || isAbsent else {
+                logger.error("Failed to delete private key (\(shape.rawValue)): \(status)")
+                if firstFailure == nil {
+                    firstFailure = status
+                }
+                continue
+            }
+        }
+
+        if let firstFailure {
+            throw KeychainError.deleteFailed(firstFailure)
         }
     }
 
@@ -503,25 +568,112 @@ nonisolated enum KeychainHelper {
 
     // MARK: Private
 
+    /// Every storage shape the root CA private key has ever been written under, in read and
+    /// cleanup priority order.
+    nonisolated private enum PrivateKeyShape: String {
+        /// Current shape: generic password in the user's login Keychain.
+        case genericPassword = "generic-password"
+        /// `kSecClassKey` with a string `kSecAttrApplicationLabel`.
+        case legacyKeyStringLabel = "legacy-key-string-label"
+        /// `kSecClassKey` with a data `kSecAttrApplicationLabel`. Both label encodings produce
+        /// a separately addressable item, so both have to be searched and cleaned up.
+        case legacyKeyDataLabel = "legacy-key-data-label"
+
+        // MARK: Internal
+
+        /// Everything that is not the current shape, in the order it is migrated from.
+        static let migrationSources: [PrivateKeyShape] = [
+            .legacyKeyStringLabel,
+            .legacyKeyDataLabel
+        ]
+
+        /// `kSecClassKey` items combine attributes Security.framework rejects on some systems.
+        var toleratesMalformedShape: Bool {
+            self == .legacyKeyStringLabel || self == .legacyKeyDataLabel
+        }
+    }
+
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "KeychainHelper")
 
-    private static func updateExistingPrivateKey(_ keyData: Data, label: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecAttrApplicationLabel as String: label,
-            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate
-        ]
+    /// Account component for the root CA private key item. The service component is the
+    /// caller's label, so one label always maps to exactly one stored key.
+    private static let privateKeyAccount = "root-ca-private-key"
 
-        let attributes: [String: Any] = [
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ]
+    private static func privateKeyQuery(label: String, shape: PrivateKeyShape) -> [String: Any] {
+        switch shape {
+        case .genericPassword:
+            [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: label,
+                kSecAttrAccount as String: privateKeyAccount
+            ]
+        case .legacyKeyStringLabel:
+            [
+                kSecClass as String: kSecClassKey,
+                kSecAttrApplicationLabel as String: label
+            ]
+        case .legacyKeyDataLabel:
+            [
+                kSecClass as String: kSecClassKey,
+                kSecAttrApplicationLabel as String: Data(label.utf8)
+            ]
+        }
+    }
 
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    private static func writePrivateKeyItem(_ keyData: Data, label: String) throws {
+        let query = privateKeyQuery(label: label, shape: .genericPassword)
+
+        // Update-or-add, never delete-then-add: a failed add after a delete would destroy
+        // the only copy of the root CA private key.
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: keyData] as CFDictionary)
+
+        if status == errSecItemNotFound {
+            var addQuery = query
+            addQuery[kSecValueData as String] = keyData
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+            status = SecItemAdd(addQuery as CFDictionary, nil)
+
+            if status == errSecDuplicateItem {
+                status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: keyData] as CFDictionary)
+            }
+        }
+
         guard status == errSecSuccess else {
-            logger.error("Failed to update duplicate private key: \(status)")
+            logger.error("Failed to save private key: \(status)")
             throw KeychainError.saveFailed(status)
+        }
+    }
+
+    /// Reads one storage shape. `nil` means that shape holds nothing; a transient Keychain
+    /// failure throws instead, so it can never be confused with absence.
+    private static func readPrivateKeyItem(label: String, shape: PrivateKeyShape) throws -> Data? {
+        var query = privateKeyQuery(label: label, shape: shape)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch classifyReadStatus(status, toleratesMalformedShape: shape.toleratesMalformedShape) {
+        case .found:
+            return result as? Data
+        case .absent:
+            return nil
+        case .failure:
+            logger.error("Failed to load private key (\(shape.rawValue)): \(status)")
+            throw KeychainError.loadFailed(status)
+        }
+    }
+
+    /// Best-effort cleanup of superseded storage shapes. Only reached once the generic-password
+    /// item has been read back and byte-compared, and a failure here never blocks the
+    /// authoritative copy.
+    private static func deleteSupersededPrivateKeyItems(label: String) {
+        for shape in PrivateKeyShape.migrationSources {
+            let status = SecItemDelete(privateKeyQuery(label: label, shape: shape) as CFDictionary)
+            if status != errSecSuccess, status != errSecItemNotFound {
+                logger.debug("Superseded private key delete (\(shape.rawValue)) returned \(status)")
+            }
         }
     }
 
@@ -556,6 +708,7 @@ nonisolated enum KeychainError: LocalizedError {
     case saveFailed(OSStatus)
     case loadFailed(OSStatus)
     case deleteFailed(OSStatus)
+    case readbackMismatch
     case invalidCertificateData
     case trustSettingsFailed(OSStatus)
 
@@ -569,6 +722,8 @@ nonisolated enum KeychainError: LocalizedError {
             "Keychain load failed with status: \(status)"
         case let .deleteFailed(status):
             "Keychain delete failed with status: \(status)"
+        case .readbackMismatch:
+            "Keychain readback did not match the value that was just written"
         case .invalidCertificateData:
             "Invalid certificate data — could not create SecCertificate"
         case let .trustSettingsFailed(status):

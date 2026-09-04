@@ -27,10 +27,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserInterfaceValidat
         }
         Task {
             await SystemProxyManager.shared.recoverStaleProxyIfNeeded()
-            do {
-                try await CertificateManager.shared.ensureRootCA()
-            } catch {
-                Self.logger.error("Failed to initialize root CA: \(error.localizedDescription)")
+            if !RockxyIdentity.isRunningTests {
+                do {
+                    try await CertificateManager.shared.ensureRootCA()
+                } catch {
+                    Self.logger.error("Failed to initialize root CA: \(error.localizedDescription)")
+                }
             }
             await HelperManager.shared.checkStatus()
             await PluginManager.shared.ensureLoadedOnce()

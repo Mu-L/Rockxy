@@ -162,6 +162,13 @@ struct DeveloperSetupAutomaticWindowView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+                if let javaProxyGuidanceText = viewModel.javaProxyGuidanceText {
+                    Text(javaProxyGuidanceText)
+                        .font(setupMetrics.secondaryFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Divider()
 
                 ViewThatFits(in: .horizontal) {

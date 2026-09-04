@@ -66,16 +66,44 @@ actor CertificateManager {
     // MARK: - Root CA
 
     func generateRootCA() throws {
+        let result = try RootCAGenerator.generate()
+        let previousPrivateKey: P256.Signing.PrivateKey? = if let rootCAPrivateKey {
+            rootCAPrivateKey
+        } else {
+            try CertificateStore.loadRootCAPrivateKey()
+        }
+
+        // Persist before adopting. A root CA whose private key cannot be stored would be
+        // gone on the next launch, silently invalidating the fingerprint the user just
+        // approved, so a persistence failure must propagate instead of leaving a
+        // usable-looking volatile root behind. The key is written first: a certificate on
+        // disk without its key would force another regeneration on the next launch.
+        try CertificateStore.saveRootCAPrivateKey(result.privateKey)
+        do {
+            try CertificateStore.saveRootCACertificate(result.certificate)
+        } catch {
+            // Keychain and the certificate PEM are separate stores. If the PEM write
+            // fails after replacing the key, restore the previous key (or remove the
+            // orphan created by a first-time generation) so the persisted pair cannot
+            // become mismatched on the next launch.
+            do {
+                if let previousPrivateKey {
+                    try CertificateStore.saveRootCAPrivateKey(previousPrivateKey)
+                } else {
+                    try KeychainHelper.deletePrivateKey(label: CertificateStore.activeKeychainKeyLabel)
+                }
+            } catch let rollbackError {
+                Self.logger.error(
+                    "Failed to roll back root CA key after certificate persistence failed: \(rollbackError.localizedDescription)"
+                )
+            }
+            throw error
+        }
+
         lastTrustValidationResult = nil
         lastValidationErrorMessage = nil
-        let result = try RootCAGenerator.generate()
         rootCACertificate = result.certificate
         rootCAPrivateKey = result.privateKey
-
-        try CertificateStore.saveRootCACertificate(result.certificate)
-        // saveRootCAPrivateKey stores to Keychain (primary) and disk (recovery fallback)
-        try CertificateStore.saveRootCAPrivateKey(result.privateKey)
-
         activeRootFingerprint = computeFingerprint(result.certificate)
         rootCAFreshlyInstalled = true
         Self.logger.info("Generated new root CA certificate")
@@ -99,7 +127,10 @@ actor CertificateManager {
 
         // loadRootCAPrivateKey tries Keychain first, falls back to disk PEM with auto-migration
         guard let key = try CertificateStore.loadRootCAPrivateKey() else {
-            Self.logger.debug("No existing root CA private key found")
+            // An install whose key was never persisted keeps its certificate PEM but has no
+            // recoverable key, so that CA cannot be preserved. One regeneration follows and
+            // needs one final trust approval; the new key persists from then on.
+            Self.logger.info("Existing root CA certificate has no recoverable private key — regenerating once")
             return false
         }
 
@@ -112,13 +143,24 @@ actor CertificateManager {
             Self.logger.warning("SECURITY: Cert-key mismatch detected — cert and key are from different generations")
             rootCACertificate = nil
             rootCAPrivateKey = nil
+            activeRootFingerprint = nil
             lastTrustValidationResult = nil
             lastValidationErrorMessage = nil
 
-            if let diskKey = try? CertificateStore.loadRootCAPrivateKeyFromDisk() {
+            if let diskKey = try CertificateStore.loadRootCAPrivateKeyFromDisk() {
                 let diskKeyBytes = Certificate.PublicKey(diskKey.publicKey).subjectPublicKeyInfoBytes
                 if cert.publicKey.subjectPublicKeyInfoBytes == diskKeyBytes {
-                    Self.logger.info("Disk PEM key matches certificate — using disk fallback")
+                    Self.logger.info("Disk PEM key matches certificate — repairing Keychain from recovery key")
+                    do {
+                        try CertificateStore.saveRootCAPrivateKey(diskKey)
+                        CertificateStore.cleanupLegacyDiskKeys(matching: diskKey)
+                    } catch {
+                        // The verified disk key remains available, so keep this launch usable
+                        // and preserve the recovery file for the next repair attempt.
+                        Self.logger.error(
+                            "Failed to repair root CA Keychain item from disk recovery: \(error.localizedDescription)"
+                        )
+                    }
                     rootCACertificate = cert
                     rootCAPrivateKey = diskKey
                     activeRootFingerprint = computeFingerprint(cert)
@@ -133,6 +175,7 @@ actor CertificateManager {
         rootCACertificate = cert
         rootCAPrivateKey = key
         activeRootFingerprint = computeFingerprint(cert)
+        CertificateStore.cleanupLegacyDiskKeys(matching: key)
         Self.logger.info("Loaded existing root CA (key source: Keychain or migrated)")
         return true
     }
@@ -508,7 +551,10 @@ actor CertificateManager {
                 issuer: customRoot.certificate,
                 issuerPrivateKey: customRoot.privateKey
             )
-            insertCacheEntry(cacheKey, entry: HostCertEntry(certificate: result.certificate, privateKey: result.privateKey))
+            insertCacheEntry(
+                cacheKey,
+                entry: HostCertEntry(certificate: result.certificate, privateKey: result.privateKey)
+            )
             Self.logger.debug("Generated certificate for host with custom root issuer: \(host)")
             return result
         }
@@ -587,7 +633,9 @@ actor CertificateManager {
         rootCAPrivateKey = nil
         clearHostCache()
 
-        try KeychainHelper.deletePrivateKey(label: Self.keychainKeyLabel)
+        // Delete the key under the label the store actually wrote it with; KeychainHelper
+        // removes both the current generic-password item and any legacy key item.
+        try KeychainHelper.deletePrivateKey(label: CertificateStore.activeKeychainKeyLabel)
         try KeychainHelper.removeCertificate(label: Self.keychainCertLabel)
         try CertificateStore.deleteAll()
 
@@ -599,7 +647,6 @@ actor CertificateManager {
 
     private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "CertificateManager")
 
-    private static let keychainKeyLabel = RockxyIdentity.current.rootCAKeyLabel
     private static let keychainCertLabel = RockxyIdentity.current.rootCACertificateLabel
     private static let maxCacheSize = Int(1e3)
 

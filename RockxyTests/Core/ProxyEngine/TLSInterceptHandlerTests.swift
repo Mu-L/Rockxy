@@ -51,6 +51,8 @@ private final class RecordedTransactionBox: @unchecked Sendable {
 
 @MainActor
 struct TLSInterceptHandlerTests {
+    // MARK: Internal
+
     @Test("bypass proxy list forces raw tunnel before SSL interception")
     func bypassProxyListForcesRawTunnel() {
         let sslManager = makeSSLProxyingManager()
@@ -247,6 +249,60 @@ struct TLSInterceptHandlerTests {
         #expect(recorded.transaction?.state == .completed)
         #expect(recorded.transaction?.isTLSFailure == false)
     }
+
+    @Test("post-handshake tunnel failure reports a visible failed CONNECT")
+    func postHandshakeRecordTunnelFailure() {
+        let recorded = RecordedTransactionBox()
+        let handler = PostHandshakeHandler(
+            host: "api.example.com",
+            port: 443,
+            ruleEngine: RuleEngine(),
+            scriptPluginManager: nil,
+            connectionLimiter: ConnectionLimiter(),
+            sslProxyingManager: .shared,
+            clientSourcePort: 60_123,
+            onTransactionComplete: { transaction in
+                recorded.record(transaction)
+            }
+        )
+
+        handler.recordTunnelFailure(statusCode: 502, statusMessage: "Upstream Connection Failed")
+
+        #expect(recorded.transaction?.request.method == "CONNECT")
+        #expect(recorded.transaction?.response?.statusCode == 502)
+        #expect(recorded.transaction?.response?.statusMessage == "Upstream Connection Failed")
+        #expect(recorded.transaction?.state == .failed)
+        // Not a TLS handshake failure, so the row stays visible in the request list.
+        #expect(recorded.transaction?.isTLSFailure == false)
+    }
+
+    @Test("rejected raw tunnel reports a visible failed CONNECT instead of closing silently")
+    func tlsInterceptRecordTunnelFailure() {
+        let recorded = RecordedTransactionBox()
+        let handler = TLSInterceptHandler(
+            host: "api.example.com",
+            port: 8_443,
+            certificateManager: .shared,
+            ruleEngine: RuleEngine(),
+            connectionLimiter: ConnectionLimiter(),
+            sslProxyingManager: makeSSLProxyingManager(),
+            bypassProxyManager: makeBypassProxyManager(),
+            clientSourcePort: 60_124,
+            onTransactionComplete: { transaction in
+                recorded.record(transaction)
+            }
+        )
+
+        handler.recordTunnelFailure(statusCode: 503, statusMessage: "Connection Limit Reached")
+
+        #expect(recorded.transaction?.request.method == "CONNECT")
+        #expect(recorded.transaction?.request.url.absoluteString == "https://api.example.com:8443")
+        #expect(recorded.transaction?.response?.statusCode == 503)
+        #expect(recorded.transaction?.state == .failed)
+        #expect(recorded.transaction?.isTLSFailure == false)
+    }
+
+    // MARK: Private
 
     private func makeSSLProxyingManager() -> SSLProxyingManager {
         SSLProxyingManager(
