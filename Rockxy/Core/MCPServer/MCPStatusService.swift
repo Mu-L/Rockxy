@@ -71,6 +71,9 @@ struct MCPStatusService {
         fields["is_installed_in_keychain"] = .bool(snapshot.isInstalledInKeychain)
         fields["has_trust_settings"] = .bool(snapshot.hasTrustSettings)
         fields["is_system_trust_validated"] = .bool(snapshot.isSystemTrustValidated)
+        // The booleans above are fail-closed defaults when the status could not be read, so the
+        // flag says which of the two an agent is looking at.
+        fields["status_unavailable"] = .bool(snapshot.isStatusUnavailable)
 
         if let commonName = snapshot.commonName {
             fields["common_name"] = .string(commonName)
@@ -217,6 +220,8 @@ struct MCPStatusService {
             "installed_not_trusted"
         case .trusted:
             "trusted"
+        case .unknown:
+            "unknown"
         }
     }
 

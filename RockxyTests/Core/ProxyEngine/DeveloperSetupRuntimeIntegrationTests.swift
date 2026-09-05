@@ -6,12 +6,16 @@ import NIOPosix
 @testable import Rockxy
 import Testing
 
+// MARK: - DeveloperSetupRuntimeIntegrationTests
+
 @Suite(
     "Developer Setup Runtime Integration",
     .serialized,
     .enabled(if: ProcessInfo.processInfo.environment["ROCKXY_RUN_RUNTIME_INTEGRATION_TESTS"] == "1")
 )
 struct DeveloperSetupRuntimeIntegrationTests {
+    // MARK: Internal
+
     @Test("Python runtime traffic is captured end-to-end")
     func pythonRuntimeTrafficIsCaptured() async throws {
         try await assertRuntimeProbe(
@@ -71,8 +75,8 @@ struct DeveloperSetupRuntimeIntegrationTests {
                 request.end();
                 """.write(to: scriptURL, atomically: true, encoding: .utf8)
 
-                return ProcessInvocation(
-                    executableURL: try runtimeExecutable(
+                return try ProcessInvocation(
+                    executableURL: runtimeExecutable(
                         name: "node",
                         additionalCandidates: ["/usr/local/bin/node", "/opt/homebrew/bin/node"],
                         searchNVM: true
@@ -190,7 +194,9 @@ struct DeveloperSetupRuntimeIntegrationTests {
                     let mut stream = TcpStream::connect(("127.0.0.1", \(proxyPort))).expect("connect proxy");
                     stream.set_read_timeout(Some(Duration::from_secs(5))).expect("set read timeout");
                     let request = format!(
-                        "GET http://127.0.0.1:\(upstreamPort)/developer-setup/rust HTTP/1.1\\r\\nHost: 127.0.0.1:\(upstreamPort)\\r\\nConnection: close\\r\\n\\r\\n"
+                        "GET http://127.0.0.1:\(upstreamPort)/developer-setup/rust HTTP/1.1\\r\\nHost: 127.0.0.1:\(
+                            upstreamPort
+                        )\\r\\nConnection: close\\r\\n\\r\\n"
                     );
 
                     stream.write_all(request.as_bytes()).expect("write request");
@@ -228,10 +234,9 @@ struct DeveloperSetupRuntimeIntegrationTests {
 
     @Test("Java runtime traffic is captured end-to-end when a local JDK is installed")
     func javaRuntimeTrafficIsCaptured() async throws {
-        guard
-            let java = installedJavaTool(named: "java"),
-            let javac = installedJavaTool(named: "javac")
-        else {
+        guard let java = installedJavaTool(named: "java"),
+              let javac = installedJavaTool(named: "javac") else
+        {
             return
         }
 
@@ -240,9 +245,10 @@ struct DeveloperSetupRuntimeIntegrationTests {
             requestPath: "/developer-setup/java",
             buildInvocation: { proxyPort, upstreamPort, workingDirectory in
                 let sourceURL = workingDirectory.appendingPathComponent("DeveloperSetupProbeMain.java")
+                // No explicit ProxySelector: the client must reach Rockxy purely through the
+                // JVM's default selection from the JAVA_TOOL_OPTIONS the setup script exports,
+                // which is the mechanism Automatic Setup actually ships.
                 try """
-                import java.net.InetSocketAddress;
-                import java.net.ProxySelector;
                 import java.net.URI;
                 import java.net.http.HttpClient;
                 import java.net.http.HttpRequest;
@@ -251,10 +257,7 @@ struct DeveloperSetupRuntimeIntegrationTests {
 
                 public class DeveloperSetupProbeMain {
                     public static void main(String[] args) throws Exception {
-                        HttpClient client = HttpClient.newBuilder()
-                            .connectTimeout(Duration.ofSeconds(10))
-                            .proxy(ProxySelector.of(new InetSocketAddress("127.0.0.1", \(proxyPort))))
-                            .build();
+                        HttpClient client = HttpClient.newHttpClient();
 
                         HttpRequest request = HttpRequest.newBuilder()
                             .uri(URI.create("http://127.0.0.1:\(upstreamPort)/developer-setup/java"))
@@ -278,9 +281,48 @@ struct DeveloperSetupRuntimeIntegrationTests {
                 )
                 #expect(compileResult.terminationStatus == 0, "javac failed: \(compileResult.stderr)")
 
+                // Launch through the exact script Automatic Setup writes for Java VMs.
+                let setupScriptURL = try RockxySetupScriptBuilder.writeScript(
+                    context: RockxySetupScriptContext(
+                        proxyHost: "127.0.0.1",
+                        proxyPort: proxyPort,
+                        certificatePath: nil,
+                        generatedAt: Date(timeIntervalSince1970: 0),
+                        appName: "Rockxy",
+                        targetID: .javaVMs
+                    ),
+                    scriptURL: workingDirectory
+                        .appendingPathComponent("setup", isDirectory: true)
+                        .appendingPathComponent("rockxy_env_setup.sh")
+                )
+
+                let runnerURL = workingDirectory.appendingPathComponent("java-probe.sh")
+                try """
+                #!/bin/zsh
+                set -eu
+
+                \(RockxySetupScriptBuilder.sourceCommand(scriptURL: setupScriptURL))
+
+                case "${JAVA_TOOL_OPTIONS:-}" in
+                  *-Dhttp.proxyHost=127.0.0.1*) ;;
+                  *) echo "JAVA_TOOL_OPTIONS missing Rockxy proxy properties: ${JAVA_TOOL_OPTIONS:-}" >&2; exit 1 ;;
+                esac
+
+                # The upstream probe listens on loopback, which the JVM's default selector
+                # bypasses. Clearing only nonProxyHosts keeps the generated proxy properties
+                # themselves under test.
+                export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dhttp.nonProxyHosts="
+
+                exec "\(java.path)" -cp "\(workingDirectory.path)" DeveloperSetupProbeMain
+                """.write(to: runnerURL, atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o755],
+                    ofItemAtPath: runnerURL.path
+                )
+
                 return ProcessInvocation(
-                    executableURL: java,
-                    arguments: ["-cp", workingDirectory.path, "DeveloperSetupProbeMain"]
+                    executableURL: URL(fileURLWithPath: "/bin/zsh"),
+                    arguments: [runnerURL.path]
                 )
             }
         )
@@ -380,10 +422,9 @@ struct DeveloperSetupRuntimeIntegrationTests {
             name: "docker",
             additionalCandidates: ["/usr/local/bin/docker", "/opt/homebrew/bin/docker"]
         )
-        guard
-            let docker,
-            let dockerHostAddress = dockerReachableHostIPv4Address()
-        else {
+        guard let docker,
+              let dockerHostAddress = dockerReachableHostIPv4Address() else
+        {
             return
         }
 
@@ -430,12 +471,11 @@ struct DeveloperSetupRuntimeIntegrationTests {
 
     @Test("Next.js route handler traffic is captured end-to-end when Node.js tooling is installed")
     func nextJSTrafficIsCaptured() async throws {
-        guard
-            let node = try? runtimeExecutable(
-                name: "node",
-                additionalCandidates: ["/usr/local/bin/node", "/opt/homebrew/bin/node"],
-                searchNVM: true
-            ),
+        guard let node = try? runtimeExecutable(
+            name: "node",
+            additionalCandidates: ["/usr/local/bin/node", "/opt/homebrew/bin/node"],
+            searchNVM: true
+        ),
             let npm = try? runtimeExecutable(
                 name: "npm",
                 additionalCandidates: ["/usr/local/bin/npm", "/opt/homebrew/bin/npm"],
@@ -446,8 +486,8 @@ struct DeveloperSetupRuntimeIntegrationTests {
                 additionalCandidates: ["/usr/local/bin/npx", "/opt/homebrew/bin/npx"],
                 searchNVM: true
             ),
-            let nextHostAddress = dockerReachableHostIPv4Address()
-        else {
+            let nextHostAddress = dockerReachableHostIPv4Address() else
+        {
             return
         }
 
@@ -601,8 +641,15 @@ struct DeveloperSetupRuntimeIntegrationTests {
         expectedCapturedPath: String? = nil,
         allowAnyCapturedPath: Bool = false,
         captureTimeout: Duration = .seconds(10),
-        buildInvocation: @escaping @Sendable (_ proxyPort: Int, _ upstreamPort: Int, _ workingDirectory: URL) async throws -> ProcessInvocation
-    ) async throws {
+        buildInvocation: @escaping @Sendable (
+            _ proxyPort: Int,
+            _ upstreamPort: Int,
+            _ workingDirectory: URL
+        )
+        async throws -> ProcessInvocation
+    )
+        async throws
+    {
         let probeLock = try RuntimeProbeFileLock.acquire()
         defer { probeLock.release() }
 
@@ -682,7 +729,9 @@ struct DeveloperSetupRuntimeIntegrationTests {
         additionalCandidates: [String] = [],
         searchCargoHome: Bool = false,
         searchNVM: Bool = false
-    ) throws -> URL {
+    )
+        throws -> URL
+    {
         let fileManager = FileManager.default
         let homeDirectory = fileManager.homeDirectoryForCurrentUser
         var candidates = additionalCandidates
@@ -735,11 +784,10 @@ struct DeveloperSetupRuntimeIntegrationTests {
         }
 
         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        guard
-            let javaHomePath = String(bytes: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-            !javaHomePath.isEmpty
-        else {
+        guard let javaHomePath = String(bytes: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !javaHomePath.isEmpty else
+        {
             return nil
         }
 
@@ -768,12 +816,11 @@ struct DeveloperSetupRuntimeIntegrationTests {
             let flags = Int32(interface.pointee.ifa_flags)
             let isUp = (flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING)
             let isLoopback = (flags & IFF_LOOPBACK) != 0
-            guard
-                isUp,
-                !isLoopback,
-                let address = interface.pointee.ifa_addr,
-                address.pointee.sa_family == UInt8(AF_INET)
-            else {
+            guard isUp,
+                  !isLoopback,
+                  let address = interface.pointee.ifa_addr,
+                  address.pointee.sa_family == UInt8(AF_INET) else
+            {
                 continue
             }
 
@@ -813,7 +860,9 @@ struct DeveloperSetupRuntimeIntegrationTests {
         workingDirectory: URL? = nil,
         environment: [String: String]? = nil,
         timeout: Duration = .seconds(20)
-    ) async throws -> ProcessResult {
+    )
+        async throws -> ProcessResult
+    {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
@@ -885,8 +934,8 @@ struct DeveloperSetupRuntimeIntegrationTests {
             }
         }
 
-        let stdoutData = (try? await stdoutReader.value) ?? Data()
-        let stderrData = (try? await stderrReader.value) ?? Data()
+        let stdoutData = await (try? stdoutReader.value) ?? Data()
+        let stderrData = await (try? stderrReader.value) ?? Data()
         let stdout = String(bytes: stdoutData, encoding: .utf8) ?? ""
         let stderr = String(bytes: stderrData, encoding: .utf8) ?? ""
         return ProcessResult(
@@ -932,6 +981,8 @@ private struct ProcessResult {
 // MARK: - TransactionRecorder
 
 private final class TransactionRecorder: @unchecked Sendable {
+    // MARK: Internal
+
     func record(_ transaction: HTTPTransaction) {
         lock.lock()
         transactions.append(transaction)
@@ -943,7 +994,9 @@ private final class TransactionRecorder: @unchecked Sendable {
         method: String,
         path: String?,
         budget: TimeoutBudget
-    ) async throws -> HTTPTransaction {
+    )
+        async throws -> HTTPTransaction
+    {
         while !budget.hasExpired {
             try Task.checkCancellation()
             if let transaction = matchingTransaction(host: host, method: method, path: path) {
@@ -955,6 +1008,11 @@ private final class TransactionRecorder: @unchecked Sendable {
         throw RuntimeProbeError.captureTimedOut(path ?? host)
     }
 
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var transactions: [HTTPTransaction] = []
+
     private func matchingTransaction(host: String, method: String, path: String?) -> HTTPTransaction? {
         lock.lock()
         defer { lock.unlock() }
@@ -964,19 +1022,20 @@ private final class TransactionRecorder: @unchecked Sendable {
                 (path == nil || transaction.request.path == path)
         })
     }
-
-    private let lock = NSLock()
-    private var transactions: [HTTPTransaction] = []
 }
 
-// MARK: - UpstreamRequestRecorder
+// MARK: - UpstreamRequest
 
 private struct UpstreamRequest: Equatable {
     let method: String
     let uri: String
 }
 
+// MARK: - UpstreamRequestRecorder
+
 private final class UpstreamRequestRecorder: @unchecked Sendable {
+    // MARK: Internal
+
     func record(method: String, uri: String) {
         lock.lock()
         requests.append(UpstreamRequest(method: method, uri: uri))
@@ -995,21 +1054,29 @@ private final class UpstreamRequestRecorder: @unchecked Sendable {
         throw RuntimeProbeError.upstreamTimedOut(path)
     }
 
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var requests: [UpstreamRequest] = []
+
     private func matchingRequest(path: String) -> UpstreamRequest? {
         lock.lock()
         defer { lock.unlock() }
         return requests.first(where: { $0.uri == path })
     }
-
-    private let lock = NSLock()
-    private var requests: [UpstreamRequest] = []
 }
 
+// MARK: - TimeoutBudget
+
 private final class TimeoutBudget: @unchecked Sendable {
+    // MARK: Lifecycle
+
     init(timeout: Duration, clock: ContinuousClock = ContinuousClock()) {
         self.clock = clock
         deadline = clock.now + timeout
     }
+
+    // MARK: Internal
 
     var hasExpired: Bool {
         clock.now >= deadline
@@ -1023,6 +1090,8 @@ private final class TimeoutBudget: @unchecked Sendable {
         try await Task.sleep(for: min(step, remaining))
     }
 
+    // MARK: Private
+
     private let clock: ContinuousClock
     private let deadline: ContinuousClock.Instant
 }
@@ -1030,11 +1099,15 @@ private final class TimeoutBudget: @unchecked Sendable {
 // MARK: - LocalHTTPProbeServer
 
 private final class LocalHTTPProbeServer: @unchecked Sendable {
+    // MARK: Lifecycle
+
     init(host: String, port: Int, requestRecorder: UpstreamRequestRecorder) {
         self.host = host
         self.port = port
         self.requestRecorder = requestRecorder
     }
+
+    // MARK: Internal
 
     func start() async throws -> LocalHTTPProbeServer {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -1072,6 +1145,8 @@ private final class LocalHTTPProbeServer: @unchecked Sendable {
         }
     }
 
+    // MARK: Private
+
     private let host: String
     private let port: Int
     private let requestRecorder: UpstreamRequestRecorder
@@ -1082,12 +1157,16 @@ private final class LocalHTTPProbeServer: @unchecked Sendable {
 // MARK: - ProbeRequestHandler
 
 private final class ProbeRequestHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = HTTPServerRequestPart
-    typealias OutboundOut = HTTPServerResponsePart
+    // MARK: Lifecycle
 
     init(requestRecorder: UpstreamRequestRecorder) {
         self.requestRecorder = requestRecorder
     }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPServerRequestPart
+    typealias OutboundOut = HTTPServerResponsePart
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         switch unwrapInboundIn(data) {
@@ -1101,6 +1180,11 @@ private final class ProbeRequestHandler: ChannelInboundHandler, @unchecked Senda
             currentRequestHead = nil
         }
     }
+
+    // MARK: Private
+
+    private let requestRecorder: UpstreamRequestRecorder
+    private var currentRequestHead: HTTPRequestHead?
 
     private func respond(context: ChannelHandlerContext) {
         var buffer = context.channel.allocator.buffer(capacity: 2)
@@ -1118,14 +1202,13 @@ private final class ProbeRequestHandler: ChannelInboundHandler, @unchecked Senda
             context.close(promise: nil)
         }
     }
-
-    private let requestRecorder: UpstreamRequestRecorder
-    private var currentRequestHead: HTTPRequestHead?
 }
 
 // MARK: - RuntimeProbeFileLock
 
 private struct RuntimeProbeFileLock {
+    // MARK: Internal
+
     static func acquire() throws -> RuntimeProbeFileLock {
         let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("rockxy-developer-setup-runtime.lock")
@@ -1152,6 +1235,8 @@ private struct RuntimeProbeFileLock {
         close(fd)
     }
 
+    // MARK: Private
+
     private let fd: Int32
 }
 
@@ -1164,7 +1249,11 @@ private func findFreePort() throws -> Int {
     return port
 }
 
+// MARK: - TCPListener
+
 private final class TCPListener {
+    // MARK: Lifecycle
+
     init(port: Int, address: String) throws {
         let socketFd = socket(AF_INET, SOCK_STREAM, 0)
         guard socketFd >= 0 else {
@@ -1210,11 +1299,15 @@ private final class TCPListener {
         boundPort = Int(in_port_t(bigEndian: boundAddr.sin_port))
     }
 
+    // MARK: Internal
+
     let boundPort: Int
 
     func close() {
         Darwin.close(fd)
     }
+
+    // MARK: Private
 
     private let fd: Int32
 }
@@ -1231,6 +1324,8 @@ private enum RuntimeProbeError: LocalizedError {
     case listenFailed
     case getsocknameFailed
     case fileLockFailed
+
+    // MARK: Internal
 
     var errorDescription: String? {
         switch self {

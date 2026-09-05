@@ -13,6 +13,17 @@ struct HelperManagerTests {
         #expect(HelperManager.installDisposition(for: .requiresApproval) == .requiresApproval)
     }
 
+    @Test("compatibility decisions map onto the published helper status")
+    @MainActor
+    func compatibilityDecisionsMapOntoStatus() {
+        // A helper one protocol behind stays usable for the operations it already implements,
+        // so it must surface as outdated — not as incompatible, which blocks the proxy and
+        // certificate-install paths that still work.
+        #expect(HelperManager.HelperStatus(.compatible) == .installedCompatible)
+        #expect(HelperManager.HelperStatus(.outdated) == .installedOutdated)
+        #expect(HelperManager.HelperStatus(.incompatible) == .installedIncompatible)
+    }
+
     @Test("install disposition does not re-register already enabled helpers")
     @MainActor
     func installDispositionAlreadyEnabled() {

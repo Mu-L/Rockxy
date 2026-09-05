@@ -121,15 +121,42 @@ struct MacCertificateSetupGuideView: View {
             String(localized: "Repair Trust", bundle: RockxyLocalization.bundle)
         case .installedAndTrusted:
             String(localized: "Installed & Trusted", bundle: RockxyLocalization.bundle)
+        case .statusUnavailable:
+            String(localized: "Recheck Status", bundle: RockxyLocalization.bundle)
         }
     }
 
     private var primaryActionIcon: String {
-        currentState.isReady ? "checkmark.shield.fill" : "checkmark.shield"
+        switch currentState {
+        case .statusUnavailable:
+            "arrow.clockwise"
+        case .installedAndTrusted:
+            "checkmark.shield.fill"
+        case .generatedOnly,
+             .installedNotTrusted,
+             .missing:
+            "checkmark.shield"
+        }
+    }
+
+    /// True when the state is unknown rather than known-bad. The primary action becomes a read,
+    /// and no field claims the certificate is missing, untrusted, or rejected.
+    private var isStatusUnavailable: Bool {
+        snapshot?.isStatusUnavailable == true
+    }
+
+    private var unavailableValueText: String {
+        String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
     }
 
     private var systemValidationText: String {
-        guard let snapshot, snapshot.hasTrustSettings else {
+        guard let snapshot else {
+            return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
+        }
+        if snapshot.isStatusUnavailable {
+            return unavailableValueText
+        }
+        guard snapshot.hasTrustSettings else {
             return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
         }
         return snapshot.isSystemTrustValidated
@@ -138,10 +165,28 @@ struct MacCertificateSetupGuideView: View {
     }
 
     private var systemValidationColor: Color {
-        guard let snapshot, snapshot.hasTrustSettings else {
+        guard let snapshot else {
+            return .secondary
+        }
+        if snapshot.isStatusUnavailable {
+            return .orange
+        }
+        guard snapshot.hasTrustSettings else {
             return .secondary
         }
         return snapshot.isSystemTrustValidated ? .green : .red
+    }
+
+    /// The reason to show for an unreadable status, shown regardless of `hasTrustSettings` —
+    /// that flag is a fail-closed default here, not evidence about the certificate.
+    private var statusUnavailableMessage: String? {
+        guard let snapshot, snapshot.isStatusUnavailable else {
+            return nil
+        }
+        return snapshot.statusReadErrorMessage ?? String(
+            localized: "Rockxy could not read the certificate status, so nothing was changed. Recheck the status once your keychain is available.",
+            bundle: RockxyLocalization.bundle
+        )
     }
 
     private var expiryColor: Color {
@@ -383,7 +428,15 @@ struct MacCertificateSetupGuideView: View {
 
     @ViewBuilder private var automaticPrimaryActions: some View {
         Button {
-            Task { await installAndTrust() }
+            // An unreadable status is answered by reading it again. Installing and trusting here
+            // would request administrator approval for material this window cannot describe.
+            Task {
+                if isStatusUnavailable {
+                    await recheckStatus()
+                } else {
+                    await installAndTrust()
+                }
+            }
         } label: {
             Label(primaryActionTitle, systemImage: primaryActionIcon)
         }
@@ -391,12 +444,14 @@ struct MacCertificateSetupGuideView: View {
         .rockxyGlassButtonStyle(prominent: true)
         .disabled(activeOperation != nil || currentState.isReady || !hasLoadedSnapshot)
 
-        Button {
-            Task { await recheckStatus() }
-        } label: {
-            Label(String(localized: "Recheck", bundle: RockxyLocalization.bundle), systemImage: "arrow.clockwise")
+        if !isStatusUnavailable {
+            Button {
+                Task { await recheckStatus() }
+            } label: {
+                Label(String(localized: "Recheck", bundle: RockxyLocalization.bundle), systemImage: "arrow.clockwise")
+            }
+            .disabled(activeOperation != nil)
         }
-        .disabled(activeOperation != nil)
     }
 
     @ViewBuilder private var certificateUtilityActions: some View {
@@ -410,24 +465,39 @@ struct MacCertificateSetupGuideView: View {
         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
             diagnosticRow(
                 label: String(localized: "Certificate", bundle: RockxyLocalization.bundle),
-                value: snapshot?.hasGeneratedCertificate == true
-                    ? String(localized: "Generated", bundle: RockxyLocalization.bundle)
-                    : String(localized: "Not Generated", bundle: RockxyLocalization.bundle),
-                isComplete: snapshot?.hasGeneratedCertificate == true
+                value: snapshot?.isGeneratedStateKnown == false
+                    ? unavailableValueText
+                    : (
+                        snapshot?.hasGeneratedCertificate == true
+                            ? String(localized: "Generated", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Not Generated", bundle: RockxyLocalization.bundle)
+                    ),
+                isComplete: snapshot?.hasGeneratedCertificate == true,
+                color: snapshot?.isGeneratedStateKnown == false ? .orange : nil
             )
             diagnosticRow(
                 label: String(localized: "Keychain", bundle: RockxyLocalization.bundle),
-                value: snapshot?.isInstalledInKeychain == true
-                    ? String(localized: "Installed", bundle: RockxyLocalization.bundle)
-                    : String(localized: "Not Installed", bundle: RockxyLocalization.bundle),
-                isComplete: snapshot?.isInstalledInKeychain == true
+                value: isStatusUnavailable
+                    ? unavailableValueText
+                    : (
+                        snapshot?.isInstalledInKeychain == true
+                            ? String(localized: "Installed", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Not Installed", bundle: RockxyLocalization.bundle)
+                    ),
+                isComplete: snapshot?.isInstalledInKeychain == true,
+                color: isStatusUnavailable ? .orange : nil
             )
             diagnosticRow(
                 label: String(localized: "Trust Settings", bundle: RockxyLocalization.bundle),
-                value: snapshot?.hasTrustSettings == true
-                    ? String(localized: "Present", bundle: RockxyLocalization.bundle)
-                    : String(localized: "Missing", bundle: RockxyLocalization.bundle),
-                isComplete: snapshot?.hasTrustSettings == true
+                value: isStatusUnavailable
+                    ? unavailableValueText
+                    : (
+                        snapshot?.hasTrustSettings == true
+                            ? String(localized: "Present", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Missing", bundle: RockxyLocalization.bundle)
+                    ),
+                isComplete: snapshot?.hasTrustSettings == true,
+                color: isStatusUnavailable ? .orange : nil
             )
             diagnosticRow(
                 label: String(localized: "TLS Validation", bundle: RockxyLocalization.bundle),
@@ -441,9 +511,15 @@ struct MacCertificateSetupGuideView: View {
     }
 
     @ViewBuilder private var validationCallout: some View {
-        if let snapshot,
-           snapshot.hasTrustSettings,
-           !snapshot.isSystemTrustValidated
+        if let statusUnavailableMessage {
+            callout(
+                message: statusUnavailableMessage,
+                systemImage: "questionmark.circle.fill",
+                color: .orange
+            )
+        } else if let snapshot,
+                  snapshot.hasTrustSettings,
+                  !snapshot.isSystemTrustValidated
         {
             let message = snapshot.lastValidationErrorMessage
                 ?? String(
@@ -588,9 +664,18 @@ struct MacCertificateSetupGuideView: View {
                     openKeychainButton
                         .padding(.leading, stepContentInset)
 
-                    if let snapshot,
-                       snapshot.hasTrustSettings,
-                       !snapshot.isSystemTrustValidated
+                    if let statusUnavailableMessage {
+                        // Not "macOS rejects it": nothing was read, so the manual re-trust steps
+                        // are not the fix and are not offered as one.
+                        callout(
+                            message: statusUnavailableMessage,
+                            systemImage: "questionmark.circle.fill",
+                            color: .orange
+                        )
+                        .padding(.leading, stepContentInset)
+                    } else if let snapshot,
+                              snapshot.hasTrustSettings,
+                              !snapshot.isSystemTrustValidated
                     {
                         callout(
                             message: snapshot.lastValidationErrorMessage
@@ -623,7 +708,9 @@ struct MacCertificateSetupGuideView: View {
     }
 
     @ViewBuilder private var manualCertificateActions: some View {
-        if snapshot?.hasGeneratedCertificate != true {
+        // Generation is offered only when the absence of a certificate is a real finding. Under
+        // an unreadable status it would be a guess about material that may already exist.
+        if snapshot?.hasGeneratedCertificate != true, !isStatusUnavailable {
             Button {
                 Task { await generateCertificate() }
             } label: {

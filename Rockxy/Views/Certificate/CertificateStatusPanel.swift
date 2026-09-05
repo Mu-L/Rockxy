@@ -89,6 +89,12 @@ struct CertificateStatusPanel: View {
         guard let snapshot else {
             return .notAvailable
         }
+        // An unreadable status is not "no root CA": the booleans below it are fail-closed
+        // defaults, and offering Generate or Reset for them would destroy or replace a
+        // certificate that may be installed and trusted.
+        if snapshot.isStatusUnavailable {
+            return .statusUnavailable
+        }
         if snapshot.isSystemTrustValidated {
             return .trusted
         }
@@ -104,8 +110,24 @@ struct CertificateStatusPanel: View {
         return .notAvailable
     }
 
+    /// Copy for a diagnostic field whose real value could not be read. Never "No", "Missing", or
+    /// "Failed": each of those is a claim about the certificate that this answer does not make.
+    private var unavailableValueText: String {
+        String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+    }
+
+    private var isStatusUnavailable: Bool {
+        snapshot?.isStatusUnavailable == true
+    }
+
     private var systemValidationText: String {
-        guard let snapshot, snapshot.hasTrustSettings else {
+        guard let snapshot else {
+            return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
+        }
+        if snapshot.isStatusUnavailable {
+            return unavailableValueText
+        }
+        guard snapshot.hasTrustSettings else {
             return String(localized: "Not Checked", bundle: RockxyLocalization.bundle)
         }
         return snapshot.isSystemTrustValidated
@@ -114,10 +136,41 @@ struct CertificateStatusPanel: View {
     }
 
     private var systemValidationColor: Color {
-        guard let snapshot, snapshot.hasTrustSettings else {
+        guard let snapshot else {
+            return .secondary
+        }
+        if snapshot.isStatusUnavailable {
+            return .orange
+        }
+        guard snapshot.hasTrustSettings else {
             return .secondary
         }
         return snapshot.isSystemTrustValidated ? .green : .red
+    }
+
+    /// The callout message, or `nil` when there is nothing to explain.
+    ///
+    /// The unavailable reason is shown even though `hasTrustSettings` is false — that flag is the
+    /// fail-closed default for a read that did not complete, and gating the callout on it is what
+    /// hid the diagnostic that explains the state.
+    private var calloutMessage: String? {
+        guard let snapshot else {
+            return nil
+        }
+        if snapshot.isStatusUnavailable {
+            return snapshot.statusReadErrorMessage ?? String(
+                localized: "Rockxy could not read the certificate status, so nothing was changed. Recheck the status once your keychain is available.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        guard snapshot.hasTrustSettings, !snapshot.isSystemTrustValidated else {
+            return nil
+        }
+        return snapshot.lastValidationErrorMessage
+            ?? String(
+                localized: "macOS has not validated the certificate for TLS. Recheck the status before changing your certificate or trust settings.",
+                bundle: RockxyLocalization.bundle
+            )
     }
 
     private var expiryColor: Color {
@@ -188,29 +241,49 @@ struct CertificateStatusPanel: View {
 
     private var diagnosticsGrid: some View {
         Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 4) {
-            diagnosticRow(
-                label: String(localized: "Generated:", bundle: RockxyLocalization.bundle),
-                value: snapshot?.hasGeneratedCertificate == true
-                    ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
-                    : String(localized: "No", bundle: RockxyLocalization.bundle),
-                color: snapshot?.hasGeneratedCertificate == true ? .primary : .secondary
-            )
+            if snapshot?.isGeneratedStateKnown == false {
+                diagnosticRow(
+                    label: String(localized: "Generated:", bundle: RockxyLocalization.bundle),
+                    value: unavailableValueText,
+                    color: .orange
+                )
+            } else {
+                diagnosticRow(
+                    label: String(localized: "Generated:", bundle: RockxyLocalization.bundle),
+                    value: snapshot?.hasGeneratedCertificate == true
+                        ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No", bundle: RockxyLocalization.bundle),
+                    color: snapshot?.hasGeneratedCertificate == true ? .primary : .secondary
+                )
+            }
 
-            diagnosticRow(
-                label: String(localized: "Installed:", bundle: RockxyLocalization.bundle),
-                value: snapshot?.isInstalledInKeychain == true
-                    ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
-                    : String(localized: "No", bundle: RockxyLocalization.bundle),
-                color: snapshot?.isInstalledInKeychain == true ? .primary : .secondary
-            )
-
-            diagnosticRow(
-                label: String(localized: "Trust Settings:", bundle: RockxyLocalization.bundle),
-                value: snapshot?.hasTrustSettings == true
-                    ? String(localized: "Present", bundle: RockxyLocalization.bundle)
-                    : String(localized: "Missing", bundle: RockxyLocalization.bundle),
-                color: snapshot?.hasTrustSettings == true ? .primary : .orange
-            )
+            if isStatusUnavailable {
+                diagnosticRow(
+                    label: String(localized: "Installed:", bundle: RockxyLocalization.bundle),
+                    value: unavailableValueText,
+                    color: .orange
+                )
+                diagnosticRow(
+                    label: String(localized: "Trust Settings:", bundle: RockxyLocalization.bundle),
+                    value: unavailableValueText,
+                    color: .orange
+                )
+            } else {
+                diagnosticRow(
+                    label: String(localized: "Installed:", bundle: RockxyLocalization.bundle),
+                    value: snapshot?.isInstalledInKeychain == true
+                        ? String(localized: "Yes", bundle: RockxyLocalization.bundle)
+                        : String(localized: "No", bundle: RockxyLocalization.bundle),
+                    color: snapshot?.isInstalledInKeychain == true ? .primary : .secondary
+                )
+                diagnosticRow(
+                    label: String(localized: "Trust Settings:", bundle: RockxyLocalization.bundle),
+                    value: snapshot?.hasTrustSettings == true
+                        ? String(localized: "Present", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Missing", bundle: RockxyLocalization.bundle),
+                    color: snapshot?.hasTrustSettings == true ? .primary : .orange
+                )
+            }
 
             diagnosticRow(
                 label: String(localized: "System Validation:", bundle: RockxyLocalization.bundle),
@@ -267,26 +340,19 @@ struct CertificateStatusPanel: View {
     }
 
     @ViewBuilder private var errorCallout: some View {
-        if let snapshot,
-           snapshot.hasTrustSettings,
-           !snapshot.isSystemTrustValidated
-        {
-            let message = snapshot.lastValidationErrorMessage
-                ?? String(
-                    localized: "Trust settings were applied but macOS still does not trust generated certificates. Try Reset Certificate, then Install & Trust again.",
-                    bundle: RockxyLocalization.bundle
-                )
+        if let message = calloutMessage {
+            let tint: Color = isStatusUnavailable ? .orange : .red
             HStack(alignment: .top, spacing: 4) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                Image(systemName: isStatusUnavailable ? "questionmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(tint)
                     .font(metadataFont)
                 Text(message)
                     .font(secondaryFont)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(tint)
             }
             .padding(6)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.08))
+            .background(tint.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: Theme.Layout.badgeCornerRadius))
             .accessibilityElement(children: .combine)
         }
@@ -312,6 +378,20 @@ struct CertificateStatusPanel: View {
         }
 
         switch state {
+        case .statusUnavailable:
+            // Recheck only. Generate, Reset, and Install & Trust would each act on — or ask for
+            // administrator approval for — a certificate whose real state is unknown.
+            Button(String(localized: "Recheck Status", bundle: RockxyLocalization.bundle)) {
+                onAction(.recheck)
+            }
+            .rockxyGlassButtonStyle(prominent: true)
+            .disabled(isLoading)
+            if snapshot?.hasGeneratedCertificate == true {
+                // Sharing only ever exports the public certificate this app already holds, so it
+                // stays available when that material is known.
+                shareCertificateButton
+            }
+
         case .notAvailable:
             Button(String(localized: "Generate New\u{2026}", bundle: RockxyLocalization.bundle)) {
                 onAction(.generate)
@@ -416,6 +496,7 @@ private enum PanelState {
     case installedNotTrusted
     case generatedOnly
     case notAvailable
+    case statusUnavailable
 
     // MARK: Internal
 
@@ -430,6 +511,8 @@ private enum PanelState {
             "arrow.down.circle"
         case .notAvailable:
             "xmark.shield"
+        case .statusUnavailable:
+            "questionmark.circle.fill"
         }
     }
 
@@ -439,7 +522,8 @@ private enum PanelState {
             .green
         case .trustIncomplete,
              .installedNotTrusted,
-             .generatedOnly:
+             .generatedOnly,
+             .statusUnavailable:
             .orange
         case .notAvailable:
             .secondary
@@ -458,6 +542,8 @@ private enum PanelState {
             String(localized: "Root CA Not Installed", bundle: RockxyLocalization.bundle)
         case .notAvailable:
             String(localized: "No Root CA", bundle: RockxyLocalization.bundle)
+        case .statusUnavailable:
+            String(localized: "Certificate Status Unavailable", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -479,6 +565,11 @@ private enum PanelState {
             )
         case .notAvailable:
             String(localized: "Generate a root certificate to get started.", bundle: RockxyLocalization.bundle)
+        case .statusUnavailable:
+            String(
+                localized: "Rockxy could not read the Keychain or trust state. Nothing was changed.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -494,6 +585,8 @@ private enum PanelState {
             String(localized: "not installed", bundle: RockxyLocalization.bundle)
         case .notAvailable:
             String(localized: "not available", bundle: RockxyLocalization.bundle)
+        case .statusUnavailable:
+            String(localized: "status unavailable", bundle: RockxyLocalization.bundle)
         }
     }
 }

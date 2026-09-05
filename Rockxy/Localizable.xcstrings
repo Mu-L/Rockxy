@@ -6331,6 +6331,16 @@
         }
       }
     },
+    "Certificate Status Unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证书状态不可用"
+          }
+        }
+      }
+    },
     "Certificate sharing could not be started for %@. Check your network and try again.": {
       "localizations": {
         "zh-Hans": {
@@ -7740,6 +7750,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态码"
+          }
+        }
+      }
+    },
+    "status unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态不可用"
           }
         }
       }
@@ -28058,6 +28078,36 @@
         }
       }
     },
+    "Rockxy cannot read the certificate and trust status right now.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 目前无法读取证书和信任状态。"
+          }
+        }
+      }
+    },
+    "Rockxy cannot read the certificate and trust status right now. Nothing was changed — check the status again once your keychain is available.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 目前无法读取证书和信任状态。未做任何更改——待钥匙串可用后请重新检查状态。"
+          }
+        }
+      }
+    },
+    "Rockxy cannot verify the Root CA trust status, so HTTPS interception is paused. HTTP traffic and logs are still captured.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法验证根 CA 的信任状态，因此 HTTPS 拦截已暂停。HTTP 流量和日志仍会被捕获。"
+          }
+        }
+      }
+    },
     "Rockxy cannot write to %@. Choose another install folder.": {
       "localizations": {
         "zh-Hans": {
@@ -28154,6 +28204,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rockxy 无法加载默认根证书的详细信息。"
+          }
+        }
+      }
+    },
+    "Rockxy could not read the Keychain or trust state. Nothing was changed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法读取钥匙串或信任状态。未做任何更改。"
+          }
+        }
+      }
+    },
+    "Rockxy could not read the certificate status, so nothing was changed. Recheck the status once your keychain is available.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法读取证书状态，因此未做任何更改。待钥匙串可用后请重新检查状态。"
           }
         }
       }
@@ -29249,6 +29319,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "根 CA 共享 URL 已复制。"
+          }
+        }
+      }
+    },
+    "Root CA status unavailable": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根 CA 状态不可用"
           }
         }
       }
@@ -36976,12 +37056,12 @@
         }
       }
     },
-    "Trust settings were applied but macOS still does not trust generated certificates. Try Reset Certificate, then Install & Trust again.": {
+    "macOS has not validated the certificate for TLS. Recheck the status before changing your certificate or trust settings.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已应用信任设置，但 macOS 仍不信任生成的证书。请尝试“重置证书”，然后再次“安装并信任”。"
+            "value": "macOS 尚未验证此证书可用于 TLS。更改证书或信任设置前，请重新检查状态。"
           }
         }
       }

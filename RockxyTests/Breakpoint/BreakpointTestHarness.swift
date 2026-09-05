@@ -6,10 +6,14 @@ import NIOPosix
 @testable import Rockxy
 import Testing
 
+// MARK: - BreakpointHarnessError
+
 enum BreakpointHarnessError: Error, CustomStringConvertible {
     case noNetwork(URL, underlying: Error)
     case timeout(String)
     case socket(String)
+
+    // MARK: Internal
 
     var description: String {
         switch self {
@@ -23,12 +27,10 @@ enum BreakpointHarnessError: Error, CustomStringConvertible {
     }
 }
 
+// MARK: - BreakpointTestHarness
+
 actor BreakpointTestHarness {
-    let manager: BreakpointManager
-    let ruleEngine: RuleEngine
-    private let captureSink = CaptureSink()
-    private var proxyServer: ProxyServer?
-    private var proxyPort: Int?
+    // MARK: Lifecycle
 
     init(
         manager: BreakpointManager,
@@ -38,12 +40,51 @@ actor BreakpointTestHarness {
         self.ruleEngine = ruleEngine
     }
 
+    // MARK: Internal
+
+    let manager: BreakpointManager
+    let ruleEngine: RuleEngine
+
     static func start() async throws -> BreakpointTestHarness {
         let manager = await MainActor.run { BreakpointManager() }
         let engine = RuleEngine()
         let harness = BreakpointTestHarness(manager: manager, ruleEngine: engine)
         _ = try await harness.startProxy()
         return harness
+    }
+
+    static func dataWithRetry(
+        from url: URL,
+        session: URLSession = .shared
+    )
+        async throws -> (Data, URLResponse)
+    {
+        try await dataWithRetry(
+            from: url,
+            request: { requestURL in
+                try await session.data(from: requestURL)
+            }
+        )
+    }
+
+    static func dataWithRetry(
+        from url: URL,
+        request: @escaping @Sendable (URL) async throws -> (Data, URLResponse)
+    )
+        async throws -> (Data, URLResponse)
+    {
+        do {
+            return try await request(url)
+        } catch {
+            if (error as NSError).domain == NSURLErrorDomain,
+               (error as NSError).code == NSURLErrorCannotFindHost
+               || (error as NSError).code == NSURLErrorDNSLookupFailed
+            {
+                try await Task.sleep(nanoseconds: 300_000_000)
+                return try await request(url)
+            }
+            throw BreakpointHarnessError.noNetwork(url, underlying: error)
+        }
     }
 
     func startProxy() async throws -> Int {
@@ -111,41 +152,26 @@ actor BreakpointTestHarness {
     }
 
     func awaitNextPause(timeout seconds: TimeInterval = 5) async throws -> PausedBreakpointItem {
-        if let item = await MainActor.run(body: { manager.pausedItems.first }) {
-            return item
+        // A pause stays queued until this harness resolves it. Observe that durable state,
+        // not a notification registered after checking it: that check/subscribe gap loses
+        // a pause that arrives between the two and falsely times out on a populated queue.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+        while ContinuousClock.now < deadline {
+            try Task.checkCancellation()
+            if let item = await MainActor.run(body: { manager.pausedItems.first }) {
+                return item
+            }
+            try await Task.sleep(for: .milliseconds(10))
         }
-        return try await withThrowingTaskGroup(of: PausedBreakpointItem.self) { group in
-            group.addTask { [manager] in
-                for await notification in NotificationCenter.default.notifications(named: .breakpointHit) {
-                    guard notification.object as AnyObject? === manager else {
-                        continue
-                    }
-                    if let item = await MainActor.run(body: { manager.pausedItems.first }) {
-                        return item
-                    }
-                }
-                throw BreakpointHarnessError.timeout("Breakpoint queue notification ended before a pause arrived.")
-            }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw BreakpointHarnessError.timeout(
-                    "Timed out waiting \(seconds)s for the next breakpoint pause."
-                )
-            }
-            guard let item = try await group.next() else {
-                throw BreakpointHarnessError.timeout(
-                    "Breakpoint queue wait ended before either task completed."
-                )
-            }
-            group.cancelAll()
-            return item
-        }
+        throw BreakpointHarnessError.timeout("Timed out waiting \(seconds)s for the next breakpoint pause.")
     }
 
     func editDraft(
         _ itemID: UUID,
         mutate: @MainActor @escaping (inout BreakpointRequestData) -> Void
-    ) async {
+    )
+        async
+    {
         await MainActor.run {
             manager.updateDraft(id: itemID, mutate)
         }
@@ -178,35 +204,11 @@ actor BreakpointTestHarness {
         await captureSink.all()
     }
 
-    static func dataWithRetry(
-        from url: URL,
-        session: URLSession = .shared
-    ) async throws -> (Data, URLResponse) {
-        try await dataWithRetry(
-            from: url,
-            request: { requestURL in
-                try await session.data(from: requestURL)
-            }
-        )
-    }
+    // MARK: Private
 
-    static func dataWithRetry(
-        from url: URL,
-        request: @escaping @Sendable (URL) async throws -> (Data, URLResponse)
-    ) async throws -> (Data, URLResponse) {
-        do {
-            return try await request(url)
-        } catch {
-            if (error as NSError).domain == NSURLErrorDomain,
-               (error as NSError).code == NSURLErrorCannotFindHost
-                    || (error as NSError).code == NSURLErrorDNSLookupFailed
-            {
-                try await Task.sleep(nanoseconds: 300_000_000)
-                return try await request(url)
-            }
-            throw BreakpointHarnessError.noNetwork(url, underlying: error)
-        }
-    }
+    private let captureSink = CaptureSink()
+    private var proxyServer: ProxyServer?
+    private var proxyPort: Int?
 
     private static func findFreePort() throws -> Int {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
@@ -252,6 +254,10 @@ final class BreakpointRawHTTPClient: @unchecked Sendable {
 
     deinit {
         close()
+    }
+
+    private init(descriptor: Int32) {
+        self.descriptor = descriptor
     }
 
     // MARK: Internal
@@ -306,10 +312,6 @@ final class BreakpointRawHTTPClient: @unchecked Sendable {
     private let lock = NSLock()
     private var descriptor: Int32
 
-    private init(descriptor: Int32) {
-        self.descriptor = descriptor
-    }
-
     private func sendRequest(to url: URL) throws {
         guard let host = url.host else {
             throw BreakpointHarnessError.socket("Raw breakpoint client received a URL without a host.")
@@ -347,6 +349,8 @@ final class BreakpointRawHTTPClient: @unchecked Sendable {
 // MARK: - BreakpointLocalHTTPServer
 
 actor BreakpointLocalHTTPServer {
+    // MARK: Internal
+
     static func start() async throws -> BreakpointLocalHTTPServer {
         let server = BreakpointLocalHTTPServer()
         try await server.start()
@@ -381,6 +385,8 @@ actor BreakpointLocalHTTPServer {
         eventLoopGroup = nil
         port = 0
     }
+
+    // MARK: Private
 
     private let host = "127.0.0.1"
     private var port = 0
@@ -418,7 +424,11 @@ actor BreakpointLocalHTTPServer {
     }
 }
 
+// MARK: - BreakpointLocalHTTPHandler
+
 private final class BreakpointLocalHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
+    // MARK: Internal
+
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
 
@@ -433,6 +443,8 @@ private final class BreakpointLocalHTTPHandler: ChannelInboundHandler, @unchecke
             requestHead = nil
         }
     }
+
+    // MARK: Private
 
     private var requestHead: HTTPRequestHead?
 
@@ -463,7 +475,10 @@ private final class BreakpointLocalHTTPHandler: ChannelInboundHandler, @unchecke
         switch path {
         case "/headers":
             headers.add(name: "Content-Type", value: "application/json")
-            let echoedHeaders = Dictionary(requestHeaders.map { ($0.name, $0.value) }, uniquingKeysWith: { _, latest in latest })
+            let echoedHeaders = Dictionary(
+                requestHeaders.map { ($0.name, $0.value) },
+                uniquingKeysWith: { _, latest in latest }
+            )
             let payload = (try? JSONSerialization.data(withJSONObject: ["headers": echoedHeaders])) ?? Data("{}".utf8)
             buffer.writeBytes(payload)
             return (.ok, headers, buffer)
@@ -471,7 +486,8 @@ private final class BreakpointLocalHTTPHandler: ChannelInboundHandler, @unchecke
             headers.add(name: "Content-Type", value: "text/plain")
             buffer.writeString("unauthorized")
             return (.unauthorized, headers, buffer)
-        case "/delay/1", "/get":
+        case "/delay/1",
+             "/get":
             headers.add(name: "Content-Type", value: "application/json")
             buffer.writeString(#"{"ok":true}"#)
             return (.ok, headers, buffer)
@@ -483,8 +499,10 @@ private final class BreakpointLocalHTTPHandler: ChannelInboundHandler, @unchecke
     }
 }
 
+// MARK: - CaptureSink
+
 private actor CaptureSink {
-    private var transactions: [HTTPTransaction] = []
+    // MARK: Internal
 
     func append(_ transaction: HTTPTransaction) {
         transactions.append(transaction)
@@ -497,6 +515,10 @@ private actor CaptureSink {
     func all() -> [HTTPTransaction] {
         transactions
     }
+
+    // MARK: Private
+
+    private var transactions: [HTTPTransaction] = []
 }
 
 extension ProxyRule {
@@ -508,7 +530,9 @@ extension ProxyRule {
         phases: BreakpointRulePhase = .both,
         includeSubpaths: Bool = false,
         isEnabled: Bool = true
-    ) -> ProxyRule {
+    )
+        -> ProxyRule
+    {
         ProxyRule(
             name: name,
             isEnabled: isEnabled,
@@ -533,7 +557,9 @@ extension BreakpointRequestData {
         body: String = "",
         statusCode: Int = 200,
         phase: BreakpointPhase = .request
-    ) -> BreakpointRequestData {
+    )
+        -> BreakpointRequestData
+    {
         BreakpointRequestData(
             method: method,
             url: url,
@@ -545,16 +571,18 @@ extension BreakpointRequestData {
     }
 }
 
+// MARK: - BreakpointRuleStateBackup
+
 struct BreakpointRuleStateBackup {
     let diskData: Data?
     let engineRules: [ProxyRule]
     let breakpointToolEnabled: Bool?
 }
 
-enum BreakpointRuleTestIsolation {
-    private static let breakpointToolEnabledKey = "breakpointToolEnabled"
+// MARK: - BreakpointRuleTestIsolation
 
-    private static let rulesPath = RockxyIdentity.current.appSupportPath(TestIdentity.rulesPathComponent)
+enum BreakpointRuleTestIsolation {
+    // MARK: Internal
 
     static func withSharedRuleState(_ body: () async throws -> Void) async rethrows {
         await RuleTestLock.shared.acquire()
@@ -570,10 +598,16 @@ enum BreakpointRuleTestIsolation {
         }
     }
 
+    // MARK: Private
+
+    private static let breakpointToolEnabledKey = "breakpointToolEnabled"
+
+    private static let rulesPath = RockxyIdentity.current.appSupportPath(TestIdentity.rulesPathComponent)
+
     private static func backup() async -> BreakpointRuleStateBackup {
-        BreakpointRuleStateBackup(
+        await BreakpointRuleStateBackup(
             diskData: try? Data(contentsOf: rulesPath),
-            engineRules: await RuleEngine.shared.allRules,
+            engineRules: RuleEngine.shared.allRules,
             breakpointToolEnabled: UserDefaults.standard.object(forKey: breakpointToolEnabledKey) as? Bool
         )
     }
