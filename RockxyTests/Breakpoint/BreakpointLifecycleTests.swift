@@ -19,58 +19,52 @@ struct BreakpointLifecycleTests {
     /// wait and the origin never receives the request.
     @Test("client disconnect during a request pause drains the queue and skips the origin")
     func clientDisconnectDrainsQueueWithoutOriginHit() async throws {
-        let origin = try await CountingOriginServer.start()
-        defer { Task { await origin.stop() } }
+        try await withLifecycleHarness { origin, harness in
+            let matchingRule = await origin.matchingRule("pause")
+            await harness.addRule(
+                .breakpointTest(matchingRule: matchingRule, phases: .request)
+            )
+            let proxyPort = try await harness.startProxy()
+            let originURL = await origin.url("pause")
 
-        let harness = try await BreakpointTestHarness.start()
-        let matchingRule = await origin.matchingRule("pause")
-        await harness.addRule(
-            .breakpointTest(matchingRule: matchingRule, phases: .request)
-        )
-        let proxyPort = try await harness.startProxy()
-        let originURL = await origin.url("pause")
+            // A raw client makes the downstream connection lifetime explicit. The request
+            // pauses before the proxy ever connects to the origin.
+            let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: originURL)
+            defer { client.close() }
 
-        // A raw client makes the downstream connection lifetime explicit. The request
-        // pauses before the proxy ever connects to the origin.
-        let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: originURL)
+            let paused = try await harness.awaitNextPause(timeout: 8)
+            #expect(paused.method == "GET")
 
-        let paused = try await harness.awaitNextPause(timeout: 8)
-        #expect(paused.method == "GET")
+            // Closing the descriptor sends a real FIN while the item is still paused.
+            client.close()
 
-        // Closing the descriptor sends a real FIN while the item is still paused.
-        client.close()
+            // The paused queue must drain on its own (no user resolution) within a bound.
+            try await waitUntilQueueDrains(harness, timeout: 8)
 
-        // The paused queue must drain on its own (no user resolution) within a bound.
-        try await waitUntilQueueDrains(harness, timeout: 8)
-
-        // Settle briefly, then assert the origin was never contacted.
-        try await Task.sleep(nanoseconds: 300_000_000)
-        #expect(await origin.requestCount() == 0)
-
-        await harness.stop()
+            // Settle briefly, then assert the origin was never contacted.
+            try await Task.sleep(nanoseconds: 300_000_000)
+            #expect(await origin.requestCount() == 0)
+        }
     }
 
     /// BP_LC2 — stopping the live proxy while an item is paused drains the queue
     /// without forwarding the held request to the origin.
     @Test("stopping the proxy drains a paused breakpoint queue without forwarding")
     func stopDrainsPausedQueue() async throws {
-        let origin = try await CountingOriginServer.start()
-        defer { Task { await origin.stop() } }
+        try await withLifecycleHarness { origin, harness in
+            let matchingRule = await origin.matchingRule("stop")
+            await harness.addRule(.breakpointTest(matchingRule: matchingRule, phases: .request))
+            let proxyPort = try await harness.startProxy()
+            let originURL = await origin.url("stop")
+            let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: originURL)
+            defer { client.close() }
 
-        let harness = try await BreakpointTestHarness.start()
-        let matchingRule = await origin.matchingRule("stop")
-        await harness.addRule(.breakpointTest(matchingRule: matchingRule, phases: .request))
-        let proxyPort = try await harness.startProxy()
-        let originURL = await origin.url("stop")
-        let client = try BreakpointRawHTTPClient.connect(proxyPort: proxyPort, requestURL: originURL)
+            _ = try await harness.awaitNextPause(timeout: 8)
+            await harness.stopProxyOnly()
 
-        _ = try await harness.awaitNextPause(timeout: 8)
-        await harness.stopProxyOnly()
-
-        #expect(harness.manager.pausedItems.isEmpty)
-        #expect(await origin.requestCount() == 0)
-        await harness.stop()
-        client.close()
+            #expect(harness.manager.pausedItems.isEmpty)
+            #expect(await origin.requestCount() == 0)
+        }
     }
 
     @Test("proxy restart closes stale registered client channels")
@@ -98,6 +92,27 @@ struct BreakpointLifecycleTests {
     }
 
     // MARK: Private
+
+    private func withLifecycleHarness(
+        _ body: (CountingOriginServer, BreakpointTestHarness) async throws -> Void
+    )
+        async throws
+    {
+        let origin = try await CountingOriginServer.start()
+        var harness: BreakpointTestHarness?
+        do {
+            let started = try await BreakpointTestHarness.start()
+            harness = started
+            try await body(origin, started)
+            await started.stop()
+            await origin.stop()
+        } catch {
+            // Await teardown on failure too; a timeout must not leak listeners into later tests.
+            await harness?.stop()
+            await origin.stop()
+            throw error
+        }
+    }
 
     private func waitUntilQueueDrains(
         _ harness: BreakpointTestHarness,

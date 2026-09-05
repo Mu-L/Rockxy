@@ -43,8 +43,8 @@ struct CALifecycleTests {
     }
 
     @Test("cleanupLegacyDiskKeys removes verified primary and backup files when Keychain has key")
-    func cleanupRemovesLegacyFilesWithKeychainKey() throws {
-        let overrides = installSharedTestOverrides()
+    func cleanupRemovesLegacyFilesWithKeychainKey() async throws {
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         // The Keychain must hold a key for cleanup to consider the .bak file redundant.
@@ -66,8 +66,8 @@ struct CALifecycleTests {
     }
 
     @Test("cleanupLegacyDiskKeys preserves .bak when Keychain is empty")
-    func cleanupPreservesBakWithoutKeychainKey() throws {
-        let overrides = installSharedTestOverrides()
+    func cleanupPreservesBakWithoutKeychainKey() async throws {
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         let bakPath = overrides.storageDir.appendingPathComponent(TestIdentity.rootCABackupFilename)
@@ -81,8 +81,8 @@ struct CALifecycleTests {
     }
 
     @Test("cleanupLegacyDiskKeys preserves recovery when Keychain key is corrupt")
-    func cleanupPreservesRecoveryWithCorruptKeychainKey() throws {
-        let overrides = installSharedTestOverrides()
+    func cleanupPreservesRecoveryWithCorruptKeychainKey() async throws {
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         let verifiedKey = P256.Signing.PrivateKey()
@@ -101,8 +101,8 @@ struct CALifecycleTests {
     }
 
     @Test("bak migration preserves recovery when no primary PEM exists")
-    func bakMigrationPreservesRecoveryWhenNoPrimaryPEM() throws {
-        let overrides = installSharedTestOverrides()
+    func bakMigrationPreservesRecoveryWhenNoPrimaryPEM() async throws {
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         // Start from a Keychain with no key for this label so the .bak file is the only source.
@@ -131,7 +131,7 @@ struct CALifecycleTests {
     @Test("root CA generation that cannot persist leaves no volatile root behind")
     func generationFailurePropagatesWithoutAdoptingRoot() async throws {
         let manager = CertificateManager.shared
-        let overrides = installSharedTestOverrides()
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         // Establish a persisted root so a failed regeneration can be shown not to replace it.
@@ -165,7 +165,7 @@ struct CALifecycleTests {
     @Test("mismatched Keychain key is repaired from the disk key matching the certificate")
     func mismatchRecoveryRepairsKeychainAndCleansDisk() async throws {
         let manager = CertificateManager.shared
-        let overrides = installSharedTestOverrides()
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.reset()
@@ -196,7 +196,7 @@ struct CALifecycleTests {
     @Test("mismatch recovery propagates unreadable disk source instead of rotating")
     func mismatchRecoveryPropagatesDiskReadFailure() async throws {
         let manager = CertificateManager.shared
-        let overrides = installSharedTestOverrides()
+        let overrides = try await installSharedTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.reset()

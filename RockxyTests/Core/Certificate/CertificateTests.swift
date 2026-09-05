@@ -117,9 +117,11 @@ struct HostCertGeneratorTests {
 // MARK: - Test Isolation Helpers
 
 /// Uses installSharedTestOverrides() from CertificateTestHelpers.swift
-/// for cross-suite lock coordination of CertificateStore overrides.
-private func installTestOverrides() -> (label: String, storageDir: URL, cleanup: () -> Void) {
-    installSharedTestOverrides()
+/// for cross-suite gate coordination of CertificateStore overrides.
+private func installTestOverrides() async throws
+    -> (label: String, certificateLabel: String, storageDir: URL, cleanup: @Sendable () -> Void)
+{
+    try await installSharedTestOverrides()
 }
 
 // MARK: - CertificateStoreTests
@@ -129,8 +131,8 @@ struct CertificateStoreTests {
     // MARK: Internal
 
     @Test("ensureDirectoryExists creates path without throwing")
-    func ensureDirectoryCreatesPath() throws {
-        let overrides = installTestOverrides()
+    func ensureDirectoryCreatesPath() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try CertificateStore.ensureDirectoryExists()
@@ -138,8 +140,8 @@ struct CertificateStoreTests {
     }
 
     @Test("save and load roundtrip preserves certificate DER bytes")
-    func saveAndLoadRoundtrip() throws {
-        let overrides = installTestOverrides()
+    func saveAndLoadRoundtrip() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -164,8 +166,8 @@ struct CertificateStoreTests {
     }
 
     @Test("save and load roundtrip preserves private key")
-    func saveAndLoadKeyRoundtrip() throws {
-        let overrides = installTestOverrides()
+    func saveAndLoadKeyRoundtrip() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -184,8 +186,8 @@ struct CertificateStoreTests {
     }
 
     @Test("reload after persistence keeps the exact key and certificate fingerprint")
-    func reloadPreservesKeyAndFingerprint() throws {
-        let overrides = installTestOverrides()
+    func reloadPreservesKeyAndFingerprint() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -208,8 +210,8 @@ struct CertificateStoreTests {
     }
 
     @Test("persisting the private key never writes a plaintext key file")
-    func persistingKeyWritesNoPlaintextFile() throws {
-        let overrides = installTestOverrides()
+    func persistingKeyWritesNoPlaintextFile() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -227,8 +229,8 @@ struct CertificateStoreTests {
     }
 
     @Test("corrupt persisted certificate is treated as recoverable absence")
-    func corruptCertificateReturnsNil() throws {
-        let overrides = installTestOverrides()
+    func corruptCertificateReturnsNil() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try CertificateStore.ensureDirectoryExists()
@@ -251,9 +253,11 @@ struct CertificateStoreTests {
 
 @Suite(.serialized)
 struct KeychainPrimaryStorageTests {
+    // MARK: Internal
+
     @Test("key round-trip through Keychain preserves key material")
-    func keychainRoundTrip() throws {
-        let overrides = installTestOverrides()
+    func keychainRoundTrip() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -268,8 +272,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test("manually seeded generic-password key is loaded")
-    func seededGenericPasswordKeyLoads() throws {
-        let overrides = installTestOverrides()
+    func seededGenericPasswordKeyLoads() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let key = P256.Signing.PrivateKey()
@@ -286,8 +290,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test("invalid Keychain key recovers from valid disk backup")
-    func corruptKeychainKeyRecoversFromBackup() throws {
-        let overrides = installTestOverrides()
+    func corruptKeychainKeyRecoversFromBackup() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let validKey = P256.Signing.PrivateKey()
@@ -306,8 +310,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test("migration: disk-only key migrates to Keychain on load")
-    func diskToKeychainMigration() throws {
-        let overrides = installTestOverrides()
+    func diskToKeychainMigration() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -340,8 +344,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test("Keychain-primary: loads from Keychain even without disk file")
-    func keychainPrimaryNoDiskNeeded() throws {
-        let overrides = installTestOverrides()
+    func keychainPrimaryNoDiskNeeded() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -364,8 +368,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test(".bak recovery: loads from .bak when Keychain and disk PEM are both missing")
-    func bakRecoveryFallback() throws {
-        let overrides = installTestOverrides()
+    func bakRecoveryFallback() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         let ca = try RootCAGenerator.generate()
@@ -399,8 +403,8 @@ struct KeychainPrimaryStorageTests {
     }
 
     @Test("corrupt primary disk key falls through to valid backup")
-    func corruptPrimaryDiskKeyFallsThroughToBackup() throws {
-        let overrides = installTestOverrides()
+    func corruptPrimaryDiskKeyFallsThroughToBackup() async throws {
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try KeychainHelper.deletePrivateKey(label: overrides.label)
@@ -445,7 +449,9 @@ struct KeychainPrimaryStorageTests {
     private func addPrivateKeyFixture(
         _ data: Data,
         label: String
-    ) throws {
+    )
+        throws
+    {
         var query = privateKeyFixtureQuery(label: label)
         SecItemDelete(query as CFDictionary)
         query[kSecValueData as String] = data

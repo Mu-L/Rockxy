@@ -41,7 +41,7 @@ struct TrustCacheRecoveryTests {
     @Test("cached false does not block real revalidation via isRootCATrustValidated")
     func cachedFalseDoesNotBlockRealRevalidation() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         // Generate a root CA so validateSystemTrust() has material to work with
@@ -49,10 +49,9 @@ struct TrustCacheRecoveryTests {
 
         // Force a failed validation — without real trust settings installed,
         // validateSystemTrust() will return false and cache that result.
-        // validateSystemTrust() may pass via Strategy B (explicit anchor) even without
-        // admin trust. The key test: isRootCATrustValidated() uses hasTrustSettingsPresent()
-        // as its pre-filter (NOT isRootCATrusted()), so the cache never blocks revalidation.
+        // Explicit-anchor validation is diagnostic only and cannot make this result positive.
         let firstResult = await manager.validateSystemTrust()
+        #expect(firstResult == false)
         let cached = await manager.lastTrustValidationResult
         #expect(cached != nil) // Cached some result (true or false)
 
@@ -65,12 +64,12 @@ struct TrustCacheRecoveryTests {
     @Test("cached false surfaces in cheap check isRootCATrusted")
     func cachedFalseSurfacesInCheapCheck() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
 
-        // Run validateSystemTrust() — may return true (Strategy B) or false
+        // A unique, never-trusted fixture cannot pass the real system evaluation.
         let result = await manager.validateSystemTrust()
         let cached = await manager.lastTrustValidationResult
         #expect(cached != nil)
@@ -85,7 +84,7 @@ struct TrustCacheRecoveryTests {
     @Test("cache cleared by generateRootCA")
     func cacheClearedByGenerateRootCA() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         // Generate once and force a validation failure into the cache
@@ -100,14 +99,10 @@ struct TrustCacheRecoveryTests {
         #expect(cachedAfter == nil)
     }
 
-    @Test("installAndTrust clears cache at start (verified via source inspection)")
+    @Test("installAndTrust clears the prior validation cache before a failed install")
     func cacheClearedByInstallAndTrust() async throws {
-        // installAndTrust() sets lastTrustValidationResult = nil as its first line.
-        // We cannot call it in unit tests because it requires XPC to the helper daemon.
-        // This test verifies the equivalent behavior: that generateRootCA() (which also
-        // clears the cache) demonstrates the pattern works correctly.
-        let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let manager = CertificateManager.makeForTesting()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -115,16 +110,22 @@ struct TrustCacheRecoveryTests {
         let cachedBefore = await manager.lastTrustValidationResult
         #expect(cachedBefore != nil)
 
-        // generateRootCA() clears cache — same pattern as installAndTrust()
-        try await manager.generateRootCA()
+        await manager.setHelperInstallOverrideForTests { _ in
+            Issue.record("Trust installation must not dispatch a helper installation RPC")
+        }
+        await manager.setAppInstallOverrideForTests { _ in
+            throw HelperConnectionError.certInstallFailed("injected install failure")
+        }
+        await #expect(throws: HelperConnectionError.self) { try await manager.installAndTrust() }
         let cachedAfter = await manager.lastTrustValidationResult
         #expect(cachedAfter == nil)
+        #expect(await manager.lastValidationErrorMessage?.contains("injected install failure") == true)
     }
 
     @Test("cache cleared by removeRootCATrust")
     func cacheClearedByRemoveRootCATrust() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -148,7 +149,7 @@ struct TrustCacheRecoveryTests {
     @Test("cache cleared by reset")
     func cacheClearedByReset() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -172,18 +173,17 @@ struct TrustCacheRecoveryTests {
     @Test("lastValidationErrorMessage set on failure and cleared on cache reset")
     func validationErrorMessageLifecycle() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
 
-        // Run validateSystemTrust() — may succeed via Strategy B or fail via Strategy A.
-        // Either way, the cache and error message state should be updated.
+        // Only the real system evaluation sets the result; the diagnostic explicit anchor cannot.
         let result = await manager.validateSystemTrust()
         let cached = await manager.lastTrustValidationResult
         #expect(cached != nil)
 
-        // If validation passed (Strategy B), error message should be nil.
+        // If real system validation passed, the error message should be nil.
         // If validation failed, error message should be non-nil.
         let errorMessage = await manager.lastValidationErrorMessage
         if result {
@@ -209,7 +209,7 @@ struct RootCAStatusSnapshotTests {
     @Test("snapshot reflects generated state")
     func snapshotReflectsGeneratedState() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -249,7 +249,7 @@ struct RootCAStatusSnapshotTests {
     @Test("snapshot validation fields match trust result for generated-only cert")
     func snapshotValidationFieldMatchesTrustResult() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         // Generate cert but do NOT install or trust it
@@ -266,7 +266,7 @@ struct RootCAStatusSnapshotTests {
     @Test("snapshot validity dates are in the correct order")
     func snapshotValidityDatesOrdered() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -283,7 +283,7 @@ struct RootCAStatusSnapshotTests {
     @Test("snapshot fingerprint is SHA-256 format")
     func snapshotFingerprintFormat() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -533,7 +533,7 @@ struct ProxyGatingTests {
     @Test("proxy gating uses real validation not just metadata check")
     func proxyGatingUsesRealValidation() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         try await manager.generateRootCA()
@@ -556,7 +556,7 @@ struct ProxyGatingTests {
     @Test("isRootCATrustValidated returns false without root CA")
     func proxyGatingReturnsFalseWithoutRootCA() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         // Reset to remove any existing root CA
@@ -573,7 +573,7 @@ struct ProxyGatingTests {
     @Test("validateSystemTrust returns false and sets error without root CA")
     func validateSystemTrustWithoutRootCA() async throws {
         let manager = CertificateManager.shared
-        let overrides = installTestOverrides()
+        let overrides = try await installTestOverrides()
         defer { overrides.cleanup() }
 
         do {
@@ -594,7 +594,9 @@ struct ProxyGatingTests {
 // MARK: - Test Isolation Helpers (shared with CertificateTests)
 
 /// Uses installSharedTestOverrides() from CertificateTestHelpers.swift
-/// for cross-suite lock coordination of CertificateStore overrides.
-private func installTestOverrides() -> (label: String, storageDir: URL, cleanup: () -> Void) {
-    installSharedTestOverrides()
+/// for cross-suite gate coordination of CertificateStore overrides.
+private func installTestOverrides() async throws
+    -> (label: String, certificateLabel: String, storageDir: URL, cleanup: @Sendable () -> Void)
+{
+    try await installSharedTestOverrides()
 }

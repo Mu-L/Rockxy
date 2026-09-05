@@ -10,11 +10,16 @@ enum CertReadiness: Equatable {
     case generatedNotInstalled
     case installedNotTrusted
     case trusted
+    /// The certificate, Keychain, or trust state could not be read. Never treated as an absent
+    /// or untrusted root: the recovery is a recheck, not another install and approval.
+    case unknown
 
     // MARK: Internal
 
     var localizedDescription: String {
         switch self {
+        case .unknown:
+            String(localized: "Root CA status unavailable", bundle: RockxyLocalization.bundle)
         case .notGenerated:
             String(localized: "Root CA not generated", bundle: RockxyLocalization.bundle)
         case .generatedNotInstalled:
@@ -125,6 +130,21 @@ final class ReadinessCoordinator {
     {
         guard isCaptureActive, certReadiness != .trusted else {
             return nil
+        }
+        if certReadiness == .unknown {
+            // Nothing is known to be wrong with the certificate, so the offer is a status check
+            // rather than a reinstall that would ask for administrator approval on the strength
+            // of a failed read. HTTPS interception stays paused either way.
+            return ReadinessWarning(
+                message: String(
+                    localized: """
+                    Rockxy cannot verify the Root CA trust status, so HTTPS interception is paused. \
+                    HTTP traffic and logs are still captured.
+                    """, bundle: RockxyLocalization.bundle
+                ),
+                action: .openGeneralSettings,
+                isDismissible: false
+            )
         }
         return ReadinessWarning(
             message: String(
@@ -341,7 +361,11 @@ final class ReadinessCoordinator {
 
         let previousReadiness = certReadiness
 
-        if snapshot.isSystemTrustValidated {
+        // An unreadable status outranks the booleans: they are fail-closed defaults, not
+        // findings, so reporting them would present a trusted root as missing or untrusted.
+        if snapshot.isStatusUnavailable {
+            certReadiness = .unknown
+        } else if snapshot.isSystemTrustValidated {
             certReadiness = .trusted
         } else if snapshot.hasTrustSettings || snapshot.isInstalledInKeychain {
             certReadiness = .installedNotTrusted

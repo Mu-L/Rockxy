@@ -347,7 +347,11 @@ struct ReadinessCoordinatorTests {
 
         let snapshot = try #require(coordinator.lastCertSnapshot)
 
-        if snapshot.isSystemTrustValidated {
+        if snapshot.isStatusUnavailable {
+            // The booleans below are fail-closed defaults for a read that did not complete, so
+            // the readiness has to say "unknown" rather than pick one of them.
+            #expect(coordinator.certReadiness == .unknown)
+        } else if snapshot.isSystemTrustValidated {
             #expect(coordinator.certReadiness == .trusted)
         } else if snapshot.hasTrustSettings || snapshot.isInstalledInKeychain {
             #expect(coordinator.certReadiness == .installedNotTrusted)
@@ -434,5 +438,26 @@ struct ReadinessWarningTests {
         #expect(!CertReadiness.generatedNotInstalled.localizedDescription.isEmpty)
         #expect(!CertReadiness.installedNotTrusted.localizedDescription.isEmpty)
         #expect(!CertReadiness.trusted.localizedDescription.isEmpty)
+        #expect(!CertReadiness.unknown.localizedDescription.isEmpty)
+    }
+
+    @Test("an unreadable cert status warns that verification failed and offers a status check")
+    func unknownCertReadinessOffersStatusCheck() throws {
+        let warning = try #require(ReadinessCoordinator.certNotTrustedWarning(
+            certReadiness: .unknown,
+            isCaptureActive: true
+        ))
+
+        // Not "Install & Trust": that would ask for administrator approval on the strength of a
+        // read that failed. Capture stays up for HTTP.
+        #expect(warning.action == .openGeneralSettings)
+        #expect(warning.isDismissible == false)
+        #expect(warning.message.contains("cannot verify"))
+        #expect(warning.message.contains("HTTP traffic and logs are still captured"))
+        // A known-untrusted root still offers the install, so the two paths stay distinct.
+        #expect(ReadinessCoordinator.certNotTrustedWarning(
+            certReadiness: .installedNotTrusted,
+            isCaptureActive: true
+        )?.action == .reinstallAndTrust)
     }
 }

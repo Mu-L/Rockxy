@@ -107,15 +107,12 @@ struct WelcomeView: View {
                     bundle: RockxyLocalization.bundle
                 ),
                 symbol: "lock.badge.plus",
-                actionLabel: viewModel.certInstalled ? nil : String(
-                    localized: "Install",
-                    bundle: RockxyLocalization.bundle
-                ),
+                actionLabel: certificateStepActionLabel,
                 isCompleted: viewModel.certInstalled,
                 isDisabled: false,
                 activeAction: .certificate,
                 errorArea: .certificate,
-                action: { await viewModel.installCert() }
+                action: certificateStepAction
             ),
             WelcomeStepItem(
                 id: 2,
@@ -125,15 +122,12 @@ struct WelcomeView: View {
                     bundle: RockxyLocalization.bundle
                 ),
                 symbol: "checkmark.shield",
-                actionLabel: viewModel.certTrusted ? nil : String(
-                    localized: "Trust",
-                    bundle: RockxyLocalization.bundle
-                ),
+                actionLabel: trustStepActionLabel,
                 isCompleted: viewModel.certTrusted,
                 isDisabled: !viewModel.certInstalled,
                 activeAction: .certificate,
                 errorArea: .certificate,
-                action: { await viewModel.installCert() }
+                action: certificateStepAction
             ),
             WelcomeStepItem(
                 id: 3,
@@ -169,6 +163,31 @@ struct WelcomeView: View {
                 action: { await viewModel.enableProxy() }
             ),
         ]
+    }
+
+    /// An unreadable status offers a status check, never an install: the install would raise an
+    /// administrator prompt for a certificate Rockxy could not describe.
+    private var certificateStepActionLabel: String? {
+        if viewModel.isCertStatusUnavailable {
+            return viewModel.certInstalled ? nil : String(localized: "Recheck Status", bundle: RockxyLocalization.bundle)
+        }
+        return viewModel.certInstalled
+            ? nil
+            : String(localized: "Install", bundle: RockxyLocalization.bundle)
+    }
+
+    private var certificateStepAction: () async -> Void {
+        if viewModel.isCertStatusUnavailable {
+            return { await viewModel.recheckCertificateStatus() }
+        }
+        return { await viewModel.installCert() }
+    }
+
+    private var trustStepActionLabel: String? {
+        if viewModel.isCertStatusUnavailable {
+            return viewModel.certInstalled ? String(localized: "Recheck Status", bundle: RockxyLocalization.bundle) : nil
+        }
+        return viewModel.certTrusted ? nil : String(localized: "Trust", bundle: RockxyLocalization.bundle)
     }
 
     private var appVersion: String {
@@ -271,6 +290,24 @@ struct WelcomeView: View {
         .frame(maxHeight: .infinity)
     }
 
+    /// Shown under the first certificate step when the status could not be read. It states what
+    /// is unknown; the step's own action re-reads it. Nothing here offers an install or a trust
+    /// write, and it never touches `errorMessage`, so an unrelated helper or proxy failure keeps
+    /// its own inline error.
+    @ViewBuilder private var certificateSupplement: some View {
+        if let message = viewModel.certStatusUnavailableMessage {
+            Label {
+                Text(message)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "questionmark.circle.fill")
+            }
+            .font(toolMetrics.metadataFont())
+            .foregroundStyle(.orange)
+            .padding(.top, 2)
+        }
+    }
+
     @ViewBuilder private var helperSupplement: some View {
         if let detail = viewModel.helperStatusDetail {
             Text(detail)
@@ -344,6 +381,16 @@ struct WelcomeView: View {
 
     private var footerButtons: some View {
         HStack(spacing: toolMetrics.controlSpacing) {
+            Button(String(localized: "Close", bundle: RockxyLocalization.bundle), role: .cancel) {
+                // Dismissing setup is not completing it. Keep the readiness milestones and
+                // onboarding preference intact so incomplete setup remains discoverable.
+                dismiss()
+            }
+            .rockxyGlassButtonStyle()
+            .controlSize(.large)
+            .keyboardShortcut(.cancelAction)
+            .disabled(viewModel.isBusy)
+
             if viewModel.canGetStarted {
                 Button(String(localized: "Debug My App…", bundle: RockxyLocalization.bundle)) {
                     finish(openDeveloperSetup: true)
@@ -375,6 +422,10 @@ struct WelcomeView: View {
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(step.isDisabled ? .tertiary : .secondary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if step.id == 1 {
+                    certificateSupplement
+                }
 
                 if step.id == 3 {
                     helperSupplement
