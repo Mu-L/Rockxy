@@ -59,7 +59,9 @@ enum HelperCompatibilityPolicy {
     )
         -> HelperCompatibilityDecision
     {
-        guard [1, 2].contains(installedProtocolVersion), [1, 2].contains(expectedProtocolVersion) else {
+        guard knownProtocolVersions.contains(installedProtocolVersion),
+              knownProtocolVersions.contains(expectedProtocolVersion)
+        else {
             // A missing or unreadable protocol version describes nothing.
             return .incompatible
         }
@@ -96,6 +98,9 @@ enum HelperCompatibilityPolicy {
     }
 
     // MARK: Private
+
+    /// Every helper protocol whose contract this app can reason about.
+    private static let knownProtocolVersions: Set<Int> = [1, 2]
 
     /// Older protocol versions whose already-implemented operations stay safe to call.
     private static let backwardCompatibleProtocolVersions: Set<Int> = [1]

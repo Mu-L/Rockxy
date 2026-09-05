@@ -344,7 +344,7 @@ struct CertificateStatusPanel: View {
             let tint: Color = isStatusUnavailable ? .orange : .red
             HStack(alignment: .top, spacing: 4) {
                 Image(systemName: isStatusUnavailable ? "questionmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(tint)
                     .font(metadataFont)
                 Text(message)
                     .font(secondaryFont)

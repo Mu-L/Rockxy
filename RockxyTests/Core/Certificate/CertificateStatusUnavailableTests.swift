@@ -510,6 +510,13 @@ struct CertificateUnavailableUXTests {
         #expect(callout.contains("snapshot.isStatusUnavailable"))
         #expect(callout.contains("statusReadErrorMessage"))
 
+        // The icon, text, and background share the same semantic color: unavailable is orange,
+        // while a known trust-validation failure is red.
+        let errorCallout = try #require(declaration(named: "@ViewBuilder private var errorCallout: some View", in: panel))
+        #expect(errorCallout.contains("let tint: Color = isStatusUnavailable ? .orange : .red"))
+        #expect(errorCallout.contains(".foregroundStyle(tint)"))
+        #expect(errorCallout.contains(".foregroundStyle(.orange)") == false)
+
         // The unavailable branch offers a recheck and no generate, reset, or install.
         let actions = try #require(declaration(named: "@ViewBuilder private var actionButtons: some View", in: panel))
         let branchStart = try #require(actions.range(of: "case .statusUnavailable:"))
