@@ -7,11 +7,18 @@ enum CertificateSetupState: Equatable {
     case installedNotTrusted
     case generatedOnly
     case missing
+    /// Rockxy could not read the certificate, Keychain, or trust state. Distinct from `missing`
+    /// and `installedNotTrusted`: nothing is known, so the answer is a recheck, never a reinstall.
+    case statusUnavailable
 
     // MARK: Lifecycle
 
     init(snapshot: RootCAStatusSnapshot) {
-        if snapshot.isInstalledInKeychain, snapshot.isSystemTrustValidated {
+        // An unreadable status outranks every boolean below it: those are fail-closed defaults
+        // for an answer that was never produced, not findings about the certificate.
+        if snapshot.isStatusUnavailable {
+            self = .statusUnavailable
+        } else if snapshot.isInstalledInKeychain, snapshot.isSystemTrustValidated {
             self = .installedAndTrusted
         } else if snapshot.isInstalledInKeychain {
             self = .installedNotTrusted
@@ -34,6 +41,8 @@ enum CertificateSetupState: Equatable {
             String(localized: "Generated, Not Installed", bundle: RockxyLocalization.bundle)
         case .missing:
             String(localized: "Certificate Missing", bundle: RockxyLocalization.bundle)
+        case .statusUnavailable:
+            String(localized: "Certificate Status Unavailable", bundle: RockxyLocalization.bundle)
         }
     }
 
@@ -56,6 +65,11 @@ enum CertificateSetupState: Equatable {
                 localized: "Generate Rockxy's root CA, then install and trust it in Keychain.",
                 bundle: RockxyLocalization.bundle
             )
+        case .statusUnavailable:
+            String(
+                localized: "Rockxy cannot read the certificate and trust status right now. Nothing was changed — check the status again once your keychain is available.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 
@@ -69,6 +83,8 @@ enum CertificateSetupState: Equatable {
             "certificate.fill"
         case .missing:
             "xmark.circle.fill"
+        case .statusUnavailable:
+            "questionmark.circle.fill"
         }
     }
 

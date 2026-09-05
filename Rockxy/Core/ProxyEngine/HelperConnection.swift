@@ -13,7 +13,9 @@ enum HelperConnectionError: LocalizedError {
     case uninstallFailed
     case xpcTimeout
     case certInstallFailed(String)
+    case certInstallUnsupported
     case certRemoveFailed(String)
+    case certRemovalUnsupported
     case bypassDomainsFailed(String)
     case applicationMustReopen
     case appSignatureInvalid(String)
@@ -35,8 +37,12 @@ enum HelperConnectionError: LocalizedError {
             "XPC call timed out — helper tool may not be responding"
         case let .certInstallFailed(reason):
             "Helper failed to install root certificate: \(reason)"
+        case .certInstallUnsupported:
+            "The installed Rockxy helper installs certificates destructively, so it was not used. Update it in Settings > Advanced > Proxy Helper Tool."
         case let .certRemoveFailed(reason):
             "Helper failed to remove root certificate: \(reason)"
+        case .certRemovalUnsupported:
+            "The installed Rockxy helper does not support safe certificate removal. Update the helper in Settings > Advanced > Proxy Helper Tool, then try again."
         case let .bypassDomainsFailed(reason):
             "Helper failed to set bypass domains: \(reason)"
         case .applicationMustReopen:
@@ -47,6 +53,219 @@ enum HelperConnectionError: LocalizedError {
             "This app is signed by \"\(app)\" but the installed helper was signed by \"\(helper)\""
         }
     }
+}
+
+// MARK: - XPCOperationCompletion
+
+/// Completes one XPC operation exactly once.
+///
+/// A single call can be answered three ways — the helper's reply, the connection's error
+/// handler, and the local timeout — and more than one of them can arrive. Resuming a
+/// continuation twice traps, so every path claims completion first and only the winner
+/// resumes.
+final class XPCOperationCompletion: @unchecked Sendable {
+    // MARK: Internal
+
+    /// Whether some path has already completed this operation.
+    ///
+    /// Only meaningful to a caller that reads it under the session lock, which is why the send
+    /// gate lives on `XPCFailureRouter` rather than here: an unsynchronized read would decide
+    /// nothing, it would only move the window in which a completed operation can still send.
+    var isFinished: Bool {
+        state.withLock { $0 }
+    }
+
+    /// Returns true for the first caller only.
+    func claim() -> Bool {
+        state.withLock { finished in
+            if finished {
+                return false
+            }
+            finished = true
+            return true
+        }
+    }
+
+    // MARK: Private
+
+    private let state = OSAllocatedUnfairLock(initialState: false)
+}
+
+// MARK: - XPCFailureRouter
+
+/// Routes an XPC delivery failure to the operation currently waiting on a proxy, and gates what
+/// that operation is still allowed to send.
+///
+/// `remoteObjectProxyWithErrorHandler` installs one handler per proxy, but a session sends more
+/// than one message through the same proxy. Without routing, a message that never reaches the
+/// helper would leave its caller waiting out the full timeout. A delivered failure poisons the
+/// session permanently, including in the window between the info probe and the mutation: the
+/// session belongs to one removal, and a transport failure must never authorize its next phase.
+///
+/// The lock is the session's, not just this type's. Claiming completion and committing a send both
+/// run under it, so "this operation is already over" and "send the privileged message" cannot
+/// interleave. It is recursive because a reply — a test double's, or a real connection's inline
+/// error report — can arrive on the sending thread while the send is still in progress.
+final class XPCFailureRouter: @unchecked Sendable {
+    // MARK: Internal
+
+    /// Opens the window for one message exchange.
+    ///
+    /// Returns false after reporting a transport failure this session has already seen; the
+    /// handler has been called and nothing may be sent.
+    @discardableResult
+    func begin(
+        operation: XPCOperationCompletion = XPCOperationCompletion(),
+        _ handler: @escaping @Sendable (any Error) -> Void
+    )
+        -> Bool
+    {
+        lock.lock()
+        self.handler = handler
+        current = operation
+        committed = false
+        let replay = pendingFailure
+        lock.unlock()
+
+        if let replay {
+            handler(replay)
+            return false
+        }
+        return true
+    }
+
+    /// Sends under the session lock, and only while this exchange may still send.
+    ///
+    /// Dispatch commitment is the boundary this can honestly draw. Once the message is enqueued a
+    /// later failure or cancellation may still find privileged work in flight, and nothing here
+    /// promises to roll that back. What it does guarantee is that an exchange whose session was
+    /// poisoned — or which some path already completed — *before* this point sends nothing at all.
+    func commit(_ operation: XPCOperationCompletion, _ send: () -> Void) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard pendingFailure == nil, !committed, current === operation, !operation.isFinished else {
+            return false
+        }
+        committed = true
+        send()
+        return true
+    }
+
+    /// Claims completion for `operation`, but only while it is this session's open exchange.
+    ///
+    /// A reply that arrives after its exchange ended — the late half of a timeout — loses here, so
+    /// it can neither resume its own continuation twice nor complete the exchange that followed it.
+    func claim(_ operation: XPCOperationCompletion) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard current === operation else {
+            return false
+        }
+        return operation.claim()
+    }
+
+    /// Closes the current exchange's window. The recorded failure is deliberately not cleared.
+    func end() {
+        lock.lock()
+        handler = nil
+        current = nil
+        committed = false
+        lock.unlock()
+    }
+
+    func deliver(_ error: any Error) {
+        lock.lock()
+        let handler = handler
+        pendingFailure = pendingFailure ?? error
+        lock.unlock()
+
+        handler?(error)
+    }
+
+    // MARK: Private
+
+    private let lock = NSRecursiveLock()
+    private var handler: (@Sendable (any Error) -> Void)?
+    private var pendingFailure: (any Error)?
+    private var current: XPCOperationCompletion?
+    private var committed = false
+}
+
+// MARK: - HelperInstallNotDispatched
+
+/// A helper certificate installation that is known to have sent nothing to the daemon.
+///
+/// The distinction matters exactly once: it is the only condition under which this app may go on
+/// to raise its own authorization dialog for the same material. Anything that fails *after* the
+/// message was committed — a reported error, a dropped connection, the local timeout — leaves the
+/// system in a state this process cannot describe, so it is reported rather than retried, and
+/// never with a second prompt in the same call.
+struct HelperInstallNotDispatched: LocalizedError, Sendable, Equatable {
+    // MARK: Lifecycle
+
+    init(_ reason: any Error) {
+        detail = reason.localizedDescription
+    }
+
+    // MARK: Internal
+
+    /// Why nothing was sent, in the words of whatever refused. Kept as text so this error can
+    /// cross actor boundaries as freely as the failure it describes.
+    let detail: String
+
+    var errorDescription: String? {
+        detail
+    }
+}
+
+// MARK: - HelperCertificateSession
+
+/// One connection dedicated to a single certificate mutation — an exact removal, or an install.
+///
+/// The capability probe and the mutation share it, so the helper that answered "I speak protocol 2"
+/// is the helper that receives the bytes. It is deliberately not the cached general-purpose
+/// connection: that one is shared with every other operation and reconnects on demand, which would
+/// let a replacement helper answer the mutation after a different helper passed the probe.
+final class HelperCertificateSession: @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(
+        proxy: any RockxyHelperProtocol,
+        router: XPCFailureRouter = XPCFailureRouter(),
+        teardown: @escaping @Sendable () -> Void
+    ) {
+        self.proxy = proxy
+        self.router = router
+        self.teardown = teardown
+    }
+
+    // MARK: Internal
+
+    let proxy: any RockxyHelperProtocol
+    let router: XPCFailureRouter
+
+    /// Tears the connection down. Idempotent, because every exit from the wrapper — the success,
+    /// each throw, and cancellation — runs it.
+    func invalidate() {
+        let alreadyTornDown = tornDown.withLock { done -> Bool in
+            if done {
+                return true
+            }
+            done = true
+            return false
+        }
+        guard !alreadyTornDown else {
+            return
+        }
+        teardown()
+    }
+
+    // MARK: Private
+
+    private let teardown: @Sendable () -> Void
+    private let tornDown = OSAllocatedUnfairLock(initialState: false)
 }
 
 // MARK: - SigningPreflightCache
@@ -128,6 +347,27 @@ final class HelperConnection {
     static let shared = HelperConnection()
 
     let signingCache = SigningPreflightCache()
+
+    // How long each phase of a dedicated certificate mutation may wait.
+    //
+    // The helper's privileged work runs a bounded `security` command — five seconds plus its
+    // termination budget — with keychain reads and a verification pass around it. The request
+    // timeout leaves room for surrounding work. Security framework calls may still stall
+    // independently, so a timeout never promises that an enqueued mutation was rolled back.
+    // Both are mutable in DEBUG only, so a test can drive a timeout without waiting one out.
+    #if DEBUG
+    /// Test seam: supplies the session one certificate mutation runs on, so the real wrapper —
+    /// its probe, its capability gate, its cancellation check, and its send gate — can be
+    /// exercised against a fake helper instead of a privileged one. Per instance; never set on
+    /// `shared`.
+    var certificateSessionProvider: (@MainActor () throws -> HelperCertificateSession)?
+
+    var certificateProbeTimeout: Duration = .seconds(3)
+    var certificateRequestTimeout: Duration = .seconds(15)
+    #else
+    let certificateProbeTimeout: Duration = .seconds(3)
+    let certificateRequestTimeout: Duration = .seconds(15)
+    #endif
 
     nonisolated static func performEmergencyProxyRestore(timeout: TimeInterval = 3) -> Bool {
         let connection = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
@@ -464,90 +704,188 @@ final class HelperConnection {
         }
     }
 
-    /// Install a root CA certificate in the system keychain and trust it for SSL.
+    /// Install exactly this root CA certificate in the System keychain and record admin trust for
+    /// it, over a session dedicated to this call.
+    ///
+    /// The probe and the mutation share one connection, so the helper that answered "I speak
+    /// protocol 2" is the helper that receives the bytes. The capability question is not academic:
+    /// a protocol 1 helper implements this same selector but sweeps every certificate carrying the
+    /// root CA label before adding the new one, destroying a root the user may still be relying on.
+    /// A build number cannot answer it either — shipped copies embed a protocol 1 helper at or
+    /// above this checkout's build.
+    ///
+    /// Everything that can refuse before the message is committed throws
+    /// `HelperInstallNotDispatched`, which is the caller's only licence to install app-side
+    /// instead. After the commit the outcome is genuinely unknown, so the failure is reported as
+    /// itself and nothing here claims a rollback.
     func installRootCertificate(derData: Data) async throws {
-        let proxy = try await getProxy()
+        let session: HelperCertificateSession
+        do {
+            session = try await certificateSession()
+        } catch {
+            throw HelperInstallNotDispatched(error)
+        }
+        // Every exit tears the connection down: the success, each throw, and cancellation.
+        defer { session.invalidate() }
+
+        let info: HelperInfo
+        do {
+            info = try await helperInfo(over: session)
+        } catch {
+            throw HelperInstallNotDispatched(error)
+        }
+        guard HelperCompatibilityPolicy.supportsSafeCertificateInstall(
+            protocolVersion: info.protocolVersion
+        ) else {
+            Self.logger.error(
+                "Installed helper speaks protocol \(info.protocolVersion) — non-destructive install is unavailable"
+            )
+            throw HelperInstallNotDispatched(HelperConnectionError.certInstallUnsupported)
+        }
+
+        // The last opportunity to stop before privileged, irreversible work.
+        try Task.checkCancellation()
+
+        let timeout = certificateRequestTimeout
         Self.logger.info("Calling helper installRootCertificate (\(derData.count) bytes)")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let resumed = OSAllocatedUnfairLock(initialState: false)
+            let operation = XPCOperationCompletion()
+            let router = session.router
+            // Set inside the send gate, before the message goes out, so a transport failure
+            // reported from within the send itself is already classified as dispatched.
+            let dispatched = OSAllocatedUnfairLock(initialState: false)
 
-            proxy.installRootCertificate(derData) { success, errorMessage in
-                let alreadyResumed = resumed.withLock { val -> Bool in
-                    if val {
-                        return true
-                    }
-                    val = true
-                    return false
-                }
-                guard !alreadyResumed else {
+            @Sendable
+            func finish(_ result: Result<Void, any Error>) {
+                guard router.claim(operation) else {
                     return
                 }
-                if success {
-                    Self.logger.info("Helper installed root certificate in system keychain")
-                    continuation.resume()
-                } else {
-                    let reason = errorMessage ?? "Unknown error"
-                    Self.logger.error("Helper failed to install root certificate: \(reason)")
-                    continuation.resume(throwing: HelperConnectionError.certInstallFailed(reason))
+                router.end()
+                continuation.resume(with: result)
+            }
+
+            /// A dropped connection before the send means nothing was applied; after it, the
+            /// helper may have applied the request and lost the reply.
+            @Sendable
+            func transportFailure(_ error: any Error) -> any Error {
+                let failure = HelperConnectionError.certInstallFailed(error.localizedDescription)
+                return dispatched.withLock { $0 } ? failure : HelperInstallNotDispatched(failure)
+            }
+
+            guard router.begin(operation: operation, { error in
+                finish(.failure(transportFailure(error)))
+            }) else {
+                return
+            }
+
+            let sent = router.commit(operation) {
+                dispatched.withLock { $0 = true }
+                session.proxy.installRootCertificate(derData) { success, errorMessage in
+                    if success {
+                        Self.logger.info("Helper installed root certificate in system keychain")
+                        finish(.success(()))
+                    } else {
+                        let reason = errorMessage ?? "Unknown error"
+                        Self.logger.error("Helper failed to install root certificate: \(reason)")
+                        finish(.failure(HelperConnectionError.certInstallFailed(reason)))
+                    }
                 }
+            }
+            guard sent else {
+                // The session was poisoned, or the operation completed, between opening this
+                // exchange and the send. Either way nothing reached the helper, so the caller may
+                // still install app-side.
+                Self.logger.error("Install request was not sent: the dedicated helper session ended first")
+                finish(.failure(HelperInstallNotDispatched(HelperConnectionError.certInstallFailed(
+                    "the helper connection ended before the request was sent"
+                ))))
+                return
             }
 
             Task {
-                try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
-                let alreadyResumed = resumed.withLock { val -> Bool in
-                    if val {
-                        return true
-                    }
-                    val = true
-                    return false
-                }
-                if !alreadyResumed {
-                    continuation.resume(throwing: HelperConnectionError.xpcTimeout)
-                }
+                try? await Task.sleep(for: timeout)
+                // Committed before the timer fired, so the helper may still be applying this
+                // request. The app stopped waiting; it did not undo anything.
+                finish(.failure(HelperConnectionError.xpcTimeout))
             }
         }
     }
 
-    /// Remove the Rockxy root CA certificate and trust settings from the system keychain.
-    func removeRootCertificate() async throws {
-        let proxy = try await getProxy()
-        Self.logger.info("Calling helper removeRootCertificate")
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let resumed = OSAllocatedUnfairLock(initialState: false)
+    /// Remove exactly the root CA certificate whose DER bytes are supplied, together with its
+    /// admin trust settings, from the system keychain.
+    ///
+    /// The capability probe and the mutation run over one proxy on one connection of this call's
+    /// own, so the helper that answered "I speak protocol 2" is the helper that receives the
+    /// bytes. A cached `HelperManager.installedInfo` cannot stand in for that probe — it may
+    /// describe a helper that has since been replaced — and a build number never implied this
+    /// selector at all: shipped app copies embed a helper at this build that still speaks
+    /// protocol 1.
+    func removeRootCertificate(matching derData: Data) async throws {
+        let session = try await certificateSession()
+        // Every exit tears the connection down: the success, each throw, and cancellation.
+        defer { session.invalidate() }
 
-            proxy.removeRootCertificate { success, errorMessage in
-                let alreadyResumed = resumed.withLock { val -> Bool in
-                    if val {
-                        return true
-                    }
-                    val = true
-                    return false
-                }
-                guard !alreadyResumed else {
+        let info = try await helperInfo(over: session)
+        guard HelperCompatibilityPolicy.supportsExactCertificateRemoval(
+            protocolVersion: info.protocolVersion
+        ) else {
+            Self.logger.error(
+                "Installed helper speaks protocol \(info.protocolVersion) — exact certificate removal is unavailable"
+            )
+            throw HelperConnectionError.certRemovalUnsupported
+        }
+
+        // The last opportunity to stop before privileged, irreversible work.
+        try Task.checkCancellation()
+
+        let timeout = certificateRequestTimeout
+        Self.logger.info("Calling helper removeRootCertificateMatching (\(derData.count) bytes)")
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let operation = XPCOperationCompletion()
+            let router = session.router
+
+            @Sendable
+            func finish(_ result: Result<Void, any Error>) {
+                guard router.claim(operation) else {
                     return
                 }
-                if success {
-                    Self.logger.info("Helper removed root certificate from system keychain")
-                    continuation.resume()
-                } else {
-                    let reason = errorMessage ?? "Unknown error"
-                    Self.logger.error("Helper failed to remove root certificate: \(reason)")
-                    continuation.resume(throwing: HelperConnectionError.certRemoveFailed(reason))
+                router.end()
+                continuation.resume(with: result)
+            }
+
+            guard router.begin(operation: operation, { error in
+                finish(.failure(HelperConnectionError.certRemoveFailed(error.localizedDescription)))
+            }) else {
+                return
+            }
+
+            let sent = router.commit(operation) {
+                session.proxy.removeRootCertificateMatching(derData) { success, errorMessage in
+                    if success {
+                        Self.logger.info("Helper removed the requested root certificate from the system keychain")
+                        finish(.success(()))
+                    } else {
+                        let reason = errorMessage ?? "Unknown error"
+                        Self.logger.error("Helper failed to remove root certificate: \(reason)")
+                        finish(.failure(HelperConnectionError.certRemoveFailed(reason)))
+                    }
                 }
+            }
+            guard sent else {
+                // The session was poisoned, or the operation completed, between opening this
+                // exchange and the send. Either way nothing reached the helper. A failure that
+                // arrived through the router has already completed the continuation, so this is
+                // the remaining case rather than a second answer.
+                Self.logger.error("Removal request was not sent: the dedicated helper session ended first")
+                finish(.failure(HelperConnectionError.certRemoveFailed(
+                    "the helper connection ended before the request was sent"
+                )))
+                return
             }
 
             Task {
-                try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
-                let alreadyResumed = resumed.withLock { val -> Bool in
-                    if val {
-                        return true
-                    }
-                    val = true
-                    return false
-                }
-                if !alreadyResumed {
-                    continuation.resume(throwing: HelperConnectionError.xpcTimeout)
-                }
+                try? await Task.sleep(for: timeout)
+                finish(.failure(HelperConnectionError.xpcTimeout))
             }
         }
     }
@@ -645,6 +983,95 @@ final class HelperConnection {
 
     private var connection: NSXPCConnection?
 
+    /// A connection created for one certificate mutation and torn down when that call returns.
+    ///
+    /// Its interruption and invalidation handlers poison the session's router rather than clearing
+    /// the cached general-purpose connection, so this call cannot silently reconnect to a
+    /// replacement helper between the probe and the mutation, and the cached connection's own
+    /// identity-scoped handlers are left alone.
+    private func certificateSession() async throws -> HelperCertificateSession {
+        #if DEBUG
+        if let certificateSessionProvider {
+            return try certificateSessionProvider()
+        }
+        #endif
+
+        try await signingPreflight()
+
+        let router = XPCFailureRouter()
+        let conn = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
+        conn.remoteObjectInterface = NSXPCInterface(with: RockxyHelperProtocol.self)
+        conn.invalidationHandler = {
+            // Also fires for this call's own teardown, which is why it only poisons a session
+            // that is by then finished with.
+            Self.logger.debug("Dedicated certificate connection invalidated")
+            router.deliver(HelperConnectionError.connectionFailed)
+        }
+        conn.interruptionHandler = { [weak conn] in
+            Self.logger.warning("Dedicated certificate connection interrupted")
+            router.deliver(HelperConnectionError.connectionFailed)
+            // Do not let this one-operation connection automatically reconnect after its probe.
+            conn?.invalidate()
+        }
+        conn.resume()
+
+        guard let proxy = conn.remoteObjectProxyWithErrorHandler({ [weak conn] error in
+            Self.logger.error("Dedicated certificate proxy error: \(error.localizedDescription)")
+            router.deliver(error)
+            conn?.invalidate()
+        }) as? any RockxyHelperProtocol else {
+            Self.logger.error("Failed to obtain a dedicated certificate proxy")
+            conn.invalidate()
+            throw HelperConnectionError.connectionFailed
+        }
+
+        return HelperCertificateSession(proxy: proxy, router: router) { conn.invalidate() }
+    }
+
+    /// Reads the connected helper's info over an existing session, so a capability decision
+    /// and the operation it authorizes address the same helper.
+    private func helperInfo(over session: HelperCertificateSession) async throws -> HelperInfo {
+        let timeout = certificateProbeTimeout
+        return try await withCheckedThrowingContinuation { continuation in
+            let operation = XPCOperationCompletion()
+            let router = session.router
+
+            @Sendable
+            func finish(_ result: Result<HelperInfo, any Error>) {
+                guard router.claim(operation) else {
+                    return
+                }
+                router.end()
+                continuation.resume(with: result)
+            }
+
+            guard router.begin(operation: operation, { _ in
+                finish(.failure(HelperConnectionError.connectionFailed))
+            }) else {
+                return
+            }
+
+            let sent = router.commit(operation) {
+                session.proxy.getHelperInfo { version, build, protocolVersion in
+                    finish(.success(HelperInfo(
+                        binaryVersion: version,
+                        buildNumber: build,
+                        protocolVersion: protocolVersion
+                    )))
+                }
+            }
+            guard sent else {
+                finish(.failure(HelperConnectionError.connectionFailed))
+                return
+            }
+
+            Task {
+                try? await Task.sleep(for: timeout)
+                finish(.failure(HelperConnectionError.xpcTimeout))
+            }
+        }
+    }
+
     /// Evaluate the signing preflight cache and throw a typed error if the
     /// current app has a signing issue relative to the installed helper.
     private func signingPreflight() async throws {
@@ -664,36 +1091,49 @@ final class HelperConnection {
         }
     }
 
-    /// Create or reuse an NSXPCConnection to the helper's Mach service.
-    private func getProxy() async throws -> any RockxyHelperProtocol {
+    /// Create or reuse an NSXPCConnection to the helper's Mach service, after the signing
+    /// preflight has cleared this app copy.
+    private func activeConnection() async throws -> NSXPCConnection {
         try await signingPreflight()
-        let conn: NSXPCConnection
         if let existing = connection {
-            conn = existing
-        } else {
-            conn = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
-            conn.remoteObjectInterface = NSXPCInterface(with: RockxyHelperProtocol.self)
-            conn.invalidationHandler = { [weak self] in
-                Task { @MainActor in
-                    Self.logger.debug("XPC connection invalidated")
-                    self?.connection = nil
-                }
-            }
-            conn.interruptionHandler = { [weak self] in
-                Task { @MainActor in
-                    Self.logger.warning("XPC connection interrupted")
-                    self?.connection = nil
-                }
-            }
-            conn.resume()
-            connection = conn
+            return existing
         }
 
-        guard let proxy = conn.remoteObjectProxyWithErrorHandler({ [weak self] error in
+        let conn = NSXPCConnection(machServiceName: Self.machServiceName, options: .privileged)
+        conn.remoteObjectInterface = NSXPCInterface(with: RockxyHelperProtocol.self)
+        conn.invalidationHandler = { [weak self, weak conn] in
+            Task { @MainActor in
+                Self.logger.debug("XPC connection invalidated")
+                if self?.connection === conn {
+                    self?.connection = nil
+                }
+            }
+        }
+        conn.interruptionHandler = { [weak self, weak conn] in
+            Task { @MainActor in
+                Self.logger.warning("XPC connection interrupted")
+                if self?.connection === conn {
+                    self?.connection = nil
+                }
+            }
+        }
+        conn.resume()
+        connection = conn
+        return conn
+    }
+
+    /// A proxy for a single operation whose XPC failures are logged but not routed back to the
+    /// caller; the operation's own timeout ends the wait.
+    private func getProxy() async throws -> any RockxyHelperProtocol {
+        let conn = try await activeConnection()
+
+        guard let proxy = conn.remoteObjectProxyWithErrorHandler({ [weak self, weak conn] error in
             Self.logger.error("XPC remote object error: \(error.localizedDescription)")
             Task { @MainActor in
-                self?.connection?.invalidate()
-                self?.connection = nil
+                conn?.invalidate()
+                if self?.connection === conn {
+                    self?.connection = nil
+                }
             }
         }) as? any RockxyHelperProtocol else {
             Self.logger.error("Failed to obtain remote object proxy")

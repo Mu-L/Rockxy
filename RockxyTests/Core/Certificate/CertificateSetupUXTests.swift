@@ -33,25 +33,24 @@ struct CertificateSetupUXTests {
     }
 
     @Test("manage certificates targets the General settings tab")
-    func manageCertificatesSelectsGeneralSettings() {
-        UserDefaults.standard.removeObject(forKey: RockxySettingsTab.defaultsKey)
-        defer { UserDefaults.standard.removeObject(forKey: RockxySettingsTab.defaultsKey) }
+    func manageCertificatesSelectsGeneralSettings() throws {
+        let suiteName = "CertificateSetupUXTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        RockxySettingsTab.select(.general)
+        RockxySettingsTab.select(.general, defaults: defaults)
 
-        #expect(UserDefaults.standard.string(forKey: RockxySettingsTab.defaultsKey) == RockxySettingsTab.general.rawValue)
+        #expect(defaults.string(forKey: RockxySettingsTab.defaultsKey) == RockxySettingsTab.general.rawValue)
     }
 
     @Test("manual trust command uses the public root CA PEM path")
-    func rootCAPublicPEMPath() {
-        let tempDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("rockxy-root-ca-url-\(UUID().uuidString)", isDirectory: true)
-        CertificateStore.storageDirectoryOverride = tempDirectory
-        defer { CertificateStore.storageDirectoryOverride = nil }
+    func rootCAPublicPEMPath() async throws {
+        let overrides = try await installSharedTestOverrides()
+        defer { overrides.cleanup() }
 
         let url = CertificateStore.rootCACertificateURL
 
-        #expect(url.deletingLastPathComponent() == tempDirectory)
+        #expect(url.deletingLastPathComponent() == overrides.storageDir)
         #expect(url.lastPathComponent == "rootCA.pem")
     }
 

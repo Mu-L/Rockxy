@@ -141,6 +141,34 @@ struct DeveloperSetupSessionSetupTests {
         #expect(contents.contains("Export or trust the Rockxy root certificate"))
     }
 
+    @Test("Java Automatic Setup names the JetBrains proxy override and the active endpoint")
+    @MainActor
+    func javaGuidanceNamesJetBrainsOverrideAndEndpoint() throws {
+        let viewModel = DeveloperSetupSessionSetupViewModel(
+            coordinator: MainContentCoordinator(),
+            targetID: .javaVMs
+        )
+
+        let guidance = try #require(viewModel.javaProxyGuidanceText)
+
+        #expect(guidance.contains("JetBrains"))
+        #expect(guidance.contains("HTTP Proxy"))
+        #expect(guidance.contains("Auto-detect"))
+        #expect(guidance.contains(viewModel.proxyEndpointText))
+        #expect(viewModel.proxyEndpointText.hasPrefix("127.0.0.1:"))
+    }
+
+    @Test("Non-Java targets show no JetBrains guidance")
+    @MainActor
+    func nonJavaTargetsShowNoJetBrainsGuidance() {
+        let viewModel = DeveloperSetupSessionSetupViewModel(
+            coordinator: MainContentCoordinator(),
+            targetID: .python
+        )
+
+        #expect(viewModel.javaProxyGuidanceText == nil)
+    }
+
     @Test("Firefox setup uses a generated profile proxy preference file")
     func firefoxSetupUsesGeneratedProfileProxyPreferenceFile() {
         let userJS = RockxySetupSessionLauncher.firefoxUserJS(proxyHost: "127.0.0.1", proxyPort: 9_090)

@@ -1274,21 +1274,24 @@ final class HelperManager {
         }
     }
 
-    /// Evaluate helper compatibility based on protocol version and build number.
+    /// Evaluate helper compatibility through the shared protocol-first policy.
+    ///
+    /// A helper one protocol behind is reported as outdated rather than incompatible: it still
+    /// answers every operation it already implements, so the proxy and certificate-install
+    /// paths keep working while the user is prompted to update. Only the protocol version is
+    /// ever consulted for capability — see `HelperCompatibilityPolicy`.
     private func evaluateCompatibility(_ info: HelperInfo) -> HelperStatus {
-        guard info.protocolVersion == expectedProtocolVersion else {
-            Self.logger.info(
-                "Helper protocol mismatch: installed=\(info.protocolVersion) expected=\(self.expectedProtocolVersion)"
-            )
-            return .installedIncompatible
-        }
-        if info.buildNumber >= bundledHelperBuild {
-            return .installedCompatible
-        }
-        Self.logger.info(
-            "Helper outdated: installed build=\(info.buildNumber) bundled=\(self.bundledHelperBuild)"
+        let decision = HelperCompatibilityPolicy.classify(
+            installedProtocolVersion: info.protocolVersion,
+            installedBuildNumber: info.buildNumber,
+            expectedProtocolVersion: expectedProtocolVersion,
+            bundledBuildNumber: bundledHelperBuild
         )
-        return .installedOutdated
+
+        Self.logger.info(
+            "Helper \(String(describing: decision)): installed protocol=\(info.protocolVersion) build=\(info.buildNumber), expected protocol=\(self.expectedProtocolVersion) build=\(self.bundledHelperBuild)"
+        )
+        return HelperStatus(decision)
     }
 
     private func probeHelperInfo() async throws -> HelperInfo {
@@ -1305,6 +1308,24 @@ final class HelperManager {
             }
         ) {
             try await HelperConnection.shared.getHelperInfo()
+        }
+    }
+}
+
+// MARK: - HelperManager.HelperStatus + HelperCompatibilityDecision
+
+extension HelperManager.HelperStatus {
+    /// Maps the shared, protocol-first compatibility decision onto the status this manager
+    /// publishes. `.outdated` stays reachable on purpose: the operations that helper already
+    /// implements remain usable while the update prompt is shown.
+    init(_ decision: HelperCompatibilityDecision) {
+        switch decision {
+        case .compatible:
+            self = .installedCompatible
+        case .outdated:
+            self = .installedOutdated
+        case .incompatible:
+            self = .installedIncompatible
         }
     }
 }

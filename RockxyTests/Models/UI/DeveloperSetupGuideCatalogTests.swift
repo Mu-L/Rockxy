@@ -219,12 +219,13 @@ struct DeveloperSetupGuideCatalogTests {
         #expect(currentSupport.contains("NODE_USE_ENV_PROXY"))
     }
 
-    @Test("Java currentSupportSummary references keytool + HttpClient")
+    @Test("Java currentSupportSummary references keytool + HttpClient and the JetBrains override")
     func javaSupportCopyIsConcrete() {
         let currentSupport = SetupTarget.javaVMs.currentSupportSummary
 
         #expect(currentSupport.contains("keytool"))
         #expect(currentSupport.contains("HttpClient"))
+        #expect(currentSupport.contains("JetBrains"))
     }
 
     // MARK: - Guide catalog coverage

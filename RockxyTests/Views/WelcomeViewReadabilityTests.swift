@@ -62,6 +62,21 @@ struct WelcomeViewReadabilityTests {
         #expect(app.contains("if certInstalled, certTrusted, helperOK, proxyOK {"))
     }
 
+    @Test("incomplete Welcome has an explicit safe dismissal without completing onboarding")
+    func incompleteSetupCanBeDismissed() throws {
+        let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")
+        let start = try #require(view.range(of: "Button(String(localized: \"Close\", bundle: RockxyLocalization.bundle), role: .cancel)"))
+        let end = try #require(view.range(of: "if viewModel.canGetStarted", range: start.upperBound ..< view.endIndex))
+        let closeAction = String(view[start.lowerBound ..< end.lowerBound])
+
+        #expect(closeAction.contains("dismiss()"))
+        #expect(closeAction.contains(".keyboardShortcut(.cancelAction)"))
+        #expect(closeAction.contains(".disabled(viewModel.isBusy)"))
+        #expect(!closeAction.contains("onboardingCompletedOnce ="))
+        #expect(!closeAction.contains("finish("))
+        #expect(!closeAction.contains("onComplete"))
+    }
+
     // MARK: Private
 
     private enum ResolveError: Error {

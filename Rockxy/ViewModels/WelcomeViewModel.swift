@@ -30,8 +30,26 @@ final class WelcomeViewModel {
         case reopenApp
     }
 
+    /// What the two certificate steps should show for one readiness answer.
+    ///
+    /// Pure so the unavailable case can be exercised without a coordinator, a Keychain, or an
+    /// authorization dialog: an unreadable status is neither "generated" nor "trusted", and the
+    /// only action it may offer is a recheck.
+    nonisolated struct CertificateStepState: Equatable {
+        let isGenerated: Bool
+        let isTrusted: Bool
+        /// Set only when the status could not be read. Kept out of `errorMessage` so it can
+        /// never overwrite an unrelated helper or system-proxy failure.
+        let unavailableMessage: String?
+
+        var isUnavailable: Bool {
+            unavailableMessage != nil
+        }
+    }
+
     var certInstalled = false
     var certTrusted = false
+    private(set) var certStatusUnavailableMessage: String?
     var helperStatus: HelperManager.HelperStatus = .notInstalled
     var helperSigningIssue: HelperManager.SigningIssue?
     var systemProxyEnabled = false
@@ -146,8 +164,39 @@ final class WelcomeViewModel {
         }
     }
 
+    var isCertStatusUnavailable: Bool {
+        certStatusUnavailableMessage != nil
+    }
+
     static func canBeginAction(current: ActiveAction?, isCheckingSystem: Bool = false) -> Bool {
         current == nil && !isCheckingSystem
+    }
+
+    /// Maps one readiness answer onto the certificate steps.
+    ///
+    /// `.unknown` is deliberately not folded into "generated": marking step 1 complete because
+    /// the readiness is merely not `.notGenerated` claims a certificate nobody could read.
+    nonisolated static func certificateStepState(
+        certReadiness: CertReadiness,
+        snapshot: RootCAStatusSnapshot?
+    )
+        -> CertificateStepState
+    {
+        guard certReadiness != .unknown else {
+            return CertificateStepState(
+                isGenerated: snapshot?.isGeneratedStateKnown == true && snapshot?.hasGeneratedCertificate == true,
+                isTrusted: false,
+                unavailableMessage: snapshot?.statusReadErrorMessage ?? String(
+                    localized: "Rockxy cannot read the certificate and trust status right now.",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
+        }
+        return CertificateStepState(
+            isGenerated: certReadiness != .notGenerated,
+            isTrusted: certReadiness == .trusted,
+            unavailableMessage: nil
+        )
     }
 
     static func resolveHelperFailureRecovery(for error: Error) -> HelperFailureRecovery {
@@ -182,12 +231,28 @@ final class WelcomeViewModel {
     }
 
     func installCert() async {
-        guard !certTrusted else {
+        guard !certTrusted, !isCertStatusUnavailable else {
             return
         }
         await perform(.certificate, errorArea: .certificate) {
             try await CertificateManager.shared.installAndTrust()
         }
+    }
+
+    /// Re-reads the real certificate state and nothing else.
+    ///
+    /// The recovery for an unreadable status is a read, never an install or a trust write: those
+    /// would raise an administrator prompt for material this app cannot describe. Unrelated
+    /// helper and system-proxy failures are left exactly as they are.
+    func recheckCertificateStatus() async {
+        guard Self.canBeginAction(current: activeAction, isCheckingSystem: isCheckingSystem) else {
+            return
+        }
+        activeAction = .certificate
+        defer { activeAction = nil }
+
+        await ReadinessCoordinator.shared.deepRefresh()
+        apply(readiness: ReadinessCoordinator.shared)
     }
 
     func installHelper() async {
@@ -202,6 +267,19 @@ final class WelcomeViewModel {
     ) {
         helperStatus = status
         helperSigningIssue = signingIssue
+    }
+
+    /// Applies one resolved certificate step state. Kept separate from `apply(readiness:)` so a
+    /// test can drive the four-step UI from a snapshot without the shared coordinator.
+    func applyCertificateState(_ state: CertificateStepState) {
+        certInstalled = state.isGenerated
+        certTrusted = state.isTrusted
+        certStatusUnavailableMessage = state.unavailableMessage
+        if !state.isUnavailable, certificateErrorWasUnavailable, errorArea == .certificate {
+            errorMessage = nil
+            errorArea = nil
+            certificateErrorWasUnavailable = false
+        }
     }
 
     func retryHelperConnection() async {
@@ -322,18 +400,27 @@ final class WelcomeViewModel {
         }
     }
 
-    private func recordFailure(_ error: Error, area: ErrorArea) {
+    func recordFailure(_ error: Error, area: ErrorArea) {
         errorMessage = error.localizedDescription
         errorArea = area
+        if area == .certificate, case CertificateManagerError.trustStateUnavailable = error {
+            certificateErrorWasUnavailable = true
+        } else {
+            certificateErrorWasUnavailable = false
+        }
         if area == .helper {
             helperFailureRecovery = Self.resolveHelperFailureRecovery(for: error)
         }
     }
 
     private func apply(readiness: ReadinessCoordinator) {
-        certInstalled = readiness.certReadiness != .notGenerated
-        certTrusted = readiness.canInterceptHTTPS
+        applyCertificateState(Self.certificateStepState(
+            certReadiness: readiness.certReadiness,
+            snapshot: readiness.lastCertSnapshot
+        ))
         applyHelperState(status: readiness.helperReadiness, signingIssue: readiness.helperSigningIssue)
         systemProxyEnabled = readiness.proxyMode != .unavailable
     }
+
+    private var certificateErrorWasUnavailable = false
 }
