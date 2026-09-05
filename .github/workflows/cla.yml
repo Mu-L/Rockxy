@@ -25,8 +25,9 @@ jobs:
     if: >-
       (github.event_name == 'pull_request_target' &&
        github.event.pull_request.base.ref == 'main' &&
-       github.event.pull_request.head.ref == 'develop' &&
-       github.event.pull_request.head.repo.full_name == github.repository) ||
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       (github.event.pull_request.head.ref == 'develop' ||
+        startsWith(github.event.pull_request.head.ref, 'chore/release-public-'))) ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
        (contains(github.event.comment.body, 'I have read and agree to the Rockxy ICLA v2.0') ||
