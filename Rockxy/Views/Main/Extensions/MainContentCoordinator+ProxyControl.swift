@@ -20,6 +20,10 @@ struct ProxyOverrideReconciliation: Equatable, Sendable {
 /// proxy completed it. A small lock keeps NIO callbacks safe to compare with the
 /// main-actor health-check task without introducing asynchronous callback races.
 final class CaptureProbeTracker: @unchecked Sendable {
+    // MARK: Internal
+
+    nonisolated static let headerName = "X-Rockxy-Capture-Probe"
+
     func begin(token: String) -> UInt64 {
         lock.lock()
         defer { lock.unlock() }
@@ -40,8 +44,8 @@ final class CaptureProbeTracker: @unchecked Sendable {
         guard let token = transaction.request.headers.first(where: {
             $0.name.caseInsensitiveCompare(Self.headerName) == .orderedSame
         })?.value,
-            diagnosticTokens.contains(token)
-        else {
+            diagnosticTokens.contains(token) else
+        {
             return false
         }
 
@@ -80,9 +84,10 @@ final class CaptureProbeTracker: @unchecked Sendable {
         diagnosticTokenOrder.removeAll()
     }
 
-    nonisolated static let headerName = "X-Rockxy-Capture-Probe"
+    // MARK: Private
 
     private static let maximumRetainedTokens = 8
+
     private let lock = NSLock()
     private var generation: UInt64 = 0
     private var expectedToken: String?
@@ -106,8 +111,8 @@ extension MainContentCoordinator {
     func retryHTTPSInterception() {
         guard isProxyRunning,
               !isProxyStopping,
-              !isRetryingHTTPSInterception
-        else {
+              !isRetryingHTTPSInterception else
+        {
             return
         }
         let clientIdentifiers = readiness.tlsRetryClientIdentifiers
@@ -141,8 +146,8 @@ extension MainContentCoordinator {
                   httpsInterceptionRetryGeneration == retryGeneration,
                   isProxyRunning,
                   !isProxyStopping,
-                  readiness.isCaptureActive
-            else {
+                  readiness.isCaptureActive else
+            {
                 return
             }
             guard readiness.canInterceptHTTPS else {
@@ -266,19 +271,7 @@ extension MainContentCoordinator {
                 startBandwidthTimer()
                 startLogCapture()
 
-                evictionObserver = NotificationCenter.default.addObserver(
-                    forName: .bufferEvictionRequested,
-                    object: nil,
-                    queue: .main
-                ) { [weak self] notification in
-                    guard let self else {
-                        return
-                    }
-                    let count = notification.userInfo?["count"] as? Int ?? Int(5e3)
-                    Task { @MainActor in
-                        self.evictOldestTransactions(count: count)
-                    }
-                }
+                installEvictionObserver()
 
                 readiness.startObserving()
                 readiness.setSystemRoutingExpected(true)
@@ -309,6 +302,22 @@ extension MainContentCoordinator {
                 Self.logger.error("Failed to start proxy: \(error.localizedDescription)")
                 proxyError = error.localizedDescription
                 activeProxyPort = settings.proxyPort
+            }
+        }
+    }
+
+    private func installEvictionObserver() {
+        evictionObserver = NotificationCenter.default.addObserver(
+            forName: .bufferEvictionRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else {
+                return
+            }
+            let count = notification.userInfo?["count"] as? Int ?? Int(5e3)
+            Task { @MainActor in
+                self.evictOldestTransactions(count: count)
             }
         }
     }
@@ -484,8 +493,8 @@ extension MainContentCoordinator {
                 guard !Task.isCancelled,
                       let self,
                       self.isProxyRunning,
-                      self.activeProxyPort == proxyPort
-                else {
+                      self.activeProxyPort == proxyPort else
+                {
                     return
                 }
                 Self.logger.warning("Capture health check failed: \(error.localizedDescription)")
@@ -497,8 +506,8 @@ extension MainContentCoordinator {
     nonisolated static func performCaptureHealthProbe(
         session: DeveloperSetupProbeSession,
         proxyPort: Int
-    ) async throws
-        -> Bool
+    )
+        async throws -> Bool
     {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let responsePromise = group.next().makePromise(of: Bool.self)
@@ -1102,19 +1111,20 @@ extension MainContentCoordinator {
     }
 }
 
-// MARK: - CaptureHealthProbeResponseHandler
+// MARK: - CaptureHealthProbeError
 
 enum CaptureHealthProbeError: Error {
     case connectionClosed
     case timeout
 }
 
+// MARK: - CaptureHealthProbeResponseHandler
+
 /// Sends an absolute-form HTTP request directly to the active proxy listener. Foundation's
 /// URL loading system may bypass configured proxies for loopback destinations, which would
 /// make the readiness check report a false success without traversing Rockxy.
 final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = HTTPClientResponsePart
-    typealias OutboundOut = HTTPClientRequestPart
+    // MARK: Lifecycle
 
     init(
         requestHead: HTTPRequestHead,
@@ -1123,6 +1133,11 @@ final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked
         self.requestHead = requestHead
         self.responsePromise = responsePromise
     }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundOut = HTTPClientRequestPart
 
     func channelActive(context: ChannelHandlerContext) {
         context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
@@ -1154,6 +1169,8 @@ final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked
     func timeout() {
         fail(CaptureHealthProbeError.timeout)
     }
+
+    // MARK: Private
 
     private let requestHead: HTTPRequestHead
     private let responsePromise: EventLoopPromise<Bool>

@@ -867,13 +867,13 @@ extension HTTPProxyHandler {
                         serverHostname: host
                     )
                     return channel.pipeline.addHandler(sslHandler).flatMap {
-                        channel.pipeline.addHTTPClientHandlers()
+                        channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
                     }
                 } catch {
                     return channel.eventLoop.makeFailedFuture(error)
                 }
             }
-            return channel.pipeline.addHTTPClientHandlers()
+            return channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
         }
         .whenComplete { [weak self] result in
             guard let self else {

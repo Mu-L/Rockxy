@@ -46,6 +46,17 @@ struct ContextDockEmptyStateTests {
         #expect(state == .waitingForTraffic)
     }
 
+    @Test("No captured traffic while starting never claims capture stopped")
+    func waitingForTrafficWhileStarting() {
+        let state = ContextDockEmptyState.resolve(
+            hasCapturedTraffic: false,
+            hasVisibleResults: false,
+            isCapturing: ProxyDisplayState.starting.hasCaptureSessionContext
+        )
+
+        #expect(state == .waitingForTraffic)
+    }
+
     @Test("No captured traffic while stopped prompts to start capture")
     func captureStoppedWithoutTraffic() {
         let state = ContextDockEmptyState.resolve(

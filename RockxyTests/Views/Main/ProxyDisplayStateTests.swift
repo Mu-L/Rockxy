@@ -8,6 +8,8 @@ import Testing
 @Suite(.serialized, .sharedPolicyState)
 @MainActor
 struct ProxyDisplayStateTests {
+    // MARK: Internal
+
     @Test("Coordinator reports stopped by default")
     func stoppedByDefault() {
         let coordinator = MainContentCoordinator()
@@ -22,6 +24,7 @@ struct ProxyDisplayStateTests {
         coordinator.isProxyStarting = true
 
         #expect(coordinator.proxyDisplayState == .starting)
+        #expect(coordinator.proxyDisplayState.hasCaptureSessionContext)
     }
 
     @Test("Coordinator reports running after proxy start")
@@ -67,6 +70,7 @@ struct ProxyDisplayStateTests {
         coordinator.isProxyRunning = false
 
         #expect(coordinator.proxyDisplayState == .stopped)
+        #expect(!coordinator.proxyDisplayState.hasCaptureSessionContext)
     }
 
     @Test("Proxy start remains gated until asynchronous stop cleanup finishes")
@@ -173,18 +177,18 @@ struct ProxyDisplayStateTests {
     }
 
     @Test("Diagnostic transactions are consumed only for registered private tokens")
-    func captureProbeTrackerIsolation() async {
+    func captureProbeTrackerIsolation() throws {
         let tracker = CaptureProbeTracker()
         let generation = tracker.begin(token: "private-token")
-        let diagnostic = HTTPTransaction(request: HTTPRequestData(
+        let diagnostic = try HTTPTransaction(request: HTTPRequestData(
             method: "GET",
-            url: URL(string: "http://127.0.0.1/probe")!,
+            url: #require(URL(string: "http://127.0.0.1/probe")),
             httpVersion: "HTTP/1.1",
             headers: [HTTPHeader(name: CaptureProbeTracker.headerName, value: "private-token")]
         ))
-        let ordinary = HTTPTransaction(request: HTTPRequestData(
+        let ordinary = try HTTPTransaction(request: HTTPRequestData(
             method: "GET",
-            url: URL(string: "http://127.0.0.1/ordinary")!,
+            url: #require(URL(string: "http://127.0.0.1/ordinary")),
             httpVersion: "HTTP/1.1",
             headers: [HTTPHeader(name: CaptureProbeTracker.headerName, value: "user-token")]
         ))
@@ -265,6 +269,8 @@ struct ProxyDisplayStateTests {
     func ipv6ListenerFormatting() {
         #expect(CaptureStatusPresentation.listener(address: "::1", port: 8_888) == "[::1]:8888")
     }
+
+    // MARK: Private
 
     private func cleanUpCaptureHealthCheck(_ coordinator: MainContentCoordinator, ruleID: UUID) async {
         await RuleEngine.shared.removeRule(id: ruleID)

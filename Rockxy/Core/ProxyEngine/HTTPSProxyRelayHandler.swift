@@ -18,7 +18,7 @@ nonisolated(unsafe) private let httpsRelayLogger = Logger(
 /// Handles decrypted HTTPS traffic after TLS termination. Operates identically to
 /// `HTTPProxyHandler` for plain HTTP, but reconstructs URLs with the `https://` scheme
 /// and establishes a TLS client connection to the real upstream server.
-final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
+final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(
@@ -32,7 +32,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
-        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? = nil,
+        onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
+            nil,
         breakpointBridgeTracker: BreakpointBridgeTracker? = nil
     ) {
         self.host = host
@@ -407,7 +408,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                         serverHostname: self.host
                     )
                     return channel.pipeline.addHandler(sslHandler).flatMap {
-                        channel.pipeline.addHTTPClientHandlers()
+                        channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
                     }
                 } catch {
                     return channel.eventLoop.makeFailedFuture(error)
@@ -863,7 +864,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                             serverHostname: remoteHost
                         )
                         return channel.pipeline.addHandler(sslHandler).flatMap {
-                            channel.pipeline.addHTTPClientHandlers()
+                            channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
                         }
                     } catch {
                         return channel.eventLoop.makeFailedFuture(error)
@@ -904,7 +905,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, @unchecked Sendable {
                 targetPort: remotePort,
                 configuration: upstreamProxySnapshotProvider()
             ) { channel in
-                channel.pipeline.addHTTPClientHandlers()
+                channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
             }
             .whenComplete { [weak self] result in
                 guard let self else {

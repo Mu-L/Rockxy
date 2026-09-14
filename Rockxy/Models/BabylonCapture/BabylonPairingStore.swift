@@ -31,19 +31,38 @@ struct BabylonKeychainPairingCredentialStorage: BabylonPairingCredentialStorage 
     private let account = "pairing-token-v1"
 }
 
+// MARK: - BabylonEphemeralPairingCredentialStorage
+
+/// Keeps the app-hosted XCTest process away from the user's production Keychain.
+///
+/// SwiftUI constructs every declared window while the test host is attaching, including the
+/// Babylon windows. Reading the login Keychain from that construction path can wait for Keychain
+/// UI before XCTest has completed its handshake, leaving the entire test run stuck at
+/// `AcquiredPID`. Tests that exercise persistence inject their own storage explicitly.
+private struct BabylonEphemeralPairingCredentialStorage: BabylonPairingCredentialStorage {
+    func load() throws -> String? {
+        nil
+    }
+
+    func save(_: String) throws {
+        // Intentionally ephemeral in the app-hosted test process.
+    }
+}
+
 // MARK: - BabylonPairingStore
 
 @MainActor @Observable
 final class BabylonPairingStore {
     // MARK: Lifecycle
 
-    init(storage: any BabylonPairingCredentialStorage = BabylonKeychainPairingCredentialStorage()) {
-        self.storage = storage
+    init(storage: (any BabylonPairingCredentialStorage)? = nil) {
+        let resolvedStorage: any BabylonPairingCredentialStorage = storage ?? Self.defaultStorage()
+        self.storage = resolvedStorage
         do {
-            let storedToken = try storage.load()
+            let storedToken = try resolvedStorage.load()
             let resolvedToken = try storedToken.flatMap(Self.validToken) ?? Self.generateToken()
             if resolvedToken != storedToken {
-                try storage.save(resolvedToken)
+                try resolvedStorage.save(resolvedToken)
             }
             token = resolvedToken
             snapshot.update(resolvedToken)
@@ -97,6 +116,13 @@ final class BabylonPairingStore {
 
     private let storage: any BabylonPairingCredentialStorage
     private let snapshot = TokenSnapshot()
+
+    private static func defaultStorage() -> any BabylonPairingCredentialStorage {
+        if RockxyIdentity.isRunningTests {
+            return BabylonEphemeralPairingCredentialStorage()
+        }
+        return BabylonKeychainPairingCredentialStorage()
+    }
 
     private static func generateToken() throws -> String {
         var bytes = Data(count: 32)

@@ -23,9 +23,11 @@ nonisolated enum KeychainReadOutcome: Equatable {
 /// private key and installing the root CA certificate. Root key material is stored as a
 /// generic-password item in the user's login Keychain.
 ///
-/// Certificate trust uses the `.admin` domain for clients using the macOS trust store.
-/// Runtimes with independent trust stores still need their own CA configuration.
-/// Changes require administrator authorization through the macOS authentication dialog.
+/// Certificate trust uses the `.user` domain because the certificate itself is installed in
+/// the user's login Keychain. Keeping the item and its trust settings in the same domain is also
+/// required by Chromium's built-in verifier, which does not discover a login-keychain anchor
+/// whose only positive trust record lives in the admin domain. Runtimes with independent trust
+/// stores still need their own CA configuration.
 nonisolated enum KeychainHelper {
     // MARK: Internal
 
@@ -34,6 +36,10 @@ nonisolated enum KeychainHelper {
         let certificate: SecCertificate
         let derData: Data
     }
+
+    /// Trust must live beside the certificate in the user's login Keychain. Keeping this named
+    /// and test-visible prevents a return to the login-item/admin-trust split Chromium rejects.
+    static let clientTrustDomain = SecTrustSettingsDomain.user
 
     // MARK: - Private Key Operations
 
@@ -325,7 +331,7 @@ nonisolated enum KeychainHelper {
     /// resolved by reading the keychain, and trust is then applied to the copy that is there.
     ///
     /// Both postconditions are proved before returning: the exact bytes are installed, and the
-    /// admin domain records *positive* trust for them. Presence of settings is not the question —
+    /// user domain records *positive* trust for them. Presence of settings is not the question —
     /// a deny and an unreadable entry are settings that exist, and the previous shape logged a
     /// failed verification and returned successfully anyway, which is how a dismissed dialog was
     /// reported as an installed, trusted root.
@@ -367,15 +373,16 @@ nonisolated enum KeychainHelper {
         // request stops here rather than raising the dialog the trust write needs.
         try cancellationCheck()
 
-        // .admin applies to clients using the macOS trust store. macOS handles administrator
-        // authentication for the change.
+        // Keep the trust record in the same per-user domain as the login-keychain certificate.
+        // Chromium's built-in verifier ignores the cross-domain shape where a login item has only
+        // admin trust, even though SecTrust-based clients can accept it.
         let trustSettings: [[String: Any]] = [
             [kSecTrustSettingsResult as String: SecTrustSettingsResult.trustRoot.rawValue]
         ]
 
         let trustStatus = SecTrustSettingsSetTrustSettings(
             secCert,
-            .admin,
+            clientTrustDomain,
             trustSettings as CFTypeRef
         )
 
@@ -384,8 +391,8 @@ nonisolated enum KeychainHelper {
             throw KeychainError.trustSettingsFailed(trustStatus)
         }
 
-        guard try trustsRootInDomain(secCert, domain: .admin) else {
-            logger.error("Post-install verification: admin trust settings are absent or denied")
+        guard try trustsRootInDomain(secCert, domain: clientTrustDomain) else {
+            logger.error("Post-install verification: user trust settings are absent or denied")
             throw KeychainError.trustNotApplied
         }
         guard try isCertificateInstalledStrict(certData: certData) else {
@@ -590,9 +597,45 @@ nonisolated enum KeychainHelper {
         return references
     }
 
-    /// Fail-closed admin-domain trust check by label, for callers that can only take a boolean.
+    /// Fail-closed client-compatible trust check by label, for callers that can only take a boolean.
     static func isRootCATrusted(label: String) -> Bool {
-        (try? adminTrustsRootStrict(label: label)) ?? false
+        (try? userTrustsRootStrict(label: label)) ?? false
+    }
+
+    /// Whether the certificate carrying `label` is marked as a trusted root in the user domain,
+    /// or a throw when the lookup or domain could not be read. This matches the login Keychain
+    /// where app-side installation stores the certificate and is honoured by Chromium clients.
+    static func userTrustsRootStrict(label: String) throws -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassCertificate,
+            kSecAttrLabel as String: label,
+            kSecReturnRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let findStatus = SecItemCopyMatching(query as CFDictionary, &result)
+        if findStatus == errSecItemNotFound {
+            return false
+        }
+        guard findStatus == errSecSuccess else {
+            logger.error("Failed to search for certificates with label \(label): \(findStatus)")
+            throw KeychainError.loadFailed(findStatus)
+        }
+        guard let secCert = result, CFGetTypeID(secCert as CFTypeRef) == SecCertificateGetTypeID() else {
+            throw KeychainError.invalidCertificateData
+        }
+
+        // swiftlint:disable:next force_cast
+        return try userTrustsRootStrict(certificate: secCert as! SecCertificate)
+    }
+
+    /// Whether exactly these bytes are marked as a trusted root in the user domain.
+    static func userTrustsRootStrict(certData: Data) throws -> Bool {
+        guard let secCert = SecCertificateCreateWithData(nil, certData as CFData) else {
+            throw KeychainError.invalidCertificateData
+        }
+        return try userTrustsRootStrict(certificate: secCert)
     }
 
     /// Whether the certificate carrying `label` is marked as a trusted root in the admin
@@ -701,18 +744,18 @@ nonisolated enum KeychainHelper {
     }
 
     /// Fail-closed trust check using certificate DER data directly — works regardless of which
-    /// keychain holds the certificate or what label it has. Returns true ONLY for
-    /// admin (system-wide) domain trust, which is required for production use.
+    /// keychain holds the certificate or what label it has. Returns true ONLY for positive user
+    /// trust, matching the login-keychain certificate used by the app-side install path.
     ///
     /// Shares `TrustSettingsInterpreter` with the label-based reader so both report the same
     /// metadata for the same certificate. The answer is a prefilter, not proof of trust.
     static func isRootCATrusted(certData: Data) -> Bool {
-        (try? adminTrustsRootStrict(certData: certData)) ?? false
+        (try? userTrustsRootStrict(certData: certData)) ?? false
     }
 
     /// Returns trust presence in both admin and user domains for diagnostic purposes.
-    /// Admin trust = system-wide (required for production). User trust = per-user only
-    /// (insufficient for all TLS clients to honor it).
+    /// User trust is the production app-side contract because the certificate is a login-keychain
+    /// item. Admin trust is retained here to diagnose and remove legacy cross-domain installs.
     static func trustDomainDiagnostic(certData: Data) -> (adminTrust: Bool, userTrust: Bool) {
         guard let secCert = SecCertificateCreateWithData(nil, certData as CFData) else {
             return (adminTrust: false, userTrust: false)
@@ -1190,6 +1233,21 @@ nonisolated enum KeychainHelper {
 
         if (try? trustsRootInDomain(certificate, domain: .user)) == true {
             logger.warning("Root CA trusted at .user level only — re-trust needed for system-wide .admin domain")
+        }
+
+        return false
+    }
+
+    /// Whether one certificate carries positive trustRoot settings in the user domain, with an
+    /// admin-only legacy record reported as a diagnostic but never accepted as client-compatible.
+    private static func userTrustsRootStrict(certificate: SecCertificate) throws -> Bool {
+        if try trustsRootInDomain(certificate, domain: clientTrustDomain) {
+            logger.debug("Root CA trusted in .user domain alongside the login-keychain item")
+            return true
+        }
+
+        if (try? trustsRootInDomain(certificate, domain: .admin)) == true {
+            logger.warning("Root CA has legacy .admin trust only — per-user repair is required for Chromium")
         }
 
         return false

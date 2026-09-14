@@ -63,7 +63,9 @@ enum ProxyActivationConfirmation {
         maxAttempts: Int = 5,
         delay: Duration = .milliseconds(200),
         probe: @escaping @Sendable () async -> Bool
-    ) async -> Bool {
+    )
+        async -> Bool
+    {
         guard maxAttempts > 0 else {
             return false
         }
@@ -161,18 +163,39 @@ enum DirectOverrideApplication {
     }
 }
 
+// MARK: - SystemProxyReclaimMode
+
 enum SystemProxyReclaimMode: Equatable {
     case none
     case direct
     case helper
 }
 
-private enum DirectStaleRecoveryOutcome {
+// MARK: - DirectStaleRecoveryOutcome
+
+enum DirectStaleRecoveryOutcome {
     case noBackup
     case preserved
     case cleared
     case restored
     case restoreIncomplete
+
+    // MARK: Internal
+
+    /// A resolved or already-resolved session has no proxy state left for an old watchdog to
+    /// protect. Preserved and incomplete sessions must keep every known watcher until ownership
+    /// or restoration reaches a terminal state.
+    var shouldRetireKnownWatchdogs: Bool {
+        switch self {
+        case .noBackup,
+             .cleared,
+             .restored:
+            true
+        case .preserved,
+             .restoreIncomplete:
+            false
+        }
+    }
 }
 
 // MARK: - SystemProxyStartupRecovery
@@ -189,7 +212,7 @@ enum SystemProxyStartupRecovery {
 
 /// Snapshot of a network service's proxy configuration before Rockxy modifies it.
 /// Used to restore the exact pre-Rockxy state on disable/quit.
-struct ServiceProxySnapshot {
+struct ServiceProxySnapshot: Equatable {
     let httpEnabled: Bool
     let httpHost: String
     let httpPort: Int
@@ -206,6 +229,7 @@ struct ServiceProxySnapshot {
 
 // MARK: - SystemProxyManager
 
+// swiftlint:disable type_body_length
 /// Manages the macOS system HTTP/HTTPS proxy by shelling out to `/usr/sbin/networksetup`.
 /// Configures both HTTP and HTTPS proxy settings on all enabled network services
 /// (Wi-Fi, Ethernet, USB LAN, etc.) so traffic is captured regardless of which
@@ -227,13 +251,6 @@ final class SystemProxyManager: @unchecked Sendable {
         lock.withLock { usingHelper }
     }
 
-    /// Starts one process-wide observer for the live macOS proxy dictionary. Unlike
-    /// `.systemProxyDidChange`, this also detects changes made by System Settings,
-    /// VPN software, or another debugging proxy while Rockxy's listener is running.
-    func startMonitoringSystemProxyConfiguration() {
-        proxyConfigurationMonitor.start()
-    }
-
     nonisolated static func shouldAttemptHelperEmergencyRestore(
         wasUsingHelper: Bool,
         helperBackupExists: Bool,
@@ -253,7 +270,9 @@ final class SystemProxyManager: @unchecked Sendable {
         directBackupExists: Bool,
         usingHelper: Bool,
         isEnabled: Bool
-    ) -> SystemProxyReclaimMode {
+    )
+        -> SystemProxyReclaimMode
+    {
         if directRestorePending, directBackupExists {
             return .direct
         }
@@ -320,6 +339,24 @@ final class SystemProxyManager: @unchecked Sendable {
         return status.isOverridden && status.port == requestedPort
     }
 
+    /// A timed-out helper restore may still have completed before its XPC reply was lost. The
+    /// app may end the listener only when a fresh helper probe reports no override and every
+    /// service is byte-for-byte back on the snapshot Rockxy captured before this session.
+    nonisolated static func helperRestoreStateMatches(
+        expectedProxyState: [String: ServiceProxySnapshot],
+        expectedBypassDomains: [String: [String]],
+        currentProxyState: [String: ServiceProxySnapshot],
+        currentBypassDomains: [String: [String]]
+    )
+        -> Bool
+    {
+        guard !expectedProxyState.isEmpty else {
+            return false
+        }
+        return currentProxyState == expectedProxyState
+            && currentBypassDomains == expectedBypassDomains
+    }
+
     /// The `launchctl submit` invocation for the direct-mode watchdog.
     ///
     /// The arguments the watchdog itself reads come from `DirectProxyWatchdogInvocation`, which
@@ -346,12 +383,317 @@ final class SystemProxyManager: @unchecked Sendable {
         )
     }
 
+    nonisolated static func proxySnapshotsMatchRockxy(
+        port: Int,
+        snapshots: [ServiceProxySnapshot]
+    )
+        -> Bool
+    {
+        !snapshots.isEmpty && snapshots.allSatisfy { snapshot in
+            snapshot.httpEnabled
+                && snapshot.httpHost == "127.0.0.1"
+                && snapshot.httpPort == port
+                && snapshot.httpsEnabled
+                && snapshot.httpsHost == "127.0.0.1"
+                && snapshot.httpsPort == port
+                && !snapshot.socksEnabled
+                && !snapshot.pacEnabled
+                && !snapshot.autoDiscoveryEnabled
+        }
+    }
+
+    nonisolated static func effectiveProxyDictionaryMatchesRockxy(
+        port: Int,
+        settings: [String: Any]
+    )
+        -> Bool
+    {
+        func enabled(_ key: CFString) -> Bool {
+            (settings[key as String] as? NSNumber)?.boolValue == true
+        }
+        func host(_ key: CFString) -> String? {
+            settings[key as String] as? String
+        }
+        func configuredPort(_ key: CFString) -> Int? {
+            (settings[key as String] as? NSNumber)?.intValue
+        }
+        let hasGlobalBypass = (settings[kCFNetworkProxiesExceptionsList as String] as? [String])?
+            .contains { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "*" }
+            ?? false
+
+        return enabled(kCFNetworkProxiesHTTPEnable)
+            && host(kCFNetworkProxiesHTTPProxy) == "127.0.0.1"
+            && configuredPort(kCFNetworkProxiesHTTPPort) == port
+            && enabled(kCFNetworkProxiesHTTPSEnable)
+            && host(kCFNetworkProxiesHTTPSProxy) == "127.0.0.1"
+            && configuredPort(kCFNetworkProxiesHTTPSPort) == port
+            && !enabled(kCFNetworkProxiesSOCKSEnable)
+            && !enabled(kCFNetworkProxiesProxyAutoConfigEnable)
+            && !enabled(kCFNetworkProxiesProxyAutoDiscoveryEnable)
+            && !hasGlobalBypass
+    }
+
+    /// Starts one process-wide observer for the live macOS proxy dictionary. Unlike
+    /// `.systemProxyDidChange`, this also detects changes made by System Settings,
+    /// VPN software, or another debugging proxy while Rockxy's listener is running.
+    func startMonitoringSystemProxyConfiguration() {
+        proxyConfigurationMonitor.start()
+    }
+
     // MARK: - Public API
 
     func enableSystemProxy(port: Int) async throws {
         try await Self.lifecycleGate.withOperation { [self] in
             try await enableSystemProxyLocked(port: port)
         }
+    }
+
+    func disableSystemProxy() async throws {
+        try await Self.lifecycleGate.withOperation { [self] in
+            try await disableSystemProxyLocked()
+        }
+    }
+
+    func isSystemProxyEnabledAsync() async -> Bool {
+        await Task.detached(priority: .utility) {
+            self.isSystemProxyEnabled()
+        }.value
+    }
+
+    // MARK: - Bypass Domain Management
+
+    /// Apply bypass domains from BypassProxyManager to the system proxy.
+    /// Uses helper tool if available, otherwise runs networksetup directly.
+    func applyBypassDomains() async throws {
+        lock.lock()
+        let queuedGeneration = sessionGeneration
+        let queuedForHelper = usingHelper
+        let overrideWasActive = isEnabled
+        lock.unlock()
+
+        guard overrideWasActive else {
+            return
+        }
+
+        let domains = await BypassProxyManager.shared.enabledDomainStringsForSystemProxy()
+
+        // Domain calculation may suspend. Re-check the exact session before dispatch so work that
+        // began before a disable cannot become a mutation request after the restore completed.
+        lock.lock()
+        let sessionIsCurrent = ProxyOperationSessionPolicy.mayRun(
+            queuedGeneration: queuedGeneration,
+            currentGeneration: sessionGeneration,
+            overrideIsActive: isEnabled
+        ) && usingHelper == queuedForHelper
+        lock.unlock()
+
+        guard sessionIsCurrent else {
+            Self.logger.info("Skipping a bypass write queued for a proxy session that has already ended")
+            return
+        }
+
+        if queuedForHelper {
+            try await HelperConnection.shared.setBypassDomains(domains)
+            Self.logger.info("Applied \(domains.count) bypass domain(s) via helper")
+        } else {
+            try applyBypassDomainsViaNetworkSetup(domains, queuedGeneration: queuedGeneration)
+        }
+    }
+
+    /// Start observing bypass list changes for live updates while proxy is running.
+    func startBypassListObserver() {
+        bypassObserver = NotificationCenter.default.addObserver(
+            forName: .bypassProxyListDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else {
+                return
+            }
+            Task {
+                guard self.systemProxyEnabled else {
+                    return
+                }
+                try? await self.applyBypassDomains()
+            }
+        }
+    }
+
+    /// Stop observing bypass list changes.
+    func stopBypassListObserver() {
+        if let observer = bypassObserver {
+            NotificationCenter.default.removeObserver(observer)
+            bypassObserver = nil
+        }
+    }
+
+    /// Loads a previously persisted direct backup from disk, returning nil if missing or corrupt.
+    func loadDirectBackup() -> DirectProxyBackup? {
+        let url = Self.directBackupURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            return try PropertyListDecoder().decode(DirectProxyBackup.self, from: data)
+        } catch {
+            Self.logger.warning("Direct backup is temporarily unreadable, preserving it: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Removes the on-disk direct backup after successful restore.
+    func clearDirectBackup() {
+        let url = Self.directBackupURL
+        try? FileManager.default.removeItem(at: url)
+        Self.logger.info("Cleared direct backup plist")
+    }
+
+    // MARK: - Ownership Detection
+
+    /// Determines who currently owns the system proxy override by checking
+    /// on-disk backup (direct mode) and helper status.
+    func effectiveOverrideOwner() async -> ProxyOverrideOwner {
+        // In-memory ownership is only a hint. The proxy can be changed outside
+        // Rockxy, or a helper watchdog can restore it after an app restart.
+        // Always reconcile against live state before exposing an active override.
+        lock.lock()
+        let wasEnabled = isEnabled
+        let wasUsingHelper = usingHelper
+        lock.unlock()
+
+        if let backup = loadDirectBackup(), directBackupBelongsToCurrentProcess(backup) {
+            let backedUpServices = backup.services.map(\.service)
+            if currentProxyMatchesRockxy(port: backup.rockxyPort, backedUpServices: backedUpServices),
+               effectiveSystemProxyMatchesRockxy(port: backup.rockxyPort)
+            {
+                return .direct(backup: backup)
+            }
+        }
+
+        if let helperStatus = try? await HelperConnection.shared.getProxyStatus(),
+           helperStatus.isOverridden,
+           effectiveSystemProxyMatchesRockxy(port: helperStatus.port)
+        {
+            return .helper(port: helperStatus.port)
+        }
+
+        if wasEnabled || wasUsingHelper {
+            clearInMemoryOverrideState(preserveOverrideMethod: true)
+        }
+
+        return .none
+    }
+
+    /// Checks the routed service when it can be identified. If route-to-service mapping is
+    /// unavailable, every backed-up service must match so an arbitrary secondary service can
+    /// never make the UI claim that automatic capture is ready.
+    func currentProxyMatchesRockxy(port: Int, backedUpServices: [String]) -> Bool {
+        let servicesToCheck: [String] = if let primaryInterface = detectPrimaryInterface(),
+                                           let orderOutput = try? runNetworkSetup(["-listnetworkserviceorder"]),
+                                           let primaryService =
+                                           parseNetworkServiceMap(from: orderOutput)[primaryInterface],
+                                           backedUpServices.contains(primaryService)
+        {
+            [primaryService]
+        } else {
+            backedUpServices
+        }
+        return Self.proxySnapshotsMatchRockxy(
+            port: port,
+            snapshots: servicesToCheck.map(captureProxySnapshot)
+        )
+    }
+
+    /// Verifies the effective proxy dictionary used by the current default route. Helper
+    /// status alone is not authoritative because an older helper or another proxy app can
+    /// retain stale ownership metadata after macOS routing has already changed.
+    func effectiveSystemProxyMatchesRockxy(port: Int) -> Bool {
+        guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue()
+            as? [String: Any] else
+        {
+            return false
+        }
+        return Self.effectiveProxyDictionaryMatchesRockxy(port: port, settings: settings)
+    }
+
+    /// Best-effort cleanup used during late termination fallback and signal handling.
+    ///
+    /// It runs as one operation, and it waits for any enable or disable already in progress. That
+    /// wait is the point: restoring every service and clearing the backup while an enable loop
+    /// still has proxy commands left to write would put the settings back, delete the restore
+    /// point, and then let the loop re-apply the override with nothing on disk to undo it.
+    func performEmergencyTerminationCleanup(reason: String) {
+        Self.operationGate.withOperation {
+            performEmergencyTerminationCleanupLocked(reason: reason)
+        }
+    }
+
+    // MARK: Private
+
+    private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "SystemProxyManager")
+    private static let networkSetupPath = "/usr/sbin/networksetup"
+
+    private static let routePath = "/sbin/route"
+    private static let helperBackupPath = "/Library/Application Support/\(RockxyIdentity.current.sharedSupportDirectoryName)/proxy-backup.plist"
+    /// Serializes enable, disable, and termination cleanup against each other. It is static
+    /// because the signal handler and the capture task both reach the same shared manager, and
+    /// the thing being protected is the one machine's proxy settings.
+    private static let operationGate = ProxyOperationGate()
+    /// Keeps helper-backed and startup lifecycle operations ordered across their suspension
+    /// points. The blocking gate above still guards synchronous direct-mode mutations and signal
+    /// cleanup, while this one prevents an older async continuation from ending a newer session.
+    private static let lifecycleGate = ProxyAsyncOperationGate()
+
+    // MARK: - Direct Backup Persistence
+
+    private static var directBackupURL: URL {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return appSupport
+            .appendingPathComponent(RockxyIdentity.current.appSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent("proxy-backup-direct.plist")
+    }
+
+    /// Survives an app crash so the next session can retire the completed `launchctl submit`
+    /// record. The watchdog deletes the proxy backup after a successful crash restore, so that
+    /// backup cannot also be the durable ownership record for its launchd label.
+    private static var directWatchdogRegistryURL: URL {
+        directBackupURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("direct-proxy-watchdogs.plist")
+    }
+
+    private static var directWatchdogExecutableURL: URL {
+        Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Library/HelperTools", isDirectory: true)
+            .appendingPathComponent("RockxyHelperTool", isDirectory: false)
+    }
+
+    private let proxyConfigurationMonitor = SystemProxyConfigurationMonitor()
+
+    private let lock = NSLock()
+    private var isEnabled = false
+    private var usingHelper = false
+    private var activeServices: [String] = []
+    private var directRestorePending = false
+    /// Which override session the manager is on. Bumped by everything that ends one, and read
+    /// inside the operation gate, so work queued for a session that has since ended never runs.
+    private var sessionGeneration: UInt64 = 0
+    private var originalBypassDomains: [String: [String]] = [:]
+    private var originalProxyState: [String: ServiceProxySnapshot] = [:]
+    private var bypassObserver: NSObjectProtocol?
+    /// The watchdog job currently guarding this session's override, if one was installed. Held so
+    /// the next arming knows which job it supersedes and the disable path removes the right one.
+    private var activeDirectWatchdogLabel: String?
+
+    /// A label no `launchctl` job is using yet, so a watcher can be submitted before the one it
+    /// replaces is removed.
+    private static func uniqueDirectWatchdogLabel() -> String {
+        "\(directWatchdogLabel).\(UUID().uuidString)"
     }
 
     private func enableSystemProxyLocked(port: Int) async throws {
@@ -363,7 +705,9 @@ final class SystemProxyManager: @unchecked Sendable {
         }
         if let backupAtStart, !directBackupBelongsToCurrentProcess(backupAtStart) {
             switch recoverStaleDirectProxyIfNeeded() {
-            case .noBackup, .cleared, .restored:
+            case .noBackup,
+                 .cleared,
+                 .restored:
                 break
             case .preserved:
                 throw SystemProxyError.proxySessionInUse
@@ -488,12 +832,6 @@ final class SystemProxyManager: @unchecked Sendable {
         NotificationCenter.default.post(name: .systemProxyDidChange, object: nil, userInfo: ["enabled": true])
     }
 
-    func disableSystemProxy() async throws {
-        try await Self.lifecycleGate.withOperation { [self] in
-            try await disableSystemProxyLocked()
-        }
-    }
-
     private func disableSystemProxyLocked() async throws {
         // Same-session shortcut: if we know we own a direct override, skip ownership detection
         lock.lock()
@@ -526,7 +864,18 @@ final class SystemProxyManager: @unchecked Sendable {
             // helper's persisted snapshot still belongs to this capture session and is the only
             // authoritative route back to the user's pre-Rockxy configuration.
             Self.logger.info("Helper session ending — restoring its original proxy snapshot")
-            try await HelperConnection.shared.restoreSystemProxy()
+            do {
+                try await HelperConnection.shared.restoreSystemProxy()
+            } catch {
+                guard case HelperConnectionError.xpcTimeout = error,
+                      await helperRestoreCompletedAfterTransportTimeout() else
+                {
+                    throw error
+                }
+                Self.logger.warning(
+                    "Helper restore reply timed out, but a fresh helper probe and every captured service confirm the original proxy state"
+                )
+            }
         } else {
             let owner = await effectiveOverrideOwner()
 
@@ -599,136 +948,6 @@ final class SystemProxyManager: @unchecked Sendable {
         return false
     }
 
-    func isSystemProxyEnabledAsync() async -> Bool {
-        await Task.detached(priority: .utility) {
-            self.isSystemProxyEnabled()
-        }.value
-    }
-
-    // MARK: - Bypass Domain Management
-
-    /// Apply bypass domains from BypassProxyManager to the system proxy.
-    /// Uses helper tool if available, otherwise runs networksetup directly.
-    func applyBypassDomains() async throws {
-        lock.lock()
-        let queuedGeneration = sessionGeneration
-        let queuedForHelper = usingHelper
-        let overrideWasActive = isEnabled
-        lock.unlock()
-
-        guard overrideWasActive else {
-            return
-        }
-
-        let domains = await BypassProxyManager.shared.enabledDomainStringsForSystemProxy()
-
-        // Domain calculation may suspend. Re-check the exact session before dispatch so work that
-        // began before a disable cannot become a mutation request after the restore completed.
-        lock.lock()
-        let sessionIsCurrent = ProxyOperationSessionPolicy.mayRun(
-            queuedGeneration: queuedGeneration,
-            currentGeneration: sessionGeneration,
-            overrideIsActive: isEnabled
-        ) && usingHelper == queuedForHelper
-        lock.unlock()
-
-        guard sessionIsCurrent else {
-            Self.logger.info("Skipping a bypass write queued for a proxy session that has already ended")
-            return
-        }
-
-        if queuedForHelper {
-            try await HelperConnection.shared.setBypassDomains(domains)
-            Self.logger.info("Applied \(domains.count) bypass domain(s) via helper")
-        } else {
-            try applyBypassDomainsViaNetworkSetup(domains, queuedGeneration: queuedGeneration)
-        }
-    }
-
-    /// Start observing bypass list changes for live updates while proxy is running.
-    func startBypassListObserver() {
-        bypassObserver = NotificationCenter.default.addObserver(
-            forName: .bypassProxyListDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else {
-                return
-            }
-            Task {
-                guard self.systemProxyEnabled else {
-                    return
-                }
-                try? await self.applyBypassDomains()
-            }
-        }
-    }
-
-    /// Stop observing bypass list changes.
-    func stopBypassListObserver() {
-        if let observer = bypassObserver {
-            NotificationCenter.default.removeObserver(observer)
-            bypassObserver = nil
-        }
-    }
-
-    /// Loads a previously persisted direct backup from disk, returning nil if missing or corrupt.
-    func loadDirectBackup() -> DirectProxyBackup? {
-        let url = Self.directBackupURL
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            return try PropertyListDecoder().decode(DirectProxyBackup.self, from: data)
-        } catch {
-            Self.logger.warning("Direct backup is temporarily unreadable, preserving it: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    /// Removes the on-disk direct backup after successful restore.
-    func clearDirectBackup() {
-        let url = Self.directBackupURL
-        try? FileManager.default.removeItem(at: url)
-        Self.logger.info("Cleared direct backup plist")
-    }
-
-    // MARK: - Ownership Detection
-
-    /// Determines who currently owns the system proxy override by checking
-    /// on-disk backup (direct mode) and helper status.
-    func effectiveOverrideOwner() async -> ProxyOverrideOwner {
-        // In-memory ownership is only a hint. The proxy can be changed outside
-        // Rockxy, or a helper watchdog can restore it after an app restart.
-        // Always reconcile against live state before exposing an active override.
-        lock.lock()
-        let wasEnabled = isEnabled
-        let wasUsingHelper = usingHelper
-        lock.unlock()
-
-        if let backup = loadDirectBackup(), directBackupBelongsToCurrentProcess(backup) {
-            let backedUpServices = backup.services.map(\.service)
-            if currentProxyMatchesRockxy(port: backup.rockxyPort, backedUpServices: backedUpServices),
-               effectiveSystemProxyMatchesRockxy(port: backup.rockxyPort) {
-                return .direct(backup: backup)
-            }
-        }
-
-        if let helperStatus = try? await HelperConnection.shared.getProxyStatus(),
-           helperStatus.isOverridden,
-           effectiveSystemProxyMatchesRockxy(port: helperStatus.port)
-        {
-            return .helper(port: helperStatus.port)
-        }
-
-        if wasEnabled || wasUsingHelper {
-            clearInMemoryOverrideState(preserveOverrideMethod: true)
-        }
-
-        return .none
-    }
-
     private func activeOverrideMatches(port: Int) async -> Bool {
         await ProxyActivationConfirmation.confirm { [self] in
             await activeOverrideMatchesOnce(port: port)
@@ -763,96 +982,6 @@ final class SystemProxyManager: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Checks the routed service when it can be identified. If route-to-service mapping is
-    /// unavailable, every backed-up service must match so an arbitrary secondary service can
-    /// never make the UI claim that automatic capture is ready.
-    func currentProxyMatchesRockxy(port: Int, backedUpServices: [String]) -> Bool {
-        let servicesToCheck: [String]
-        if let primaryInterface = detectPrimaryInterface(),
-           let orderOutput = try? runNetworkSetup(["-listnetworkserviceorder"]),
-           let primaryService = parseNetworkServiceMap(from: orderOutput)[primaryInterface],
-           backedUpServices.contains(primaryService)
-        {
-            servicesToCheck = [primaryService]
-        } else {
-            servicesToCheck = backedUpServices
-        }
-        return Self.proxySnapshotsMatchRockxy(
-            port: port,
-            snapshots: servicesToCheck.map(captureProxySnapshot)
-        )
-    }
-
-    nonisolated static func proxySnapshotsMatchRockxy(
-        port: Int,
-        snapshots: [ServiceProxySnapshot]
-    ) -> Bool {
-        !snapshots.isEmpty && snapshots.allSatisfy { snapshot in
-            snapshot.httpEnabled
-                && snapshot.httpHost == "127.0.0.1"
-                && snapshot.httpPort == port
-                && snapshot.httpsEnabled
-                && snapshot.httpsHost == "127.0.0.1"
-                && snapshot.httpsPort == port
-                && !snapshot.socksEnabled
-                && !snapshot.pacEnabled
-                && !snapshot.autoDiscoveryEnabled
-        }
-    }
-
-    /// Verifies the effective proxy dictionary used by the current default route. Helper
-    /// status alone is not authoritative because an older helper or another proxy app can
-    /// retain stale ownership metadata after macOS routing has already changed.
-    func effectiveSystemProxyMatchesRockxy(port: Int) -> Bool {
-        guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue()
-            as? [String: Any]
-        else {
-            return false
-        }
-        return Self.effectiveProxyDictionaryMatchesRockxy(port: port, settings: settings)
-    }
-
-    nonisolated static func effectiveProxyDictionaryMatchesRockxy(
-        port: Int,
-        settings: [String: Any]
-    ) -> Bool {
-        func enabled(_ key: CFString) -> Bool {
-            (settings[key as String] as? NSNumber)?.boolValue == true
-        }
-        func host(_ key: CFString) -> String? {
-            settings[key as String] as? String
-        }
-        func configuredPort(_ key: CFString) -> Int? {
-            (settings[key as String] as? NSNumber)?.intValue
-        }
-        let hasGlobalBypass = (settings[kCFNetworkProxiesExceptionsList as String] as? [String])?
-            .contains { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "*" }
-            ?? false
-
-        return enabled(kCFNetworkProxiesHTTPEnable)
-            && host(kCFNetworkProxiesHTTPProxy) == "127.0.0.1"
-            && configuredPort(kCFNetworkProxiesHTTPPort) == port
-            && enabled(kCFNetworkProxiesHTTPSEnable)
-            && host(kCFNetworkProxiesHTTPSProxy) == "127.0.0.1"
-            && configuredPort(kCFNetworkProxiesHTTPSPort) == port
-            && !enabled(kCFNetworkProxiesSOCKSEnable)
-            && !enabled(kCFNetworkProxiesProxyAutoConfigEnable)
-            && !enabled(kCFNetworkProxiesProxyAutoDiscoveryEnable)
-            && !hasGlobalBypass
-    }
-
-    /// Best-effort cleanup used during late termination fallback and signal handling.
-    ///
-    /// It runs as one operation, and it waits for any enable or disable already in progress. That
-    /// wait is the point: restoring every service and clearing the backup while an enable loop
-    /// still has proxy commands left to write would put the settings back, delete the restore
-    /// point, and then let the loop re-apply the override with nothing on disk to undo it.
-    func performEmergencyTerminationCleanup(reason: String) {
-        Self.operationGate.withOperation {
-            performEmergencyTerminationCleanupLocked(reason: reason)
-        }
-    }
-
     /// The cleanup itself. Only ever reached with the operation gate held.
     private func performEmergencyTerminationCleanupLocked(reason: String) {
         stopBypassListObserver()
@@ -882,7 +1011,8 @@ final class SystemProxyManager: @unchecked Sendable {
                             "\(reason): restoring \(residualOwnedServices.count) owned direct-mode service(s) during shutdown"
                         )
                     if !recoverOwnedDirectServices(backup: backup, ownedServices: residualOwnedServices) {
-                        Self.logger.warning("\(reason): direct restore incomplete, leaving the narrowed backup for retry")
+                        Self.logger
+                            .warning("\(reason): direct restore incomplete, leaving the narrowed backup for retry")
                     }
                     return true
                 }
@@ -907,63 +1037,6 @@ final class SystemProxyManager: @unchecked Sendable {
 
             Self.logger.error("\(reason): helper emergency restore did not complete")
         }
-    }
-
-    // MARK: Private
-
-    private static let logger = Logger(subsystem: RockxyIdentity.current.logSubsystem, category: "SystemProxyManager")
-    private static let networkSetupPath = "/usr/sbin/networksetup"
-
-    private let proxyConfigurationMonitor = SystemProxyConfigurationMonitor()
-    private static let routePath = "/sbin/route"
-    private static let helperBackupPath = "/Library/Application Support/\(RockxyIdentity.current.sharedSupportDirectoryName)/proxy-backup.plist"
-    // MARK: - Direct Backup Persistence
-
-    private static var directBackupURL: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support", isDirectory: true)
-        return appSupport
-            .appendingPathComponent(RockxyIdentity.current.appSupportDirectoryName, isDirectory: true)
-            .appendingPathComponent("proxy-backup-direct.plist")
-    }
-
-    private static var directWatchdogExecutableURL: URL {
-        Bundle.main.bundleURL
-            .appendingPathComponent("Contents/Library/HelperTools", isDirectory: true)
-            .appendingPathComponent("RockxyHelperTool", isDirectory: false)
-    }
-
-    /// Serializes enable, disable, and termination cleanup against each other. It is static
-    /// because the signal handler and the capture task both reach the same shared manager, and
-    /// the thing being protected is the one machine's proxy settings.
-    private static let operationGate = ProxyOperationGate()
-    /// Keeps helper-backed and startup lifecycle operations ordered across their suspension
-    /// points. The blocking gate above still guards synchronous direct-mode mutations and signal
-    /// cleanup, while this one prevents an older async continuation from ending a newer session.
-    private static let lifecycleGate = ProxyAsyncOperationGate()
-
-    private let lock = NSLock()
-    private var isEnabled = false
-    private var usingHelper = false
-    private var activeServices: [String] = []
-    private var directRestorePending = false
-    /// Which override session the manager is on. Bumped by everything that ends one, and read
-    /// inside the operation gate, so work queued for a session that has since ended never runs.
-    private var sessionGeneration: UInt64 = 0
-    private var originalBypassDomains: [String: [String]] = [:]
-    private var originalProxyState: [String: ServiceProxySnapshot] = [:]
-    private var bypassObserver: NSObjectProtocol?
-    /// The watchdog job currently guarding this session's override, if one was installed. Held so
-    /// the next arming knows which job it supersedes and the disable path removes the right one.
-    private var activeDirectWatchdogLabel: String?
-
-    /// A label no `launchctl` job is using yet, so a watcher can be submitted before the one it
-    /// replaces is removed.
-    private static func uniqueDirectWatchdogLabel() -> String {
-        "\(directWatchdogLabel).\(UUID().uuidString)"
     }
 
     // MARK: - NetworkSetup — Enable on ALL Enabled Services
@@ -1070,7 +1143,8 @@ final class SystemProxyManager: @unchecked Sendable {
 
         if let failure {
             switch failure.step {
-            case .persistBackup, .armWatchdog:
+            case .persistBackup,
+                 .armWatchdog:
                 // Not one setting was touched, so there is nothing to undo.
                 throw failure.error
             case .mutateServices:
@@ -1092,7 +1166,8 @@ final class SystemProxyManager: @unchecked Sendable {
                     applySucceeded: false,
                     rollbackSucceeded: rollbackSucceeded
                 ) {
-                case .enabled, .rolledBack:
+                case .enabled,
+                     .rolledBack:
                     throw failure.error
                 case .rollbackIncomplete:
                     throw SystemProxyError.overrideRollbackIncomplete(
@@ -1173,8 +1248,8 @@ final class SystemProxyManager: @unchecked Sendable {
     /// user's configuration or another tool's, and it is left with no command issued against it.
     private func directOverrideBaseline(for service: String, port: Int) -> ProxyServiceRestorationState? {
         guard let backup = loadDirectBackup(),
-              let entry = backup.services.first(where: { $0.service == service })
-        else {
+              let entry = backup.services.first(where: { $0.service == service }) else
+        {
             Self.logger.warning("Skipping proxy for '\(service)' — it has no captured restore point")
             return nil
         }
@@ -1209,10 +1284,12 @@ final class SystemProxyManager: @unchecked Sendable {
         baseline: ProxyServiceRestorationState,
         to stage: ProxyRecoveryStage,
         port: Int
-    ) throws {
+    )
+        throws
+    {
         guard let backup = loadDirectBackup(),
-              let entry = backup.services.first(where: { $0.service == service })
-        else {
+              let entry = backup.services.first(where: { $0.service == service }) else
+        {
             throw SystemProxyError.proxyRestoreFailed
         }
         var journal = backup.journal.filter { $0.service != service }
@@ -1223,72 +1300,6 @@ final class SystemProxyManager: @unchecked Sendable {
             port: port
         ))
         try writeDirectBackup(backup.with(journal: journal))
-    }
-
-    /// Submits the watchdog against the backup that was just published, before the first proxy
-    /// command runs.
-    ///
-    /// The new watcher goes in under a label nothing is using yet, and the one it supersedes is
-    /// only removed once the replacement is known installed. Removing first and submitting after
-    /// is what could leave an override — this attempt's, or one already on the machine — with no
-    /// watcher at all the moment the submit failed.
-    ///
-    /// A failure here costs nothing but the restore point this very attempt created: no setting
-    /// has been touched, so there is nothing to undo, and whatever was watching before still is.
-    /// An earlier session's backup is left exactly where it is — it belongs to an override this
-    /// attempt did not apply.
-    private func armDirectProxyWatchdog(
-        _ arming: DirectWatchdogArming,
-        hadBackupBefore: Bool
-    ) throws {
-        let newLabel = Self.uniqueDirectWatchdogLabel()
-        lock.lock()
-        let supersededLabel = activeDirectWatchdogLabel
-        lock.unlock()
-
-        let outcome = DirectProxyWatchdogInstallation.install(
-            newLabel: newLabel,
-            supersededLabel: supersededLabel,
-            submit: { label in
-                try Self.submitDirectProxyWatchdog(
-                    label: label,
-                    executableURL: arming.executableURL,
-                    parentPID: arming.parentPID,
-                    parentStartSignature: arming.parentStartSignature,
-                    backupPath: Self.directBackupURL.path
-                )
-            },
-            remove: { label in
-                try Self.removeDirectProxyWatchdog(label: label, tolerateMissing: true)
-            }
-        )
-
-        switch outcome {
-        case let .installed(activeLabel, supersededLabel):
-            lock.lock()
-            activeDirectWatchdogLabel = activeLabel
-            lock.unlock()
-            Self.logger
-                .info(
-                    "Registered direct proxy watchdog '\(activeLabel)' for pid \(arming.parentPID) before the first proxy change, superseding '\(supersededLabel ?? "none")'"
-                )
-            // A build before the label became unique left one job behind under the fixed name. It
-            // is only asked to go once a replacement is already watching.
-            if supersededLabel == nil {
-                try? Self.removeDirectProxyWatchdog(label: Self.directWatchdogLabel, tolerateMissing: true)
-            }
-        case let .failed(activeLabel, error):
-            Self.logger
-                .error(
-                    "Failed to start direct proxy watchdog: \(error.localizedDescription) — '\(activeLabel ?? "no")' watcher left in place"
-                )
-            if !hadBackupBefore {
-                clearDirectBackup()
-            }
-            throw SystemProxyError.directProxyWatchdogUnavailable(
-                reason: "the watchdog could not be registered, so no proxy setting was changed"
-            )
-        }
     }
 
     /// Snapshots bypass domains and proxy state for all detected target services
@@ -1347,11 +1358,33 @@ final class SystemProxyManager: @unchecked Sendable {
 
     /// Captures the current HTTP and HTTPS proxy settings for a single service.
     private func captureProxySnapshot(for service: String) -> ServiceProxySnapshot {
-        let httpOutput = (try? runNetworkSetup(["-getwebproxy", service])) ?? ""
-        let httpsOutput = (try? runNetworkSetup(["-getsecurewebproxy", service])) ?? ""
-        let socksOutput = (try? runNetworkSetup(["-getsocksfirewallproxy", service])) ?? ""
-        let pacOutput = (try? runNetworkSetup(["-getautoproxyurl", service])) ?? ""
-        let autoDiscoveryOutput = (try? runNetworkSetup(["-getproxyautodiscovery", service])) ?? ""
+        captureReadableProxySnapshot(for: service) ?? ServiceProxySnapshot(
+            httpEnabled: false,
+            httpHost: "",
+            httpPort: 0,
+            httpsEnabled: false,
+            httpsHost: "",
+            httpsPort: 0,
+            socksEnabled: false,
+            socksHost: "",
+            socksPort: 0,
+            pacEnabled: false,
+            pacURL: "",
+            autoDiscoveryEnabled: false
+        )
+    }
+
+    /// Unlike the ordinary best-effort snapshot, restore reconciliation must distinguish an
+    /// unreadable service from one whose proxy fields are genuinely empty.
+    private func captureReadableProxySnapshot(for service: String) -> ServiceProxySnapshot? {
+        guard let httpOutput = try? runNetworkSetup(["-getwebproxy", service]),
+              let httpsOutput = try? runNetworkSetup(["-getsecurewebproxy", service]),
+              let socksOutput = try? runNetworkSetup(["-getsocksfirewallproxy", service]),
+              let pacOutput = try? runNetworkSetup(["-getautoproxyurl", service]),
+              let autoDiscoveryOutput = try? runNetworkSetup(["-getproxyautodiscovery", service]) else
+        {
+            return nil
+        }
 
         let http = parseProxyOutput(httpOutput)
         let https = parseProxyOutput(httpsOutput)
@@ -1372,6 +1405,51 @@ final class SystemProxyManager: @unchecked Sendable {
             pacURL: pac.url,
             autoDiscoveryEnabled: ProxyRestoreCommandBuilder.parseAutoDiscoveryOutput(autoDiscoveryOutput)
         )
+    }
+
+    private func helperRestoreCompletedAfterTransportTimeout() async -> Bool {
+        await HelperConnection.shared.resetConnection()
+        guard let status = try? await HelperConnection.shared.getProxyStatus(),
+              !status.isOverridden else
+        {
+            return false
+        }
+
+        let captured = lock.withLock {
+            (
+                services: activeServices,
+                proxyState: originalProxyState,
+                bypassDomains: originalBypassDomains
+            )
+        }
+        guard !captured.services.isEmpty else {
+            return false
+        }
+
+        var currentProxyState: [String: ServiceProxySnapshot] = [:]
+        var currentBypassDomains: [String: [String]] = [:]
+        for service in captured.services {
+            guard let proxy = captureReadableProxySnapshot(for: service),
+                  let bypassOutput = try? runNetworkSetup(["-getproxybypassdomains", service]) else
+            {
+                return false
+            }
+            currentProxyState[service] = proxy
+            currentBypassDomains[service] = parseBypassDomains(bypassOutput)
+        }
+
+        return Self.helperRestoreStateMatches(
+            expectedProxyState: captured.proxyState,
+            expectedBypassDomains: captured.bypassDomains,
+            currentProxyState: currentProxyState,
+            currentBypassDomains: currentBypassDomains
+        )
+    }
+
+    private func parseBypassDomains(_ output: String) -> [String] {
+        output.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("There aren't any bypass domains") }
     }
 
     /// Restores the proxy state for a single service from its snapshot.
@@ -1523,7 +1601,9 @@ final class SystemProxyManager: @unchecked Sendable {
         services: [String],
         ownerPID: Int32,
         ownerStartSignature: String
-    ) throws {
+    )
+        throws
+    {
         let existingBackup = loadDirectBackup()
         guard existingBackup != nil || !directBackupFileExists else {
             throw SystemProxyError.proxyRestoreFailed
@@ -1657,14 +1737,14 @@ final class SystemProxyManager: @unchecked Sendable {
 
 extension SystemProxyManager {
     private func captureDirectServiceBackup(service: String) throws -> DirectServiceBackup {
-        let http = parseProxyOutput(try runNetworkSetup(["-getwebproxy", service]))
-        let https = parseProxyOutput(try runNetworkSetup(["-getsecurewebproxy", service]))
-        let socks = parseProxyOutput(try runNetworkSetup(["-getsocksfirewallproxy", service]))
-        let pac = ProxyRestoreCommandBuilder.parsePACOutput(
-            try runNetworkSetup(["-getautoproxyurl", service])
+        let http = try parseProxyOutput(runNetworkSetup(["-getwebproxy", service]))
+        let https = try parseProxyOutput(runNetworkSetup(["-getsecurewebproxy", service]))
+        let socks = try parseProxyOutput(runNetworkSetup(["-getsocksfirewallproxy", service]))
+        let pac = try ProxyRestoreCommandBuilder.parsePACOutput(
+            runNetworkSetup(["-getautoproxyurl", service])
         )
-        let autoDiscovery = ProxyRestoreCommandBuilder.parseAutoDiscoveryOutput(
-            try runNetworkSetup(["-getproxyautodiscovery", service])
+        let autoDiscovery = try ProxyRestoreCommandBuilder.parseAutoDiscoveryOutput(
+            runNetworkSetup(["-getproxyautodiscovery", service])
         )
         let bypassOutput = try runNetworkSetup(["-getproxybypassdomains", service])
         let bypass = bypassOutput.components(separatedBy: "\n")
@@ -1839,6 +1919,130 @@ extension SystemProxyManager {
 /// restore flows because it answers a different question: not what the override is, but which job
 /// is currently watching it.
 extension SystemProxyManager {
+    /// Submits the watchdog against the backup that was just published, before the first proxy
+    /// command runs. A replacement is installed before any earlier watcher is removed.
+    private func armDirectProxyWatchdog(
+        _ arming: DirectWatchdogArming,
+        hadBackupBefore: Bool
+    )
+        throws
+    {
+        let newLabel = Self.uniqueDirectWatchdogLabel()
+        lock.lock()
+        let activeLabel = activeDirectWatchdogLabel
+        lock.unlock()
+        let knownLabels = Self.loadKnownDirectWatchdogLabels()
+        let supersededLabel = activeLabel ?? knownLabels.last
+
+        // Publish the label before launchctl can start it. If the app dies immediately after a
+        // successful submit, the next process still knows which completed job record it owns.
+        do {
+            try Self.writeKnownDirectWatchdogLabels(knownLabels + [newLabel])
+        } catch {
+            throw SystemProxyError.directProxyWatchdogUnavailable(
+                reason: "the watchdog ownership record could not be saved, so no proxy setting was changed"
+            )
+        }
+
+        let outcome = DirectProxyWatchdogInstallation.install(
+            newLabel: newLabel,
+            supersededLabel: supersededLabel,
+            submit: { label in
+                try Self.submitDirectProxyWatchdog(
+                    label: label,
+                    executableURL: arming.executableURL,
+                    parentPID: arming.parentPID,
+                    parentStartSignature: arming.parentStartSignature,
+                    backupPath: Self.directBackupURL.path
+                )
+            },
+            remove: { label in
+                try Self.removeDirectProxyWatchdog(label: label, tolerateMissing: true)
+            }
+        )
+
+        switch outcome {
+        case let .installed(activeLabel, supersededLabel, retainedSupersededLabel):
+            // A cold launch has no in-memory label, but the durable registry still identifies
+            // completed jobs from the crashed process. The new watcher is already live before
+            // any of them are removed.
+            var retainedLabels = Set([retainedSupersededLabel].compactMap { $0 })
+            for staleLabel in knownLabels where staleLabel != supersededLabel {
+                do {
+                    try Self.removeDirectProxyWatchdog(label: staleLabel, tolerateMissing: true)
+                } catch {
+                    retainedLabels.insert(staleLabel)
+                }
+            }
+            if supersededLabel == nil {
+                do {
+                    try Self.removeDirectProxyWatchdog(label: Self.directWatchdogLabel, tolerateMissing: true)
+                } catch {
+                    retainedLabels.insert(Self.directWatchdogLabel)
+                }
+            }
+            try? Self.writeKnownDirectWatchdogLabels([activeLabel] + Array(retainedLabels))
+            lock.lock()
+            activeDirectWatchdogLabel = activeLabel
+            lock.unlock()
+            Self.logger
+                .info(
+                    "Registered direct proxy watchdog '\(activeLabel)' for pid \(arming.parentPID) before the first proxy change, superseding '\(supersededLabel ?? "none")'"
+                )
+        case let .failed(activeLabel, error):
+            try? Self.writeKnownDirectWatchdogLabels(knownLabels)
+            Self.logger
+                .error(
+                    "Failed to start direct proxy watchdog: \(error.localizedDescription) — '\(activeLabel ?? "no")' watcher left in place"
+                )
+            if !hadBackupBefore {
+                clearDirectBackup()
+            }
+            throw SystemProxyError.directProxyWatchdogUnavailable(
+                reason: "the watchdog could not be registered, so no proxy setting was changed"
+            )
+        }
+    }
+
+    private static func loadKnownDirectWatchdogLabels() -> [String] {
+        guard let data = try? Data(contentsOf: directWatchdogRegistryURL),
+              let labels = try? PropertyListDecoder().decode([String].self, from: data) else
+        {
+            return []
+        }
+        return Array(Set(labels)).sorted()
+    }
+
+    private static func writeKnownDirectWatchdogLabels(_ labels: [String]) throws {
+        let uniqueLabels = Array(Set(labels)).sorted()
+        if uniqueLabels.isEmpty {
+            try? FileManager.default.removeItem(at: directWatchdogRegistryURL)
+            return
+        }
+
+        try FileManager.default.createDirectory(
+            at: directWatchdogRegistryURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try PropertyListEncoder().encode(uniqueLabels).write(
+            to: directWatchdogRegistryURL,
+            options: .atomic
+        )
+    }
+
+    /// Includes jobs from builds that did not yet persist the registry, plus the narrow crash
+    /// window where launchd accepted a UUID label but the app died before its registry write
+    /// became visible. Discovery is intentionally used only after the proxy session is resolved.
+    private static func discoverDirectWatchdogLabels() -> [String] {
+        guard let output = try? runLaunchctl(["list"]) else {
+            return []
+        }
+        return DirectProxyWatchdogJobDiscovery.labels(
+            in: output,
+            baseLabel: directWatchdogLabel
+        )
+    }
+
     private static func submitDirectProxyWatchdog(
         label: String,
         executableURL: URL,
@@ -2012,7 +2216,10 @@ extension SystemProxyManager {
         do {
             try writeDirectBackup(narrowedBackup)
         } catch {
-            Self.logger.error("Could not mark direct recovery pending — leaving settings untouched: \(error.localizedDescription)")
+            Self.logger
+                .error(
+                    "Could not mark direct recovery pending — leaving settings untouched: \(error.localizedDescription)"
+                )
             return false
         }
 
@@ -2189,7 +2396,57 @@ extension SystemProxyManager {
             // directRestorePending stays true for same-session retry
         }
         lock.unlock()
+
+        if Self.shouldRetireDirectWatchdog(
+            restored: restored,
+            survivingPreservedServices: survivingPreservedServices
+        ) {
+            retireKnownDirectProxyWatchdogs()
+        }
         return restored
+    }
+
+    /// A watchdog can retire only when this restore succeeded and no older service entries keep
+    /// the backup alive. Removing it earlier creates an unguarded override; leaving it registered
+    /// after the backup is gone leaks one launchd job record per app lifetime.
+    static func shouldRetireDirectWatchdog(
+        restored: Bool,
+        survivingPreservedServices: [String]
+    )
+        -> Bool
+    {
+        restored && survivingPreservedServices.isEmpty
+    }
+
+    private func retireKnownDirectProxyWatchdogs() {
+        lock.lock()
+        let label = activeDirectWatchdogLabel
+        lock.unlock()
+        let labels = Array(Set(
+            Self.loadKnownDirectWatchdogLabels()
+                + Self.discoverDirectWatchdogLabels()
+                + [label].compactMap { $0 }
+        ))
+        var retainedLabels: [String] = []
+
+        for ownedLabel in labels {
+            do {
+                try Self.removeDirectProxyWatchdog(label: ownedLabel, tolerateMissing: true)
+                Self.logger.info("Removed completed direct proxy watchdog '\(ownedLabel)'")
+            } catch {
+                retainedLabels.append(ownedLabel)
+                Self.logger.warning(
+                    "Could not remove completed direct proxy watchdog '\(ownedLabel)': \(error.localizedDescription)"
+                )
+            }
+        }
+
+        try? Self.writeKnownDirectWatchdogLabels(retainedLabels)
+        lock.lock()
+        if let label, !retainedLabels.contains(label) {
+            activeDirectWatchdogLabel = nil
+        }
+        lock.unlock()
     }
 
     // MARK: - Direct Override Rollback
@@ -2209,7 +2466,9 @@ extension SystemProxyManager {
     private func rollBackDirectOverride(
         touchedServices: [String],
         preAttemptServices: Set<String>
-    ) -> Bool {
+    )
+        -> Bool
+    {
         guard let backup = loadDirectBackup() else {
             return !directBackupFileExists
         }
@@ -2291,7 +2550,7 @@ extension SystemProxyManager {
     /// unreadable service is not a changed one, and an empty state would look exactly like a user
     /// who had just turned every proxy off — which is the difference between deferring a service
     /// and writing over it.
-    fileprivate func currentRestorationStates(
+    private func currentRestorationStates(
         for services: [String]
     )
         -> [String: ProxyServiceRestorationState]
@@ -2306,14 +2565,14 @@ extension SystemProxyManager {
     /// Reads every proxy field of one service, or nothing at all. A single failed `networksetup`
     /// read makes the whole state nil: a partially read service cannot be compared against a
     /// journal without inventing values for the fields that were not read.
-    fileprivate func restorationState(for service: String) -> ProxyServiceRestorationState? {
+    private func restorationState(for service: String) -> ProxyServiceRestorationState? {
         guard let httpOutput = try? runNetworkSetup(["-getwebproxy", service]),
               let httpsOutput = try? runNetworkSetup(["-getsecurewebproxy", service]),
               let socksOutput = try? runNetworkSetup(["-getsocksfirewallproxy", service]),
               let pacOutput = try? runNetworkSetup(["-getautoproxyurl", service]),
               let autoDiscoveryOutput = try? runNetworkSetup(["-getproxyautodiscovery", service]),
-              let bypassOutput = try? runNetworkSetup(["-getproxybypassdomains", service])
-        else {
+              let bypassOutput = try? runNetworkSetup(["-getproxybypassdomains", service]) else
+        {
             return nil
         }
 
@@ -2501,7 +2760,8 @@ extension SystemProxyManager {
     }
 
     private func recoverStaleProxyIfNeededLocked() async {
-        switch recoverStaleDirectProxyIfNeeded() {
+        let outcome = recoverStaleDirectProxyIfNeeded()
+        switch outcome {
         case .restored:
             stopBypassListObserver()
             clearInMemoryOverrideState()
@@ -2514,8 +2774,17 @@ extension SystemProxyManager {
             lock.withLock { directRestorePending = true }
         case .preserved:
             Self.logger.info("A live app process owns the direct proxy backup — preserving its session")
-        case .noBackup, .cleared:
+        case .noBackup,
+             .cleared:
             break
+        }
+
+        // A watchdog that restored after its app was killed exits with no process left to remove
+        // the launchctl job record. Its durable label registry intentionally outlives the proxy
+        // backup, so the next launch must retire those completed records even when recovery finds
+        // no backup at all. Unresolved or live-owner sessions keep their watchers untouched.
+        if outcome.shouldRetireKnownWatchdogs {
+            retireKnownDirectProxyWatchdogs()
         }
 
         // Helper startup recovery and its owner watchdog make this decision from the persisted
@@ -2569,6 +2838,8 @@ extension SystemProxyManager {
     }
 }
 
+// swiftlint:enable type_body_length
+
 // MARK: - SystemProxyConfigurationMonitor
 
 /// Observes the effective proxy dictionary maintained by SystemConfiguration.
@@ -2576,6 +2847,8 @@ extension SystemProxyManager {
 /// Rockxy's own notifications only describe mutations initiated by Rockxy. This observer
 /// closes the external-change gap without polling or taking ownership back from another app.
 private final class SystemProxyConfigurationMonitor: @unchecked Sendable {
+    // MARK: Lifecycle
+
     deinit {
         lock.lock()
         if let store {
@@ -2584,6 +2857,8 @@ private final class SystemProxyConfigurationMonitor: @unchecked Sendable {
         store = nil
         lock.unlock()
     }
+
+    // MARK: Internal
 
     func start() {
         lock.lock()
@@ -2612,8 +2887,8 @@ private final class SystemProxyConfigurationMonitor: @unchecked Sendable {
 
         let proxyKey = SCDynamicStoreKeyCreateProxies(nil)
         guard SCDynamicStoreSetNotificationKeys(newStore, [proxyKey] as CFArray, nil),
-              SCDynamicStoreSetDispatchQueue(newStore, queue)
-        else {
+              SCDynamicStoreSetDispatchQueue(newStore, queue) else
+        {
             Self.logger.error("Could not subscribe to macOS proxy configuration changes")
             return
         }
@@ -2622,11 +2897,15 @@ private final class SystemProxyConfigurationMonitor: @unchecked Sendable {
         Self.logger.info("Observing macOS proxy configuration changes")
     }
 
+    // MARK: Fileprivate
+
     fileprivate func configurationDidChange() {
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .systemProxyConfigurationDidChange, object: nil)
         }
     }
+
+    // MARK: Private
 
     private static let logger = Logger(
         subsystem: RockxyIdentity.current.logSubsystem,

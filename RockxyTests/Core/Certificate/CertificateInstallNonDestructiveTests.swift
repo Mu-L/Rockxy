@@ -66,6 +66,12 @@ struct RootCAInstallDispatchRuleTests {
 struct RootCANonDestructiveInstallTests {
     // MARK: Internal
 
+    @Test("app-side trust uses the user domain beside the login-keychain certificate")
+    func appSideTrustDomainMatchesCertificateScope() {
+        #expect(KeychainHelper.clientTrustDomain == .user)
+        #expect(KeychainHelper.clientTrustDomain != .admin)
+    }
+
     @Test("explicit repair rotates a legacy Chromium-incompatible root exactly once")
     func explicitRepairRotatesLegacyRoot() async throws {
         let overrides = try await installSharedTestOverrides()
@@ -78,7 +84,7 @@ struct RootCANonDestructiveInstallTests {
 
         let manager = CertificateManager.makeForTesting()
         await manager.setStatusReadOverrideForTests {
-            StatusReadResultForTests(isInstalledInKeychain: true, hasAdminTrustSettings: true)
+            StatusReadResultForTests(isInstalledInKeychain: true, hasClientCompatibleTrustSettings: true)
         }
         let recorder = InstallCallRecorder()
         await manager.setAppInstallOverrideForTests { der in recorder.recordApp(der) }
