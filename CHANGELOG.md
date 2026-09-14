@@ -38,6 +38,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Kept AI, Web3, and gRPC inspector tabs available at the end of the inspector tab row so protocol details are consistent with the existing Headers, Body, Set-Cookie, and Timeline workflow.
 - Clarified that existing rules and debugging tools still operate on URL, HTTP method, and headers rather than AI model names, tool calls, chain IDs, JSON-RPC methods, or batch subcalls.
 
+## [0.38.4] - 2026-09-14
+
+### Fixed
+
+- Made HTTPS decryption recover reliably after certificate rejection, trust changes, certificate rotation, and app relaunch.
+- Kept recovery scoped to the affected app and connection, preventing one client's TLS fallback from disrupting other traffic.
+- Preserved tunnel data during HTTPS recovery so requests can continue without dropped bytes.
+- Improved first-use capture and proxy recovery when certificate trust or system proxy setup is incomplete.
+- Preserved WebSocket sessions after reload, including handshakes with no captured frames, so they are not mistaken for ordinary HTTP requests.
+
 ## [0.38.3] - 2026-09-11
 
 ### Fixed

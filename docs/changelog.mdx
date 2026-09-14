@@ -6,6 +6,17 @@ rss: true
 
 # Changelog
 
+<Update label="September 2026" description="v0.38.4">
+  ### Fixed
+
+  - Made HTTPS decryption recover reliably after certificate rejection, trust changes, certificate rotation, and app relaunch.
+  - Kept recovery scoped to the affected app and connection, preventing one client's TLS fallback from disrupting other traffic.
+  - Preserved tunnel data during HTTPS recovery so requests can continue without dropped bytes.
+  - Improved first-use capture and proxy recovery when certificate trust or system proxy setup is incomplete.
+  - Preserved WebSocket sessions after reload, including handshakes with no captured frames, so they are not mistaken for ordinary HTTP requests.
+
+</Update>
+
 <Update label="September 2026" description="v0.38.3">
   ### Fixed
 
