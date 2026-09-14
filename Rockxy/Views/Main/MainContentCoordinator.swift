@@ -49,7 +49,10 @@ enum ProxyDisplayState: Equatable {
         case .starting:
             String(localized: "Preparing the listener and system routing.", bundle: RockxyLocalization.bundle)
         case .stopping:
-            String(localized: "Closing active connections and restoring system routing.", bundle: RockxyLocalization.bundle)
+            String(
+                localized: "Closing active connections and restoring system routing.",
+                bundle: RockxyLocalization.bundle
+            )
         case .running:
             String(localized: "New traffic is being added to the active workspace.", bundle: RockxyLocalization.bundle)
         case .paused:
@@ -89,6 +92,13 @@ enum ProxyDisplayState: Equatable {
         case .stopped:
             String(localized: "Start Capture", bundle: RockxyLocalization.bundle)
         }
+    }
+
+    /// Whether the Context Dock should describe a live or in-flight capture session instead of
+    /// claiming capture has stopped. Paused and stopping preserve the prior `isProxyRunning`
+    /// behaviour; starting is the state that was previously misreported during launch autostart.
+    var hasCaptureSessionContext: Bool {
+        self != .stopped
     }
 }
 
@@ -263,11 +273,6 @@ final class MainContentCoordinator {
     var isProxyStopping = false
     var isRetryingHTTPSInterception = false
     var activeProxyPort = AppSettingsManager.shared.settings.proxyPort
-    var isRecording = true {
-        didSet {
-            captureRecordingGate.update(isRecording: isRecording)
-        }
-    }
     var sessionGeneration: UInt = 0
     var liveHistoryLimit: Int
     var isClearingSession = false
@@ -400,6 +405,12 @@ final class MainContentCoordinator {
     /// editors update the model immediately but coalesce SQLite writes through these so a
     /// large transaction row is not rewritten on every keystroke. See `+Notes`.
     @ObservationIgnored var noteFlushTasks: [UUID: Task<Void, Never>] = [:]
+
+    var isRecording = true {
+        didSet {
+            captureRecordingGate.update(isRecording: isRecording)
+        }
+    }
 
     var systemProxyWarning: SystemProxyWarning? {
         guard let warning = readiness.activeWarning else {
@@ -817,10 +828,7 @@ struct SystemProxyWarning {
 
 /// Groups captured transactions by originating application for the sidebar "Apps" tree.
 struct AppInfo: Identifiable {
-    let name: String
-    var domains: [String]
-    var requestCount: Int
-    var identity: ClientApplicationIdentity?
+    // MARK: Lifecycle
 
     init(
         name: String,
@@ -833,6 +841,13 @@ struct AppInfo: Identifiable {
         self.requestCount = requestCount
         self.identity = identity
     }
+
+    // MARK: Internal
+
+    let name: String
+    var domains: [String]
+    var requestCount: Int
+    var identity: ClientApplicationIdentity?
 
     var id: String {
         identity?.identifier ?? name

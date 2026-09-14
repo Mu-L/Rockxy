@@ -300,7 +300,7 @@ struct RootCAStatusUnavailableTests {
         try await manager.generateRootCA()
 
         await manager.setStatusReadOverrideForTests {
-            StatusReadResultForTests(isInstalledInKeychain: false, hasAdminTrustSettings: false)
+            StatusReadResultForTests(isInstalledInKeychain: false, hasClientCompatibleTrustSettings: false)
         }
         let snapshot = await manager.rootCAStatusSnapshot()
 
@@ -329,7 +329,7 @@ struct RootCAStatusUnavailableTests {
         // The keychain became readable again: the same certificate is now reported as installed
         // and untrusted, with no diagnostic left over from the failed read.
         await manager.setStatusReadOverrideForTests {
-            StatusReadResultForTests(isInstalledInKeychain: true, hasAdminTrustSettings: false)
+            StatusReadResultForTests(isInstalledInKeychain: true, hasClientCompatibleTrustSettings: false)
         }
         let recovered = await manager.rootCAStatusSnapshot(performValidation: true)
 
@@ -512,7 +512,10 @@ struct CertificateUnavailableUXTests {
 
         // The icon, text, and background share the same semantic color: unavailable is orange,
         // while a known trust-validation failure is red.
-        let errorCallout = try #require(declaration(named: "@ViewBuilder private var errorCallout: some View", in: panel))
+        let errorCallout = try #require(declaration(
+            named: "@ViewBuilder private var errorCallout: some View",
+            in: panel
+        ))
         #expect(errorCallout.contains("let tint: Color = isStatusUnavailable ? .orange : .red"))
         #expect(errorCallout.contains(".foregroundStyle(tint)"))
         #expect(errorCallout.contains(".foregroundStyle(.orange)") == false)
@@ -688,7 +691,7 @@ private final class StatusReadSequence: @unchecked Sendable {
             guard calls == 1 else {
                 throw KeychainError.trustSettingsUnreadable(errSecAuthFailed)
             }
-            return StatusReadResultForTests(isInstalledInKeychain: false, hasAdminTrustSettings: false)
+            return StatusReadResultForTests(isInstalledInKeychain: false, hasClientCompatibleTrustSettings: false)
         }
     }
 

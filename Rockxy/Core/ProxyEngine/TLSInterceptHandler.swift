@@ -22,8 +22,6 @@ nonisolated(unsafe) private let tlsLogger = Logger(
 /// noise without allowing one application to hide another application's evidence.
 /// Thread-safe via NSLock; designed for use from NIO event loops.
 final class RecentFailureTracker: @unchecked Sendable {
-    static let certificateRejections = RecentFailureTracker()
-
     // MARK: Lifecycle
 
     init(
@@ -41,6 +39,14 @@ final class RecentFailureTracker: @unchecked Sendable {
     struct FailureInfo {
         var count: Int
         var lastFailed: DispatchTime
+    }
+
+    static let certificateRejections = RecentFailureTracker()
+
+    var trackedEntryCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return failures.count
     }
 
     func recordFailure(host: String, clientIdentifier: String? = nil) -> FailureInfo {
@@ -74,8 +80,8 @@ final class RecentFailureTracker: @unchecked Sendable {
 
     func recordIdentifiedFailure(host: String, clientIdentifier: String?) -> FailureInfo? {
         guard let clientIdentifier,
-              !clientIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else {
+              !clientIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else
+        {
             return nil
         }
         return recordFailure(host: host, clientIdentifier: clientIdentifier)
@@ -111,7 +117,9 @@ final class RecentFailureTracker: @unchecked Sendable {
     /// Re-arms rejection evidence for every client scope of one explicitly retried host.
     func reset(host: String) {
         let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalizedHost.isEmpty else { return }
+        guard !normalizedHost.isEmpty else {
+            return
+        }
 
         lock.lock()
         failures = failures.filter { $0.key.host != normalizedHost }
@@ -124,17 +132,10 @@ final class RecentFailureTracker: @unchecked Sendable {
         lock.unlock()
     }
 
-    var trackedEntryCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return failures.count
-    }
-
     // MARK: Private
 
     private struct FailureKey: Hashable {
-        let host: String
-        let clientIdentifier: String?
+        // MARK: Lifecycle
 
         init(host: String, clientIdentifier: String?) {
             self.host = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -142,6 +143,11 @@ final class RecentFailureTracker: @unchecked Sendable {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
         }
+
+        // MARK: Internal
+
+        let host: String
+        let clientIdentifier: String?
     }
 
     private var failures: [FailureKey: FailureInfo] = [:]
@@ -165,8 +171,8 @@ final class RecentFailureTracker: @unchecked Sendable {
         guard failures.count >= maximumEntries,
               let oldest = failures.min(by: {
                   $0.value.lastFailed.uptimeNanoseconds < $1.value.lastFailed.uptimeNanoseconds
-              })?.key
-        else {
+              })?.key else
+        {
             return
         }
         failures.removeValue(forKey: oldest)
@@ -186,27 +192,6 @@ final class RecentFailureTracker: @unchecked Sendable {
 /// If certificate generation fails (e.g., SSL pinned host), falls back to a raw TCP
 /// tunnel via `RawTunnelHandler` so the connection still works — just without inspection.
 final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
-    static let maximumBufferedTunnelBytes = 256 * 1_024
-
-    typealias RawTunnelConnector = @Sendable (
-        EventLoop, String, Int, UpstreamProxyResolvedConfiguration?
-    ) -> EventLoopFuture<Channel>
-
-    nonisolated static func connectRawTunnel(
-        _ eventLoop: EventLoop, _ host: String, _ port: Int,
-        _ configuration: UpstreamProxyResolvedConfiguration?
-    ) -> EventLoopFuture<Channel> {
-        UpstreamProxyConnector.connect(
-            eventLoop: eventLoop,
-            targetScheme: "https",
-            targetHost: host,
-            targetPort: port,
-            configuration: configuration
-        ) { channel in
-            channel.eventLoop.makeSucceededVoidFuture()
-        }
-    }
-
     // MARK: Lifecycle
 
     init(
@@ -256,6 +241,11 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
 
     // MARK: Internal
 
+    typealias RawTunnelConnector = @Sendable (
+        EventLoop, String, Int, UpstreamProxyResolvedConfiguration?
+    )
+        -> EventLoopFuture<Channel>
+
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
 
@@ -271,19 +261,40 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         case autoPassthrough
     }
 
+    static let maximumBufferedTunnelBytes = 256 * 1_024
+
+    nonisolated static func connectRawTunnel(
+        _ eventLoop: EventLoop, _ host: String, _ port: Int,
+        _ configuration: UpstreamProxyResolvedConfiguration?
+    )
+        -> EventLoopFuture<Channel>
+    {
+        UpstreamProxyConnector.connect(
+            eventLoop: eventLoop,
+            targetScheme: "https",
+            targetHost: host,
+            targetPort: port,
+            configuration: configuration
+        ) { channel in
+            channel.eventLoop.makeSucceededVoidFuture()
+        }
+    }
+
     /// Stable scope for TLS recovery. Local clients use their application identity. Remote
     /// devices use a one-way digest of their source address so failures from one device never
     /// disable interception for another and persisted recovery state does not expose the address.
     nonisolated static func clientScopeIdentifier(
         application: ClientApplicationIdentity?,
         connectionDescriptor: ProxyConnectionDescriptor?
-    ) -> String? {
+    )
+        -> String?
+    {
         if let application {
             return application.identifier
         }
         guard let sourceHost = connectionDescriptor?.clientHost,
-              !ClientConnectionMatcher.isLocalSource(sourceHost)
-        else {
+              !ClientConnectionMatcher.isLocalSource(sourceHost) else
+        {
             return nil
         }
         let normalized = sourceHost.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -472,7 +483,9 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     /// Reports a tunnel that was rejected or could not connect. Called only from terminal
     /// paths that close the connection, so a tunnel still reports exactly once.
     nonisolated func recordTunnelFailure(statusCode: Int, statusMessage: String) {
-        guard !tunnelOutcomeRecorded else { return }
+        guard !tunnelOutcomeRecorded else {
+            return
+        }
         tunnelOutcomeRecorded = true
         onTransactionComplete(makeTunnelFailureTransaction(statusCode: statusCode, statusMessage: statusMessage))
     }
@@ -592,7 +605,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 }
 
                 let result = try await certManager.certificateForHost(host)
-                return (try result.serverIdentity(), result.provesRootCATrust)
+                return try (result.serverIdentity(), result.provesRootCATrust)
             }
 
         certFuture.whenComplete { result in
@@ -799,7 +812,9 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     }
 
     nonisolated private func recordSuccessfulTunnel() {
-        guard !tunnelOutcomeRecorded else { return }
+        guard !tunnelOutcomeRecorded else {
+            return
+        }
         tunnelOutcomeRecorded = true
         onTransactionComplete(
             Self.makeTunnelTransaction(
@@ -880,9 +895,41 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
 
     typealias InboundIn = ByteBuffer
 
+    nonisolated static func rejectionNotificationUserInfo(
+        host: String,
+        clientIdentifier: String?
+    )
+        -> [String: String]
+    {
+        var userInfo = [TLSMITMNotificationUserInfoKey.host: host]
+        if let clientIdentifier {
+            userInfo[TLSMITMNotificationUserInfoKey.clientIdentifier] = clientIdentifier
+        }
+        return userInfo
+    }
+
+    /// Returns whether this rejection should produce user-facing evidence. Duplicate failures
+    /// still continue through transaction capture and raw-tunnel recovery; only their repeated
+    /// notification is suppressed.
+    nonisolated static func shouldReportCertificateRejection(
+        host: String,
+        clientIdentifier: String?,
+        tracker: RecentFailureTracker = .certificateRejections
+    )
+        -> Bool
+    {
+        let failure = tracker.recordFailure(
+            host: host,
+            clientIdentifier: clientIdentifier
+        )
+        return failure.count == 1
+    }
+
     nonisolated func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         if let tlsEvent = event as? TLSUserEvent, case .handshakeCompleted = tlsEvent {
-            guard !handshakeResolved else { return }
+            guard !handshakeResolved else {
+                return
+            }
             handshakeResolved = true
             tlsLogger.info("TLS handshake completed for \(self.host) — adding HTTP codecs")
             if provesRootCATrust, let clientIdentifier {
@@ -890,7 +937,9 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
             }
             if provesRootCATrust {
                 var acceptanceUserInfo = [TLSMITMNotificationUserInfoKey.host: host]
-                if let clientIdentifier { acceptanceUserInfo[TLSMITMNotificationUserInfoKey.clientIdentifier] = clientIdentifier }
+                if let clientIdentifier {
+                    acceptanceUserInfo[TLSMITMNotificationUserInfoKey.clientIdentifier] = clientIdentifier
+                }
                 NotificationCenter.default.post(name: .tlsMitmAccepted, object: nil, userInfo: acceptanceUserInfo)
             }
 
@@ -982,7 +1031,10 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                     tlsLogger.debug("Suppressing duplicate TLS rejection for \(self.host) and the same client scope")
                 }
             } else {
-                tlsLogger.warning("Custom HTTPS identity failed for \(self.host); preserving fallback without Root CA evidence")
+                tlsLogger
+                    .warning(
+                        "Custom HTTPS identity failed for \(self.host); preserving fallback without Root CA evidence"
+                    )
             }
         } else if isAbandonedHandshake {
             tlsLogger.debug(
@@ -1009,7 +1061,9 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     /// interception, so it is captured as `.tunneled`.
     nonisolated func makeSuccessfulTunnelTransaction(
         statusMessage: String = "Connection Established"
-    ) -> HTTPTransaction {
+    )
+        -> HTTPTransaction
+    {
         TLSInterceptHandler.makeTunnelTransaction(
             host: host,
             port: port,
@@ -1027,7 +1081,9 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     nonisolated func recordSuccessfulTunnel(
         statusMessage: String = "Connection Established"
     ) {
-        guard !tunnelOutcomeRecorded else { return }
+        guard !tunnelOutcomeRecorded else {
+            return
+        }
         tunnelOutcomeRecorded = true
         onTransactionComplete(makeSuccessfulTunnelTransaction(statusMessage: statusMessage))
     }
@@ -1053,7 +1109,9 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     /// close the connection, and mutually exclusive with `recordSuccessfulTunnel()`, so a
     /// tunnel still reports exactly once.
     nonisolated func recordTunnelFailure(statusCode: Int, statusMessage: String) {
-        guard !tunnelOutcomeRecorded else { return }
+        guard !tunnelOutcomeRecorded else {
+            return
+        }
         tunnelOutcomeRecorded = true
         onTransactionComplete(makeTunnelFailureTransaction(statusCode: statusCode, statusMessage: statusMessage))
     }
@@ -1143,34 +1201,10 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
             || description.contains("uncleanshutdown")
     }
 
-    nonisolated static func rejectionNotificationUserInfo(
-        host: String,
-        clientIdentifier: String?
-    ) -> [String: String] {
-        var userInfo = [TLSMITMNotificationUserInfoKey.host: host]
-        if let clientIdentifier {
-            userInfo[TLSMITMNotificationUserInfoKey.clientIdentifier] = clientIdentifier
-        }
-        return userInfo
-    }
-
-    /// Returns whether this rejection should produce user-facing evidence. Duplicate failures
-    /// still continue through transaction capture and raw-tunnel recovery; only their repeated
-    /// notification is suppressed.
-    nonisolated static func shouldReportCertificateRejection(
-        host: String,
-        clientIdentifier: String?,
-        tracker: RecentFailureTracker = .certificateRejections
-    ) -> Bool {
-        let failure = tracker.recordFailure(
-            host: host,
-            clientIdentifier: clientIdentifier
-        )
-        return failure.count == 1
-    }
-
     nonisolated private func recordTLSHandshakeFailure() {
-        guard !tunnelOutcomeRecorded else { return }
+        guard !tunnelOutcomeRecorded else {
+            return
+        }
         tunnelOutcomeRecorded = true
         onTransactionComplete(
             TLSInterceptHandler.makeTunnelTransaction(
@@ -1371,64 +1405,5 @@ final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHand
         bufferedRawTunnelByteCount += buffer.readableBytes
         bufferedRawTunnelData.append(buffer)
         return true
-    }
-}
-
-// MARK: - RawTunnelHandler
-
-/// Bidirectional byte-level relay between two channels. Used as a fallback when TLS
-/// interception cannot be performed (cert generation failure, SSL pinning). Each side
-/// of the tunnel gets its own RawTunnelHandler pointing at the peer channel.
-final class RawTunnelHandler: ChannelInboundHandler, @unchecked Sendable {
-    // MARK: Lifecycle
-
-    init(peerChannel: Channel) {
-        self.peerChannel = peerChannel
-    }
-
-    // MARK: Internal
-
-    typealias InboundIn = ByteBuffer
-    typealias OutboundOut = ByteBuffer
-
-    nonisolated func handlerAdded(context: ChannelHandlerContext) {
-        resetIdleTimeout(context: context)
-    }
-
-    nonisolated func handlerRemoved(context: ChannelHandlerContext) {
-        idleTimeout?.cancel()
-        idleTimeout = nil
-    }
-
-    nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        resetIdleTimeout(context: context)
-        let buffer = unwrapInboundIn(data)
-        peerChannel.writeAndFlush(NIOAny(buffer), promise: nil)
-    }
-
-    nonisolated func channelInactive(context: ChannelHandlerContext) {
-        idleTimeout?.cancel()
-        peerChannel.close(promise: nil)
-    }
-
-    nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {
-        idleTimeout?.cancel()
-        peerChannel.close(promise: nil)
-        context.close(promise: nil)
-    }
-
-    // MARK: Private
-
-    private static let idleTimeoutDuration: TimeAmount = .seconds(60)
-
-    private let peerChannel: Channel
-    private var idleTimeout: Scheduled<Void>?
-
-    nonisolated private func resetIdleTimeout(context: ChannelHandlerContext) {
-        idleTimeout?.cancel()
-        idleTimeout = context.eventLoop.scheduleTask(in: Self.idleTimeoutDuration) {
-            tlsLogger.debug("Raw tunnel idle timeout, closing")
-            context.close(promise: nil)
-        }
     }
 }

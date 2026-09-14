@@ -1,10 +1,132 @@
+import Foundation
 import NIOCore
 import NIOEmbedded
+import NIOHTTP1
 import NIOWebSocket
 @testable import Rockxy
 import Testing
 
+// MARK: - WebSocketFrameHandlerTests
+
 struct WebSocketFrameHandlerTests {
+    @Test("WebSocket lifecycle completes and releases exactly once")
+    func lifecycleIsIdempotent() {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let transaction = HTTPTransaction(request: request, state: .active)
+        let completions = WebSocketEventCount()
+        let releases = WebSocketEventCount()
+        let lifecycle = WebSocketLifecycle(
+            onTransactionComplete: { _ in completions.record() },
+            onChannelClosed: { releases.record() }
+        )
+
+        lifecycle.complete(transaction)
+        lifecycle.complete(transaction)
+        lifecycle.failSetup()
+
+        #expect(completions.value == 1)
+        #expect(releases.value == 1)
+    }
+
+    @Test("HTTP-to-WebSocket transition removes codecs and relays the first frame")
+    func transitionRemovesHTTPCodecsAndRelaysFirstFrame() throws {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let connection = WebSocketConnection(upgradeRequest: request)
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: connection
+        )
+        let peer = EmbeddedChannel()
+        let eventLoop = EmbeddedEventLoop()
+        let channel = EmbeddedChannel(loop: eventLoop)
+        let httpConfiguration = ProxyPipeline.configureHTTPPipeline(
+            channel: channel,
+            handler: WebSocketTransitionPassThroughHandler()
+        )
+        eventLoop.run()
+        try httpConfiguration.wait()
+
+        let relay = WebSocketFrameHandler(
+            direction: .sent,
+            peerChannel: peer,
+            webSocketConnection: connection,
+            parentTransaction: transaction,
+            onTransactionComplete: { _ in }
+        )
+        let webSocketConfiguration = ProxyPipeline.configureClientWebSocketPipeline(
+            channel: channel,
+            handler: relay
+        )
+        eventLoop.run()
+        try webSocketConfiguration.wait()
+
+        #expect((try? channel.pipeline.context(
+            handlerType: ByteToMessageHandler<HTTPRequestDecoder>.self
+        ).wait()) == nil)
+        #expect((try? channel.pipeline.context(handlerType: HTTPResponseEncoder.self).wait()) == nil)
+
+        var bytes = channel.allocator.buffer(capacity: 4)
+        bytes.writeBytes([0x81, 0x02, 0x6F, 0x6B])
+        try channel.writeInbound(bytes)
+
+        let forwarded = try #require(try peer.readOutbound(as: WebSocketFrame.self))
+        var payload = forwarded.unmaskedData
+        #expect(payload.readString(length: 2) == "ok")
+        #expect(connection.frames.count == 1)
+
+        _ = try? channel.finish(acceptAlreadyClosed: true)
+        _ = try? peer.finish(acceptAlreadyClosed: true)
+    }
+
+    @Test("Upstream WebSocket transition removes HTTP codecs and relays the first server frame")
+    func upstreamTransitionRemovesHTTPCodecsAndRelaysFirstFrame() throws {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let connection = WebSocketConnection(upgradeRequest: request)
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: connection
+        )
+        let peer = EmbeddedChannel()
+        let eventLoop = EmbeddedEventLoop()
+        let channel = EmbeddedChannel(loop: eventLoop)
+        let httpConfiguration = channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
+        eventLoop.run()
+        try httpConfiguration.wait()
+
+        let relay = WebSocketFrameHandler(
+            direction: .received,
+            peerChannel: peer,
+            webSocketConnection: connection,
+            parentTransaction: transaction,
+            onTransactionComplete: { _ in }
+        )
+        let webSocketConfiguration = ProxyPipeline.configureUpstreamWebSocketPipeline(
+            channel: channel,
+            handler: relay
+        )
+        eventLoop.run()
+        try webSocketConfiguration.wait()
+
+        #expect((try? channel.pipeline.context(
+            handlerType: ByteToMessageHandler<HTTPResponseDecoder>.self
+        ).wait()) == nil)
+        #expect((try? channel.pipeline.context(handlerType: HTTPRequestEncoder.self).wait()) == nil)
+
+        var bytes = channel.allocator.buffer(capacity: 4)
+        bytes.writeBytes([0x81, 0x02, 0x6F, 0x6B])
+        try channel.writeInbound(bytes)
+
+        let forwarded = try #require(try peer.readOutbound(as: WebSocketFrame.self))
+        var payload = forwarded.unmaskedData
+        #expect(payload.readString(length: 2) == "ok")
+        #expect(connection.frames.count == 1)
+
+        _ = try? channel.finish(acceptAlreadyClosed: true)
+        _ = try? peer.finish(acceptAlreadyClosed: true)
+    }
+
     @Test("Capture limit never interrupts the proxied WebSocket")
     func captureLimitKeepsRelayActive() throws {
         let request = TestFixtures.makeRequest(url: "wss://example.com/ws")
@@ -41,4 +163,131 @@ struct WebSocketFrameHandlerTests {
         _ = try? channel.finish(acceptAlreadyClosed: true)
         _ = try? peer.finish(acceptAlreadyClosed: true)
     }
+
+    @Test("Client relay hands unmasked payload to the encoder exactly once")
+    func clientRelayDoesNotDoubleMaskDecodedFrames() throws {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let connection = WebSocketConnection(upgradeRequest: request)
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: connection
+        )
+        let peer = EmbeddedChannel(handler: WebSocketFrameEncoder())
+        let handler = WebSocketFrameHandler(
+            direction: .sent,
+            peerChannel: peer,
+            webSocketConnection: connection,
+            parentTransaction: transaction,
+            onTransactionComplete: { _ in }
+        )
+        let channel = EmbeddedChannel(handler: handler)
+        let maskingKey: WebSocketMaskingKey = [0x11, 0x22, 0x33, 0x44]
+        let plaintext = Array("client-text".utf8)
+        var maskedPayload = channel.allocator.buffer(capacity: plaintext.count)
+        maskedPayload.writeBytes(plaintext)
+        maskedPayload.webSocketMask(maskingKey)
+
+        try channel.writeInbound(WebSocketFrame(
+            fin: true,
+            opcode: .text,
+            maskKey: maskingKey,
+            data: maskedPayload
+        ))
+
+        var wire = peer.allocator.buffer(capacity: plaintext.count + 6)
+        while var part = try peer.readOutbound(as: ByteBuffer.self) {
+            wire.writeBuffer(&part)
+        }
+        #expect(wire.readInteger(as: UInt8.self) == 0x81)
+        #expect(wire.readInteger(as: UInt8.self) == 0x80 | UInt8(plaintext.count))
+        #expect(wire.readBytes(length: 4) == Array(maskingKey))
+        let encodedSlice = wire.readSlice(length: plaintext.count)
+        var encodedPayload = try #require(encodedSlice)
+        encodedPayload.webSocketUnmask(maskingKey)
+        #expect(encodedPayload.readBytes(length: plaintext.count) == plaintext)
+
+        _ = try? channel.finish(acceptAlreadyClosed: true)
+        _ = try? peer.finish(acceptAlreadyClosed: true)
+    }
+
+    @Test("Server relay never emits a masked frame to the client")
+    func serverRelayStripsUnexpectedMasking() throws {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let connection = WebSocketConnection(upgradeRequest: request)
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: connection
+        )
+        let peer = EmbeddedChannel(handler: WebSocketFrameEncoder())
+        let handler = WebSocketFrameHandler(
+            direction: .received,
+            peerChannel: peer,
+            webSocketConnection: connection,
+            parentTransaction: transaction,
+            onTransactionComplete: { _ in }
+        )
+        let channel = EmbeddedChannel(handler: handler)
+        let maskingKey: WebSocketMaskingKey = [0xAA, 0xBB, 0xCC, 0xDD]
+        let plaintext = Array("server-text".utf8)
+        var maskedPayload = channel.allocator.buffer(capacity: plaintext.count)
+        maskedPayload.writeBytes(plaintext)
+        maskedPayload.webSocketMask(maskingKey)
+
+        try channel.writeInbound(WebSocketFrame(
+            fin: true,
+            opcode: .text,
+            maskKey: maskingKey,
+            data: maskedPayload
+        ))
+
+        var wire = peer.allocator.buffer(capacity: plaintext.count + 2)
+        while var part = try peer.readOutbound(as: ByteBuffer.self) {
+            wire.writeBuffer(&part)
+        }
+        #expect(wire.readInteger(as: UInt8.self) == 0x81)
+        #expect(wire.readInteger(as: UInt8.self) == UInt8(plaintext.count))
+        #expect(wire.readBytes(length: plaintext.count) == plaintext)
+
+        _ = try? channel.finish(acceptAlreadyClosed: true)
+        _ = try? peer.finish(acceptAlreadyClosed: true)
+    }
+}
+
+// MARK: - WebSocketTransitionPassThroughHandler
+
+private final class WebSocketTransitionPassThroughHandler:
+    ChannelInboundHandler,
+    RemovableChannelHandler,
+    @unchecked Sendable
+{
+    typealias InboundIn = HTTPServerRequestPart
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        context.fireChannelRead(data)
+    }
+}
+
+// MARK: - WebSocketEventCount
+
+private final class WebSocketEventCount: @unchecked Sendable {
+    // MARK: Internal
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func record() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var count = 0
 }

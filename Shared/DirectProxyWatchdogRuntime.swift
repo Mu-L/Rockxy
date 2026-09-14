@@ -75,8 +75,8 @@ enum DirectProxyWatchdogInvocation: Equatable {
         guard arguments.count >= 5,
               let parentPID = Int32(arguments[2]),
               parentPID > 0,
-              !arguments[4].isEmpty
-        else {
+              !arguments[4].isEmpty else
+        {
             return .unidentifiableParent
         }
         return .watch(
@@ -98,12 +98,15 @@ enum DirectProxyWatchdogInvocation: Equatable {
 /// using yet inverts it, so the old watcher stays effective for exactly as long as the new one is
 /// not, and the superseded job is only removed once its replacement is known installed.
 enum DirectProxyWatchdogInstallation {
-    // MARK: Internal
-
     enum Outcome {
-        /// The new watcher is running. The superseded label, if there was one, has been asked to
-        /// go away; whether that removal itself succeeded does not change who is watching.
-        case installed(activeLabel: String, supersededLabel: String?)
+        /// The new watcher is running. A superseded label that launchd refused to remove is
+        /// returned explicitly so the caller can retain durable cleanup ownership for the next
+        /// restore or app launch.
+        case installed(
+            activeLabel: String,
+            supersededLabel: String?,
+            retainedSupersededLabel: String?
+        )
         /// Nothing was submitted. Whatever was watching before still is, and the caller must not
         /// treat the override as watched by anything new.
         case failed(activeLabel: String?, error: any Error)
@@ -114,7 +117,7 @@ enum DirectProxyWatchdogInstallation {
         /// whether the override is covered.
         var activeLabel: String? {
             switch self {
-            case let .installed(activeLabel, _):
+            case let .installed(activeLabel, _, _):
                 activeLabel
             case let .failed(activeLabel, _):
                 activeLabel
@@ -145,12 +148,54 @@ enum DirectProxyWatchdogInstallation {
             return .failed(activeLabel: supersededLabel, error: error)
         }
 
+        var retainedSupersededLabel: String?
         if let supersededLabel, supersededLabel != newLabel {
             // The replacement is already running, so a stubborn old job is a stray process rather
-            // than a gap in cover. It exits on its own as soon as the backup is resolved.
-            try? remove(supersededLabel)
+            // than a gap in cover. Keep its label durable if removal fails so the app can retry
+            // after the backup is resolved instead of forgetting an orphaned launchd record.
+            do {
+                try remove(supersededLabel)
+            } catch {
+                retainedSupersededLabel = supersededLabel
+            }
         }
-        return .installed(activeLabel: newLabel, supersededLabel: supersededLabel)
+        return .installed(
+            activeLabel: newLabel,
+            supersededLabel: supersededLabel,
+            retainedSupersededLabel: retainedSupersededLabel
+        )
+    }
+}
+
+// MARK: - DirectProxyWatchdogJobDiscovery
+
+/// Finds launchd jobs owned by Rockxy even when they predate the durable label registry.
+///
+/// Older builds submitted a stable label, and an interrupted replacement build could submit a
+/// UUID-suffixed label before persisting it. `launchctl list` is therefore the last-resort source
+/// of truth during resolved-session cleanup. Matching stays deliberately exact: only the base
+/// label itself or a UUID suffix is accepted, so cleanup cannot broaden to unrelated jobs that
+/// merely share a textual prefix.
+enum DirectProxyWatchdogJobDiscovery {
+    static func labels(in launchctlListOutput: String, baseLabel: String) -> [String] {
+        let prefix = "\(baseLabel)."
+        let labels = launchctlListOutput.split(whereSeparator: \.isNewline).compactMap { line -> String? in
+            guard let candidate = line.split(whereSeparator: \.isWhitespace).last.map(String.init) else {
+                return nil
+            }
+            if candidate == baseLabel {
+                return candidate
+            }
+            guard candidate.hasPrefix(prefix) else {
+                return nil
+            }
+            let suffix = String(candidate.dropFirst(prefix.count))
+            guard UUID(uuidString: suffix) != nil else {
+                return nil
+            }
+            return candidate
+        }
+        return Array(Set(labels)).sorted()
     }
 }
 

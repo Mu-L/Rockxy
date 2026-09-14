@@ -21,7 +21,7 @@ nonisolated(unsafe) private let upstreamLogger = Logger(
 ///
 /// Timing measurements (DNS, TCP, TTFB, transfer) are captured via `DispatchTime`
 /// checkpoints passed from the caller that initiated the upstream connection.
-final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(
@@ -206,17 +206,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
 
             if isWebSocketUpgrade {
                 relayResponseHead(modifiedHead)
-                let serverChannel = context.channel
-                let clientChannel = clientContext.channel
-                WebSocketPipelineConfigurator.upgradeToWebSocket(
-                    clientChannel: clientChannel,
-                    serverChannel: serverChannel,
-                    requestData: requestData,
-                    onTransactionComplete: onTransactionComplete
-                ).whenFailure { error in
-                    upstreamLogger.error("WebSocket upgrade failed: \(error.localizedDescription)")
-                    context.close(promise: nil)
-                }
+                pendingWebSocketUpgrade = true
                 return
             }
 
@@ -282,6 +272,36 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
             guard !completed else {
                 return
             }
+            if pendingWebSocketUpgrade {
+                completed = true
+                readTimeoutTask?.cancel()
+                readTimeoutTask = nil
+
+                let handshakePromise = clientContext.eventLoop.makePromise(of: Void.self)
+                clientContext.writeAndFlush(
+                    NIOAny(HTTPServerResponsePart.end(nil)),
+                    promise: handshakePromise
+                )
+                let webSocketLifecycle = WebSocketLifecycle(
+                    onTransactionComplete: onTransactionComplete,
+                    onChannelClosed: onChannelClosed
+                )
+                handshakePromise.futureResult.flatMap { [clientContext, requestData, onTransactionComplete] in
+                    WebSocketPipelineConfigurator.upgradeToWebSocket(
+                        clientChannel: clientContext.channel,
+                        serverChannel: context.channel,
+                        requestData: requestData,
+                        onTransactionComplete: onTransactionComplete,
+                        lifecycle: webSocketLifecycle
+                    )
+                }.whenFailure { error in
+                    upstreamLogger.error("WebSocket upgrade failed: \(error.localizedDescription)")
+                    webSocketLifecycle.failSetup()
+                    self.clientContext.close(promise: nil)
+                    context.close(promise: nil)
+                }
+                return
+            }
             completed = true
             readTimeoutTask?.cancel()
             readTimeoutTask = nil
@@ -341,6 +361,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, @unchecked Sendable 
     private let onChannelClosed: @Sendable () -> Void
 
     private var responseHead: HTTPResponseHead?
+    private var pendingWebSocketUpgrade = false
     private var channelClosedCalled = false
     private var responseBody: ByteBuffer?
     private var responseBodyTruncated = false

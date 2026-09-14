@@ -348,6 +348,26 @@ actor SessionStore {
 
     private let bodiesDirectory: URL
 
+    /// RFC 6455 handshake evidence: header names are case-insensitive and both values are
+    /// comma-separated token lists, so `Connection: keep-alive, Upgrade` still qualifies.
+    private static func isWebSocketHandshake(_ headers: [HTTPHeader]) -> Bool {
+        headerTokens(named: "Upgrade", in: headers).contains("websocket")
+            && headerTokens(named: "Connection", in: headers).contains("upgrade")
+    }
+
+    private static func headerTokens(named name: String, in headers: [HTTPHeader]) -> Set<String> {
+        var tokens = Set<String>()
+        for header in headers where header.name.caseInsensitiveCompare(name) == .orderedSame {
+            for token in header.value.split(separator: ",") {
+                let normalized = token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !normalized.isEmpty {
+                    tokens.insert(normalized)
+                }
+            }
+        }
+        return tokens
+    }
+
     // MARK: - Schema
 
     private func createTablesIfNeeded() throws {
@@ -474,6 +494,9 @@ actor SessionStore {
             (3, [
                 "ALTER TABLE transactions ADD COLUMN is_websocket INTEGER NOT NULL DEFAULT 0",
             ]),
+            // v3 introduced the identity column but did not backfill zero-frame handshakes.
+            // Keep this as a distinct migration so databases that already reached v3 are repaired.
+            (4, []),
         ]
 
         let pending = migrations.filter { $0.version > currentVersion }
@@ -486,11 +509,46 @@ actor SessionStore {
             for sql in migration.statements {
                 try db.run(sql)
             }
+            if migration.version == 4 {
+                try backfillLegacyWebSocketIdentity()
+            }
             try setSchemaVersion(migration.version)
         }
 
         if let newVersion = pending.last?.version {
             Self.logger.info("Schema migrated from v\(currentVersion) to v\(newVersion)")
+        }
+    }
+
+    /// Rows written before `is_websocket` existed only kept their WebSocket identity through
+    /// stored frames, so a handshake that captured zero frames would restore as plain HTTP and
+    /// become eligible for Repeat. Mark only rows carrying protocol evidence of a completed
+    /// WebSocket handshake: a 101 status plus `Upgrade: websocket` / `Connection: upgrade`
+    /// tokens on the response (or, failing that, the request). Other 101 upgrades stay HTTP.
+    private func backfillLegacyWebSocketIdentity() throws {
+        let candidates = Self.transactions
+            .select(Self.txId, Self.txRequestHeaders, Self.txResponseHeaders)
+            .filter(Self.txStatusCode == 101 && Self.txIsWebSocket == 0)
+
+        var legacyWebSocketIDs: [String] = []
+        let rows = try db.prepareRowIterator(candidates)
+        while let row = try rows.failableNext() {
+            let responseHeaders = row[Self.txResponseHeaders].map { decodeHeaders($0) } ?? []
+            let requestHeaders = decodeHeaders(row[Self.txRequestHeaders])
+            let hasResponseHandshake = Self.isWebSocketHandshake(responseHeaders)
+            let hasRequestFallback = responseHeaders.isEmpty && Self.isWebSocketHandshake(requestHeaders)
+            if hasResponseHandshake || hasRequestFallback {
+                legacyWebSocketIDs.append(row[Self.txId])
+            }
+        }
+
+        for id in legacyWebSocketIDs {
+            let update = Self.transactions.filter(Self.txId == id).update(Self.txIsWebSocket <- 1)
+            try db.run(update)
+        }
+
+        if !legacyWebSocketIDs.isEmpty {
+            Self.logger.info("Restored WebSocket identity on \(legacyWebSocketIDs.count) legacy transaction(s)")
         }
     }
 
@@ -706,8 +764,8 @@ actor SessionStore {
     private func deserializeWeb3RPCInfo(from row: Row) -> Web3RPCInfo? {
         guard let familyValue = row[Self.txWeb3Family],
               let family = Web3RPCFamily(rawValue: familyValue),
-              let providerHost = row[Self.txWeb3ProviderHost]
-        else {
+              let providerHost = row[Self.txWeb3ProviderHost] else
+        {
             return nil
         }
 
@@ -733,8 +791,8 @@ actor SessionStore {
     private func deserializeWeb3BatchSummary(from row: Row) -> Web3RPCBatchSummary? {
         guard let requestCount = row[Self.txWeb3BatchRequestCount],
               let web3RequestCount = row[Self.txWeb3BatchRPCRequestCount],
-              let errorCount = row[Self.txWeb3BatchErrorCount]
-        else {
+              let errorCount = row[Self.txWeb3BatchErrorCount] else
+        {
             return nil
         }
 
