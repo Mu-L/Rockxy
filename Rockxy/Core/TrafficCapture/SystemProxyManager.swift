@@ -571,7 +571,11 @@ final class SystemProxyManager: @unchecked Sendable {
             }
         }
 
-        if let helperStatus = try? await HelperConnection.shared.getProxyStatus(),
+        // Without an installed helper there is no XPC service to answer, and the status probe
+        // would only return after its 10 s timeout — which is what made quitting and readiness
+        // checks stall on machines that never installed the helper.
+        if await HelperManager.shared.status != .notInstalled,
+           let helperStatus = try? await HelperConnection.shared.getProxyStatus(),
            helperStatus.isOverridden,
            effectiveSystemProxyMatchesRockxy(port: helperStatus.port)
         {
