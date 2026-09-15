@@ -326,12 +326,20 @@ struct DeveloperSetupWindowView: View {
     // MARK: Detail column
 
     private var detailColumn: some View {
-        VStack(spacing: 0) {
-            centerContent
-            if let message = feedbackMessage {
-                Divider()
-                feedbackBar(message)
+        // Resolve the column against the space the split view actually offers. Measured
+        // through its own ideal size, the stacked scroll view + feedback bar reported the
+        // scroll content's natural height, the window adopted that taller layout, and the
+        // sidebar search field, first targets, and detail header ended up hidden above the
+        // title bar at the default window size.
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                centerContent
+                if let message = feedbackMessage {
+                    Divider()
+                    feedbackBar(message)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
     }
 

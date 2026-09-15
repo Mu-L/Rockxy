@@ -1241,6 +1241,18 @@ struct DeveloperSetupViewModelTests {
         #expect(viewModel.certificatePathStatusText == "Export required")
     }
 
+    @Test("Targets without a validation probe never report the probe as unavailable")
+    func nonValidatingTargetsDoNotBlameProbe() async {
+        let viewModel = DeveloperSetupViewModel(coordinator: MainContentCoordinator())
+        // The iOS Simulator is guide-driven: it never starts the local validation probe, so
+        // refreshing must surface its real state instead of a Retry that can never succeed.
+        await viewModel.selectTarget(.iosSimulator)
+        await viewModel.refreshSnapshot()
+
+        #expect(viewModel.supportsValidation == false)
+        #expect(viewModel.activeIssue != .localProbeUnavailable)
+    }
+
     @Test("refreshSnapshot preserves terminal verification states")
     func refreshSnapshotPreservesTerminalState() async {
         let viewModel = DeveloperSetupViewModel(coordinator: MainContentCoordinator())

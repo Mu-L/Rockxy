@@ -43,6 +43,11 @@ struct DeveloperSetupNativeStructureTests {
         #expect(source.contains("LazyVGrid") == false)
         #expect(source.contains("bottomStatusText") == false)
         #expect(source.contains("inspectorPresented = false"))
+        // The detail column must resolve against the split view's offered size. When it was a
+        // plain stack, the window adopted the scroll content's natural height and the sidebar
+        // search field and first targets were pushed under the title bar at 1000x640.
+        #expect(source.contains("GeometryReader { proxy in"))
+        #expect(source.contains(".frame(width: proxy.size.width, height: proxy.size.height)"))
 
         // Toolbar owns a single Set Up menu with the guide/terminal actions; the
         // old Copy + Start Capture Check toolbar buttons are gone.
