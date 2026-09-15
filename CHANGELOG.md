@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Showed the Developer Setup Device Endpoint as `host:port` instead of the bare LAN address, so the value can be typed into a phone's proxy settings as-is.
 - Answered the client with `502 Bad Gateway` and recorded a failed row when the upstream server rejects the TLS handshake or closes before responding; the client previously hung until its own timeout and the request never appeared in the list.
 - Relayed plain `http://` traffic to HTTP/HTTPS upstream proxies as absolute-form requests instead of `CONNECT` tunnels, so gateways that only allow `CONNECT` to TLS ports (Squid's default policy) no longer answer every plain-HTTP request with `502`.
+- Switched the sidebar to Library and selected the new entry after "Add favorite app or domain"; from Browse or Focus mode the sheet previously closed with no visible result.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.
