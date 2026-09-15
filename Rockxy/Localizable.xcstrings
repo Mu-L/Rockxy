@@ -40272,6 +40272,36 @@
           }
         }
       }
+    },
+    "Upstream Servers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上游服务器"
+          }
+        }
+      }
+    },
+    "Accept untrusted upstream certificates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受不受信任的上游证书"
+          }
+        }
+      }
+    },
+    "Decrypt HTTPS to staging or internal servers whose certificate is self-signed or issued by a private CA. Rockxy stops verifying the server it connects to, so only enable this on networks you control.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密到证书为自签名或由私有 CA 签发的测试/内部服务器的 HTTPS。Rockxy 将不再验证所连接的服务器，因此只应在你控制的网络中启用。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

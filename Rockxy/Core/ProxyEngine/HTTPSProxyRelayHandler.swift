@@ -65,9 +65,14 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
 
-    nonisolated static func makeClientTLSConfiguration(clientIdentity: CustomTLSIdentity?) throws -> TLSConfiguration {
+    nonisolated static func makeClientTLSConfiguration(
+        clientIdentity: CustomTLSIdentity?,
+        acceptsUntrustedCertificates: Bool = UpstreamTrustPolicy.acceptsUntrustedCertificates
+    ) throws -> TLSConfiguration {
         var clientTLSConfig = TLSConfiguration.makeClientConfiguration()
-        clientTLSConfig.certificateVerification = .fullVerification
+        clientTLSConfig.certificateVerification = UpstreamTrustPolicy.certificateVerification(
+            acceptingUntrusted: acceptsUntrustedCertificates
+        )
         if let clientIdentity {
             clientTLSConfig.certificateChain = try clientIdentity.certificateSources
             clientTLSConfig.privateKey = try clientIdentity.privateKeySource

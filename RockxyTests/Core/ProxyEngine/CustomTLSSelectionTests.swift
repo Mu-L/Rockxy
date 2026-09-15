@@ -83,6 +83,26 @@ struct CustomTLSSelectionTests {
         #expect(config.privateKey == nil)
     }
 
+    @Test("upstream verification is only relaxed by the explicit untrusted-certificate opt-in")
+    func upstreamTrustPolicyControlsVerification() throws {
+        // The policy defaults to strict verification even when nothing was ever saved.
+        #expect(UpstreamTrustPolicy.certificateVerification(acceptingUntrusted: false) == .fullVerification)
+        #expect(UpstreamTrustPolicy.certificateVerification(acceptingUntrusted: true) == .none)
+
+        let strict = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: false
+        )
+        #expect(strict.certificateVerification == .fullVerification)
+
+        let relaxed = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: true
+        )
+        #expect(relaxed.certificateVerification == .none)
+        #expect(UpstreamTrustPolicy.userDefaultsKey.hasSuffix("acceptUntrustedUpstreamCertificates"))
+    }
+
     @Test("default generated certificate remains available when no custom server match exists")
     func defaultGeneratedCertificateFallback() throws {
         let manager = CustomCertificateManager(
