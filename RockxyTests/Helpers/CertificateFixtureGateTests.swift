@@ -405,7 +405,9 @@ struct CertificateFixtureLeaseTests {
             first.cleanup()
             cleaned.signal()
         }
-        try await expectSignal(cleaned, "fixture cleanup on another executor")
+        // Cleanup touches the Keychain, which other test processes exercise concurrently, so the
+        // bound only has to catch a hang rather than a slow but finishing cleanup.
+        try await expectSignal(cleaned, "fixture cleanup on another executor", within: 20)
         let next = try await installSharedTestOverrides()
         defer { next.cleanup() }
         #expect(!FileManager.default.fileExists(atPath: marker.path))

@@ -227,6 +227,80 @@ struct UpstreamProxyStoreTests {
         #expect(capture.wait()?.contains("CONNECT api.example.com:443 HTTP/1.1") == true)
     }
 
+    @Test("connection test probes plain-HTTP targets with an absolute-form GET through the proxy")
+    func connectionProbeUsesAbsoluteFormForHTTPTarget() async throws {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer {
+            Task {
+                try? await group.shutdownGracefully()
+            }
+        }
+
+        let capture = UpstreamProxyStringCapture()
+        let proxy = try startUpstreamProxyTestServer(group: group) { channel in
+            channel.pipeline.addHandler(UpstreamProxyHTTPConnectStubHandler(
+                capture: capture,
+                response: "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            ))
+        }
+        defer { proxy.close(promise: nil) }
+
+        let store = UpstreamProxyStore(
+            userDefaults: makeDefaults(),
+            credentialStorage: InMemoryCredentials(),
+            testTarget: .init(host: "example.com", port: 80)
+        )
+        try store.saveConfiguration(UpstreamProxyConfiguration(
+            isEnabled: true,
+            type: .http,
+            host: "127.0.0.1",
+            port: proxy.localAddress?.port ?? 0
+        ))
+
+        let result = await store.testConnection()
+        guard case .success = result else {
+            Issue.record("Expected successful Upstream Proxy test connection, got \(result)")
+            return
+        }
+        let request = try #require(capture.wait())
+        #expect(request.hasPrefix("GET http://example.com/ HTTP/1.1\r\n"))
+        #expect(!request.contains("CONNECT"))
+    }
+
+    @Test("connection test fails when the proxy never answers the probe")
+    func connectionProbeFailsWithoutResponse() async throws {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer {
+            Task {
+                try? await group.shutdownGracefully()
+            }
+        }
+
+        let capture = UpstreamProxyStringCapture()
+        let proxy = try startUpstreamProxyTestServer(group: group) { channel in
+            channel.pipeline.addHandler(UpstreamProxyHTTPConnectStubHandler(capture: capture, response: nil))
+        }
+        defer { proxy.close(promise: nil) }
+
+        let store = UpstreamProxyStore(
+            userDefaults: makeDefaults(),
+            credentialStorage: InMemoryCredentials(),
+            testTarget: .init(host: "example.com", port: 80)
+        )
+        try store.saveConfiguration(UpstreamProxyConfiguration(
+            isEnabled: true,
+            type: .http,
+            host: "127.0.0.1",
+            port: proxy.localAddress?.port ?? 0
+        ))
+
+        let result = await store.testConnection()
+        guard case .failure = result else {
+            Issue.record("A silent proxy must not pass the connection test")
+            return
+        }
+    }
+
     @Test("draft connection test does not mutate persisted or live configuration")
     func draftConnectionTestIsNonPersisting() async throws {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
