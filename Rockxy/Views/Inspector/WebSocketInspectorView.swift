@@ -15,6 +15,8 @@ struct WebSocketInspectorView: View {
         let _ = transaction.webSocketFrameVersion
         Group {
             if let connection = transaction.webSocketConnection {
+                // Top-aligned so a pane too short for summary + list + detail clips at the
+                // bottom instead of pushing the connection header out of view.
                 VStack(spacing: 0) {
                     connectionSummary(connection)
                     Divider()
@@ -24,8 +26,10 @@ struct WebSocketInspectorView: View {
                     if selectedFrame != nil {
                         Divider()
                         frameDetail
+                            .layoutPriority(1)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
                 InspectorEmptyStateView(
                     String(localized: "No WebSocket Data", bundle: RockxyLocalization.bundle),
@@ -49,6 +53,10 @@ struct WebSocketInspectorView: View {
     // MARK: Private
 
     private static let maxPayloadPreviewBytes = 512
+    /// Enough for the header row plus a few lines of payload; the frame list yields first.
+    private static let minimumPayloadHeight: CGFloat = 96
+    /// Roughly two frame rows, so the selection context never collapses entirely.
+    private static let minimumFrameListHeight: CGFloat = 48
 
     @State private var selectedFrameID: UUID?
     @State private var directionFilterValue: FrameDirection?
@@ -237,6 +245,7 @@ struct WebSocketInspectorView: View {
                         .tag(frame.id)
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
+                .frame(minHeight: Self.minimumFrameListHeight)
             }
         }
     }
@@ -350,13 +359,13 @@ struct WebSocketInspectorView: View {
                     description: SizeFormatter.format(bytes: payload.count)
                 )
             }
-            .frame(maxHeight: 200)
+            .frame(minHeight: Self.minimumPayloadHeight, maxHeight: 200)
         } else {
             AsyncHexDumpView(
                 data: frame.payload,
                 renderID: "\(frame.id.uuidString)-payload-hex-\(frame.payload.count)"
             )
-            .frame(maxHeight: 200)
+            .frame(minHeight: Self.minimumPayloadHeight, maxHeight: 200)
         }
     }
 
@@ -364,7 +373,7 @@ struct WebSocketInspectorView: View {
     private func protobufPayloadView(_ frame: WebSocketFrameData) -> some View {
         if let tree = frame.protobufHeuristicTree(), !tree.fields.isEmpty {
             ProtobufTreeView(tree: tree)
-                .frame(maxHeight: 220)
+                .frame(minHeight: Self.minimumPayloadHeight, maxHeight: 220)
         } else {
             InspectorEmptyStateView(
                 String(localized: "No Protobuf Fields", bundle: RockxyLocalization.bundle),
