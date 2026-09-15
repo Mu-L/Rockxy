@@ -599,6 +599,25 @@ final class ComposeViewModel {
         }
     }
 
+    /// Imports the URL field's text when it is a cURL command, so a command pasted straight into
+    /// the URL bar behaves like the explicit import. Returns `false` when the field holds a
+    /// plain URL. A failed parse rethrows without leaving a stale formatting notice behind, so
+    /// callers can stay silent while the command is still being typed.
+    func importCurlCommandFromURLFieldIfNeeded() throws -> Bool {
+        let candidate = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard candidate == "curl" || candidate.hasPrefix("curl ") else {
+            return false
+        }
+        let previousFormattingError = lastFormattingError
+        do {
+            try importCurlCommand(candidate)
+        } catch {
+            lastFormattingError = previousFormattingError
+            throw error
+        }
+        return true
+    }
+
     func importCurlCommand(_ command: String) throws {
         let tokens = Self.shellTokens(from: command)
         guard !tokens.isEmpty else {

@@ -693,6 +693,35 @@ struct ComposeViewModelTests {
         #expect(vm.queryItems[0].value == "1")
     }
 
+    @Test("A cURL command in the URL field imports in place")
+    func importCurlFromURLField() throws {
+        let vm = ComposeViewModel()
+        vm.url = "https://plain.example.com/path"
+        #expect(try vm.importCurlCommandFromURLFieldIfNeeded() == false)
+        #expect(vm.url == "https://plain.example.com/path")
+
+        vm.url = "  curl -X PUT 'https://api.example.com/items/1?v=2' -H 'X-Trace: t1' -d '{\"ok\":true}' "
+        #expect(try vm.importCurlCommandFromURLFieldIfNeeded() == true)
+        #expect(vm.method == "PUT")
+        #expect(vm.url == "https://api.example.com/items/1?v=2")
+        #expect(vm.headers.map(\.name) == ["X-Trace"])
+        #expect(vm.body == "{\"ok\":true}")
+        #expect(vm.queryItems.map(\.name) == ["v"])
+    }
+
+    @Test("A half-typed cURL command fails without leaving a stale formatting notice")
+    func incompleteCurlInURLFieldStaysSilent() throws {
+        let vm = ComposeViewModel()
+        vm.url = "curl -X POST"
+
+        #expect(throws: ComposeImportError.self) {
+            try vm.importCurlCommandFromURLFieldIfNeeded()
+        }
+        #expect(vm.lastFormattingError == nil)
+        #expect(vm.url == "curl -X POST")
+        #expect(vm.method == "GET")
+    }
+
     @Test("Import cURL supports common inline flags")
     func importCurlSupportsInlineFlags() throws {
         let vm = ComposeViewModel()

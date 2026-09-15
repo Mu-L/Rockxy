@@ -629,9 +629,10 @@ private struct MainWindowContent: View {
                     }
                 }
 
-                if !onboardingCompletedOnce {
-                    lifecycleState.showWelcome = true
-                } else if showWelcomeOnLaunch {
+                // "Show on startup" is an explicit opt-out that must win even while setup is
+                // incomplete: a device-only workflow may never enable the system proxy, and the
+                // sheet stays reachable from Help > Welcome to Rockxy.
+                if showWelcomeOnLaunch {
                     lifecycleState.showWelcome = true
                 }
             }

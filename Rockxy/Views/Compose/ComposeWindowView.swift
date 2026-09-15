@@ -181,9 +181,15 @@ struct ComposeWindowView: View {
             .frame(height: toolMetrics.formControlHeight)
             .focused($isURLFocused)
             .onSubmit {
+                guard !importCurlFromURLFieldIfNeeded(reportingErrors: true) else {
+                    return
+                }
                 startSend()
             }
             .onChange(of: viewModel.url) {
+                guard !importCurlFromURLFieldIfNeeded(reportingErrors: false) else {
+                    return
+                }
                 viewModel.syncURLToQuery()
             }
             .accessibilityLabel(String(localized: "Request URL", bundle: RockxyLocalization.bundle))
@@ -438,6 +444,26 @@ struct ComposeWindowView: View {
                 bodyImportTaskID = nil
             }
         }
+    }
+
+    /// A cURL command pasted straight into the URL field is imported in place, matching how
+    /// people move requests over from a terminal or a bug report. Returns `true` when the field
+    /// holds a command so the caller does not treat it as a URL. Parse failures are only
+    /// surfaced on submit; while the text is still being edited they stay silent.
+    private func importCurlFromURLFieldIfNeeded(reportingErrors: Bool) -> Bool {
+        do {
+            guard try viewModel.importCurlCommandFromURLFieldIfNeeded() else {
+                return false
+            }
+            sendTask?.cancel()
+            sendTask = nil
+            sendTaskID = nil
+        } catch {
+            if reportingErrors {
+                importErrorMessage = error.localizedDescription
+            }
+        }
+        return true
     }
 
     private func importCurlFromPasteboard() {
