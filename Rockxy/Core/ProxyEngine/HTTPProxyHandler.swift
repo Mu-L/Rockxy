@@ -736,6 +736,19 @@ extension HTTPProxyHandler {
         let host = parsed.host
         let port = parsed.port
 
+        if let descriptor = clientConnectionDescriptor,
+           ProxyLoopGuard.targetsOwnListener(
+               host: host,
+               port: port,
+               proxyPort: descriptor.proxyPort,
+               proxyHost: descriptor.proxyHost
+           )
+        {
+            proxyHandlerLogger.warning("SECURITY: Refused CONNECT that targets the proxy listener itself")
+            sendErrorResponse(context: context, status: 508, requestData: requestData)
+            return
+        }
+
         var responseHead = HTTPResponseHead(version: head.version, status: .ok)
         responseHead.headers.add(name: "content-length", value: "0")
         context.write(wrapOutboundOut(.head(responseHead)), promise: nil)
@@ -848,6 +861,19 @@ extension HTTPProxyHandler {
         }
 
         let port: Int = requestData.url.port ?? (requestData.url.scheme == "https" ? 443 : 80)
+
+        if let descriptor = clientConnectionDescriptor,
+           ProxyLoopGuard.targetsOwnListener(
+               host: host,
+               port: port,
+               proxyPort: descriptor.proxyPort,
+               proxyHost: descriptor.proxyHost
+           )
+        {
+            proxyHandlerLogger.warning("SECURITY: Refused request that targets the proxy listener itself")
+            sendErrorResponse(context: context, status: 508, requestData: requestData, callback: callback)
+            return
+        }
 
         let connectTime = DispatchTime.now()
 
