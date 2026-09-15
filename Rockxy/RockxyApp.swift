@@ -741,7 +741,7 @@ struct RockxyMenuCommands: Commands {
 
     @CommandsBuilder private var appMenu: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button(String(localized: "About Rockxy", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "About \(RockxyIdentity.current.displayName)", bundle: RockxyLocalization.bundle)) {
                 showAboutPanel()
             }
         }
