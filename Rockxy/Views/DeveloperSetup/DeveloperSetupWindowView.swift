@@ -136,7 +136,10 @@ struct DeveloperSetupWindowView: View {
     private var deviceProxyCaption: String {
         if viewModel.snapshot.effectiveListenAddress == "127.0.0.1" {
             return String(
-                localized: "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.",
+                localized: """
+                Devices outside this Mac cannot reach localhost-only mode. Turn off Only listen on localhost \
+                in Settings > General > Advanced Proxy Setting…, then restart the proxy.
+                """,
                 bundle: RockxyLocalization.bundle
             )
         }

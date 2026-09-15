@@ -52,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Quick Preview no longer offers "Decode Base64" for selections whose decoded bytes are unreadable control characters.
 - Refused requests and CONNECT tunnels that target the proxy's own listen port with `508 Loop Detected`; a single self-addressed request previously re-entered the proxy until the connection cap tripped, leaving dozens of 503 rows.
 - Stopped quitting and readiness checks from waiting 10 seconds on a helper XPC probe when the helper tool is not installed.
+- Told Developer Setup device targets where the "Only listen on localhost" switch lives (Settings > General > Advanced Proxy Setting…) instead of naming a control without a location.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

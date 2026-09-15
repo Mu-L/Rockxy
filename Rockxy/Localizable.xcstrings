@@ -10960,12 +10960,12 @@
         }
       }
     },
-    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.": {
+    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, then restart the proxy.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请关闭“仅监听本地主机”，然后重启代理。"
+            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听本地主机”，然后重启代理。"
           }
         }
       }
@@ -24029,12 +24029,12 @@
         }
       }
     },
-    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only Listen on localhost, restart the proxy, and use the Device Proxy host plus active port.": {
+    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, restart the proxy, and use the Device Proxy host plus active port.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
+            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
           }
         }
       }
