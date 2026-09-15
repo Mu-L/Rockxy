@@ -65,9 +65,18 @@ struct HARImporter {
         category: "HARImporter"
     )
 
-    private static let dateFormatter: ISO8601DateFormatter = {
+    /// HAR 1.2 only requires an ISO 8601 `startedDateTime`; fractional seconds are
+    /// optional, so both shapes must parse or imported entries silently collapse
+    /// onto the import time.
+    private static let fractionalDateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let wholeSecondDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
 
@@ -195,7 +204,8 @@ struct HARImporter {
         guard let string else {
             return nil
         }
-        return Self.dateFormatter.date(from: string)
+        return Self.fractionalDateFormatter.date(from: string)
+            ?? Self.wholeSecondDateFormatter.date(from: string)
     }
 
     private func harMillisToSeconds(_ value: Any?) -> TimeInterval {
