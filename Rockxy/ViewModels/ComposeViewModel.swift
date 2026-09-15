@@ -406,9 +406,9 @@ final class ComposeViewModel {
         clearRestoreConfirmation()
         method = transaction.request.method
         url = transaction.request.url.absoluteString
-        headers = transaction.request.headers.map {
-            EditableReplayHeader(name: $0.name, value: $0.value)
-        }
+        headers = transaction.request.headers
+            .filter { !RequestReplay.isTransportManagedHeader($0.name) }
+            .map { EditableReplayHeader(name: $0.name, value: $0.value) }
         if let bodyData = transaction.request.body {
             if let bodyText = String(data: bodyData, encoding: .utf8) {
                 body = bodyText

@@ -58,6 +58,30 @@ struct RequestReplayTests {
         #expect(value.contains("two"))
     }
 
+    @Test("request builder drops headers the transport derives itself")
+    func transportManagedHeadersDropped() throws {
+        let request = HTTPRequestData(
+            method: "POST",
+            url: try #require(URL(string: "https://staging.example.com/items")),
+            httpVersion: "HTTP/1.1",
+            headers: [
+                HTTPHeader(name: "Host", value: "api.example.com"),
+                HTTPHeader(name: "Content-Length", value: "2"),
+                HTTPHeader(name: "Proxy-Connection", value: "Keep-Alive"),
+                HTTPHeader(name: "Proxy-Authorization", value: "Basic abc"),
+                HTTPHeader(name: "Authorization", value: "Bearer keep"),
+            ],
+            body: Data("{}".utf8)
+        )
+
+        let built = RequestReplay.makeURLRequest(from: request)
+        #expect(built.value(forHTTPHeaderField: "Host") == nil)
+        #expect(built.value(forHTTPHeaderField: "Content-Length") == nil)
+        #expect(built.value(forHTTPHeaderField: "Proxy-Connection") == nil)
+        #expect(built.value(forHTTPHeaderField: "Proxy-Authorization") == nil)
+        #expect(built.value(forHTTPHeaderField: "Authorization") == "Bearer keep")
+    }
+
     @Test("fast replay rejects CONNECT tunnels and WebSocket sessions")
     func unsupportedTransportsRejected() {
         let http = TestFixtures.makeTransaction(method: "GET")

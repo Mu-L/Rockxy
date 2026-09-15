@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Allowed Repeat, Edit and Repeat, and Compose to send plain `http://` requests; App Transport Security previously rejected every non-TLS replay to LAN or staging servers.
 - Recorded each Repeat as a new traffic-list row attributed to Rockxy so the replayed response can be inspected, diffed, and exported; previously only a toast with the status code appeared.
 - Made the Diff viewer show each side's own line numbers and place a changed line on one row (old left, new right) instead of staggering removed and added lines with merged-stream numbering.
+- Stopped Repeat and Edit and Repeat from re-sending the captured `Host`, `Content-Length`, and `Proxy-*` headers; a URL edited to point at another host previously still carried the original `Host` and hit the wrong virtual host.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

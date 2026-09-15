@@ -722,6 +722,29 @@ struct ComposeViewModelTests {
         #expect(vm.method == "GET")
     }
 
+    @Test("Prefill leaves out headers the transport derives, so URL edits do not carry a stale Host")
+    func prefillDropsTransportManagedHeaders() throws {
+        let transaction = TestFixtures.makeTransaction(method: "POST", url: "http://api.example.com/login")
+        transaction.request = try HTTPRequestData(
+            method: "POST",
+            url: #require(URL(string: "http://api.example.com/login")),
+            httpVersion: "HTTP/1.1",
+            headers: [
+                HTTPHeader(name: "Host", value: "api.example.com"),
+                HTTPHeader(name: "Proxy-Connection", value: "Keep-Alive"),
+                HTTPHeader(name: "Content-Length", value: "2"),
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "X-Trace", value: "t1"),
+            ],
+            body: Data("{}".utf8)
+        )
+        let vm = ComposeViewModel()
+
+        vm.prefill(from: transaction)
+
+        #expect(vm.headers.map(\.name) == ["Content-Type", "X-Trace"])
+    }
+
     @Test("Import cURL supports common inline flags")
     func importCurlSupportsInlineFlags() throws {
         let vm = ComposeViewModel()

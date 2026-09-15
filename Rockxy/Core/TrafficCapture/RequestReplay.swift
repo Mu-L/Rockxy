@@ -63,12 +63,27 @@ enum RequestReplay {
     static func makeURLRequest(from request: HTTPRequestData) -> URLRequest {
         var urlRequest = URLRequest(url: request.url)
         urlRequest.httpMethod = request.method
-        for header in request.headers {
+        for header in request.headers where !isTransportManagedHeader(header.name) {
             urlRequest.addValue(header.value, forHTTPHeaderField: header.name)
         }
         urlRequest.httpBody = request.body
         return urlRequest
     }
+
+    /// Headers the transport derives itself when a captured request is re-sent directly to the
+    /// origin. `Host` and `Content-Length` come from the URL and body (a copied `Host` would
+    /// otherwise survive a URL edit and hit the wrong virtual host), and the `Proxy-*` hop
+    /// headers only meant something between the client and Rockxy.
+    static func isTransportManagedHeader(_ name: String) -> Bool {
+        Self.transportManagedHeaders.contains(name.lowercased())
+    }
+
+    private static let transportManagedHeaders: Set<String> = [
+        "host",
+        "content-length",
+        "proxy-connection",
+        "proxy-authorization",
+    ]
 
     // MARK: Private
 
