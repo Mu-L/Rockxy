@@ -136,6 +136,11 @@ private struct HAREntry {
         }
 
         let headersSize = resp.headers.reduce(0) { $0 + $1.name.count + $1.value.count + 4 }
+        // HAR `content` carries the decoded body (`size` is the uncompressed length) while
+        // `bodySize` stays the wire length; without decoding, a gzip JSON response exported
+        // with an empty `text`.
+        let contentEncoding = resp.headers.first { $0.name.lowercased() == "content-encoding" }?.value
+        let decodedBody = resp.body.map { BodyDecoder.decode($0, encoding: contentEncoding) }
 
         return [
             "status": resp.statusCode,
@@ -143,7 +148,7 @@ private struct HAREntry {
             "httpVersion": "HTTP/1.1",
             "cookies": resp.setCookies.map { ["name": $0.name, "value": $0.value] },
             "headers": resp.headers.map { headerToDict($0) },
-            "content": contentDictionary(body: resp.body, contentType: resp.contentType),
+            "content": contentDictionary(body: decodedBody, contentType: resp.contentType),
             "redirectURL": redirectURL(from: resp),
             "headersSize": headersSize,
             "bodySize": resp.body?.count ?? -1

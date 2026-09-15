@@ -14,6 +14,9 @@ struct SensitiveDataRedactor {
 
     // MARK: Internal
 
+    /// Largest captured (wire) body decompressed so its text can be redacted.
+    static let maxDecodableBodyBytes = 10 * 1_024 * 1_024
+
     static let sensitiveHeaders: Set<String> = [
         "authorization",
         "proxy-authorization",
@@ -181,6 +184,16 @@ struct SensitiveDataRedactor {
         return didRedact ? (components.url ?? url) : url
     }
 
+    /// Decodes a bounded compressed response body so redaction can inspect its text.
+    private static func readableBody(of response: HTTPResponseData) -> (body: Data?, didDecode: Bool) {
+        guard let body = response.body, !body.isEmpty, body.count <= maxDecodableBodyBytes else {
+            return (response.body, false)
+        }
+        let contentEncoding = response.headers.first { $0.name.lowercased() == "content-encoding" }?.value
+        let decoded = BodyDecoder.decodeReportingChange(body, encoding: contentEncoding)
+        return decoded.didDecode ? (decoded.data, true) : (body, false)
+    }
+
     func redactBody(_ body: Data?, contentType: ContentType?) -> Data? {
         guard isEnabled, let body else {
             return body
@@ -221,11 +234,21 @@ struct SensitiveDataRedactor {
             contentType: transaction.request.contentType
         )
         let response = transaction.response.map { response in
-            HTTPResponseData(
+            // Redaction can only see into text, so a compressed body is decoded first and the
+            // headers that described the compressed representation are dropped to keep the
+            // published transaction coherent. Undecodable bodies pass through unchanged.
+            let readable = Self.readableBody(of: response)
+            let headers = readable.didDecode
+                ? response.headers.filter { header in
+                    let name = header.name.lowercased()
+                    return name != "content-encoding" && name != "content-length"
+                }
+                : response.headers
+            return HTTPResponseData(
                 statusCode: response.statusCode,
                 statusMessage: response.statusMessage,
-                headers: redactHeaders(response.headers),
-                body: redactBody(response.body, contentType: response.contentType),
+                headers: redactHeaders(headers),
+                body: redactBody(readable.body, contentType: response.contentType),
                 bodyTruncated: response.bodyTruncated,
                 contentType: response.contentType
             )

@@ -61,6 +61,36 @@ struct AITrafficDetectorTests {
         #expect(inspection.unavailableFields.contains("usage"))
     }
 
+    @Test("Compressed AI responses still expose model and usage")
+    func compressedResponseExposesUsage() throws {
+        let requestBody = Data(#"{"model":"claude-sonnet-fixture","messages":[{"role":"user","content":"fixture"}]}"#.utf8)
+        let plainResponse = Data(
+            #"{"type":"message","model":"claude-sonnet-fixture","content":[],"usage":{"input_tokens":12,"output_tokens":7}}"#
+                .utf8
+        )
+        let compressed = try (plainResponse as NSData).compressed(using: .zlib) as Data
+        let transaction = makeTransaction(
+            url: "https://api.anthropic.com/v1/messages",
+            requestHeaders: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "anthropic-version", value: "2023-06-01"),
+            ],
+            requestBody: requestBody,
+            responseHeaders: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            responseBody: compressed
+        )
+
+        let inspection = try #require(AITrafficDetector.detect(transaction: transaction))
+
+        #expect(inspection.provider == .anthropic)
+        #expect(inspection.model == "claude-sonnet-fixture")
+        #expect(inspection.usage != nil)
+        #expect(!inspection.unavailableFields.contains("usage"))
+    }
+
     @Test("Known AI app session is detected without visible body metadata")
     func nativeAISessionIsDetectedFromHostEvidence() throws {
         let transaction = TestFixtures.makeTransaction(

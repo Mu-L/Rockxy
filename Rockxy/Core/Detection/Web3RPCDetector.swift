@@ -24,7 +24,7 @@ enum Web3RPCDetector {
             return nil
         }
 
-        let responses = parseResponses(from: response?.body)
+        let responses = parseResponses(from: response?.decodedBody(limit: maxPayloadBytes))
         let primaryResponse = responseEntry(matching: primary.id, in: responses) ?? responses.first
         let batch = makeBatchSummary(requestRoot: requestRoot, requests: requests, web3Requests: web3Requests, responses: responses)
         let error = primaryResponse?.error ?? responses.compactMap(\.error).first

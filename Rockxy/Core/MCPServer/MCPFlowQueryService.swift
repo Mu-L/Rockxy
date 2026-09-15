@@ -297,7 +297,9 @@ struct MCPFlowQueryService {
             ]
 
             if let body = resp.body {
-                response["body_preview"] = bodyPreview(body, contentType: resp.contentType)
+                // Preview the decoded payload so a gzip JSON API reads as JSON; size stays the wire size.
+                let readable = resp.decodedBody(limit: MCPLimits.maxDecodedBodyBytes) ?? body
+                response["body_preview"] = bodyPreview(readable, contentType: resp.contentType)
                 response["body_size"] = .int(body.count)
             }
 

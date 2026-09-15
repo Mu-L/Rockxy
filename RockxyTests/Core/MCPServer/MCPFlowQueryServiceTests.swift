@@ -280,6 +280,41 @@ struct MCPFlowQueryServiceTests {
         #expect(bodyPreview.contains("stephen"))
     }
 
+    @Test("Get flow detail previews and redacts a compressed JSON body")
+    func getFlowDetailDecodesCompressedBody() async throws {
+        let provider = MockFlowProvider()
+        let transaction = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://api.example.com/session",
+            statusCode: 200
+        )
+        let plain = Data(#"{"user":"stephen","access_token":"secret-token"}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        transaction.response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed,
+            contentType: .json
+        )
+        provider.transactions = [transaction]
+
+        let service = makeService(provider: provider, redactionEnabled: true)
+        let result = await service.getFlowDetail(flowId: transaction.id)
+        let json = try decodeJSONObject(from: result)
+        let response = try #require(json["response"] as? [String: Any])
+        let bodyPreview = try #require(response["body_preview"] as? String)
+
+        // Readable and redacted, not "<binary data>"; the reported size stays the wire size.
+        #expect(bodyPreview.contains("stephen"))
+        #expect(bodyPreview.contains("[REDACTED]"))
+        #expect(!bodyPreview.contains("secret-token"))
+        #expect(response["body_size"] as? Int == compressed.count)
+    }
+
     @Test("Get flow detail falls back to SessionStore lookup")
     func getFlowDetailFallsBackToSessionStore() async throws {
         let directory = FileManager.default.temporaryDirectory

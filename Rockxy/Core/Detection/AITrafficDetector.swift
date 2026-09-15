@@ -553,7 +553,7 @@ struct AITrafficSnapshot: Sendable {
         requestBody = transaction.request.body
         responseStatusCode = transaction.response?.statusCode
         responseHeaders = transaction.response?.headers ?? []
-        responseBody = transaction.response?.body
+        responseBody = transaction.response?.decodedBody(limit: AITrafficDetector.maxBodyBytes)
         duration = transaction.timingInfo?.totalDuration ?? transaction.measuredDuration
     }
 

@@ -55,6 +55,35 @@ struct SensitiveDataRedactorTests {
 
     // MARK: - Form body
 
+    @Test("Transaction redaction decodes a compressed response so secrets inside it are redacted")
+    func transactionRedactionDecodesCompressedResponse() throws {
+        let redactor = SensitiveDataRedactor()
+        let plain = Data(#"{"user":"stephen","access_token":"secret-token"}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction(statusCode: 200)
+        transaction.response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+                HTTPHeader(name: "Content-Length", value: "\(compressed.count)"),
+            ],
+            body: compressed,
+            contentType: .json
+        )
+
+        let redacted = try #require(redactor.redactTransaction(transaction).response)
+        let body = try #require(redacted.body.flatMap { String(data: $0, encoding: .utf8) })
+
+        // Without decoding, the compressed bytes would have carried the secret through unredacted.
+        #expect(body.contains("stephen"))
+        #expect(!body.contains("secret-token"))
+        #expect(!redacted.headers.contains { $0.name.lowercased() == "content-encoding" })
+        #expect(!redacted.headers.contains { $0.name.lowercased() == "content-length" })
+        #expect(redacted.headers.contains { $0.name == "Content-Type" })
+    }
+
     @Test("Form body redacts a sensitive key and keeps an ordinary field")
     func formBodyRedaction() {
         let redactor = SensitiveDataRedactor()
