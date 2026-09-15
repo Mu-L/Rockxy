@@ -120,6 +120,22 @@ struct KeyboardShortcutTests {
         #expect(!commandBar.contains("bolt.circle"))
     }
 
+    @Test("Menu commands keep working while a tool window is key")
+    func menuCommandsFallBackToMainWorkspace() throws {
+        let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
+
+        // The focused-scene value is nil whenever Settings, Map Local, Compose, … is the key
+        // window. Every command must resolve through the coordinator-backed fallback instead
+        // of optional-chaining on the focused value and silently doing nothing.
+        #expect(!app.contains("actions?."))
+        #expect(app.contains(
+            "private var proxyActions: MainContentCommandActions { actions ?? MainContentCommandActions(coordinator: coordinator) }"
+        ))
+        #expect(app.contains("proxyActions.composeFreshRequest()"))
+        #expect(app.contains("proxyActions.openSession()"))
+        #expect(app.contains("proxyActions.clearSession()"))
+    }
+
     @Test("Session and row commands have one truthful owner")
     func sessionAndContextMenuOwnership() throws {
         let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
