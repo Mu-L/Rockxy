@@ -181,7 +181,36 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         completed = true
         if responseHead != nil {
             buildAndCompleteTransaction()
+        } else {
+            failClientBeforeResponse(reason: "Upstream closed the connection before responding")
         }
+    }
+
+    /// The upstream went away (TLS handshake rejected, connection reset, server closed early)
+    /// before a single response byte arrived. Without this the client would sit on an open
+    /// socket until its own timeout and the request would never appear in the list.
+    nonisolated private func failClientBeforeResponse(reason: String) {
+        upstreamLogger.warning("Upstream failed before responding for \(self.requestData.url): \(reason)")
+        if clientContext.channel.isActive {
+            var head = HTTPResponseHead(version: .http1_1, status: .badGateway)
+            head.headers.add(name: "Connection", value: "close")
+            head.headers.add(name: "Content-Length", value: "0")
+            clientContext.write(NIOAny(HTTPServerResponsePart.head(head)), promise: nil)
+            clientContext.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil))).whenComplete { [clientContext] _ in
+                clientContext.close(promise: nil)
+            }
+        }
+
+        let transaction = HTTPTransaction(
+            request: requestData,
+            response: HTTPResponseData(statusCode: 502, statusMessage: reason, headers: []),
+            state: .failed
+        )
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds &- startTime.uptimeNanoseconds
+        transaction.measuredDuration = Double(elapsedNanoseconds) / 1_000_000_000
+        transaction.sourcePort = sourcePort
+        transaction.clientApp = Self.extractAppFromUserAgent(requestData.headers)
+        onTransactionComplete(transaction)
     }
 
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -332,6 +361,9 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             completed = true
             relayResponseEnd()
             buildAndCompleteTransaction()
+        } else if !completed, !Self.isUncleanTLSShutdown(error) {
+            completed = true
+            failClientBeforeResponse(reason: Self.upstreamFailureReason(for: error))
         }
         if Self.isUncleanTLSShutdown(error) {
             upstreamLogger.debug(
@@ -341,6 +373,23 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             upstreamLogger.debug("Upstream closed: \(error.localizedDescription)")
         }
         context.close(promise: nil)
+    }
+
+    /// A short, user-facing reason for the failed row. Certificate problems are the case a
+    /// developer most needs to recognise, so they get a dedicated message.
+    nonisolated static func upstreamFailureReason(for error: Error) -> String {
+        if let sslError = error as? NIOSSLError {
+            switch sslError {
+            case .handshakeFailed:
+                return "Upstream TLS handshake failed (certificate rejected)"
+            default:
+                return "Upstream TLS error"
+            }
+        }
+        if error is NIOSSLExtraError {
+            return "Upstream TLS handshake failed (certificate rejected)"
+        }
+        return "Upstream connection failed before responding"
     }
 
     // MARK: Private
