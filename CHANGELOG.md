@@ -774,7 +774,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Redesign rule editor with Proxyman-style dropdowns and enlarged window
+- Redesign rule editor with native dropdowns and an enlarged window
 
 ### Fixed
 
@@ -1029,7 +1029,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - JSON tree view with collapsible nodes, syntax-colored values (strings, numbers, booleans, null), and disclosure triangles
 - Theme constants for table, JSON syntax, filter pills, status bar, and inspector styling
 - `clientApp` property on HTTPTransaction for tracking originating application
-- Proxyman-style app-centric sidebar with Favorites (Pinned, Saved), All (Apps grouped by client app with nested domains, Domains tree), and Analytics sections
+- App-centric sidebar with Favorites (Pinned, Saved), All (Apps grouped by client app with nested domains, Domains tree), and Analytics sections
 - Sidebar bottom bar with add and filter shortcut buttons
 - Toolbar status indicator showing proxy connection state (green dot + listening address) in center toolbar
 - Protocol filter bar with pill buttons for content types (HTTP, HTTPS, WebSocket, JSON, XML, JS, CSS, GraphQL, Document, Media, Other) and status codes (1xx-5xx)
@@ -1158,7 +1158,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix proxy blocking all internet traffic — add 5-second connection timeouts to all upstream `ClientBootstrap` calls, 30-second read timeout to `UpstreamResponseHandler`, and 120-second max connection lifetime to prevent hung connections from exhausting resources
 - Fix leaked connections on failed TLS handshakes — `PostHandshakeHandler.errorCaught` now closes the channel after recording the failed transaction (was leaving it open with `autoRead = false`, leaking one connection per cert-pinned host)
 - Fix lost HTTPS transactions when upstream server closes without TLS `close_notify` — complete and record the transaction from whatever response data was already received instead of silently dropping it
-- Fix failed TLS handshakes (cert pinning) invisible in UI — record as failed transactions so they appear in the request list like Proxyman
+- Fix failed TLS handshakes (cert pinning) invisible in UI — record as failed transactions so they appear in the request list
 - Fix noisy `uncleanShutdown` errors flooding console — handle as normal TLS connection close, downgrade upstream close log from error to debug
 - Fix HTTPS interception "EOF during handshake" on all connections — change root CA trust from `.user` to `.admin` domain so Safari, Chrome, and system services honor the trust setting; include root CA in server certificate chain for macOS TLS compatibility; replay buffered TLS data after async pipeline reconfiguration to prevent ClientHello loss; add SecTrust chain validation diagnostic at proxy startup
 - Fix CONNECT tunnel TLS handshake failure (`WRONG_VERSION_NUMBER`) — replace broken `channel.pipeline.fireChannelRead` replay with forward-based `ProtocolDetectorHandler` that sits before NIOSSLServerHandler and forwards TLS data naturally via `context.fireChannelRead`
@@ -1186,7 +1186,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix both windows showing simultaneously on first launch — consolidate welcome window management in MainWindowContent only
 - Detect VPN/tunnel primary interface (utun, ppp) and show warning banner that traffic may not be captured
 - Fix HTTPS traffic not captured — remove HTTP codecs from NIO pipeline before CONNECT tunnel transition to TLS; without this, TLS ClientHello bytes were misinterpreted as HTTP
-- Fix empty SSL Proxying List blocking all HTTPS interception — default to intercept-all when no rules configured, matching Proxyman behavior
+- Fix empty SSL Proxying List blocking all HTTPS interception — default to intercept-all when no rules are configured
 - Fix helper tool always showing "notInstalled" — check SMAppService status at app startup so `SystemProxyManager` reads accurate helper state
 - Fix welcome screen showing on every launch — load root CA certificate into memory before checking trust status on startup
 - Fix traffic not displaying — await session manager setup before proxy server starts accepting connections, preventing race condition where `onBatchReady` callback was nil
@@ -1240,7 +1240,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - NSTableView cell reuse for status dot and client cells — eliminates per-row view allocation during scrolling
 - TLS failure transactions hidden from traffic list by default — reduces noise from cert-pinned hosts
 - Helper tool auto-updates on version mismatch — `HelperManager.checkStatus()` detects outdated helper and triggers uninstall/reinstall cycle automatically instead of requiring manual update
-- System proxy now configures all enabled network services instead of a single detected service, matching Charles/Proxyman behavior
+- System proxy now configures all enabled network services instead of a single detected service
 - Detect primary network interface via routing table (`route -n get 0.0.0.0`) for accurate diagnostics
 - Add TCP connection logging to proxy server NIO pipeline for connection-level diagnostics
 - Upgrade helper tool status logging from debug to info level for Xcode console visibility
@@ -1257,19 +1257,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - ContentView initializes favorites and auto-starts proxy on launch when configured
 - Sidebar section headers now use colored text (amber for Favorites, gray for All/Analytics) with increased header prominence
 - App icons in sidebar replaced with colored gradient rounded squares showing the app's first letter
-- Sidebar SF Symbol icons updated to filled variants matching Proxyman (pin.fill, tray.full.fill, square.stack.3d.up.fill, exclamationmark.triangle.fill)
+- Sidebar SF Symbol icons updated to filled variants (pin.fill, tray.full.fill, square.stack.3d.up.fill, exclamationmark.triangle.fill)
 - Added Theme.Sidebar color definitions for section headers and app icon gradients
 - Incremental `NSTableView` updates — use `insertRows(at:)` for append-only batches instead of full `reloadData()`, eliminating UI jank on high-traffic sessions
 - O(1) domain tree lookup — dictionary-backed index replaces O(n) `firstIndex(where:)` scan per transaction
 - Cached sidebar `appNodes` — incrementally updated in `processBatch()` instead of recomputing from all transactions on every render
 - Move GraphQL detection to `TrafficSessionManager` actor — runs on background thread instead of blocking main thread during batch processing
 - Time-throttled auto-analytics — max once per 2 seconds instead of every 100 transactions
-- Proxy server now runs independently of system proxy — matches Proxyman behavior where system proxy is best-effort
+- Proxy server now runs independently of system proxy; system proxy configuration is best-effort
 - Proxy toolbar pill shows orange when system proxy is not configured
 - `stopProxy()` now guards against re-entry to prevent race conditions with double cleanup
 - Helper tool ConnectionValidator now compares code signing certificate chains instead of relying on build-time team ID injection — self-referencing, zero-configuration, immune to Info.plist tampering
 - Redesigned app layout from 3-column NavigationSplitView to 2-column with VSplitView center (table + inspector)
-- Redesigned inspector panel with Proxyman-style HSplitView layout: URL bar on top, request tabs (left) and response tabs (right)
+- Redesigned inspector panel with an HSplitView layout: URL bar on top, request tabs (left) and response tabs (right)
 - Split inspector into dedicated request/response views with independent tab bars
 - Added new inspector sub-views: QueryInspectorView, SetCookieInspectorView, AuthInspectorView, SynopsisInspectorView
 - Filtering engine now supports protocol and status code filters
