@@ -506,6 +506,10 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         }
         bufferedByteCount += buffer.readableBytes
         bufferedData.append(buffer)
+        if let decision = pendingTunnelSniff {
+            pendingTunnelSniff = nil
+            decision()
+        }
     }
 
     nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {
@@ -542,6 +546,10 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     private let breakpointBridgeTracker: BreakpointBridgeTracker?
     private var bufferedData: [ByteBuffer] = []
     private var bufferedByteCount = 0, tunnelOutcomeRecorded = false
+    /// Runs once the client's first tunnel bytes arrive (or the sniff timer fires) so a
+    /// plain-HTTP tunnel can be relayed even when TLS interception is unavailable.
+    private var pendingTunnelSniff: (() -> Void)?
+    private var tunnelSniffTimeout: Scheduled<Void>?
     private let tunnelStartedAt = DispatchTime.now()
 
     /// Asynchronously fetches a per-host cert then rewires the pipeline on the event loop.
@@ -742,7 +750,131 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     /// When `trackingReason` is non-nil the resulting live tunnel is registered with the
     /// `LiveTunnelRegistry` so a later SSL-policy change that makes this host eligible for
     /// interception can close it (forcing a fresh, intercepted CONNECT).
+    /// Raw tunnels chosen because nothing asked for decryption (no rule, no trusted CA, or a
+    /// remembered TLS rejection) still carry plain HTTP often enough — `ws://` upgrades sent
+    /// through CONNECT most of all — that it is worth reading the first bytes before wiring a
+    /// blind relay. Bypass-list and fail-closed application tunnels stay untouched.
+    nonisolated static func sniffsForPlainHTTP(_ reason: RawTunnelReason?) -> Bool {
+        switch reason {
+        case .noSSLProxyingRule, .autoPassthrough:
+            true
+        case .bypassProxyList, .unresolvedApplicationIdentity, nil:
+            false
+        }
+    }
+
+    /// How long a silent client is given before the tunnel goes raw anyway; protocols where the
+    /// server speaks first (SMTP, MySQL) must not hang behind the sniff.
+    static let tunnelSniffTimeout: TimeAmount = .milliseconds(300)
+
     nonisolated private func setupRawTunnel(
+        context: ChannelHandlerContext,
+        host: String,
+        port: Int,
+        trackingReason: RawTunnelReason? = nil,
+        decisionGeneration: UInt64 = 0
+    ) {
+        guard Self.sniffsForPlainHTTP(trackingReason), pendingTunnelSniff == nil, tunnelSniffTimeout == nil else {
+            connectRawTunnel(
+                context: context,
+                host: host,
+                port: port,
+                trackingReason: trackingReason,
+                decisionGeneration: decisionGeneration
+            )
+            return
+        }
+
+        let decide: () -> Void = { [weak self] in
+            guard let self else {
+                return
+            }
+            self.tunnelSniffTimeout?.cancel()
+            self.tunnelSniffTimeout = nil
+            self.pendingTunnelSniff = nil
+            if let first = self.bufferedData.first,
+               ProtocolDetectorHandler.looksLikePlainHTTPRequest(first)
+            {
+                tlsLogger.info("Plain HTTP inside CONNECT tunnel for \(host); relaying as http:// instead of a raw tunnel")
+                self.installPlainHTTPRelay(context: context)
+            } else {
+                self.connectRawTunnel(
+                    context: context,
+                    host: host,
+                    port: port,
+                    trackingReason: trackingReason,
+                    decisionGeneration: decisionGeneration
+                )
+            }
+        }
+
+        if !bufferedData.isEmpty {
+            decide()
+            return
+        }
+        pendingTunnelSniff = decide
+        tunnelSniffTimeout = context.eventLoop.scheduleTask(in: Self.tunnelSniffTimeout) { [weak self] in
+            guard let self, let decision = self.pendingTunnelSniff else {
+                return
+            }
+            self.pendingTunnelSniff = nil
+            decision()
+        }
+        // The CONNECT path pauses reads before handing over; resume them so the client's first
+        // bytes can reach `channelRead` and settle the decision.
+        context.channel.setOption(ChannelOptions.autoRead, value: true).whenFailure { [weak self] error in
+            tlsLogger.warning("Could not resume reads for tunnel sniffing on \(host): \(error.localizedDescription)")
+            guard let self, let decision = self.pendingTunnelSniff else {
+                return
+            }
+            self.pendingTunnelSniff = nil
+            decision()
+        }
+    }
+
+    /// Swaps this handler for the HTTP server codecs and a plain-scheme relay, replaying the
+    /// buffered bytes so the first request is parsed like any proxied http:// request.
+    nonisolated private func installPlainHTTPRelay(context: ChannelHandlerContext) {
+        let relay = HTTPSProxyRelayHandler(
+            host: host,
+            port: port,
+            scheme: "http",
+            ruleEngine: ruleEngine,
+            scriptPluginManager: scriptPluginManager,
+            connectionLimiter: connectionLimiter,
+            customCertificateManager: customCertificateManager,
+            upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
+            upstreamTrustProvider: upstreamTrustProvider,
+            captureContextProvider: captureContextProvider,
+            clientSourcePort: clientSourcePort,
+            onTransactionComplete: onTransactionComplete,
+            onBreakpointHit: onBreakpointHit,
+            breakpointBridgeTracker: breakpointBridgeTracker
+        )
+        let pipeline = context.pipeline
+        let replay = bufferedData
+        bufferedData.removeAll(keepingCapacity: false)
+        bufferedByteCount = 0
+
+        pipeline.configureHTTPServerPipeline().flatMap {
+            pipeline.addHandler(relay)
+        }.whenComplete { result in
+            switch result {
+            case .success:
+                self.recordSuccessfulTunnel()
+                for buffer in replay {
+                    context.fireChannelRead(NIOAny(buffer))
+                }
+                pipeline.removeHandler(context: context, promise: nil)
+            case let .failure(error):
+                tlsLogger.error("Plain HTTP relay setup failed for \(self.host): \(error.localizedDescription)")
+                self.recordTunnelFailure(statusCode: 500, statusMessage: "Tunnel Relay Setup Failed")
+                context.close(promise: nil)
+            }
+        }
+    }
+
+    nonisolated private func connectRawTunnel(
         context: ChannelHandlerContext,
         host: String,
         port: Int,

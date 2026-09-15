@@ -58,6 +58,40 @@ struct HTTPSInterceptionLoopbackTests {
         }
     }
 
+    @Test("Plain HTTP inside a CONNECT tunnel is still captured when nothing is set to decrypt")
+    func plainHTTPInsideTunnelIsCapturedWithoutInterception() async throws {
+        try await HTTPSLoopbackHarness.run(acceptUntrustedUpstream: false, interceptTLS: false) { harness in
+            let response = try await harness.getPlainThroughTunnel("/tunneled/no-rule")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(HTTPSLoopbackHarness.originMarkerHeader) == "plain-origin")
+
+            try await Task.sleep(for: .milliseconds(300))
+            let captured = await harness.capturedTransactions()
+            let relayed = captured.first { $0.request.url.path == "/tunneled/no-rule" }
+            #expect(relayed?.request.url.scheme == "http")
+            #expect(relayed?.response?.statusCode == 200)
+            #expect(relayed?.sslCapture != .intercepted)
+        }
+    }
+
+    @Test("TLS inside a non-decrypted CONNECT tunnel still passes through untouched")
+    func tlsInsideTunnelStaysRawWithoutInterception() async throws {
+        try await HTTPSLoopbackHarness.run(acceptUntrustedUpstream: false, interceptTLS: false) { harness in
+            // The client trusts the test root and the origin's leaf is signed by it, so an
+            // untouched end-to-end TLS session succeeds; a MITM attempt would not.
+            let response = try await harness.get("/raw/items")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(HTTPSLoopbackHarness.originMarkerHeader) == "tls-origin")
+
+            try await Task.sleep(for: .milliseconds(300))
+            let captured = await harness.capturedTransactions()
+            #expect(!captured.contains { $0.request.url.path == "/raw/items" })
+            #expect(captured.contains { $0.request.method == "CONNECT" && $0.sslCapture == .tunneled })
+        }
+    }
+
     @Test("Strict upstream validation answers 502 quickly and records the rejected handshake")
     func strictUpstreamTrustRejectsPrivateCAOrigin() async throws {
         try await HTTPSLoopbackHarness.run(acceptUntrustedUpstream: false) { harness in
@@ -110,11 +144,12 @@ private actor HTTPSLoopbackHarness {
 
     static func run(
         acceptUntrustedUpstream: Bool,
+        interceptTLS: Bool = true,
         _ body: (HTTPSLoopbackHarness) async throws -> Void
     )
         async throws
     {
-        let harness = try await start(acceptUntrustedUpstream: acceptUntrustedUpstream)
+        let harness = try await start(acceptUntrustedUpstream: acceptUntrustedUpstream, interceptTLS: interceptTLS)
         do {
             try await body(harness)
         } catch {
@@ -169,7 +204,7 @@ private actor HTTPSLoopbackHarness {
     private let recorder: TransactionRecorder
     private let cleanup: @Sendable () -> Void
 
-    private static func start(acceptUntrustedUpstream: Bool) async throws -> HTTPSLoopbackHarness {
+    private static func start(acceptUntrustedUpstream: Bool, interceptTLS: Bool) async throws -> HTTPSLoopbackHarness {
         let overrides = try await installSharedTestOverrides()
         let manager = CertificateManager.shared
         try await manager.generateRootCA()
@@ -207,7 +242,9 @@ private actor HTTPSLoopbackHarness {
                     .appendingPathComponent("rockxy-https-loopback-passthrough-\(UUID().uuidString).json")
             )
             manager.setEnabled(true)
-            manager.addRule(SSLProxyingRule(domain: "*", listType: .include))
+            if interceptTLS {
+                manager.addRule(SSLProxyingRule(domain: "*", listType: .include))
+            }
             manager.forceGlobalPassthrough = false
             return manager
         }
