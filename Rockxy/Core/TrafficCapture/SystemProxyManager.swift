@@ -574,7 +574,7 @@ final class SystemProxyManager: @unchecked Sendable {
         // Without an installed helper there is no XPC service to answer, and the status probe
         // would only return after its 10 s timeout — which is what made quitting and readiness
         // checks stall on machines that never installed the helper.
-        if await HelperManager.shared.status != .notInstalled,
+        if await Self.shouldProbeHelperForOverride(helperStatus: HelperManager.shared.status),
            let helperStatus = try? await HelperConnection.shared.getProxyStatus(),
            helperStatus.isOverridden,
            effectiveSystemProxyMatchesRockxy(port: helperStatus.port)
@@ -587,6 +587,12 @@ final class SystemProxyManager: @unchecked Sendable {
         }
 
         return .none
+    }
+
+    /// Only an installed helper can hold a proxy override worth restoring; without one the XPC
+    /// status probe can only time out.
+    nonisolated static func shouldProbeHelperForOverride(helperStatus: HelperManager.HelperStatus) -> Bool {
+        helperStatus != .notInstalled
     }
 
     /// Checks the routed service when it can be identified. If route-to-service mapping is

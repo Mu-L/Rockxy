@@ -68,25 +68,14 @@ struct SystemProxyManagerTests {
 
     // MARK: - State Management
 
-    @Test("ownership detection does not wait on helper XPC when no helper is installed")
-    func ownershipDetectionSkipsMissingHelper() async {
-        let helperStatus = await HelperManager.shared.status
-        guard helperStatus == .notInstalled else {
-            return
-        }
-
-        let started = Date()
-        let owner = await SystemProxyManager.shared.effectiveOverrideOwner()
-        let elapsed = Date().timeIntervalSince(started)
-
-        if case .none = owner {
-            #expect(true)
-        } else {
-            Issue.record("Expected no override owner in the test host, got \(String(describing: owner))")
-        }
-        // The XPC status probe has a 10 s timeout; without a helper it must not be attempted. The
-        // bound leaves headroom for a loaded machine while still catching the timeout path.
-        #expect(elapsed < 9, "effectiveOverrideOwner took \(elapsed)s")
+    @Test("ownership detection only probes helper XPC when a helper is installed")
+    func ownershipDetectionSkipsMissingHelper() {
+        // Without a helper the XPC status probe can only wait for its 10 s timeout, which is
+        // what used to stall quitting and readiness checks on machines that never installed it.
+        #expect(!SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .notInstalled))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedCompatible))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .requiresApproval))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedOutdated))
     }
 
     @Test("routing readiness requires every fallback service to match")
