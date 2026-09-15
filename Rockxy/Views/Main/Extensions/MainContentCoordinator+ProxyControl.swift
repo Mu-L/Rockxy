@@ -369,6 +369,26 @@ extension MainContentCoordinator {
         }
     }
 
+    /// Stops the listener and starts it again with the saved listener settings, so a port or
+    /// listen-address change takes effect without hunting for Stop/Start in the Tools menu.
+    func restartProxy() {
+        guard isProxyRunning, !isProxyStopping, !isProxyStarting else {
+            return
+        }
+        stopProxy()
+        Task { @MainActor in
+            let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+            while isProxyStopping || isProxyRunning {
+                guard ContinuousClock.now < deadline else {
+                    Self.logger.error("Restart aborted: the proxy did not stop in time")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            startProxy()
+        }
+    }
+
     func stopProxy() {
         guard isProxyRunning, !isProxyStopping else {
             return

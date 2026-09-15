@@ -40252,6 +40252,26 @@
           }
         }
       }
+    },
+    "Restart Proxy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新启动代理"
+          }
+        }
+      }
+    },
+    "Restart proxy with saved listener settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用已保存的监听设置重新启动代理"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

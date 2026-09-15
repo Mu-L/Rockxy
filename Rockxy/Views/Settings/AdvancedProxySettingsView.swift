@@ -529,6 +529,13 @@ struct AdvancedProxySettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
+
+            Button(String(localized: "Restart Proxy", bundle: RockxyLocalization.bundle)) {
+                coordinator.restartProxy()
+            }
+            .controlSize(.small)
+            .disabled(coordinator.isProxyStopping || coordinator.isProxyStarting)
+            .accessibilityLabel(String(localized: "Restart proxy with saved listener settings", bundle: RockxyLocalization.bundle))
         }
     }
 
