@@ -642,6 +642,31 @@ struct RuleActionTests {
         #expect(headers.contains { $0.name == "X-Debug" && $0.value == "true" })
     }
 
+    @Test("HeaderMutator skips operations that could not be encoded on the wire")
+    func unencodableOperationsAreSkipped() {
+        var responseHeaders = HTTPHeaders([("Content-Type", "text/html")])
+        var requestHeaders = [HTTPHeader(name: "Accept", value: "*/*")]
+        let ops = [
+            HeaderOperation(type: .add, headerName: "X-Injected", headerValue: "ok\r\nX-Evil: 1", phase: .both),
+            HeaderOperation(type: .add, headerName: "Bad Name", headerValue: "1", phase: .both),
+            HeaderOperation(type: .replace, headerName: "X-Ok", headerValue: "fine", phase: .both),
+            HeaderOperation(type: .remove, headerName: "Content-Type", headerValue: nil, phase: .both),
+        ]
+
+        HeaderMutator.apply(ops, to: &responseHeaders)
+        HeaderMutator.apply(ops, to: &requestHeaders)
+
+        // A CRLF value or a non-token name would make NIO abort the response with an empty
+        // reply; the valid operations in the same rule still apply.
+        #expect(responseHeaders["X-Injected"].isEmpty)
+        #expect(responseHeaders["Bad Name"].isEmpty)
+        #expect(responseHeaders["X-Ok"] == ["fine"])
+        #expect(responseHeaders["Content-Type"].isEmpty)
+        #expect(!requestHeaders.contains { $0.name == "X-Injected" || $0.name == "Bad Name" })
+        #expect(requestHeaders.contains { $0.name == "X-Ok" && $0.value == "fine" })
+        #expect(requestHeaders.contains { $0.name == "Accept" })
+    }
+
     @Test("HeaderMutator Set operation replaces duplicate request header values")
     func setOperationReplacesDuplicateRequestHeaderValues() {
         var headers = [

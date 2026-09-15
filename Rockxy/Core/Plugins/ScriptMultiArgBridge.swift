@@ -137,7 +137,7 @@ enum ScriptMultiArgBridge {
         // Detect (and warn on) attempted host/port/scheme mutations.
         warnIfHostMutated(source: source, original: original, pluginID: pluginID)
 
-        let newHeaders = headersDict.map { HTTPHeader(name: $0.key, value: $0.value) }
+        let newHeaders = ScriptHeaderDictionary.wireSafeHeaders(from: headersDict)
         return HTTPRequestData(
             method: method,
             url: newURL,
@@ -219,7 +219,7 @@ enum ScriptMultiArgBridge {
             fromJavaScript: exposedHeaders,
             original: ScriptHeaderDictionary.storage(from: projection.headers)
         )
-        let newHeaders = headersDict.map { HTTPHeader(name: $0.key, value: $0.value) }
+        let newHeaders = ScriptHeaderDictionary.wireSafeHeaders(from: headersDict)
 
         let newBody: Data? = resolveResponseBody(source: source, fallbackBody: projection.body, pluginID: pluginID)
 

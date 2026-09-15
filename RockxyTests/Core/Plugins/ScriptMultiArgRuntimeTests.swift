@@ -259,6 +259,34 @@ struct ScriptMultiArgRuntimeTests {
         #expect(!mutated.headers.contains { $0.name.lowercased() == "content-encoding" })
     }
 
+    @Test("Script headers that cannot be encoded are dropped instead of aborting the relay")
+    func unencodableScriptHeadersAreDropped() async throws {
+        let runtime = ScriptRuntime()
+        let script = """
+        function onResponse(context, url, request, response) {
+          response.headers["X-Injected"] = "ok\\r\\nX-Evil: 1";
+          response.headers["Bad Name"] = "1";
+          response.headers["X-Ok"] = "fine";
+          return response;
+        }
+        """
+        let plugin = try makeTempPlugin(id: "test.multiarg.header-safety", script: script)
+        try await runtime.loadPlugin(plugin)
+
+        let req = makeRequest()
+        let resp = makeResponse()
+        let mutated = try await runtime.callOnResponse(
+            pluginID: plugin.id,
+            context: ScriptResponseContext(request: req, response: resp),
+            originalRequest: req,
+            originalResponse: resp
+        )
+
+        #expect(!mutated.headers.contains { $0.name == "X-Injected" || $0.name == "Bad Name" })
+        #expect(mutated.headers.contains { $0.name == "X-Ok" && $0.value == "fine" })
+        #expect(mutated.headers.contains { $0.name == "Content-Type" })
+    }
+
     // MARK: bodyFilePath
 
     @Test("bodyFilePath loads a file under ~ and uses it as the response body")

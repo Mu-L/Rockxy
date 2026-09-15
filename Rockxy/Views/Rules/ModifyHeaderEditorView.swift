@@ -54,6 +54,20 @@ final class EditableHeaderOperation: Identifiable {
                 bundle: RockxyLocalization.bundle
             )
         }
+        // Mirror the runtime contract: a header that cannot be encoded would otherwise be
+        // saved and then silently skipped (or, before that guard, close the connection).
+        if !BreakpointRequestData.isValidHTTPHeaderName(headerName) {
+            return String(
+                localized: "Header Name may only use letters, digits, and !#$%&'*+-.^_`|~ (no spaces)",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        if type != .remove, !BreakpointRequestData.isValidHTTPHeaderValue(headerValue) {
+            return String(
+                localized: "Header Value cannot contain line breaks or control characters",
+                bundle: RockxyLocalization.bundle
+            )
+        }
         return nil
     }
 

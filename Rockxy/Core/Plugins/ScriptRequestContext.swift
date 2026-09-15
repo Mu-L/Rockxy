@@ -199,7 +199,7 @@ struct ScriptRequestContext {
         } else {
             request.body
         }
-        let newHeaders = headers.map { HTTPHeader(name: $0.key, value: $0.value) }
+        let newHeaders = ScriptHeaderDictionary.wireSafeHeaders(from: headers)
 
         request = HTTPRequestData(
             method: method,

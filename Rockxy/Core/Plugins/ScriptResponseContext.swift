@@ -189,7 +189,7 @@ struct ScriptResponseContext {
     /// Preserves `statusMessage` and `contentType` from the original when the script did
     /// not supply them.
     func apply(to response: inout HTTPResponseData) {
-        let newHeaders = responseHeaders.map { HTTPHeader(name: $0.key, value: $0.value) }
+        let newHeaders = ScriptHeaderDictionary.wireSafeHeaders(from: responseHeaders)
         let newBody: Data? = if let body {
             if bodyIsUTF8 {
                 body.data(using: .utf8)
