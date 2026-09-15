@@ -141,10 +141,22 @@ enum RequestCopyFormatter {
             raw += "\(header.name): \(header.value)\r\n"
         }
         raw += "\r\n"
-        if let body = response.body, let bodyString = String(data: body, encoding: .utf8) {
+        if let bodyString = readableResponseBody(response) {
             raw += bodyString
         }
         return raw
+    }
+
+    /// The response body as text, decoded through `Content-Encoding` the same way the
+    /// inspector's raw view does. Without this a gzip/br/deflate response copies with its
+    /// headers but a silently empty body. Headers are left as captured to match the
+    /// inspector convention; only the bytes are made readable.
+    static func readableResponseBody(_ response: HTTPResponseData) -> String? {
+        guard let body = response.body else {
+            return nil
+        }
+        let contentEncoding = response.headers.first { $0.name.lowercased() == "content-encoding" }?.value
+        return String(data: BodyDecoder.decode(body, encoding: contentEncoding), encoding: .utf8)
     }
 
     // MARK: - JSON
@@ -164,7 +176,7 @@ enum RequestCopyFormatter {
                 "statusCode": response.statusCode,
                 "headers": response.headers.map { ["name": $0.name, "value": $0.value] },
             ]
-            if let body = response.body, let bodyString = String(data: body, encoding: .utf8) {
+            if let bodyString = readableResponseBody(response) {
                 respDict["body"] = bodyString
             }
             dict["response"] = respDict

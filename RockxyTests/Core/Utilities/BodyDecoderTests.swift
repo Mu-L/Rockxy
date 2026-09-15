@@ -18,6 +18,33 @@ struct BodyDecoderTests {
         #expect(result == original)
     }
 
+    @Test("Change-reporting decode flags only real decompression")
+    func decodeReportingChangeFlagsRealDecompression() throws {
+        let original = "Reporting whether bytes changed lets callers drop Content-Encoding safely."
+        let originalData = try #require(original.data(using: .utf8))
+        let compressed = try #require(deflateCompress(originalData))
+
+        let decoded = BodyDecoder.decodeReportingChange(compressed, encoding: "deflate")
+        #expect(decoded.didDecode)
+        #expect(decoded.data == originalData)
+
+        let untouched = BodyDecoder.decodeReportingChange(originalData, encoding: "unknown-encoding")
+        #expect(!untouched.didDecode)
+        #expect(untouched.data == originalData)
+
+        let missing = BodyDecoder.decodeReportingChange(originalData, encoding: nil)
+        #expect(!missing.didDecode)
+
+        let invalid = BodyDecoder.decodeReportingChange(Data([0x01, 0x02, 0x03]), encoding: "gzip")
+        #expect(!invalid.didDecode)
+        #expect(invalid.data == Data([0x01, 0x02, 0x03]))
+
+        // A chain with an unknown stage is not fully decoded, even though the known stage applied.
+        let partial = BodyDecoder.decodeReportingChange(compressed, encoding: "unknown-encoding, deflate")
+        #expect(!partial.didDecode)
+        #expect(partial.data == originalData)
+    }
+
     @Test("Unknown encoding returns original data")
     func unknownEncodingPassthrough() {
         let original = "Test data".data(using: .utf8)!

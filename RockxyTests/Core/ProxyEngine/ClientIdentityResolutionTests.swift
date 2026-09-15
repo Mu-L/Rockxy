@@ -586,6 +586,34 @@ struct ClientIdentityResolutionTests {
         #expect(preset.clientApp == "Existing")
     }
 
+    @Test("stamping callback falls back to the User-Agent label when identity is unresolved")
+    func stampingCallbackUserAgentFallback() {
+        // Locally served responses (Map Local, block) never pass through the upstream relay,
+        // so the shared callback must derive the same client label from the User-Agent.
+        let request = HTTPRequestData(
+            method: "GET",
+            url: URL(string: "http://api.example.com/users")!,
+            httpVersion: "1.1",
+            headers: [HTTPHeader(name: "User-Agent", value: "curl/8.7.1")]
+        )
+        let transaction = HTTPTransaction(request: request, state: .completed)
+        ProxyServer.makeIdentityStampingCallback(handle: nil, downstream: { _ in })(transaction)
+        #expect(transaction.clientApp == "curl")
+
+        // Without a usable User-Agent the label stays nil for port-map enrichment.
+        let anonymous = HTTPTransaction(
+            request: HTTPRequestData(
+                method: "GET",
+                url: URL(string: "http://api.example.com/")!,
+                httpVersion: "1.1",
+                headers: []
+            ),
+            state: .completed
+        )
+        ProxyServer.makeIdentityStampingCallback(handle: nil, downstream: { _ in })(anonymous)
+        #expect(anonymous.clientApp == nil)
+    }
+
     // MARK: Private
 
     private static let matchingRecord = ProxyConnectionRecord(

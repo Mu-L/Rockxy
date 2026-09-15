@@ -357,24 +357,27 @@ actor ProxyServer {
     /// Wraps a transaction callback so every emitted transaction — raw CONNECT, TLS failure,
     /// intercepted HTTP, WebSocket — inherits the connection's resolved application identity
     /// and a matching `clientApp` label. Stamping is a non-blocking read of the retained
-    /// identity; when unresolved, `clientApp` is left for downstream port-map enrichment.
+    /// identity. When it is unresolved, the request's `User-Agent` supplies the same label
+    /// the upstream relay derives, so a locally served response (Map Local, block, breakpoint
+    /// abort) is attributed to the same client as the rest of its traffic instead of showing
+    /// up as an unknown app; anything still unresolved is left for port-map enrichment.
     static func makeIdentityStampingCallback(
         handle: ClientIdentityHandle?,
         downstream: @escaping @Sendable (HTTPTransaction) -> Void
     )
         -> @Sendable (HTTPTransaction) -> Void
     {
-        guard let handle else {
-            return downstream
-        }
-        return { transaction in
-            if let identity = handle.currentIdentity {
+        { transaction in
+            if let identity = handle?.currentIdentity {
                 if transaction.clientApplicationIdentity == nil {
                     transaction.clientApplicationIdentity = identity
                 }
                 if transaction.clientApp == nil {
                     transaction.clientApp = identity.displayName
                 }
+            }
+            if transaction.clientApp == nil {
+                transaction.clientApp = UpstreamResponseHandler.extractAppFromUserAgent(transaction.request.headers)
             }
             downstream(transaction)
         }

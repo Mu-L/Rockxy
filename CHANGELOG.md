@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Made Map Local quick-create, response breakpoints, and Copy as Raw/JSON decode gzip, deflate, and Brotli response bodies so compressed JSON is editable and copyable text instead of an opaque binary payload, with the compressed-only headers dropped from the edited response.
+- Attributed locally served responses (Map Local, block, breakpoint abort) to the same client app as forwarded traffic instead of showing them under Unknown.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

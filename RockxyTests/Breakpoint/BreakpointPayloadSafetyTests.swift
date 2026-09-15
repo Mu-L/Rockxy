@@ -24,6 +24,50 @@ struct BreakpointPayloadSafetyTests {
         #expect(!projection.isEditable)
     }
 
+    @Test("Compressed response bodies are decoded into editable text with coherent headers")
+    func compressedResponseProjectionDecodes() throws {
+        let plain = Data(#"{"users":[{"id":1,"name":"Ada"}]}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let headers = [
+            EditableHeader(name: "Content-Type", value: "application/json"),
+            EditableHeader(name: "Content-Encoding", value: "deflate"),
+            EditableHeader(name: "Content-Length", value: "\(compressed.count)"),
+            EditableHeader(name: "Vary", value: "Accept-Encoding"),
+        ]
+
+        let projection = BreakpointRequestData.editableResponseProjection(body: compressed, headers: headers)
+
+        #expect(projection.isEditable)
+        #expect(projection.text == String(decoding: plain, as: UTF8.self))
+        // The editable headers must describe the plain body the editor shows.
+        #expect(projection.headers.map(\.name) == ["Content-Type", "Vary"])
+    }
+
+    @Test("Undecodable compressed bodies stay protected with their original headers")
+    func undecodableResponseProjectionStaysProtected() {
+        let garbage = Data([0xFF, 0xFE, 0xFD, 0x00, 0x01])
+        let headers = [
+            EditableHeader(name: "Content-Type", value: "application/octet-stream"),
+            EditableHeader(name: "Content-Encoding", value: "gzip"),
+        ]
+
+        let projection = BreakpointRequestData.editableResponseProjection(body: garbage, headers: headers)
+
+        #expect(!projection.isEditable)
+        #expect(projection.text.isEmpty)
+        #expect(projection.headers.map(\.name) == ["Content-Type", "Content-Encoding"])
+    }
+
+    @Test("Plain response bodies pass through the response projection unchanged")
+    func plainResponseProjectionPassesThrough() {
+        let headers = [EditableHeader(name: "Content-Length", value: "5")]
+        let projection = BreakpointRequestData.editableResponseProjection(body: Data("hello".utf8), headers: headers)
+
+        #expect(projection.isEditable)
+        #expect(projection.text == "hello")
+        #expect(projection.headers.map(\.name) == ["Content-Length"])
+    }
+
     @Test("Execute remains available for header edits on a protected body")
     @MainActor
     func protectedBodyCanExecute() async throws {

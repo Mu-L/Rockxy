@@ -590,16 +590,21 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         } else {
             nil
         }
-        let bodyProjection = BreakpointRequestData.editableBodyProjection(from: bodyData)
+        // Compressed origin bodies are decoded for the editor; the editable headers then
+        // describe the plain body so an executed edit is relayed with consistent framing.
+        let projection = BreakpointRequestData.editableResponseProjection(
+            body: bodyData,
+            headers: responseHeaders
+        )
 
         let breakpointData = BreakpointRequestData(
             method: requestData.method,
             url: requestData.url.absoluteString,
-            headers: responseHeaders,
-            body: bodyProjection.text,
+            headers: projection.headers,
+            body: projection.text,
             statusCode: Int(head.status.code),
             phase: .response,
-            isBodyEditable: bodyProjection.isEditable,
+            isBodyEditable: projection.isEditable,
             matchedRuleName: breakpointRuleName
         )
 
