@@ -38,6 +38,26 @@ struct HTTPSInterceptionLoopbackTests {
         }
     }
 
+    @Test("Plain HTTP sent through a CONNECT tunnel is relayed and captured as http://")
+    func plainHTTPInsideConnectTunnelIsCaptured() async throws {
+        try await HTTPSLoopbackHarness.run(acceptUntrustedUpstream: true) { harness in
+            let response = try await harness.getPlainThroughTunnel("/tunneled/items")
+
+            #expect(response.status == 200)
+            #expect(response.headerValue(HTTPSLoopbackHarness.originMarkerHeader) == "plain-origin")
+
+            try await Task.sleep(for: .milliseconds(300))
+            let captured = await harness.capturedTransactions()
+            let relayed = captured.first { $0.request.url.path == "/tunneled/items" }
+            #expect(relayed != nil, "the tunneled request must be captured as its own row")
+            #expect(relayed?.request.url.scheme == "http")
+            #expect(relayed?.response?.statusCode == 200)
+            // Nothing was decrypted, so the row must not claim an intercepted TLS session.
+            #expect(relayed?.sslCapture != .intercepted)
+            #expect(captured.contains { $0.request.method == "CONNECT" && $0.response?.statusCode == 200 })
+        }
+    }
+
     @Test("Strict upstream validation answers 502 quickly and records the rejected handshake")
     func strictUpstreamTrustRejectsPrivateCAOrigin() async throws {
         try await HTTPSLoopbackHarness.run(acceptUntrustedUpstream: false) { harness in
@@ -69,6 +89,7 @@ private actor HTTPSLoopbackHarness {
         proxyServer: ProxyServer,
         proxyPort: Int,
         origin: TLSOriginFixtureServer,
+        plainOrigin: TLSOriginFixtureServer,
         rootCertificate: NIOSSLCertificate,
         recorder: TransactionRecorder,
         cleanup: @escaping @Sendable () -> Void
@@ -76,6 +97,7 @@ private actor HTTPSLoopbackHarness {
         self.proxyServer = proxyServer
         self.proxyPort = proxyPort
         self.origin = origin
+        self.plainOrigin = plainOrigin
         self.rootCertificate = rootCertificate
         self.recorder = recorder
         self.cleanup = cleanup
@@ -106,6 +128,18 @@ private actor HTTPSLoopbackHarness {
         recorder.snapshot()
     }
 
+    /// Issues `GET http://localhost:<plainPort><path>` inside a CONNECT tunnel without any TLS,
+    /// the way `ws://` clients and some HTTP libraries tunnel plain traffic through a proxy.
+    func getPlainThroughTunnel(_ path: String) async throws -> LoopbackHTTPResponse {
+        try await LoopbackHTTPSClient.get(
+            host: Self.originHost,
+            port: plainOrigin.boundPort,
+            path: path,
+            proxyPort: proxyPort,
+            trustRoot: nil
+        )
+    }
+
     /// Issues `GET https://localhost:<originPort><path>` through the proxy: CONNECT, then a TLS
     /// handshake that trusts only the test root, then a plain HTTP/1.1 exchange inside it.
     func get(_ path: String) async throws -> LoopbackHTTPResponse {
@@ -121,6 +155,7 @@ private actor HTTPSLoopbackHarness {
     func stop() async {
         await proxyServer.stop()
         await origin.stop()
+        await plainOrigin.stop()
         cleanup()
     }
 
@@ -129,6 +164,7 @@ private actor HTTPSLoopbackHarness {
     private let proxyServer: ProxyServer
     private let proxyPort: Int
     private let origin: TLSOriginFixtureServer
+    private let plainOrigin: TLSOriginFixtureServer
     private let rootCertificate: NIOSSLCertificate
     private let recorder: TransactionRecorder
     private let cleanup: @Sendable () -> Void
@@ -148,9 +184,17 @@ private actor HTTPSLoopbackHarness {
         }
 
         let origin: TLSOriginFixtureServer
+        let plainOrigin: TLSOriginFixtureServer
         do {
             origin = try await TLSOriginFixtureServer.start(identity: originIdentity)
         } catch {
+            cleanup()
+            throw error
+        }
+        do {
+            plainOrigin = try await TLSOriginFixtureServer.start(identity: nil)
+        } catch {
+            await origin.stop()
             cleanup()
             throw error
         }
@@ -192,6 +236,7 @@ private actor HTTPSLoopbackHarness {
             try await proxyServer.start()
         } catch {
             await origin.stop()
+            await plainOrigin.stop()
             cleanup()
             throw error
         }
@@ -200,6 +245,7 @@ private actor HTTPSLoopbackHarness {
             proxyServer: proxyServer,
             proxyPort: proxyPort,
             origin: origin,
+            plainOrigin: plainOrigin,
             rootCertificate: rootCertificate,
             recorder: recorder,
             cleanup: cleanup
@@ -299,17 +345,25 @@ private actor TLSOriginFixtureServer {
 
     nonisolated let boundPort: Int
 
-    static func start(identity: CustomTLSIdentity) async throws -> TLSOriginFixtureServer {
+    /// `identity == nil` starts a plain-HTTP origin (used for tunneled http:// traffic).
+    static func start(identity: CustomTLSIdentity?) async throws -> TLSOriginFixtureServer {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        let tlsConfiguration = try TLSInterceptHandler.makeServerTLSConfiguration(identity: identity)
-        let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+        let sslContext: NIOSSLContext? = try identity.map { identity in
+            try NIOSSLContext(configuration: TLSInterceptHandler.makeServerTLSConfiguration(identity: identity))
+        }
+        let marker = identity == nil ? "plain-origin" : "tls-origin"
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                channel.pipeline.addHandler(NIOSSLServerHandler(context: sslContext)).flatMap {
+                let transport: EventLoopFuture<Void> = if let sslContext {
+                    channel.pipeline.addHandler(NIOSSLServerHandler(context: sslContext))
+                } else {
+                    channel.eventLoop.makeSucceededVoidFuture()
+                }
+                return transport.flatMap {
                     channel.pipeline.configureHTTPServerPipeline()
                 }.flatMap {
-                    channel.pipeline.addHandler(OriginResponder())
+                    channel.pipeline.addHandler(OriginResponder(marker: marker))
                 }
             }
         let channel = try await bootstrap.bind(host: "127.0.0.1", port: 0).get()
@@ -338,6 +392,12 @@ private final class OriginResponder: ChannelInboundHandler, @unchecked Sendable 
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
 
+    init(marker: String) {
+        self.marker = marker
+    }
+
+    private let marker: String
+
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         guard case .end = unwrapInboundIn(data) else {
             return
@@ -346,7 +406,7 @@ private final class OriginResponder: ChannelInboundHandler, @unchecked Sendable 
         var headers = HTTPHeaders()
         headers.add(name: "Content-Type", value: "application/json")
         headers.add(name: "Content-Length", value: "\(body.count)")
-        headers.add(name: HTTPSLoopbackHarness.originMarkerHeader, value: "tls-origin")
+        headers.add(name: HTTPSLoopbackHarness.originMarkerHeader, value: marker)
         headers.add(name: "Connection", value: "close")
         context.write(
             wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .ok, headers: headers))),
@@ -371,17 +431,19 @@ private enum LoopbackHTTPSClient {
         port: Int,
         path: String,
         proxyPort: Int,
-        trustRoot: NIOSSLCertificate
+        trustRoot: NIOSSLCertificate?
     )
         async throws -> LoopbackHTTPResponse
     {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { Task { try? await group.shutdownGracefully() } }
 
-        var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
-        tlsConfiguration.trustRoots = .certificates([trustRoot])
-        tlsConfiguration.certificateVerification = .fullVerification
-        let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+        let sslContext: NIOSSLContext? = try trustRoot.map { trustRoot in
+            var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
+            tlsConfiguration.trustRoots = .certificates([trustRoot])
+            tlsConfiguration.certificateVerification = .fullVerification
+            return try NIOSSLContext(configuration: tlsConfiguration)
+        }
 
         let promise = group.next().makePromise(of: LoopbackHTTPResponse.self)
         let channel = try await ClientBootstrap(group: group)
@@ -419,7 +481,7 @@ private final class TunnelThenTLSHandler: ChannelInboundHandler, RemovableChanne
         targetHost: String,
         targetPort: Int,
         path: String,
-        sslContext: NIOSSLContext,
+        sslContext: NIOSSLContext?,
         promise: EventLoopPromise<LoopbackHTTPResponse>
     ) {
         self.targetHost = targetHost
@@ -464,8 +526,14 @@ private final class TunnelThenTLSHandler: ChannelInboundHandler, RemovableChanne
         let sslContext = sslContext
         context.pipeline.removeHandler(self).whenComplete { _ in
             do {
-                let sslHandler = try NIOSSLClientHandler(context: sslContext, serverHostname: targetHost)
-                context.channel.pipeline.addHandler(sslHandler).flatMap {
+                let transport: EventLoopFuture<Void> = if let sslContext {
+                    try context.channel.pipeline.addHandler(
+                        NIOSSLClientHandler(context: sslContext, serverHostname: targetHost)
+                    )
+                } else {
+                    context.channel.eventLoop.makeSucceededVoidFuture()
+                }
+                transport.flatMap {
                     context.channel.pipeline.addHTTPClientHandlers()
                 }.flatMap {
                     context.channel.pipeline.addHandler(TunneledRequestHandler(
@@ -493,7 +561,7 @@ private final class TunnelThenTLSHandler: ChannelInboundHandler, RemovableChanne
     private let targetHost: String
     private let targetPort: Int
     private let path: String
-    private let sslContext: NIOSSLContext
+    private let sslContext: NIOSSLContext?
     private let promise: EventLoopPromise<LoopbackHTTPResponse>
     private var pending = ByteBufferAllocator().buffer(capacity: 256)
 }

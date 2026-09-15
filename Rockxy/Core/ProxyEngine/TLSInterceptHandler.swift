@@ -949,21 +949,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                 NotificationCenter.default.post(name: .tlsMitmAccepted, object: nil, userInfo: acceptanceUserInfo)
             }
 
-            let httpHandler = HTTPSProxyRelayHandler(
-                host: host,
-                port: port,
-                ruleEngine: ruleEngine,
-                scriptPluginManager: scriptPluginManager,
-                connectionLimiter: connectionLimiter,
-                customCertificateManager: customCertificateManager,
-                upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
-                upstreamTrustProvider: upstreamTrustProvider,
-                captureContextProvider: captureContextProvider,
-                clientSourcePort: clientSourcePort,
-                onTransactionComplete: onTransactionComplete,
-                onBreakpointHit: onBreakpointHit,
-                breakpointBridgeTracker: breakpointBridgeTracker
-            )
+            let httpHandler = makeRelayHandler(scheme: "https")
 
             let pipeline = context.pipeline
             pipeline.removeHandler(context: context).flatMap {
@@ -1082,6 +1068,29 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
             sslCapture: .tunneled,
             captureContext: tunnelCaptureContext,
             clientIdentifier: clientIdentifier
+        )
+    }
+
+    /// The HTTP relay for this tunnel. `https` after a completed TLS handshake; `http` when the
+    /// protocol detector found plain HTTP inside the CONNECT tunnel (a `ws://` upgrade or an
+    /// http:// request a client chose to tunnel), which is relayed and captured the same way
+    /// instead of degrading to an opaque raw tunnel.
+    nonisolated func makeRelayHandler(scheme: String) -> HTTPSProxyRelayHandler {
+        HTTPSProxyRelayHandler(
+            host: host,
+            port: port,
+            scheme: scheme,
+            ruleEngine: ruleEngine,
+            scriptPluginManager: scriptPluginManager,
+            connectionLimiter: connectionLimiter,
+            customCertificateManager: customCertificateManager,
+            upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
+            upstreamTrustProvider: upstreamTrustProvider,
+            captureContextProvider: captureContextProvider,
+            clientSourcePort: clientSourcePort,
+            onTransactionComplete: onTransactionComplete,
+            onBreakpointHit: onBreakpointHit,
+            breakpointBridgeTracker: breakpointBridgeTracker
         )
     }
 
@@ -1233,185 +1242,5 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     nonisolated private func tunnelElapsedDuration() -> TimeInterval {
         let elapsedNanos = DispatchTime.now().uptimeNanoseconds - tunnelStartedAt.uptimeNanoseconds
         return TimeInterval(elapsedNanos) / 1_000_000_000.0
-    }
-}
-
-// MARK: - ProtocolDetectorHandler
-
-/// Sits before NIOSSLServerHandler in the pipeline. Examines the first byte of
-/// incoming data to determine if the client is speaking TLS. If yes, forwards
-/// data naturally to the next handler (NIOSSLServerHandler) via context.fireChannelRead
-/// and removes itself. If no, tears down TLS handlers and sets up a raw tunnel.
-///
-/// This forward-based approach avoids the broken channel.pipeline.fireChannelRead
-/// replay pattern that causes WRONG_VERSION_NUMBER errors.
-final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
-    // MARK: Lifecycle
-
-    init(
-        sslHandler: NIOSSLServerHandler,
-        host: String,
-        port: Int,
-        postHandshake: PostHandshakeHandler,
-        connectionLimiter: ConnectionLimiter,
-        upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
-        rawTunnelConnector: @escaping TLSInterceptHandler.RawTunnelConnector = TLSInterceptHandler.connectRawTunnel
-    ) {
-        self.sslHandler = sslHandler
-        self.host = host
-        self.port = port
-        self.postHandshake = postHandshake
-        self.connectionLimiter = connectionLimiter
-        self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
-        self.rawTunnelConnector = rawTunnelConnector
-    }
-
-    // MARK: Internal
-
-    typealias InboundIn = ByteBuffer
-
-    nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        if rawTunnelPending {
-            guard appendRawTunnelData(unwrapInboundIn(data)) else {
-                tlsLogger.warning("Buffered raw CONNECT data exceeded the safety limit for \(self.host)")
-                postHandshake.recordTunnelFailure(statusCode: 413, statusMessage: "Tunnel Preface Too Large")
-                context.close(promise: nil)
-                return
-            }
-            return
-        }
-
-        if detected {
-            context.fireChannelRead(data)
-            return
-        }
-
-        let buffer = unwrapInboundIn(data)
-        guard let firstByte = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self) else {
-            return
-        }
-
-        // TLS record content types: 0x14=ChangeCipherSpec, 0x15=Alert,
-        // 0x16=Handshake, 0x17=ApplicationData, 0x18=Heartbeat.
-        // 0x80=SSLv2 ClientHello (legacy compatibility).
-        let isTLS = (firstByte >= 0x14 && firstByte <= 0x18) || firstByte == 0x80
-
-        if isTLS {
-            detected = true
-            tlsLogger.debug("TLS detected for \(self.host), forwarding to NIOSSLServerHandler")
-            // Forward naturally to the next handler (NIOSSLServerHandler) in the pipeline.
-            // No replay needed — data flows through the normal NIO path.
-            context.fireChannelRead(data)
-            // Remove ourselves so future reads go directly to NIOSSLServerHandler.
-            context.pipeline.removeHandler(context: context, promise: nil)
-        } else {
-            rawTunnelPending = true
-            guard appendRawTunnelData(buffer) else {
-                tlsLogger.warning("Buffered raw CONNECT data exceeded the safety limit for \(self.host)")
-                postHandshake.recordTunnelFailure(statusCode: 413, statusMessage: "Tunnel Preface Too Large")
-                context.close(promise: nil)
-                return
-            }
-            tlsLogger
-                .info(
-                    "Non-TLS data (0x\(String(firstByte, radix: 16))) in CONNECT tunnel for \(self.host), falling back to raw tunnel"
-                )
-            tearDownForRawTunnel(context: context)
-        }
-    }
-
-    nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {
-        tlsLogger.warning("ProtocolDetector error for \(self.host): \(String(describing: error))")
-        postHandshake.recordTunnelFailure(statusCode: 500, statusMessage: "Protocol Detection Failed")
-        context.close(promise: nil)
-    }
-
-    // MARK: Private
-
-    private let sslHandler: NIOSSLServerHandler
-    private let host: String
-    private let port: Int
-    private let postHandshake: PostHandshakeHandler
-    private let connectionLimiter: ConnectionLimiter
-    private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
-    private let rawTunnelConnector: TLSInterceptHandler.RawTunnelConnector
-    private var detected = false, rawTunnelPending = false
-    private var bufferedRawTunnelData: [ByteBuffer] = []
-    private var bufferedRawTunnelByteCount = 0
-
-    /// Remove NIOSSLServerHandler and PostHandshakeHandler, then set up a raw TCP relay.
-    nonisolated private func tearDownForRawTunnel(
-        context: ChannelHandlerContext
-    ) {
-        let host = self.host
-        let port = self.port
-        let channel = context.channel
-        let sslHandler = self.sslHandler
-        let postHandshake = self.postHandshake
-        let limiter = self.connectionLimiter
-
-        guard limiter.acquire(host: host, port: port) else {
-            tlsLogger.warning("Connection limit reached for \(host):\(port), closing")
-            postHandshake.recordTunnelFailure(statusCode: 503, statusMessage: "Connection Limit Reached")
-            channel.close(promise: nil)
-            return
-        }
-
-        let pipeline = context.pipeline
-        channel.setOption(ChannelOptions.autoRead, value: false).flatMap {
-            self.rawTunnelConnector(
-                context.eventLoop,
-                host,
-                port,
-                self.upstreamProxySnapshotProvider()
-            )
-        }.whenComplete { result in
-            switch result {
-            case let .success(serverChannel):
-                serverChannel.closeFuture.whenComplete { _ in
-                    limiter.release(host: host, port: port)
-                }
-                let replayClientReads = self.bufferedRawTunnelData
-                self.bufferedRawTunnelData.removeAll(keepingCapacity: false)
-                self.bufferedRawTunnelByteCount = 0
-                let prepareClientChannel = pipeline.removeHandler(sslHandler).flatMapError { _ in
-                    context.eventLoop.makeSucceededVoidFuture()
-                }.flatMap {
-                    pipeline.removeHandler(postHandshake)
-                }.flatMapError { _ in
-                    context.eventLoop.makeSucceededVoidFuture()
-                }.flatMap {
-                    pipeline.removeHandler(context: context)
-                }
-                TLSInterceptHandler.completeRawTunnelSetup(
-                    serverChannel: serverChannel,
-                    clientChannel: channel,
-                    prepareClientChannel: prepareClientChannel,
-                    replayClientReads: replayClientReads,
-                    enableClientAutoRead: true
-                ) {
-                    self.postHandshake.recordSuccessfulTunnel()
-                } onFailure: { error in
-                    tlsLogger.error("Raw tunnel setup failed for \(host): \(error.localizedDescription)")
-                    self.postHandshake.recordTunnelFailure(statusCode: 502, statusMessage: "Tunnel Setup Failed")
-                    serverChannel.close(promise: nil)
-                    channel.close(promise: nil)
-                }
-            case let .failure(error):
-                limiter.release(host: host, port: port)
-                tlsLogger.error("Raw tunnel connection failed to \(host):\(port): \(String(describing: error))")
-                self.postHandshake.recordTunnelFailure(statusCode: 502, statusMessage: "Upstream Connection Failed")
-                channel.close(promise: nil)
-            }
-        }
-    }
-
-    nonisolated private func appendRawTunnelData(_ buffer: ByteBuffer) -> Bool {
-        guard bufferedRawTunnelByteCount <= TLSInterceptHandler.maximumBufferedTunnelBytes - buffer.readableBytes else {
-            return false
-        }
-        bufferedRawTunnelByteCount += buffer.readableBytes
-        bufferedRawTunnelData.append(buffer)
-        return true
     }
 }
