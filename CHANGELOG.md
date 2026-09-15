@@ -43,6 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Made the MCP `export_flow_curl` tool redact sensitive query parameters and body credentials the same way flow details do; previously only header values were masked, so tokens in the URL or JSON body reached the AI client in clear text.
 - Kept File, Project, View, and Flow menu commands (Compose, Open/Save Session, Import/Export HAR, Clear Session, Repeat, …) working while Settings or a tool window is frontmost; they previously did nothing until the main window was clicked again.
 - Honored the Welcome sheet's "Show on startup" opt-out while setup is incomplete; it stays reachable from Help > Getting Started.
+- Allowed Repeat, Edit and Repeat, and Compose to send plain `http://` requests; App Transport Security previously rejected every non-TLS replay to LAN or staging servers.
+- Recorded each Repeat as a new traffic-list row attributed to Rockxy so the replayed response can be inspected, diffed, and exported; previously only a toast with the status code appeared.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.
