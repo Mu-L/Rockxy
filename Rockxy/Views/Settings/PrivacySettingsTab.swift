@@ -15,7 +15,11 @@ struct PrivacySettingsTab: View {
                                 .font(settingsMetrics.font(weight: .medium))
                             Text(
                                 String(
-                                    localized: "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac.",
+                                    localized: """
+                                    Captured traffic stays in memory for the current session and is \
+                                    discarded when Rockxy quits. Flows you pin, save, or annotate are \
+                                    stored in an unencrypted SQLite database on your Mac.
+                                    """,
                                     bundle: RockxyLocalization.bundle
                                 )
                             )
@@ -39,7 +43,7 @@ struct PrivacySettingsTab: View {
                             Text(String(localized: "Large Response Bodies", bundle: RockxyLocalization.bundle))
                                 .font(settingsMetrics.font(weight: .medium))
                             Text(String(
-                                localized: "Responses larger than 1 MB are saved as separate files.",
+                                localized: "Stored request and response bodies larger than 1 MB are saved as separate files.",
                                 bundle: RockxyLocalization.bundle
                             ))
                             .font(settingsMetrics.secondaryFont())

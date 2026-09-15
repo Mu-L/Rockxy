@@ -3863,12 +3863,12 @@
         }
       }
     },
-    "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac.": {
+    "Captured traffic stays in memory for the current session and is discarded when Rockxy quits. Flows you pin, save, or annotate are stored in an unencrypted SQLite database on your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有捕获的 HTTP/HTTPS 请求、响应、标头和正文都会存储在 Mac 上未加密的 SQLite 数据库中。"
+            "value": "捕获的流量仅保存在当前会话的内存中，Rockxy 退出时会被丢弃。你固定、保存或添加备注的流量会存储在 Mac 上未加密的 SQLite 数据库中。"
           }
         }
       }
@@ -27722,12 +27722,12 @@
         }
       }
     },
-    "Responses larger than 1 MB are saved as separate files.": {
+    "Stored request and response bodies larger than 1 MB are saved as separate files.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "大于 1 MB 的响应会另存为单独文件。"
+            "value": "已存储的请求和响应正文若大于 1 MB，会另存为单独文件。"
           }
         }
       }
