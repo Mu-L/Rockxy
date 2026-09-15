@@ -38,6 +38,14 @@ Use the appropriate setup page:
 
 The process may ignore the system proxy or require runtime-specific configuration.
 
+## Symptom: requests to `localhost` never appear
+
+macOS sends `localhost`, `127.0.0.1`, and `::1` straight to the loopback interface and skips the system proxy, so browsers and system-proxy clients never hand that traffic to Rockxy.
+
+- Use a `.localhost` name instead of `localhost`: macOS resolves any `<name>.localhost` to loopback without touching `/etc/hosts`, so `http://api.localhost:3000` reaches the same server and goes through the proxy.
+- For terminal tools, point the tool at the proxy explicitly (for example `curl -x http://127.0.0.1:9090 http://localhost:3000/`); an explicit proxy is honored even for loopback hosts.
+- Developer Setup targets for Node.js, Python, Go, and the other runtimes include a localhost sample that is already routed correctly.
+
 ## Related pages
 
 <CardGroup cols={2}>
