@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Recorded each Repeat as a new traffic-list row attributed to Rockxy so the replayed response can be inspected, diffed, and exported; previously only a toast with the status code appeared.
 - Made the Diff viewer show each side's own line numbers and place a changed line on one row (old left, new right) instead of staggering removed and added lines with merged-stream numbering.
 - Stopped Repeat and Edit and Repeat from re-sending the captured `Host`, `Content-Length`, and `Proxy-*` headers; a URL edited to point at another host previously still carried the original `Host` and hit the wrong virtual host.
-- Kept the WebSocket inspector header in view and reserved a readable payload area for the selected frame when the bottom inspector is short.
+- Kept the WebSocket inspector's URL bar and tab strip in view when the bottom inspector is short: the WebSocket tab now scrolls as a whole with a bounded frame list instead of overflowing the pane once a frame is selected.
 - Quick Preview no longer offers "Decode Base64" for selections whose decoded bytes are unreadable control characters.
 - Refused requests and CONNECT tunnels that target the proxy's own listen port with `508 Loop Detected`; a single self-addressed request previously re-entered the proxy until the connection cap tripped, leaving dozens of 503 rows.
 - Stopped quitting and readiness checks from waiting 10 seconds on a helper XPC probe when the helper tool is not installed.

@@ -12,11 +12,15 @@ struct WebSocketInspectorLayoutTests {
     func layoutKeepsHeaderAndDetailReadable() throws {
         let source = try Self.projectFile("Rockxy/Views/Inspector/WebSocketInspectorView.swift")
 
+        // The tab scrolls as a whole so its fixed-height sections can never push the
+        // inspector's URL bar and tab strip out of a short bottom pane; the frame list keeps a
+        // bounded height and scrolls on its own inside it.
+        #expect(source.contains("ScrollView(.vertical) {"))
+        #expect(source.contains(".frame(height: frameListHeight(for: connection))"))
+        #expect(source.contains("private func frameListHeight(for connection: WebSocketConnection) -> CGFloat"))
         #expect(source.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)"))
-        #expect(source.contains("frameDetail\n                            .layoutPriority(1)"))
-        #expect(source.contains(".frame(minHeight: Self.minimumFrameListHeight)"))
-        #expect(Self.occurrences(of: "minHeight: Self.minimumPayloadHeight", in: source) == 3)
-        #expect(!source.contains("            .frame(maxHeight: 200)\n"))
+        #expect(!source.contains("minHeight:"))
+        #expect(Self.occurrences(of: ".frame(maxHeight: 200)", in: source) == 2)
     }
 
     private static func occurrences(of needle: String, in haystack: String) -> Int {
