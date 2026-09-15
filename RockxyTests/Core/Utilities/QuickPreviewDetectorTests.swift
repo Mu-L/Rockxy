@@ -55,6 +55,15 @@ struct QuickPreviewDetectorTests {
         ])
     }
 
+    @Test("Does not offer Base64 decoding when the bytes are not readable text")
+    func base64RequiresReadableOutput() {
+        // "MTIz" -> "123" is readable; "AAAA" -> three NUL bytes is not.
+        #expect(QuickPreviewDetector.availableActions(for: "MTIz").contains(.decodeBase64))
+        #expect(!QuickPreviewDetector.availableActions(for: "AAAA").contains(.decodeBase64))
+        #expect(QuickPreviewDetector.decodeBase64("AAAA") == nil)
+        #expect(QuickPreviewDetector.decodeBase64("bGluZTEKbGluZTI=") == "line1\nline2")
+    }
+
     @Test("Rejects oversized selections")
     func rejectsOversizedSelections() {
         let selection = String(repeating: "a", count: QuickPreviewDetector.maxSelectionBytes + 1)
