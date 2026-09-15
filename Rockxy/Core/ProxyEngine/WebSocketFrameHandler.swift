@@ -47,6 +47,13 @@ final class WebSocketLifecycle: @unchecked Sendable {
         guard claimTerminalState() else {
             return
         }
+        // The session was delivered as `.active` when the upgrade completed and has been
+        // observed by the UI since, so its terminal state is written on the main actor
+        // before the closing delivery updates the existing row.
+        Task { @MainActor in
+            transaction.state = .completed
+            transaction.webSocketFrameVersion += 1
+        }
         onTransactionComplete(transaction)
         onChannelClosed()
     }
@@ -267,6 +274,10 @@ nonisolated enum WebSocketPipelineConfigurator {
         // The accepted and upstream channels may live on different event loops.
         // Complete the combined transition on the client loop so callers can safely
         // chain this future from the flushed 101 response promise.
-        return clientFuture.and(serverFuture.hop(to: clientChannel.eventLoop)).map { _ in }
+        return clientFuture.and(serverFuture.hop(to: clientChannel.eventLoop)).map { _ in
+            // Deliver the open session now so the row appears while it is live and frames
+            // render as they arrive; the closing delivery later updates the same row.
+            onTransactionComplete(transaction)
+        }
     }
 }

@@ -932,16 +932,38 @@ extension MainContentCoordinator {
             routedBatches[context.projectID, default: []].append(transaction)
         }
 
-        for (projectID, projectBatch) in routedBatches {
+        for (projectID, routedBatch) in routedBatches {
             var history = transactionsByProjectID[projectID] ?? []
             var sequence = nextSequenceNumberByProjectID[projectID]
                 ?? ((history.map(\.sequenceNumber).max() ?? -1) + 1)
-            for transaction in projectBatch {
+            // A WebSocket session is delivered when it opens (so the row and frames are
+            // visible live) and again when it closes with its final state. The second
+            // delivery updates the row that is already in history instead of appending
+            // a duplicate.
+            var projectBatch: [HTTPTransaction] = []
+            var updatedTransactions: [HTTPTransaction] = []
+            for transaction in routedBatch {
+                if transaction.webSocketConnection != nil,
+                   history.contains(where: { $0.id == transaction.id })
+                {
+                    // The lifecycle only re-delivers a session when it has closed.
+                    transaction.state = .completed
+                    updatedTransactions.append(transaction)
+                    continue
+                }
                 transaction.sequenceNumber = sequence
                 sequence += 1
                 history.append(transaction)
+                projectBatch.append(transaction)
             }
             nextSequenceNumberByProjectID[projectID] = sequence
+            if !updatedTransactions.isEmpty, projectID == projectStore.activeProjectID {
+                refreshRowsAfterMutation()
+            }
+            guard !projectBatch.isEmpty else {
+                transactionsByProjectID[projectID] = history
+                continue
+            }
 
             let overflow = max(0, history.count - liveHistoryLimit)
             let evictionCount: Int

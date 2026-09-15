@@ -35,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stopped Developer Setup from reporting "Local probe unavailable" for guide-only and device targets that never run the validation probe; they now show their real readiness state.
 - Prevented a Modify Headers rule or script header with a space in its name or a line break in its value from aborting the relayed response with an empty reply; such headers are now rejected in the editor and skipped at runtime while the rest of the rule still applies.
 - Kept the paused request's scheme and host in the Breakpoint URL field after editing the request line in the Raw tab, instead of showing a blank authority.
+- Made plain `ws://` upgrades sent through the proxy as absolute-form requests reach the server; the relay no longer adds `Content-Length: 0` to bodyless requests that never declared a length, which made WebSocket servers refuse the handshake.
+- Showed WebSocket sessions in the request list while they are open, with frames rendering live, and marked them Completed/Closed when the socket closes instead of leaving them Active forever.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

@@ -157,18 +157,23 @@ enum ProxyHandlerShared {
         //
         // - Chunked uploads: drop any Content-Length (they're mutually exclusive
         //   per RFC 9112 §6) and keep the chunked framing.
-        // - Otherwise: write Content-Length matching the mutated body size,
-        //   even if the original request had no body / no Content-Length. This
-        //   prevents downstream servers from hanging on a missing length when a
-        //   script added a body to a previously bodyless request.
+        // - A non-empty body, or a request that already declared a length: write
+        //   Content-Length matching the mutated body size. This prevents downstream
+        //   servers from hanging on a missing length when a script added a body to a
+        //   previously bodyless request.
+        // - A bodyless request that never declared a length keeps that shape. Adding
+        //   `Content-Length: 0` to a GET breaks WebSocket handshakes — servers refuse
+        //   an upgrade that advertises a body — and is not what the client sent.
         let isChunked = headers["Transfer-Encoding"].contains(where: {
             $0.lowercased().contains("chunked")
         })
+        let size = requestData.body?.count ?? 0
         if isChunked {
             headers.remove(name: "Content-Length")
-        } else {
-            let size = requestData.body?.count ?? 0
+        } else if size > 0 || originalHead.headers.contains(name: "Content-Length") {
             headers.replaceOrAdd(name: "Content-Length", value: "\(size)")
+        } else {
+            headers.remove(name: "Content-Length")
         }
 
         return HTTPRequestHead(
