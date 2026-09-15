@@ -15,7 +15,10 @@ enum RequestCopyFormatter {
     // MARK: - cURL
 
     static func curl(for transaction: HTTPTransaction) -> String {
-        let request = transaction.request
+        curl(for: transaction.request)
+    }
+
+    static func curl(for request: HTTPRequestData) -> String {
         var parts = ["curl"]
         parts.append(shellQuote(request.url.absoluteString))
         parts.append("-X \(request.method)")

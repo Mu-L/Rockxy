@@ -126,7 +126,9 @@ struct MCPFlowQueryService {
             return errorResult("Flow not found: \(flowId.uuidString)")
         }
 
-        let curl = RequestCopyFormatter.curl(for: transaction)
+        // Redact the request structurally before rendering so query secrets and body
+        // credentials never reach the client; the regex pass stays as a final guard.
+        let curl = RequestCopyFormatter.curl(for: redactedRequest(transaction.request))
         let redacted = redactionPolicy.redactCurlCommand(curl)
         return MCPToolCallResult(
             content: [.text(redacted)],
@@ -135,6 +137,31 @@ struct MCPFlowQueryService {
     }
 
     // MARK: Private
+
+    private func redactedRequest(_ request: HTTPRequestData) -> HTTPRequestData {
+        guard redactionPolicy.isEnabled else {
+            return request
+        }
+
+        let redactedURL = URL(string: redactionPolicy.redactURL(request.url.absoluteString)) ?? request.url
+        let redactedHeaders = redactionPolicy
+            .redactHeaders(request.headers.map { (name: $0.name, value: $0.value) })
+            .map { HTTPHeader(name: $0.name, value: $0.value) }
+        var redactedBody = request.body
+        if let body = request.body, let text = String(data: body, encoding: .utf8) {
+            redactedBody = Data(redactionPolicy.redactBody(text, contentType: request.contentType).utf8)
+        }
+
+        return HTTPRequestData(
+            method: request.method,
+            url: redactedURL,
+            httpVersion: request.httpVersion,
+            headers: redactedHeaders,
+            body: redactedBody,
+            contentType: request.contentType,
+            captureContext: request.captureContext
+        )
+    }
 
     private static let dateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

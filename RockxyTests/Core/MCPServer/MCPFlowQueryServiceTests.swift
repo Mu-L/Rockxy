@@ -400,6 +400,44 @@ struct MCPFlowQueryServiceTests {
         #expect(result.isError == true)
     }
 
+    @Test("Export cURL redacts query secrets and body credentials, not only headers")
+    func exportCurlRedactsQueryAndBody() async throws {
+        let provider = MockFlowProvider()
+        let transaction = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://api.example.com/login?api_key=query-secret&page=2"
+        )
+        transaction.request = try HTTPRequestData(
+            method: "POST",
+            url: #require(URL(string: "https://api.example.com/login?api_key=query-secret&page=2")),
+            httpVersion: "HTTP/1.1",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "X-Api-Key", value: "header-secret"),
+            ],
+            body: Data(#"{"username":"stephen","password":"body-secret"}"#.utf8),
+            contentType: .json
+        )
+        provider.transactions = [transaction]
+
+        let service = makeService(provider: provider, redactionEnabled: true)
+        let result = await service.exportFlowAsCurl(flowId: transaction.id)
+        let text = result.content.first?.text ?? ""
+
+        #expect(!text.contains("query-secret"))
+        #expect(!text.contains("header-secret"))
+        #expect(!text.contains("body-secret"))
+        #expect(text.contains("page=2"))
+        #expect(text.contains("stephen"))
+        #expect(text.contains("-X POST"))
+
+        let disabled = makeService(provider: provider, redactionEnabled: false)
+        let raw = await disabled.exportFlowAsCurl(flowId: transaction.id)
+        let rawText = raw.content.first?.text ?? ""
+        #expect(rawText.contains("query-secret"))
+        #expect(rawText.contains("body-secret"))
+    }
+
     @Test("Export cURL redacts sensitive headers when enabled")
     func exportCurlRedacted() async throws {
         let provider = MockFlowProvider()
