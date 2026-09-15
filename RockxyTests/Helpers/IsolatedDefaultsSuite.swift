@@ -10,6 +10,8 @@ import Foundation
 /// files left by processes that are no longer running (test workers are not guaranteed to
 /// run exit hooks), and the process's own files are removed at exit when that hook does run.
 enum IsolatedDefaultsSuite {
+    // MARK: Internal
+
     static func make(prefix: String) -> UserDefaults {
         sweepStaleSuites(prefix: prefix)
         let suiteName = "\(prefix).\(ProcessInfo.processInfo.processIdentifier).\(UUID().uuidString)"
@@ -64,8 +66,8 @@ enum IsolatedDefaultsSuite {
             guard let pidText = remainder.split(separator: ".").first,
                   let pid = Int32(pidText),
                   pid != ownPID,
-                  kill(pid, 0) != 0
-            else {
+                  kill(pid, 0) != 0 else
+            {
                 continue
             }
             try? FileManager.default.removeItem(at: entry)

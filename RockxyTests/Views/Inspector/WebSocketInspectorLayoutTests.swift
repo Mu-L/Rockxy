@@ -8,6 +8,8 @@ import Testing
 /// connection header must never be pushed out of view, and a selected frame keeps a readable
 /// payload area while the frame list keeps a couple of rows.
 struct WebSocketInspectorLayoutTests {
+    // MARK: Internal
+
     @Test("WebSocket inspector top-aligns overflow and bounds list/detail heights")
     func layoutKeepsHeaderAndDetailReadable() throws {
         let source = try Self.projectFile("Rockxy/Views/Inspector/WebSocketInspectorView.swift")
@@ -22,6 +24,8 @@ struct WebSocketInspectorLayoutTests {
         #expect(!source.contains("minHeight:"))
         #expect(Self.occurrences(of: ".frame(maxHeight: 200)", in: source) == 2)
     }
+
+    // MARK: Private
 
     private static func occurrences(of needle: String, in haystack: String) -> Int {
         haystack.components(separatedBy: needle).count - 1

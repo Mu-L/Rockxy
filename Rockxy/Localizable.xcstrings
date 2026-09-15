@@ -40302,6 +40302,26 @@
           }
         }
       }
+    },
+    "Header Name may only use letters, digits, and !#$%&'*+-.^_`|~ (no spaces)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头名称只能使用字母、数字以及 !#$%&'*+-.^_`|~（不能包含空格）"
+          }
+        }
+      }
+    },
+    "Header Value cannot contain line breaks or control characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头值不能包含换行符或控制字符"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

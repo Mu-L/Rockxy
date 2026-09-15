@@ -26,6 +26,20 @@ final class AbsoluteFormRequestHandler: ChannelOutboundHandler, RemovableChannel
     typealias OutboundIn = HTTPClientRequestPart
     typealias OutboundOut = HTTPClientRequestPart
 
+    /// Builds `scheme://host[:port]/path?query` from an origin-form URI. A URI that is already
+    /// absolute is passed through untouched; the default port is omitted from the authority.
+    nonisolated static func absoluteURI(scheme: String, host: String, port: Int, originFormURI: String) -> String {
+        let lowered = originFormURI.lowercased()
+        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
+            return originFormURI
+        }
+        let defaultPort = scheme == "https" ? 443 : 80
+        let authorityHost = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+        let authority = port == defaultPort ? authorityHost : "\(authorityHost):\(port)"
+        let path = originFormURI.hasPrefix("/") ? originFormURI : "/\(originFormURI)"
+        return "\(scheme)://\(authority)\(path)"
+    }
+
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         guard case var .head(head) = unwrapOutboundIn(data) else {
             context.write(data, promise: promise)
@@ -43,20 +57,6 @@ final class AbsoluteFormRequestHandler: ChannelOutboundHandler, RemovableChannel
             head.headers.replaceOrAdd(name: "Proxy-Authorization", value: "Basic \(encoded)")
         }
         context.write(wrapOutboundOut(.head(head)), promise: promise)
-    }
-
-    /// Builds `scheme://host[:port]/path?query` from an origin-form URI. A URI that is already
-    /// absolute is passed through untouched; the default port is omitted from the authority.
-    nonisolated static func absoluteURI(scheme: String, host: String, port: Int, originFormURI: String) -> String {
-        let lowered = originFormURI.lowercased()
-        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
-            return originFormURI
-        }
-        let defaultPort = scheme == "https" ? 443 : 80
-        let authorityHost = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
-        let authority = port == defaultPort ? authorityHost : "\(authorityHost):\(port)"
-        let path = originFormURI.hasPrefix("/") ? originFormURI : "/\(originFormURI)"
-        return "\(scheme)://\(authority)\(path)"
     }
 
     // MARK: Private

@@ -12,7 +12,9 @@ enum CodeSnippetLanguage: String, CaseIterable, Identifiable, Sendable {
 
     // MARK: Internal
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var displayName: String {
         switch self {
@@ -84,7 +86,10 @@ enum CodeSnippetGenerator {
             "request.httpMethod = \(swiftQuoted(input.method))",
         ]
         for header in input.headers {
-            lines.append("request.setValue(\(swiftQuoted(header.value)), forHTTPHeaderField: \(swiftQuoted(header.name)))")
+            lines
+                .append(
+                    "request.setValue(\(swiftQuoted(header.value)), forHTTPHeaderField: \(swiftQuoted(header.name)))"
+                )
         }
         switch input.body {
         case let .text(text):

@@ -46,6 +46,31 @@ final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHand
 
     typealias InboundIn = ByteBuffer
 
+    /// `true` when the tunnel's first bytes are an HTTP/1.x request line (`GET /path HTTP/1.1`).
+    /// Anything shorter or shaped differently stays a raw tunnel, which is the safe default.
+    nonisolated static func looksLikePlainHTTPRequest(_ buffer: ByteBuffer) -> Bool {
+        let probeLength = min(buffer.readableBytes, 512)
+        guard probeLength >= 16,
+              let preface = buffer.getString(at: buffer.readerIndex, length: probeLength) else
+        {
+            return false
+        }
+        guard let lineEnd = preface.range(of: "\r\n") else {
+            return false
+        }
+        let requestLine = preface[..<lineEnd.lowerBound]
+        let parts = requestLine.split(separator: " ", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              !parts[0].isEmpty,
+              parts[0].allSatisfy({ $0.isUppercase && $0.isLetter }),
+              parts[1].hasPrefix("/"),
+              parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0" else
+        {
+            return false
+        }
+        return true
+    }
+
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         if rawTunnelPending {
             guard appendRawTunnelData(unwrapInboundIn(data)) else {
@@ -98,31 +123,6 @@ final class ProtocolDetectorHandler: ChannelInboundHandler, RemovableChannelHand
                 )
             tearDownForRawTunnel(context: context)
         }
-    }
-
-    /// `true` when the tunnel's first bytes are an HTTP/1.x request line (`GET /path HTTP/1.1`).
-    /// Anything shorter or shaped differently stays a raw tunnel, which is the safe default.
-    nonisolated static func looksLikePlainHTTPRequest(_ buffer: ByteBuffer) -> Bool {
-        let probeLength = min(buffer.readableBytes, 512)
-        guard probeLength >= 16,
-              let preface = buffer.getString(at: buffer.readerIndex, length: probeLength) else
-        {
-            return false
-        }
-        guard let lineEnd = preface.range(of: "\r\n") else {
-            return false
-        }
-        let requestLine = preface[..<lineEnd.lowerBound]
-        let parts = requestLine.split(separator: " ", omittingEmptySubsequences: false)
-        guard parts.count == 3,
-              !parts[0].isEmpty,
-              parts[0].allSatisfy({ $0.isUppercase && $0.isLetter }),
-              parts[1].hasPrefix("/"),
-              parts[2] == "HTTP/1.1" || parts[2] == "HTTP/1.0" else
-        {
-            return false
-        }
-        return true
     }
 
     nonisolated func errorCaught(context: ChannelHandlerContext, error: Error) {

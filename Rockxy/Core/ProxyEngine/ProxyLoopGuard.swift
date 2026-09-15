@@ -18,7 +18,9 @@ enum ProxyLoopGuard {
         proxyPort: Int,
         proxyHost: String?,
         localAddresses: [String] = RootCADownloadServer.lanIPv4Addresses()
-    ) -> Bool {
+    )
+        -> Bool
+    {
         guard port == proxyPort else {
             return false
         }
@@ -32,7 +34,9 @@ enum ProxyLoopGuard {
         if HostPatternMatcher.isLocalhost(normalized) || normalized == "0.0.0.0" || normalized == "::" {
             return true
         }
-        if let proxyHost, normalized == proxyHost.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")) {
+        if let proxyHost,
+           normalized == proxyHost.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        {
             return true
         }
         return localAddresses.contains { $0.lowercased() == normalized }

@@ -12,6 +12,8 @@ import Testing
 /// guard, one such request bounced through the proxy until the per-destination connection
 /// cap tripped, leaving dozens of 503 rows behind a single client call.
 struct ProxyLoopGuardTests {
+    // MARK: Internal
+
     @Test("Own listener is recognised by loopback names, the accepting address, and LAN addresses")
     func detectsOwnListener() {
         let guardPort = 9_090
@@ -71,8 +73,7 @@ struct ProxyLoopGuardTests {
     // MARK: Private
 
     private final class TransactionRecorder: @unchecked Sendable {
-        private let lock = NSLock()
-        private var transactions: [HTTPTransaction] = []
+        // MARK: Internal
 
         func record(_ transaction: HTTPTransaction) {
             lock.lock()
@@ -85,9 +86,25 @@ struct ProxyLoopGuardTests {
             defer { lock.unlock() }
             return transactions
         }
+
+        // MARK: Private
+
+        private let lock = NSLock()
+        private var transactions: [HTTPTransaction] = []
     }
 
-    private static func sendAbsoluteForm(_ absoluteURL: String, hostHeader: String, proxyPort: Int) async throws -> Int {
+    private enum LoopTestError: Error {
+        case socket
+        case timeout
+    }
+
+    private static func sendAbsoluteForm(
+        _ absoluteURL: String,
+        hostHeader: String,
+        proxyPort: Int
+    )
+        async throws -> Int
+    {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { Task { try? await group.shutdownGracefully() } }
         let promise = group.next().makePromise(of: Int.self)
@@ -146,23 +163,22 @@ struct ProxyLoopGuardTests {
         }
         return Int(UInt16(bigEndian: addr.sin_port))
     }
-
-    private enum LoopTestError: Error {
-        case socket
-        case timeout
-    }
 }
 
 // MARK: - StatusOnlyHandler
 
 private final class StatusOnlyHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = HTTPClientResponsePart
-    typealias OutboundOut = HTTPClientRequestPart
+    // MARK: Lifecycle
 
     init(requestHead: HTTPRequestHead, promise: EventLoopPromise<Int>) {
         self.requestHead = requestHead
         self.promise = promise
     }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundOut = HTTPClientRequestPart
 
     func channelActive(context: ChannelHandlerContext) {
         context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
@@ -179,6 +195,8 @@ private final class StatusOnlyHandler: ChannelInboundHandler, @unchecked Sendabl
         promise.fail(error)
         context.close(promise: nil)
     }
+
+    // MARK: Private
 
     private let requestHead: HTTPRequestHead
     private let promise: EventLoopPromise<Int>

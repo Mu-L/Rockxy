@@ -30,7 +30,10 @@ struct HTTPSInterceptionLoopbackTests {
             try await Task.sleep(for: .milliseconds(300))
             let captured = await harness.capturedTransactions()
             let decrypted = captured.first { $0.request.url.path == "/secure/items" }
-            let summary = captured.map { "\($0.request.method) \($0.request.url.absoluteString) state=\($0.state) ssl=\(String(describing: $0.sslCapture))" }
+            let summary = captured
+                .map {
+                    "\($0.request.method) \($0.request.url.absoluteString) state=\($0.state) ssl=\(String(describing: $0.sslCapture))"
+                }
             #expect(decrypted != nil, "the decrypted request must appear as its own transaction; captured=\(summary)")
             #expect(decrypted?.request.url.scheme == "https")
             #expect(decrypted?.response?.statusCode == 200)
@@ -208,7 +211,6 @@ private actor HTTPSLoopbackHarness {
         let overrides = try await installSharedTestOverrides()
         let manager = CertificateManager.shared
         try await manager.generateRootCA()
-
 
         let rootPEM = try #require(try await manager.getRootCAPEM())
         let rootCertificate = try NIOSSLCertificate(bytes: Array(rootPEM.utf8), format: .pem)
@@ -426,14 +428,16 @@ private actor TLSOriginFixtureServer {
 // MARK: - OriginResponder
 
 private final class OriginResponder: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = HTTPServerRequestPart
-    typealias OutboundOut = HTTPServerResponsePart
+    // MARK: Lifecycle
 
     init(marker: String) {
         self.marker = marker
     }
 
-    private let marker: String
+    // MARK: Internal
+
+    typealias InboundIn = HTTPServerRequestPart
+    typealias OutboundOut = HTTPServerResponsePart
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         guard case .end = unwrapInboundIn(data) else {
@@ -456,6 +460,10 @@ private final class OriginResponder: ChannelInboundHandler, @unchecked Sendable 
             context.close(promise: nil)
         }
     }
+
+    // MARK: Private
+
+    private let marker: String
 }
 
 // MARK: - LoopbackHTTPSClient
