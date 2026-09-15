@@ -138,14 +138,12 @@ private actor HTTPSLoopbackHarness {
         let manager = CertificateManager.shared
         try await manager.generateRootCA()
 
-        UpstreamTrustPolicy.setOverrideForTesting(acceptUntrustedUpstream)
 
         let rootPEM = try #require(try await manager.getRootCAPEM())
         let rootCertificate = try NIOSSLCertificate(bytes: Array(rootPEM.utf8), format: .pem)
         let originIdentity = try await manager.certificateForHost(originHost).serverIdentity()
 
         let cleanup: @Sendable () -> Void = {
-            UpstreamTrustPolicy.setOverrideForTesting(nil)
             overrides.cleanup()
         }
 
@@ -187,6 +185,7 @@ private actor HTTPSLoopbackHarness {
             ruleEngine: RuleEngine(),
             sslProxyingManager: sslManager,
             bypassProxyManager: bypassManager,
+            upstreamTrustProvider: { acceptUntrustedUpstream },
             onTransactionComplete: { recorder.record($0) }
         )
         do {

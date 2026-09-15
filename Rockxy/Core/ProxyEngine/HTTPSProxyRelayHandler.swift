@@ -29,6 +29,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         connectionLimiter: ConnectionLimiter,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
@@ -43,6 +44,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         self.connectionLimiter = connectionLimiter
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.clientSourcePort = clientSourcePort
         // Every transaction this handler emits was decrypted inside an intercepted tunnel, so
@@ -152,6 +154,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     private let connectionLimiter: ConnectionLimiter
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let clientSourcePort: UInt16?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
@@ -400,7 +403,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
 
         do {
             let clientTLSConfig = try Self.makeClientTLSConfiguration(
-                clientIdentity: customCertificateManager.clientIdentity(for: upstreamHost)
+                clientIdentity: customCertificateManager.clientIdentity(for: upstreamHost),
+                acceptsUntrustedCertificates: upstreamTrustProvider()
             )
             let sslContext = try NIOSSLContext(configuration: clientTLSConfig)
 
@@ -861,7 +865,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
             let connectTime = DispatchTime.now()
             do {
                 let clientTLSConfig = try Self.makeClientTLSConfiguration(
-                    clientIdentity: customCertificateManager.clientIdentity(for: remoteHost)
+                    clientIdentity: customCertificateManager.clientIdentity(for: remoteHost),
+                    acceptsUntrustedCertificates: upstreamTrustProvider()
                 )
                 let sslContext = try NIOSSLContext(configuration: clientTLSConfig)
 

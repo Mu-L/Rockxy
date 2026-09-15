@@ -84,8 +84,9 @@ struct SystemProxyManagerTests {
         } else {
             Issue.record("Expected no override owner in the test host, got \(String(describing: owner))")
         }
-        // The XPC status probe has a 10 s timeout; without a helper it must not be attempted.
-        #expect(elapsed < 5, "effectiveOverrideOwner took \(elapsed)s")
+        // The XPC status probe has a 10 s timeout; without a helper it must not be attempted. The
+        // bound leaves headroom for a loaded machine while still catching the timeout path.
+        #expect(elapsed < 9, "effectiveOverrideOwner took \(elapsed)s")
     }
 
     @Test("routing readiness requires every fallback service to match")

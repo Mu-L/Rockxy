@@ -303,6 +303,7 @@ actor ProxyServer {
         sslProxyingManager: SSLProxyingManager? = nil,
         bypassProxyManager: BypassProxyManager? = nil,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         shouldBypassUserModifications: @escaping @Sendable (HTTPRequestData) -> Bool = { _ in false },
         clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)? = nil,
@@ -319,6 +320,7 @@ actor ProxyServer {
         self.sslProxyingManagerOverride = sslProxyingManager
         self.bypassProxyManagerOverride = bypassProxyManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.shouldBypassUserModifications = shouldBypassUserModifications
         self.clientIdentityHandleProvider = clientIdentityHandleProvider
@@ -526,6 +528,7 @@ actor ProxyServer {
                         sslProxyingManager: sslProxyingManager,
                         bypassProxyManager: bypassProxyManager,
                         upstreamProxySnapshotProvider: upstreamProxyProvider,
+                        upstreamTrustProvider: self.upstreamTrustProvider,
                         captureContextProvider: captureProvider,
                         shouldBypassUserModifications: bypassUserModifications,
                         clientIdentityHandle: identityHandle,
@@ -613,6 +616,7 @@ actor ProxyServer {
     private let sslProxyingManagerOverride: SSLProxyingManager?
     private let bypassProxyManagerOverride: BypassProxyManager?
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let shouldBypassUserModifications: @Sendable (HTTPRequestData) -> Bool
     private let clientIdentityHandleProvider: (@Sendable (ProxyConnectionDescriptor) -> ClientIdentityHandle?)?

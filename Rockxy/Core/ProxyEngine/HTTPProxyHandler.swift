@@ -36,6 +36,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         bypassProxyManager: BypassProxyManager,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         shouldBypassUserModifications: @escaping @Sendable (HTTPRequestData) -> Bool = { _ in false },
         clientIdentityHandle: ClientIdentityHandle? = nil,
@@ -54,6 +55,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.bypassProxyManager = bypassProxyManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.shouldBypassUserModifications = shouldBypassUserModifications
         self.clientIdentityHandle = clientIdentityHandle
@@ -138,6 +140,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private let bypassProxyManager: BypassProxyManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let shouldBypassUserModifications: @Sendable (HTTPRequestData) -> Bool
     private let clientIdentityHandle: ClientIdentityHandle?
@@ -783,6 +786,7 @@ extension HTTPProxyHandler {
                 bypassProxyManager: self.bypassProxyManager,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
+                upstreamTrustProvider: self.upstreamTrustProvider,
                 captureContextProvider: self.captureContextProvider,
                 tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
@@ -895,7 +899,8 @@ extension HTTPProxyHandler {
             if useTLS {
                 do {
                     let tlsConfig = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
-                        clientIdentity: self.customCertificateManager.clientIdentity(for: host)
+                        clientIdentity: self.customCertificateManager.clientIdentity(for: host),
+                        acceptsUntrustedCertificates: self.upstreamTrustProvider()
                     )
                     let sslContext = try NIOSSLContext(configuration: tlsConfig)
                     let sslHandler = try NIOSSLClientHandler(

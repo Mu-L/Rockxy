@@ -205,6 +205,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         bypassProxyManager: BypassProxyManager = .shared,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
@@ -227,6 +228,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
         self.bypassProxyManager = bypassProxyManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
@@ -524,6 +526,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
     private let bypassProxyManager: BypassProxyManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?
@@ -662,6 +665,7 @@ final class TLSInterceptHandler: ChannelInboundHandler, RemovableChannelHandler,
                 sslProxyingManager: self.sslProxyingManager,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
+                upstreamTrustProvider: self.upstreamTrustProvider,
                 captureContextProvider: self.captureContextProvider,
                 tunnelCaptureContext: self.tunnelCaptureContext,
                 clientSourcePort: self.clientSourcePort,
@@ -859,6 +863,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         sslProxyingManager: SSLProxyingManager,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         tunnelCaptureContext: TrafficCaptureContext? = nil,
         clientSourcePort: UInt16? = nil,
@@ -879,6 +884,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
         self.sslProxyingManager = sslProxyingManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.tunnelCaptureContext = tunnelCaptureContext
         self.clientSourcePort = clientSourcePort
@@ -951,6 +957,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
                 connectionLimiter: connectionLimiter,
                 customCertificateManager: customCertificateManager,
                 upstreamProxySnapshotProvider: upstreamProxySnapshotProvider,
+                upstreamTrustProvider: upstreamTrustProvider,
                 captureContextProvider: captureContextProvider,
                 clientSourcePort: clientSourcePort,
                 onTransactionComplete: onTransactionComplete,
@@ -1126,6 +1133,7 @@ final class PostHandshakeHandler: ChannelInboundHandler, RemovableChannelHandler
     private let sslProxyingManager: SSLProxyingManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let tunnelCaptureContext: TrafficCaptureContext?
     private let clientSourcePort: UInt16?

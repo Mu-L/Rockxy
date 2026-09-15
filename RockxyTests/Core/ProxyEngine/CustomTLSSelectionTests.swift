@@ -67,7 +67,10 @@ struct CustomTLSSelectionTests {
     @Test("client TLS configuration includes matching identity and keeps full verification")
     func clientTLSConfigurationIncludesIdentity() throws {
         let identity = try makeIdentity(host: "mtls.example.com")
-        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(clientIdentity: identity)
+        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: identity,
+            acceptsUntrustedCertificates: false
+        )
 
         #expect(config.certificateVerification == .fullVerification)
         #expect(config.certificateChain.count == 1)
@@ -76,7 +79,10 @@ struct CustomTLSSelectionTests {
 
     @Test("client TLS configuration omits identity when there is no match and keeps full verification")
     func clientTLSConfigurationWithoutIdentity() throws {
-        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(clientIdentity: nil)
+        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: false
+        )
 
         #expect(config.certificateVerification == .fullVerification)
         #expect(config.certificateChain.isEmpty)
