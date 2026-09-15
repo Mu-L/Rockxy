@@ -111,7 +111,7 @@ struct DiffEngineTests {
 
     // MARK: - Regression: Side-by-side alignment
 
-    @Test("Side-by-side paired rows have same count for both panes")
+    @Test("Side-by-side pairs a removed line with the added line that replaces it")
     func pairedRowAlignment() {
         let lines = [
             DiffLine(lineNumber: 1, content: "same", type: .unchanged),
@@ -120,19 +120,52 @@ struct DiffEngineTests {
             DiffLine(lineNumber: 4, content: "same2", type: .unchanged),
         ]
         let rows = DiffResult.sideBySideRows(from: lines)
-        #expect(rows.count == 4)
+        #expect(rows.count == 3)
         // Row 1: unchanged — both sides present
         #expect(rows[0].left != nil)
         #expect(rows[0].right != nil)
-        // Row 2: removed — left only
-        #expect(rows[1].left != nil)
-        #expect(rows[1].right == nil)
-        // Row 3: added — right only
-        #expect(rows[2].left == nil)
+        // Row 2: the change reads as one row — old on the left, new on the right
+        #expect(rows[1].left?.content == "removed")
+        #expect(rows[1].right?.content == "added")
+        // Row 3: unchanged — both sides
+        #expect(rows[2].left != nil)
         #expect(rows[2].right != nil)
-        // Row 4: unchanged — both sides
-        #expect(rows[3].left != nil)
-        #expect(rows[3].right != nil)
+    }
+
+    @Test("Side-by-side pads uneven change blocks with spacers")
+    func unevenChangeBlocks() {
+        let lines = [
+            DiffLine(lineNumber: 1, content: "r1", type: .removed),
+            DiffLine(lineNumber: 2, content: "r2", type: .removed),
+            DiffLine(lineNumber: 3, content: "a1", type: .added),
+            DiffLine(lineNumber: 4, content: "same", type: .unchanged),
+            DiffLine(lineNumber: 5, content: "a2", type: .added),
+            DiffLine(lineNumber: 6, content: "r3", type: .removed),
+        ]
+        let rows = DiffResult.sideBySideRows(from: lines)
+        #expect(rows.count == 5)
+        #expect(rows[0].left?.content == "r1")
+        #expect(rows[0].right?.content == "a1")
+        #expect(rows[1].left?.content == "r2")
+        #expect(rows[1].right == nil)
+        #expect(rows[2].left?.content == "same")
+        // An added run followed by a removed line starts a new block instead of pairing backwards.
+        #expect(rows[3].left == nil)
+        #expect(rows[3].right?.content == "a2")
+        #expect(rows[4].left?.content == "r3")
+        #expect(rows[4].right == nil)
+    }
+
+    @Test("Lines carry their own old and new line numbers")
+    func perSideLineNumbers() {
+        let old = ["a", "b", "c"]
+        let new = ["a", "x", "y", "c"]
+        let result = DiffEngine.diff(old: old, new: new)
+
+        #expect(result.map(\.type) == [.unchanged, .removed, .added, .added, .unchanged])
+        #expect(result.map(\.oldLineNumber) == [1, 2, nil, nil, 3])
+        #expect(result.map(\.newLineNumber) == [1, nil, 2, 3, 4])
+        #expect(result.map(\.lineNumber) == [1, 2, 3, 4, 5])
     }
 
     @Test("Section matching by title handles mismatched section counts")
