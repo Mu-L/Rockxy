@@ -139,7 +139,7 @@ struct BreakpointPayloadSafetyTests {
         let application = try #require(template.applicationPayload)
         let updated = application.applying(to: draft)
 
-        #expect(updated.url == "/v1/items")
+        #expect(updated.url == "https://api.example.com/v1/items")
         #expect(updated.fixedHTTPSAuthority == "api.example.com")
     }
 

@@ -181,9 +181,21 @@ struct BreakpointPhaseCTests {
             to: draft
         )
         #expect(updated.method == "POST")
-        #expect(updated.url == "/anything")
+        // The origin-form request line keeps the draft's captured authority.
+        #expect(updated.url == "https://httpbin.org/anything")
         #expect(updated.headers.first?.name == "X-Raw")
         #expect(updated.body == "payload")
+    }
+
+    @Test("Raw absolute-form request lines replace the whole URL")
+    func rawAbsoluteFormTargetReplacesURL() throws {
+        let draft = BreakpointRequestData.test()
+        let updated = try BreakpointRawMessage.applying(
+            "GET http://127.0.0.1:8080/health HTTP/1.1\nHost: 127.0.0.1:8080\n\n",
+            kind: .request,
+            to: draft
+        )
+        #expect(updated.url == "http://127.0.0.1:8080/health")
     }
 
     // BP_C12
@@ -197,7 +209,7 @@ struct BreakpointPhaseCTests {
         let payload = try #require(template.applicationPayload)
         let updated = payload.applying(to: .test(method: "GET", url: "https://httpbin.org/get"))
         #expect(updated.method == "PUT")
-        #expect(updated.url == "/post")
+        #expect(updated.url == "https://httpbin.org/post")
         #expect(updated.headers.map(\.name) == ["X-Template"])
         #expect(updated.body == "updated")
     }
