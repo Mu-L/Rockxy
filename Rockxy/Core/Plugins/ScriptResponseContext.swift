@@ -12,12 +12,13 @@ struct ScriptResponseContext {
     // MARK: Lifecycle
 
     init(request: HTTPRequestData, response: HTTPResponseData) {
+        let projection = ScriptResponseBodyProjection(response: response)
         self.method = request.method
         self.url = request.url.absoluteString
         self.requestHeaders = ScriptHeaderDictionary.storage(from: request.headers)
         self.statusCode = response.statusCode
-        self.responseHeaders = ScriptHeaderDictionary.storage(from: response.headers)
-        if let body = response.body {
+        self.responseHeaders = ScriptHeaderDictionary.storage(from: projection.headers)
+        if let body = projection.body {
             let utf8String = String(data: body, encoding: .utf8)
             self.body = utf8String ?? body.base64EncodedString()
             self.bodyIsUTF8 = utf8String != nil

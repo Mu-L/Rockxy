@@ -521,8 +521,17 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             fallbackScheme: "http",
             fallbackHost: "localhost"
         )
+        let provenanceCallback = ProxyHandlerShared.makeMapRemoteProvenanceCallback(
+            originalURL: requestData.url,
+            downstream: callback
+        )
 
-        forwardRequest(context: context, head: rewrite.head, requestData: rewrite.requestData, callback: callback)
+        forwardRequest(
+            context: context,
+            head: rewrite.head,
+            requestData: rewrite.requestData,
+            callback: provenanceCallback
+        )
     }
 
     nonisolated private func handleMapLocal(
@@ -824,7 +833,8 @@ extension HTTPProxyHandler {
         var head = head
         var requestData = requestData
 
-        if !bypassUserModifications, NoCacheHeaderMutator.isEnabled {
+        let disablesCaching = !bypassUserModifications && NoCacheHeaderMutator.isEnabled
+        if disablesCaching {
             requestData.headers = NoCacheHeaderMutator.apply(to: requestData.headers)
             head.headers = HTTPHeaders(requestData.headers.map { ($0.name, $0.value) })
         }
@@ -896,6 +906,7 @@ extension HTTPProxyHandler {
                     connectTime: connectTime,
                     tcpTime: tcpTime,
                     responseHeaderOperations: responseHeaderOperations,
+                    disablesResponseCaching: disablesCaching,
                     networkConditionProfile: networkConditionProfile,
                     bypassUserModifications: bypassUserModifications,
                     onUpstreamClosed: { limiter.release(host: host, port: port) },
@@ -919,6 +930,7 @@ extension HTTPProxyHandler {
         connectTime: DispatchTime,
         tcpTime: DispatchTime,
         responseHeaderOperations: [HeaderOperation]? = nil,
+        disablesResponseCaching: Bool = false,
         networkConditionProfile: NetworkConditionProfile? = nil,
         bypassUserModifications: Bool = false,
         onUpstreamClosed: @escaping @Sendable () -> Void,
@@ -935,6 +947,7 @@ extension HTTPProxyHandler {
             breakpointPhase: pendingBreakpointPhase,
             breakpointRuleName: pendingBreakpointRuleName,
             headerResponseOperations: responseHeaderOperations,
+            disablesResponseCaching: disablesResponseCaching,
             networkConditionProfile: networkConditionProfile,
             scriptPluginManager: bypassUserModifications ? nil : scriptPluginManager,
             onBreakpointHit: bypassUserModifications ? nil : onBreakpointHit,

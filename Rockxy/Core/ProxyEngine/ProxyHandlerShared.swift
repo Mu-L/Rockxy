@@ -83,10 +83,35 @@ enum ProxyHandlerShared {
         return { transaction in
             transaction.matchedRuleID = matchedRuleID
             transaction.matchedRuleName = matchedRuleName
-            transaction.matchedRuleActionSummary = matchedRuleActionSummary
+            // A handler may already have attached a request-specific summary (for example
+            // the pre-rewrite URL of a Map Remote hit); keep it over the generic rule text.
+            if transaction.matchedRuleActionSummary == nil {
+                transaction.matchedRuleActionSummary = matchedRuleActionSummary
+            }
             transaction.matchedRulePattern = matchedRulePattern
             downstream(transaction)
         }
+    }
+
+    /// Wraps a callback so a Map Remote transaction records where the client originally
+    /// sent the request. The request list and inspector show the rewritten destination;
+    /// without this the original URL would be lost, leaving no way to confirm which
+    /// address the rule redirected.
+    nonisolated static func makeMapRemoteProvenanceCallback(
+        originalURL: URL,
+        downstream: @escaping @Sendable (HTTPTransaction) -> Void
+    )
+        -> @Sendable (HTTPTransaction) -> Void
+    {
+        let summary = mapRemoteActionSummary(originalURL: originalURL)
+        return { transaction in
+            transaction.matchedRuleActionSummary = summary
+            downstream(transaction)
+        }
+    }
+
+    nonisolated static func mapRemoteActionSummary(originalURL: URL) -> String {
+        "Map Remote (from \(originalURL.absoluteString))"
     }
 
     /// Rebuild the outbound `HTTPRequestHead` from a (possibly script-mutated)

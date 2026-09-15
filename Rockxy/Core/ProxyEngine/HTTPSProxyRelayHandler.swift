@@ -156,6 +156,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     ))?
     private let breakpointBridgeTracker: BreakpointBridgeTracker?
 
+    private var pendingDisablesResponseCaching = false
     private var pendingBreakpointPhase: BreakpointRulePhase?
     private var pendingBreakpointRuleName: String?
     /// The unstructured Task bridging an in-flight request breakpoint to the
@@ -206,7 +207,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         var requestData = buildRequestData(from: head)
 
         var head = head
-        if NoCacheHeaderMutator.isEnabled {
+        // Decided once per request so the relayed response is marked uncacheable exactly
+        // when its request was made fresh; consumed by `connectToUpstream`.
+        pendingDisablesResponseCaching = NoCacheHeaderMutator.isEnabled
+        if pendingDisablesResponseCaching {
             requestData.headers = NoCacheHeaderMutator.apply(to: requestData.headers)
             head.headers = HTTPHeaders(requestData.headers.map { ($0.name, $0.value) })
         }
@@ -472,6 +476,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
                 breakpointPhase: self.pendingBreakpointPhase,
                 breakpointRuleName: self.pendingBreakpointRuleName,
                 headerResponseOperations: responseHeaderOperations,
+                disablesResponseCaching: self.pendingDisablesResponseCaching,
                 networkConditionProfile: networkConditionProfile,
                 scriptPluginManager: self.scriptPluginManager,
                 onBreakpointHit: self.onBreakpointHit,
@@ -831,6 +836,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
             fallbackScheme: "https",
             fallbackHost: host,
             fallbackPort: port
+        )
+        let callback = ProxyHandlerShared.makeMapRemoteProvenanceCallback(
+            originalURL: requestData.url,
+            downstream: callback
         )
         let remoteHost = rewrite.upstreamHost
         let remotePort = rewrite.upstreamPort

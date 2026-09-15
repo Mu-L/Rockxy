@@ -169,9 +169,10 @@ enum ScriptMultiArgBridge {
             return nil
         }
         resp.setObject(response.statusCode, forKeyedSubscript: "statusCode" as NSString)
-        let headersDict = ScriptHeaderDictionary.storage(from: response.headers)
+        let projection = ScriptResponseBodyProjection(response: response)
+        let headersDict = ScriptHeaderDictionary.storage(from: projection.headers)
         resp.setObject(ScriptHeaderDictionary.exposed(from: headersDict), forKeyedSubscript: "headers" as NSString)
-        if let body = response.body {
+        if let body = projection.body {
             if let s = String(data: body, encoding: .utf8) {
                 resp.setObject(s, forKeyedSubscript: "body" as NSString)
             } else {
@@ -211,14 +212,16 @@ enum ScriptMultiArgBridge {
             original.statusCode
         }
 
+        // The script saw the decoded projection, so its mutations are read back against it.
+        let projection = ScriptResponseBodyProjection(response: original)
         let exposedHeaders = (source.objectForKeyedSubscript("headers")?.toDictionary() as? [String: String]) ?? [:]
         let headersDict = ScriptHeaderDictionary.storage(
             fromJavaScript: exposedHeaders,
-            original: ScriptHeaderDictionary.storage(from: original.headers)
+            original: ScriptHeaderDictionary.storage(from: projection.headers)
         )
         let newHeaders = headersDict.map { HTTPHeader(name: $0.key, value: $0.value) }
 
-        let newBody: Data? = resolveResponseBody(source: source, original: original, pluginID: pluginID)
+        let newBody: Data? = resolveResponseBody(source: source, fallbackBody: projection.body, pluginID: pluginID)
 
         let reason = HTTPResponseStatusLookup.reasonPhrase(for: statusCode) ?? original.statusMessage
         return HTTPResponseData(
@@ -303,7 +306,7 @@ enum ScriptMultiArgBridge {
 
     private static func resolveResponseBody(
         source: JSValue,
-        original: HTTPResponseData,
+        fallbackBody: Data?,
         pluginID: String
     )
         -> Data?
@@ -333,7 +336,7 @@ enum ScriptMultiArgBridge {
                 return json
             }
         }
-        return original.body
+        return fallbackBody
     }
 
     private static func parseQueries(_ query: String) -> [String: [String]] {

@@ -182,6 +182,83 @@ struct ScriptMultiArgRuntimeTests {
         #expect(String(data: mutated.body ?? Data(), encoding: .utf8) == "teapot")
     }
 
+    @Test("Multi-arg onResponse sees a decoded compressed body and relays plain text")
+    func multiArgResponseDecodesCompressedBody() async throws {
+        let runtime = ScriptRuntime()
+        let script = """
+        function onResponse(context, url, request, response) {
+          var body = JSON.parse(response.body);
+          body.patched = true;
+          response.body = JSON.stringify(body);
+          response.headers["X-Seen-Encoding"] = String(response.headers["Content-Encoding"]);
+          return response;
+        }
+        """
+        let plugin = try makeTempPlugin(id: "test.multiarg.resp-compressed", script: script)
+        try await runtime.loadPlugin(plugin)
+
+        let plain = Data(#"{"users":[1,2]}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let req = makeRequest()
+        let resp = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+                HTTPHeader(name: "Content-Length", value: "\(compressed.count)"),
+            ],
+            body: compressed
+        )
+        let mutated = try await runtime.callOnResponse(
+            pluginID: plugin.id,
+            context: ScriptResponseContext(request: req, response: resp),
+            originalRequest: req,
+            originalResponse: resp
+        )
+
+        let body = try #require(mutated.body)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["patched"] as? Bool == true)
+        // The script never saw the compressed representation, and it is not relayed either.
+        #expect(mutated.headers.first { $0.name == "X-Seen-Encoding" }?.value == "undefined")
+        #expect(!mutated.headers.contains { $0.name.lowercased() == "content-encoding" })
+        #expect(!mutated.headers.contains { $0.name.lowercased() == "content-length" })
+    }
+
+    @Test("Single-arg onResponse sees a decoded compressed body")
+    func singleArgResponseDecodesCompressedBody() async throws {
+        let runtime = ScriptRuntime()
+        let script = """
+        function onResponse(ctx) {
+          ctx.setBody(ctx.body.toUpperCase());
+          return ctx;
+        }
+        """
+        let plugin = try makeTempPlugin(id: "test.singlearg.resp-compressed", script: script)
+        try await runtime.loadPlugin(plugin)
+
+        let compressed = try (Data("hello".utf8) as NSData).compressed(using: .zlib) as Data
+        let req = makeRequest()
+        let resp = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "text/plain"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed
+        )
+        let mutated = try await runtime.callOnResponse(
+            pluginID: plugin.id,
+            context: ScriptResponseContext(request: req, response: resp),
+            originalRequest: req,
+            originalResponse: resp
+        )
+        #expect(String(data: mutated.body ?? Data(), encoding: .utf8) == "HELLO")
+        #expect(!mutated.headers.contains { $0.name.lowercased() == "content-encoding" })
+    }
+
     // MARK: bodyFilePath
 
     @Test("bodyFilePath loads a file under ~ and uses it as the response body")

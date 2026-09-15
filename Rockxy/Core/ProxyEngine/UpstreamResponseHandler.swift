@@ -36,6 +36,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         breakpointPhase: BreakpointRulePhase? = nil,
         breakpointRuleName: String? = nil,
         headerResponseOperations: [HeaderOperation]? = nil,
+        disablesResponseCaching: Bool = false,
         networkConditionProfile: NetworkConditionProfile? = nil,
         scriptPluginManager: ScriptPluginManager? = nil,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
@@ -45,6 +46,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         onChannelClosed: @escaping @Sendable () -> Void = {}
     ) {
         self.requestData = requestData
+        self.disablesResponseCaching = disablesResponseCaching
         self.graphQLInfo = graphQLInfo
         self.startTime = startTime
         self.connectTime = connectTime
@@ -199,6 +201,11 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             if !isWebSocketUpgrade, let ops = headerResponseOperations, !ops.isEmpty {
                 HeaderMutator.apply(ops, to: &modifiedHead.headers)
             }
+            // No Caching was decided when the request was forwarded, so the response is
+            // marked uncacheable for the client exactly when its request was made fresh.
+            if !isWebSocketUpgrade, disablesResponseCaching {
+                NoCacheHeaderMutator.applyToResponse(&modifiedHead.headers)
+            }
 
             responseHead = modifiedHead
             firstByteTime = .now()
@@ -349,6 +356,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
     private let breakpointPhase: BreakpointRulePhase?
     private let breakpointRuleName: String?
     private let headerResponseOperations: [HeaderOperation]?
+    private let disablesResponseCaching: Bool
     private let networkConditionProfile: NetworkConditionProfile?
     private let scriptPluginManager: ScriptPluginManager?
     private let hasResponseScript: Bool

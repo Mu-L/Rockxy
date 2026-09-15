@@ -368,6 +368,36 @@ struct MapRemoteRewriteTests {
         #expect(result.matchedRulePattern == ".*api\\.example\\.com.*")
     }
 
+    @Test("Map Remote provenance keeps the pre-rewrite URL in the transaction summary")
+    func provenanceCallbackRecordsOriginalURL() throws {
+        let rule = ProxyRule(
+            name: "Prod to local",
+            matchCondition: RuleMatchCondition(urlPattern: ".*api\\.example\\.com.*"),
+            action: .mapRemote(configuration: MapRemoteConfiguration(host: "127.0.0.1", port: 8_080))
+        )
+        let originalURL = try #require(URL(string: "https://api.example.com/v1/users?page=2"))
+        // The recorded transaction carries the rewritten request, as the relay does.
+        let transaction = HTTPTransaction(
+            request: makeRequest(url: "http://127.0.0.1:8080/v1/users?page=2"),
+            state: .completed
+        )
+        let captured = CapturedTransactionBox()
+        let ruleCallback = ProxyHandlerShared.makeTransactionCallback(for: rule) {
+            captured.transaction = $0
+        }
+        let callback = ProxyHandlerShared.makeMapRemoteProvenanceCallback(
+            originalURL: originalURL,
+            downstream: ruleCallback
+        )
+
+        callback(transaction)
+
+        let result = try #require(captured.transaction)
+        #expect(result.matchedRuleName == "Prod to local")
+        #expect(result.matchedRuleActionSummary == "Map Remote (from https://api.example.com/v1/users?page=2)")
+        #expect(result.matchedRulePattern == ".*api\\.example\\.com.*")
+    }
+
     private func makeRequest(
         method: String = "GET",
         url: String,
