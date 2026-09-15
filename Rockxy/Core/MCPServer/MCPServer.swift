@@ -25,11 +25,13 @@ actor MCPServer {
     init(
         configuration: MCPServerConfiguration = .default,
         toolRegistry: MCPToolRegistry,
-        sessionManager: MCPSessionManager = MCPSessionManager()
+        sessionManager: MCPSessionManager = MCPSessionManager(),
+        activityStore: MCPClientActivityStore = MCPClientActivityStore()
     ) {
         self.configuration = configuration
         self.toolRegistry = toolRegistry
         self.sessionManager = sessionManager
+        self.activityStore = activityStore
     }
 
     // MARK: Internal
@@ -50,6 +52,8 @@ actor MCPServer {
             throw MCPServerError.tokenGenerationFailed
         }
 
+        activityStore.reset()
+
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         self.eventLoopGroup = group
 
@@ -57,6 +61,7 @@ actor MCPServer {
         let sessMgr = sessionManager
         let registry = toolRegistry
         let storedToken = token
+        let activity = activityStore
 
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(.backlog, value: 64)
@@ -67,7 +72,8 @@ actor MCPServer {
                         configuration: config,
                         sessionManager: sessMgr,
                         toolRegistry: registry,
-                        storedToken: storedToken
+                        storedToken: storedToken,
+                        activityStore: activity
                     )
                     return channel.pipeline.addHandler(handler)
                 }
@@ -115,6 +121,7 @@ actor MCPServer {
     private let configuration: MCPServerConfiguration
     private let toolRegistry: MCPToolRegistry
     private let sessionManager: MCPSessionManager
+    private let activityStore: MCPClientActivityStore
 
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var serverChannel: Channel?
@@ -146,6 +153,7 @@ actor MCPServer {
         }
 
         MCPHandshakeStore.delete()
+        activityStore.reset()
         mcpServerLogger.info("MCP server stopped")
 
         if notifyObservers {

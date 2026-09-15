@@ -101,6 +101,23 @@ struct InvestigationResultPresentationTests {
 struct ContextDockInvestigationReportTests {
     // MARK: Internal
 
+    @Test("Configured model picker exposes runtime identity and data destination")
+    func configuredModelPickerShowsRuntimeAndExecutionLocation() throws {
+        let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let presentation = try readProjectFile(
+            "Rockxy/Models/Assistant/AssistantModelSelectionPresentation.swift"
+        )
+
+        #expect(dock.contains("AssistantModelSelectionPresentation("))
+        #expect(dock.contains("modelPresentation.selectionLabel"))
+        #expect(dock.contains("modelPresentation.destinationLabel"))
+        #expect(presentation.contains("AssistantLocalRuntimePreset.matching(configuration)"))
+        #expect(presentation.contains("configuration.executionLocation.isLocal"))
+        #expect(presentation.contains("Local endpoint"))
+        #expect(presentation.contains("Local ·"))
+        #expect(presentation.contains("Remote ·"))
+    }
+
     @Test("Investigation response uses editorial Summary/Next step headings and collapses evidence")
     func investigateRendersAnswerFirstResponse() throws {
         let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
