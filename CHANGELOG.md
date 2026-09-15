@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Made plain `ws://` upgrades sent through the proxy as absolute-form requests reach the server; the relay no longer adds `Content-Length: 0` to bodyless requests that never declared a length, which made WebSocket servers refuse the handshake.
 - Showed WebSocket sessions in the request list while they are open, with frames rendering live, and marked them Completed/Closed when the socket closes instead of leaving them Active forever.
 - Kept the original `startedDateTime` of imported HAR entries when the archive omits fractional seconds; those sessions previously showed every request at the import time.
+- Rendered listen ports as plain digits in the MCP status, Developer Setup proxy step, and system-proxy override banner instead of locale-grouped numbers such as `9,090`.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

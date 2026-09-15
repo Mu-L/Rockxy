@@ -28891,18 +28891,18 @@
         }
       }
     },
-    "Rockxy is listening on %@:%lld.": {
+    "Rockxy is listening on %@:%@.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Rockxy is listening on %1$@:%2$lld."
+            "value": "Rockxy is listening on %1$@:%2$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 正在监听 %1$@:%2$lld。"
+            "value": "Rockxy 正在监听 %1$@:%2$@。"
           }
         }
       }
@@ -30212,12 +30212,12 @@
         }
       }
     },
-    "Running on port %lld": {
+    "Running on port %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在端口 %lld 上运行"
+            "value": "正在端口 %@ 上运行"
           }
         }
       }
@@ -34209,18 +34209,18 @@
         }
       }
     },
-    "System Proxy is Overridden by Rockxy (IP=%@ Port=%lld) (Toggle by: ⌥⌘O)": {
+    "System Proxy is Overridden by Rockxy (IP=%@ Port=%@) (Toggle by: ⌥⌘O)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$lld) (Toggle by: ⌥⌘O)"
+            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$@) (Toggle by: ⌥⌘O)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$lld）（切换快捷键：⌥⌘O）"
+            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$@）（切换快捷键：⌥⌘O）"
           }
         }
       }

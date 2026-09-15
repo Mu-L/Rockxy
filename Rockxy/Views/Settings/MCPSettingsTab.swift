@@ -118,7 +118,7 @@ struct MCPSettingsTab: View {
                     Circle()
                         .fill(.green)
                         .frame(width: 10, height: 10)
-                    Text(String(localized: "Running on port \(port)", bundle: RockxyLocalization.bundle))
+                    Text(String(localized: "Running on port \(String(port))", bundle: RockxyLocalization.bundle))
                         .font(settingsMetrics.secondaryFont(weight: .medium))
                         .foregroundStyle(.green)
                 }

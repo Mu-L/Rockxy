@@ -499,6 +499,39 @@ struct DeveloperSetupViewModelTests {
         #expect(port == 9_090)
     }
 
+    @Test("Proxy step renders the listen port without digit grouping")
+    func proxyStepPortIsNotGrouped() throws {
+        let snapshot = SetupSnapshot(
+            supportStatus: .availableNow,
+            proxyRunning: true,
+            recordingEnabled: true,
+            activePort: 19_090,
+            effectiveListenAddress: "127.0.0.1",
+            certificateGenerated: false,
+            certificateTrusted: false,
+            certificateExportable: false,
+            proxyMode: .unavailable,
+            readinessWarningMessage: nil,
+            selectedSnippetID: .pythonRequests,
+            verificationState: .idle,
+            matchedTransactionID: nil,
+            matchedHost: nil,
+            matchedMethod: nil,
+            matchedPath: nil
+        )
+
+        let target = try #require(SetupTarget.target(for: .python))
+        let steps = DeveloperSetupWorkflowCatalog.steps(
+            for: target,
+            snapshot: snapshot,
+            selectedSnippetID: .pythonRequests
+        )
+        let proxyStep = steps.first { $0.id == "proxy" }
+
+        #expect(proxyStep?.description.contains("127.0.0.1:19090") == true)
+        #expect(proxyStep?.description.contains("19,090") == false)
+    }
+
     @Test("Validation preflight reports the first blocking issue for available manual targets")
     func validationIssuePriority() {
         let snapshot = SetupSnapshot(
