@@ -1129,6 +1129,16 @@ extension RequestTableView {
         }
 
         @objc
+        func handleCopyAsCodeSnippet(_ sender: NSMenuItem) {
+            let languages = CodeSnippetLanguage.allCases
+            guard languages.indices.contains(sender.tag) else {
+                return
+            }
+            let language = languages[sender.tag]
+            withCoordinator(sender) { $0.copyAsCodeSnippet(for: $1, language: language) }
+        }
+
+        @objc
         func handleCopyRawResponse(_ sender: NSMenuItem) {
             withCoordinator(sender) { $0.copyAsRawResponse(for: $1) }
         }
@@ -1710,6 +1720,16 @@ extension RequestTableView {
                 action: #selector(handleCopyRawResponse(_:)),
                 transaction: transaction
             ))
+            copyAsSubmenu.addItem(.separator())
+            for (index, language) in CodeSnippetLanguage.allCases.enumerated() {
+                let item = menuItem(
+                    language.displayName,
+                    action: #selector(handleCopyAsCodeSnippet(_:)),
+                    transaction: transaction
+                )
+                item.tag = index
+                copyAsSubmenu.addItem(item)
+            }
             let copyAsItem = NSMenuItem(
                 title: String(localized: "Copy as", bundle: RockxyLocalization.bundle), action: nil, keyEquivalent: ""
             )

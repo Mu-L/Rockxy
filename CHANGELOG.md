@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added Tools menu windows for External Proxy Settings, SOCKS Proxy Settings, Protobuf mapping rules, and Protobuf schema list management.
 - Added an on-demand Protobuf view to the WebSocket frame inspector for heuristic field-tree rendering.
 - Compose now imports a cURL command pasted or typed into the URL field, filling method, URL, headers, query, and body in place.
+- Added **Copy as** code snippets for Swift (URLSession), Python (requests), JavaScript (fetch), and Go (net/http) to the request context menu.
 
 ### Fixed
 
