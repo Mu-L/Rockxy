@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Made No Caching also mark relayed responses uncacheable (strips `ETag`, `Last-Modified`, and `Expires`; sets `Cache-Control: no-cache, no-store, must-revalidate`) so clients cannot serve the next load from their own cache and skip the proxy.
 - Delivered decoded gzip, deflate, and Brotli response bodies to `onResponse` scripts (multi-arg and single-arg APIs) and dropped `Content-Encoding` on relay, so documented JSON body edits work on compressed APIs; the new-script template now shows the string body contract.
 - Recorded the pre-rewrite URL of Map Remote hits in the matched-rule action summary shown by Synopsis and Context Details.
+- Kept the authored wildcard pattern and match semantics on Modify Headers rules so reopening a rule shows what was typed instead of the compiled regular expression.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

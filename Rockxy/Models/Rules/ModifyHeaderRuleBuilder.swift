@@ -22,9 +22,15 @@ enum ModifyHeaderRuleBuilder {
             id: existingRule?.id ?? UUID(),
             name: displayName.isEmpty ? trimmedPattern : displayName,
             isEnabled: existingRule?.isEnabled ?? true,
+            // Persist the authored pattern and match semantics alongside the compiled
+            // regex so reopening the rule restores the wildcard the user typed instead
+            // of presenting the compiled expression as an editable regex.
             matchCondition: RuleMatchCondition(
                 urlPattern: pattern,
-                method: httpMethod.methodValue
+                sourceURLPattern: trimmedPattern,
+                method: httpMethod.methodValue,
+                matchType: matchType,
+                includeSubpaths: matchType == .wildcard ? includeSubpaths : false
             ),
             action: .modifyHeader(operations: operations),
             priority: existingRule?.priority ?? 0
