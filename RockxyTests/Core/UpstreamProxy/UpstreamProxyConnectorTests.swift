@@ -1,5 +1,6 @@
 import Foundation
 import NIOCore
+import NIOHTTP1
 import NIOPosix
 @testable import Rockxy
 import Testing
@@ -109,6 +110,74 @@ struct UpstreamProxyConnectorTests {
         #expect(request?.contains("CONNECT api.example.com:443 HTTP/1.1") == true)
         #expect(request?.contains("Host: api.example.com:443") == true)
         #expect(initializerCapture.wait() == "initialized")
+    }
+
+    @Test("plain-HTTP targets are relayed to an HTTP proxy in absolute form, not tunneled")
+    func httpTargetUsesAbsoluteFormThroughHTTPProxy() throws {
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { try? group.syncShutdownGracefully() }
+
+        // The stub only records bytes; it must never see a CONNECT for an http:// target.
+        let capture = UpstreamProxyStringCapture()
+        let proxy = try startUpstreamProxyTestServer(group: group) { channel in
+            channel.pipeline.addHandler(UpstreamProxyByteCaptureHandler(capture: capture))
+        }
+        defer { try? proxy.close().wait() }
+
+        let configuration = UpstreamProxyResolvedConfiguration(
+            configuration: UpstreamProxyConfiguration(
+                isEnabled: true,
+                type: .http,
+                host: "127.0.0.1",
+                port: serverPort(proxy),
+                bypassLocalhost: false
+            ),
+            credentials: UpstreamProxyCredentials(username: "user", password: "pa:ss")
+        )
+        let channel = try UpstreamProxyConnector.connect(
+            eventLoop: group.next(),
+            targetScheme: "http",
+            targetHost: "staging.example.com",
+            targetPort: 8_080,
+            configuration: configuration
+        ) { channel in
+            channel.pipeline.addHTTPClientHandlers()
+        }.wait()
+        defer { try? channel.close().wait() }
+
+        var headers = HTTPHeaders()
+        headers.add(name: "Host", value: "staging.example.com:8080")
+        let head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "/api/items?page=2", headers: headers)
+        try channel.writeAndFlush(HTTPClientRequestPart.head(head)).wait()
+        try channel.writeAndFlush(HTTPClientRequestPart.end(nil)).wait()
+
+        let request = try #require(capture.wait())
+        #expect(request.hasPrefix("GET http://staging.example.com:8080/api/items?page=2 HTTP/1.1\r\n"))
+        #expect(!request.contains("CONNECT"))
+        #expect(request.contains("Host: staging.example.com:8080"))
+        #expect(request.contains("Proxy-Authorization: Basic dXNlcjpwYTpzcw=="))
+    }
+
+    @Test("absolute-form relay applies only to http targets on HTTP proxies")
+    func absoluteFormRelayDecision() {
+        #expect(UpstreamProxyConnector.usesAbsoluteFormRelay(proxyType: .http, targetScheme: "http"))
+        #expect(UpstreamProxyConnector.usesAbsoluteFormRelay(proxyType: .https, targetScheme: "HTTP"))
+        #expect(!UpstreamProxyConnector.usesAbsoluteFormRelay(proxyType: .http, targetScheme: "https"))
+        #expect(!UpstreamProxyConnector.usesAbsoluteFormRelay(proxyType: .socks5, targetScheme: "http"))
+        #expect(!UpstreamProxyConnector.usesAbsoluteFormRelay(proxyType: .automatic, targetScheme: "http"))
+
+        #expect(AbsoluteFormRequestHandler.absoluteURI(
+            scheme: "http", host: "example.com", port: 80, originFormURI: "/"
+        ) == "http://example.com/")
+        #expect(AbsoluteFormRequestHandler.absoluteURI(
+            scheme: "http", host: "example.com", port: 8_080, originFormURI: "/a?b=1"
+        ) == "http://example.com:8080/a?b=1")
+        #expect(AbsoluteFormRequestHandler.absoluteURI(
+            scheme: "http", host: "::1", port: 8_080, originFormURI: "/x"
+        ) == "http://[::1]:8080/x")
+        #expect(AbsoluteFormRequestHandler.absoluteURI(
+            scheme: "http", host: "example.com", port: 80, originFormURI: "http://other.example/y"
+        ) == "http://other.example/y")
     }
 
     @Test("automatic PAC direct route connects to target without upstream proxy")
