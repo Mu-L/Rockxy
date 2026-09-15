@@ -129,8 +129,13 @@ struct DeveloperSetupWindowView: View {
         )
     }
 
+    /// The device endpoint is what someone types into a phone's proxy settings, so it must show
+    /// the port alongside the host; the caption already promises "this host and port".
     private var deviceProxyHostText: String {
-        viewModel.snapshot.reachableLANAddress ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        guard let host = viewModel.snapshot.reachableLANAddress else {
+            return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        }
+        return "\(host):\(String(viewModel.snapshot.activePort))"
     }
 
     private var deviceProxyCaption: String {

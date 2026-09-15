@@ -8,6 +8,17 @@ import Testing
 struct DeveloperSetupNativeStructureTests {
     // MARK: Internal
 
+    @Test("Device Endpoint shows host and port, never the bare LAN address")
+    func deviceEndpointShowsHostAndPort() throws {
+        let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupWindowView.swift")
+        let start = try #require(source.range(of: "private var deviceProxyHostText: String {"))
+        let end = try #require(source.range(of: "private var deviceProxyCaption: String {"))
+        let body = source[start.lowerBound ..< end.lowerBound]
+
+        #expect(body.contains(#""\(host):\(String(viewModel.snapshot.activePort))""#))
+        #expect(!body.contains("viewModel.snapshot.reachableLANAddress ?? String(localized: \"Unavailable\""))
+    }
+
     @Test("Hub uses native adaptive split structure, not a fixed dashboard shell")
     func hubUsesNativeAdaptiveStructure() throws {
         let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupWindowView.swift")
