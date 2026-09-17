@@ -17,6 +17,8 @@ DerivedData/
 *.ipa
 *.dSYM.zip
 *.dSYM
+*.profraw
+*.profdata
 timeline.xctimeline
 playground.xcworkspace
 

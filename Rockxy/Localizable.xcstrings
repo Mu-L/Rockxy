@@ -40212,6 +40212,1476 @@
           }
         }
       }
+    },
+    "%lld err": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 错误"
+          }
+        }
+      }
+    },
+    "%lld in flight": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个进行中"
+          }
+        }
+      }
+    },
+    "%lld req": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 请求"
+          }
+        }
+      }
+    },
+    "Basis": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依据"
+          }
+        }
+      }
+    },
+    "Binary / Other": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "二进制 / 其他"
+          }
+        }
+      }
+    },
+    "Building report…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成报告…"
+          }
+        }
+      }
+    },
+    "Bytes over time across %lld intervals. Sent %@, received %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个时间段内的字节变化。已发送 %@，已接收 %@。"
+          }
+        }
+      }
+    },
+    "Client Error (4xx)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "客户端错误 (4xx)"
+          }
+        }
+      }
+    },
+    "Content Types": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容类型"
+          }
+        }
+      }
+    },
+    "Copy Name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝名称"
+          }
+        }
+      }
+    },
+    "Copy Report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝报告"
+          }
+        }
+      }
+    },
+    "Decrypted HTTPS requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已解密的 HTTPS 请求"
+          }
+        }
+      }
+    },
+    "Encrypted tunnels that were not decrypted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未被解密的加密隧道"
+          }
+        }
+      }
+    },
+    "Entire Session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整个会话"
+          }
+        }
+      }
+    },
+    "Focus App": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聚焦应用"
+          }
+        }
+      }
+    },
+    "Focus App in Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在流量中聚焦此应用"
+          }
+        }
+      }
+    },
+    "Focus Host": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聚焦主机"
+          }
+        }
+      }
+    },
+    "Focus Host in Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在流量中聚焦此主机"
+          }
+        }
+      }
+    },
+    "GraphQL operations": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GraphQL 操作"
+          }
+        }
+      }
+    },
+    "Image": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        }
+      }
+    },
+    "In Flight": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进行中"
+          }
+        }
+      }
+    },
+    "Largest Responses": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最大响应"
+          }
+        }
+      }
+    },
+    "Last 15 Minutes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 15 分钟"
+          }
+        }
+      }
+    },
+    "Last 5 Minutes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 5 分钟"
+          }
+        }
+      }
+    },
+    "Last Hour": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 1 小时"
+          }
+        }
+      }
+    },
+    "Last Minute": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 1 分钟"
+          }
+        }
+      }
+    },
+    "Latency over time across %lld intervals. Highest p95 %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个时间段内的延迟变化。最高 p95 为 %@。"
+          }
+        }
+      }
+    },
+    "Live": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时"
+          }
+        }
+      }
+    },
+    "Median": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中位数"
+          }
+        }
+      }
+    },
+    "Median Latency": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中位延迟"
+          }
+        }
+      }
+    },
+    "Metric": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指标"
+          }
+        }
+      }
+    },
+    "No Visible Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可见流量"
+          }
+        }
+      }
+    },
+    "No decrypted responses yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无已解密的响应"
+          }
+        }
+      }
+    },
+    "No hosts yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无主机"
+          }
+        }
+      }
+    },
+    "No requests yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无请求"
+          }
+        }
+      }
+    },
+    "No response bodies yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无响应正文"
+          }
+        }
+      }
+    },
+    "No responses yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无响应"
+          }
+        }
+      }
+    },
+    "No timed requests yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无带耗时的请求"
+          }
+        }
+      }
+    },
+    "Outcomes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结果"
+          }
+        }
+      }
+    },
+    "Plain HTTP requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "明文 HTTP 请求"
+          }
+        }
+      }
+    },
+    "Protocol share by %@: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按%@统计的协议占比：%@"
+          }
+        }
+      }
+    },
+    "Protocols": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "协议"
+          }
+        }
+      }
+    },
+    "Recognized AI model API traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已识别的 AI 模型 API 流量"
+          }
+        }
+      }
+    },
+    "Redirect (3xx)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重定向 (3xx)"
+          }
+        }
+      }
+    },
+    "Refresh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新"
+          }
+        }
+      }
+    },
+    "Report All Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报告全部流量"
+          }
+        }
+      }
+    },
+    "Requests over time across %lld intervals, %lld requests in total.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个时间段内的请求变化，共 %lld 个请求。"
+          }
+        }
+      }
+    },
+    "Reveal in Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在流量中显示"
+          }
+        }
+      }
+    },
+    "Save Report…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存储报告…"
+          }
+        }
+      }
+    },
+    "Save Traffic Insights Report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存储流量洞察报告"
+          }
+        }
+      }
+    },
+    "Server Error (5xx)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器错误 (5xx)"
+          }
+        }
+      }
+    },
+    "Show All %lld Findings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示全部 %lld 条发现"
+          }
+        }
+      }
+    },
+    "Show Fewer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起"
+          }
+        }
+      }
+    },
+    "Slowest Requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最慢请求"
+          }
+        }
+      }
+    },
+    "Success (2xx)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "成功 (2xx)"
+          }
+        }
+      }
+    },
+    "Time Window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间窗口"
+          }
+        }
+      }
+    },
+    "Top Apps": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "热门应用"
+          }
+        }
+      }
+    },
+    "Top Hosts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "热门主机"
+          }
+        }
+      }
+    },
+    "Traffic Insights": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量洞察"
+          }
+        }
+      }
+    },
+    "Traffic Insights report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量洞察报告"
+          }
+        }
+      }
+    },
+    "Traffic Over Time": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量随时间变化"
+          }
+        }
+      }
+    },
+    "Tunneled": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隧道"
+          }
+        }
+      }
+    },
+    "Updating report": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在更新报告"
+          }
+        }
+      }
+    },
+    "Visible Traffic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可见流量"
+          }
+        }
+      }
+    },
+    "Web3 JSON-RPC calls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web3 JSON-RPC 调用"
+          }
+        }
+      }
+    },
+    "WebSocket connections and frames": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebSocket 连接与帧"
+          }
+        }
+      }
+    },
+    "gRPC calls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gRPC 调用"
+          }
+        }
+      }
+    },
+    "over %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历时 %@"
+          }
+        }
+      }
+    },
+    "p95 %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "p95 %@"
+          }
+        }
+      }
+    },
+    "protocol": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "种协议"
+          }
+        }
+      }
+    },
+    "protocols": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "种协议"
+          }
+        }
+      }
+    },
+    "%lld hr": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时"
+          }
+        }
+      }
+    },
+    "%lld min": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分钟"
+          }
+        }
+      }
+    },
+    "%lld s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 秒"
+          }
+        }
+      }
+    },
+    "Rank %lld, %@, %@, %@ of traffic, ^[%lld request](inflect: true), ^[%lld error](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %lld 名，%@，%@，占流量的 %@，%lld 个请求，%lld 个错误"
+          }
+        }
+      }
+    },
+    "^[%lld app](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个应用"
+          }
+        }
+      }
+    },
+    "Copy Report as Markdown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以 Markdown 格式拷贝报告"
+          }
+        }
+      }
+    },
+    "Hide Traffic Insights": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏流量洞察"
+          }
+        }
+      }
+    },
+    "Report on this Traffic Tab: findings, traffic over time, protocols, top apps and hosts.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此流量标签页的报告：发现、流量随时间变化、协议、热门应用与主机。"
+          }
+        }
+      }
+    },
+    "Show Traffic Insights": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示流量洞察"
+          }
+        }
+      }
+    },
+    "%@/s · peak %@/s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@/秒 · 峰值 %@/秒"
+          }
+        }
+      }
+    },
+    "%@: 4xx on %lld of ^[%lld request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：%lld / %lld 个请求返回 4xx"
+          }
+        }
+      }
+    },
+    "%@: 5xx on %lld of ^[%lld request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：%lld / %lld 个请求返回 5xx"
+          }
+        }
+      }
+    },
+    "%@: TLS handshake avg %@ over %lld connections": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：TLS 握手平均 %@（%lld 个连接）"
+          }
+        }
+      }
+    },
+    "%@: p95 %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：p95 %@"
+          }
+        }
+      }
+    },
+    "%lld failed in the TLS handshake: the client does not trust the Rockxy certificate or pins its own.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其中 %lld 个在 TLS 握手时失败：客户端不信任 Rockxy 证书或固定了自己的证书。"
+          }
+        }
+      }
+    },
+    "1 in 20 requests to this host took at least this long. The Timing tab shows which phase dominates.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每 20 个发往此主机的请求就有 1 个至少耗时这么久。“耗时”标签页可显示哪个阶段占主导。"
+          }
+        }
+      }
+    },
+    "4xx, 5xx, and failed requests over completed ones": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4xx、5xx 与失败请求占已完成请求的比例"
+          }
+        }
+      }
+    },
+    "All Traffic: every request in this tab. Visible Traffic: what the current filters show.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部流量：此标签页中的所有请求。可见流量：当前过滤器显示的内容。"
+          }
+        }
+      }
+    },
+    "Average per request across ^[%lld timed request](inflect: true). Tunnels and WebSockets are excluded.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基于 %lld 个带耗时的请求的平均值。不含隧道和 WebSocket。"
+          }
+        }
+      }
+    },
+    "Body bytes plus WebSocket frames, by direction": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按方向统计的正文字节与 WebSocket 帧"
+          }
+        }
+      }
+    },
+    "Click to filter the request list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按以过滤请求列表"
+          }
+        }
+      }
+    },
+    "Click to select": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按以选中"
+          }
+        }
+      }
+    },
+    "Click to select this request": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按以选中此请求"
+          }
+        }
+      }
+    },
+    "Click to show only this app's requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按以仅显示此应用的请求"
+          }
+        }
+      }
+    },
+    "Click to show only this host's requests": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点按以仅显示此主机的请求"
+          }
+        }
+      }
+    },
+    "Connection closed, timed out, or upstream unreachable.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接已关闭、超时或上游不可达。"
+          }
+        }
+      }
+    },
+    "Counted back from the latest request": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从最新请求向前计算"
+          }
+        }
+      }
+    },
+    "Distinct hosts and local apps in scope": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围内的不同主机与本地应用"
+          }
+        }
+      }
+    },
+    "GET %@ repeated %lld× on %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GET %@ 重复了 %lld 次（%@）"
+          }
+        }
+      }
+    },
+    "Half of the requests were faster than the median, 95 percent faster than p95": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一半的请求快于中位数，95% 的请求快于 p95"
+          }
+        }
+      }
+    },
+    "Headers, cookies, and bodies travel unencrypted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头、Cookie 和正文以未加密方式传输。"
+          }
+        }
+      }
+    },
+    "Large bodies dominate upload time on slow links.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在慢速链路上，大正文会占据大部分上传时间。"
+          }
+        }
+      }
+    },
+    "Local addresses only — normal for development servers.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅本地地址 — 开发服务器的正常情况。"
+          }
+        }
+      }
+    },
+    "Markdown with hosts, paths, counts, and timings — no payloads": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包含主机、路径、计数和耗时的 Markdown — 不含载荷"
+          }
+        }
+      }
+    },
+    "Median %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "中位数 %@"
+          }
+        }
+      }
+    },
+    "No Cache-Control, ETag, Expires, or Last-Modified, so they download again on every visit.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺少 Cache-Control、ETag、Expires 或 Last-Modified，每次访问都会重新下载。"
+          }
+        }
+      }
+    },
+    "No Content-Encoding. gzip or Brotli usually shrinks JSON, HTML, and scripts by 70 percent or more.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺少 Content-Encoding。gzip 或 Brotli 通常可将 JSON、HTML 和脚本缩小 70% 以上。"
+          }
+        }
+      }
+    },
+    "No app attribution yet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚无应用归属"
+          }
+        }
+      }
+    },
+    "No matching list filter": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有对应的列表过滤器"
+          }
+        }
+      }
+    },
+    "Only the CONNECT is visible. Enable HTTPS Decryption for these hosts to inspect them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只能看到 CONNECT。为这些主机启用 HTTPS 解密即可检查。"
+          }
+        }
+      }
+    },
+    "Open HTTPS Decryption to add these hosts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 HTTPS 解密以添加这些主机"
+          }
+        }
+      }
+    },
+    "Pause to freeze the numbers while reading": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停以在阅读时冻结数字"
+          }
+        }
+      }
+    },
+    "Paused %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已于 %@ 暂停"
+          }
+        }
+      }
+    },
+    "Rebuild now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即重新生成"
+          }
+        }
+      }
+    },
+    "Repeated handshakes mean connections are not reused.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "反复握手意味着连接没有被复用。"
+          }
+        }
+      }
+    },
+    "Requests in scope, average and peak rate": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围内的请求数、平均与峰值速率"
+          }
+        }
+      }
+    },
+    "Same URL fetched repeatedly: missing client cache, polling, or retries.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同一 URL 被反复获取：缺少客户端缓存、轮询或重试。"
+          }
+        }
+      }
+    },
+    "Select ^[%lld Request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中 %lld 个请求"
+          }
+        }
+      }
+    },
+    "Select these requests in the request list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在请求列表中选中这些请求"
+          }
+        }
+      }
+    },
+    "Server-side failures. Compare failing and succeeding requests on this host.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器端故障。对比此主机上失败与成功的请求。"
+          }
+        }
+      }
+    },
+    "Show only this source in the request list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在请求列表中仅显示此来源"
+          }
+        }
+      }
+    },
+    "Start capture or open a session.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始捕获或打开会话。"
+          }
+        }
+      }
+    },
+    "The current filters hide every request.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前过滤器隐藏了所有请求。"
+          }
+        }
+      }
+    },
+    "The report fills in as requests arrive.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "报告会随请求到达而填充。"
+          }
+        }
+      }
+    },
+    "Time per Request": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每个请求的耗时"
+          }
+        }
+      }
+    },
+    "Timing and payloads of these requests do not reflect the real server.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些请求的耗时和载荷不反映真实服务器。"
+          }
+        }
+      }
+    },
+    "Usually expired credentials, a wrong path, or missing parameters.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通常是凭据过期、路径错误或缺少参数。"
+          }
+        }
+      }
+    },
+    "Visible only as CONNECT rows": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅以 CONNECT 行显示"
+          }
+        }
+      }
+    },
+    "Waiting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待"
+          }
+        }
+      }
+    },
+    "^[%lld connection](inflect: true) to ^[%lld host](inflect: true) not decrypted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个连接（%lld 个主机）未解密"
+          }
+        }
+      }
+    },
+    "^[%lld request](inflect: true) changed by rules: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个请求被规则更改：%@"
+          }
+        }
+      }
+    },
+    "^[%lld request](inflect: true) failed without a response": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个请求未收到响应即失败"
+          }
+        }
+      }
+    },
+    "^[%lld request](inflect: true) over plain HTTP (^[%lld host](inflect: true))": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个请求使用明文 HTTP（%lld 个主机）"
+          }
+        }
+      }
+    },
+    "^[%lld request](inflect: true) · ^[%lld error](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个请求 · %lld 个错误"
+          }
+        }
+      }
+    },
+    "^[%lld static asset](inflect: true) without cache headers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个静态资源缺少缓存标头"
+          }
+        }
+      }
+    },
+    "^[%lld text response](inflect: true) ≥ 100 KB without compression (%@)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个 ≥ 100 KB 的文本响应未压缩（%@）"
+          }
+        }
+      }
+    },
+    "^[%lld upload](inflect: true) over 5 MB (largest %@)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个上传超过 5 MB（最大 %@）"
+          }
+        }
+      }
+    },
+    "avg of ^[%lld timed request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个带耗时请求的平均值"
+          }
+        }
+      }
+    },
+    "by bytes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按字节"
+          }
+        }
+      }
+    },
+    "per %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每 %@"
+          }
+        }
+      }
+    },
+    "↑ %@ sent": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ 已发送 %@"
+          }
+        }
+      }
+    },
+    "↓ %@  ↑ %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↓ %@  ↑ %@"
+          }
+        }
+      }
+    },
+    "%lld h %lld min": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时 %lld 分钟"
+          }
+        }
+      }
+    },
+    "%lld min %lld s": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分 %lld 秒"
+          }
+        }
+      }
+    },
+    "Report copied as Markdown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已以 Markdown 格式拷贝报告"
+          }
+        }
+      }
+    },
+    "in %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历时 %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

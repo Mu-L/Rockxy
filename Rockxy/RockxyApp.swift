@@ -660,46 +660,6 @@ private enum ProjectLinks {
     }
 }
 
-// MARK: - ExternalProxyMenuState
-
-@MainActor
-private final class ExternalProxyMenuState: ObservableObject {
-    // MARK: Lifecycle
-
-    init(notificationCenter: NotificationCenter = .default) {
-        self.notificationCenter = notificationCenter
-        self.isEnabled = UpstreamProxyStore.shared.configuration.isEnabled
-        observer = notificationCenter.addObserver(
-            forName: .upstreamProxyConfigurationDidChange,
-            object: nil,
-            queue: .main
-        ) { _ in
-            Task { @MainActor [weak self] in
-                self?.refresh()
-            }
-        }
-    }
-
-    deinit {
-        if let observer {
-            notificationCenter.removeObserver(observer)
-        }
-    }
-
-    // MARK: Internal
-
-    @Published private(set) var isEnabled: Bool
-
-    func refresh() {
-        isEnabled = UpstreamProxyStore.shared.configuration.isEnabled
-    }
-
-    // MARK: Private
-
-    private let notificationCenter: NotificationCenter
-    private var observer: NSObjectProtocol?
-}
-
 // MARK: - RockxyMenuCommands
 
 /// Defines Rockxy's full menu bar structure: File (session/export), Edit (copy as cURL),
@@ -929,6 +889,17 @@ struct RockxyMenuCommands: Commands {
                 )
             )
             .keyboardShortcut("l", modifiers: [.command, .shift])
+
+            Divider()
+
+            Button(
+                actions?.isShowingTrafficInsights == true
+                    ? String(localized: "Hide Traffic Insights", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Show Traffic Insights", bundle: RockxyLocalization.bundle)
+            ) {
+                actions?.toggleTrafficInsights()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
 
             Divider()
 

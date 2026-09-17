@@ -300,6 +300,7 @@ struct SidebarView: View {
 
     private var browseList: some View {
         List(selection: sidebarBinding) {
+            SidebarInsightsSection(coordinator: coordinator)
             allSection
             signalsSection
         }

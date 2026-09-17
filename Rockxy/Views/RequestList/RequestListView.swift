@@ -42,6 +42,8 @@ struct RequestListView: View {
             switch coordinator.activeMainTab {
             case .traffic:
                 trafficListView
+            case .insights:
+                TrafficInsightsReportView(coordinator: coordinator)
             case .logs:
                 LogStreamView(coordinator: coordinator)
             case .timeline:

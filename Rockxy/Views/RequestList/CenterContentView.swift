@@ -26,7 +26,13 @@ struct CenterContentView: View {
                 onOpenToolWindow: onOpenToolWindow
             )
 
-            inspectorWorkspace
+            if coordinator.activeMainTab == .insights {
+                TrafficInsightsReportView(coordinator: coordinator)
+                    .id(coordinator.activeWorkspace.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                inspectorWorkspace
+            }
 
             StatusBarView(
                 totalCount: coordinator.filteredTransactions.count,

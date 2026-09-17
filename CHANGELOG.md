@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added Traffic Insights: an Insights destination at the top of the Focus Navigator that turns the active Traffic Tab into a live report — findings with one-click handoffs, traffic over time by bytes, outcome, or latency, protocol share, outcome/content/method breakdowns, top apps and hosts, slowest requests, largest responses, an All/Visible scope that follows the current filters, trailing time windows, pause/resume, and Markdown export.
 - Added persistent application-scoped HTTPS Decrypt and Tunnel rules, with a unified app/host rule list and observed-host picker.
 - Added local Projects with Project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only `.rockxyproject` import and export.
 - Added nearby iPhone transfers as a dedicated iOS workspace so the current Mac traffic remains available.

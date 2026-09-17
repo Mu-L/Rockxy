@@ -5,6 +5,7 @@ import Foundation
 /// application logs, and request timeline.
 enum MainTab: String, CaseIterable {
     case traffic
+    case insights
     case logs
     case timeline
 
@@ -13,6 +14,7 @@ enum MainTab: String, CaseIterable {
     var displayName: String {
         switch self {
         case .traffic: String(localized: "Traffic", bundle: RockxyLocalization.bundle)
+        case .insights: String(localized: "Insights", bundle: RockxyLocalization.bundle)
         case .logs: String(localized: "Logs", bundle: RockxyLocalization.bundle)
         case .timeline: String(localized: "Timeline", bundle: RockxyLocalization.bundle)
         }
@@ -21,6 +23,7 @@ enum MainTab: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .traffic: "network"
+        case .insights: "chart.pie"
         case .logs: "doc.text"
         case .timeline: "chart.bar.xaxis"
         }

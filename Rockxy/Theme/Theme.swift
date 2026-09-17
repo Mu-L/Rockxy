@@ -291,6 +291,58 @@ enum Theme {
         static let transfer = Color.blue
     }
 
+    // MARK: - Traffic Insights
+
+    /// Chart and breakdown colors for the Traffic Insights report. Series colors follow the
+    /// entity they represent (a protocol keeps its hue no matter how many others are visible),
+    /// and status classes reuse the request-list status palette so both surfaces agree.
+    enum Insights {
+        static let received = Color.blue
+        static let sent = Color.teal
+        static let latencyMedian = Color.indigo
+        static let latencyTail = Color.orange
+        static let neutralBar = Color(nsColor: .quaternaryLabelColor)
+        static let cardBackground = Color(nsColor: .controlBackgroundColor)
+        static let cardStroke = Color(nsColor: .separatorColor)
+        static let findingInfo = Color.blue
+        static let findingNotice = Color.orange
+        static let findingWarning = Color.red
+
+        static let cardCornerRadius: CGFloat = 12
+        static let cardPadding: CGFloat = 14
+        static let cardSpacing: CGFloat = 12
+        static let chartHeight: CGFloat = 200
+        static let rankBarHeight: CGFloat = 3
+        static let donutInnerRadiusRatio: CGFloat = 0.64
+
+        /// Fixed hue order for protocol shares. Never cycled or re-assigned by rank.
+        static func protocolColor(_ kind: TrafficInsightsProtocol) -> Color {
+            switch kind {
+            case .https: .blue
+            case .http: .orange
+            case .tunneled: Color(nsColor: .systemGray)
+            case .webSocket: .cyan
+            case .graphQL: .pink
+            case .grpc: .green
+            case .aiAPI: .purple
+            case .web3RPC: .mint
+            }
+        }
+
+        static func statusClassColor(_ statusClass: TrafficInsightsStatusClass) -> Color {
+            switch statusClass {
+            case .success: Theme.StatusCode.success
+            case .redirect: Theme.StatusCode.redirect
+            case .clientError: Theme.StatusCode.clientError
+            case .serverError: Theme.StatusCode.serverError
+            case .failed: .red
+            case .blocked: .gray
+            case .pending: Color(nsColor: .tertiaryLabelColor)
+            case .other: Color(nsColor: .secondaryLabelColor)
+            }
+        }
+    }
+
     // MARK: - Highlight Colors
 
     enum Highlight {

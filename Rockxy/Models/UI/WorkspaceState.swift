@@ -95,6 +95,10 @@ final class WorkspaceState: Identifiable {
     var isPreparingDebugAssistantReviewOverride = false
     var isDebugAssistantComposerFocusRequested = false
     var focusNavigatorMode: FocusNavigatorMode = .browse
+
+    /// Report state for the Insights destination. Owned per Traffic Tab so scope, window,
+    /// metric, and the last report survive switching tabs and closing the sidebar row.
+    @ObservationIgnored let trafficInsights = TrafficInsightsViewModel()
     var activeTrafficSignal: TrafficSignal?
     var focusSets: [FocusSet] = []
     var activeFocusSetID: UUID?

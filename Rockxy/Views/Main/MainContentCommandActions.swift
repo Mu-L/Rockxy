@@ -240,6 +240,14 @@ struct MainContentCommandActions {
         coordinator.activeMainTab = tab
     }
 
+    var isShowingTrafficInsights: Bool {
+        coordinator.isShowingTrafficInsights
+    }
+
+    func toggleTrafficInsights() {
+        coordinator.toggleTrafficInsights()
+    }
+
     // MARK: - Selection
 
     func deleteSelected() {
