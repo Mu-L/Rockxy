@@ -25,15 +25,17 @@ struct TrafficInsightsReportView: View {
     var body: some View {
         reportLayout
             .font(toolMetrics.font())
+            .background {
+                // Isolated so a 100 ms capture batch invalidates this zero-size view only; the
+                // card tree re-renders when the report itself changes.
+                TrafficInsightsSourceMonitor(coordinator: coordinator, viewModel: viewModel)
+            }
             .onAppear {
                 viewModel.isLive = storedIsLive
                 viewModel.attach(to: coordinator)
             }
             .onDisappear {
                 viewModel.detach()
-            }
-            .onChange(of: coordinator.trafficInsightsSourceToken) { _, token in
-                viewModel.sourceDidChange(token)
             }
             .onChange(of: viewModel.isLive) { _, isLive in
                 storedIsLive = isLive
@@ -98,28 +100,6 @@ struct TrafficInsightsReportView: View {
         viewModel.report
     }
 
-    private var canExport: Bool {
-        viewModel.hasReport && !report.isEmpty
-    }
-
-    private var subtitle: String {
-        let totals = report.totals
-        var parts = [TrafficInsightsText.inflected("^[\(totals.requestCount) request](inflect: true)")]
-        if totals.span > 0 {
-            parts.append(TrafficInsightsReportFormatter.formatSpan(totals.span))
-        }
-        if totals.totalBytes > 0 {
-            parts.append(TrafficInsightsFormatting.bytes(totals.totalBytes))
-        }
-        if !viewModel.isLive, let refreshedAt = viewModel.lastRefreshedAt {
-            parts.append(String(
-                localized: "Paused \(TrafficInsightsFormatting.clockTime(refreshedAt))",
-                bundle: RockxyLocalization.bundle
-            ))
-        }
-        return parts.joined(separator: " · ")
-    }
-
     private var timelineSubtitle: String {
         String(
             localized: "per \(TrafficInsightsReportFormatter.formatBinWidth(report.binWidth))",
@@ -159,120 +139,11 @@ struct TrafficInsightsReportView: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "Insights", bundle: RockxyLocalization.bundle))
-                    .font(toolMetrics.font(weight: .semibold))
-                Text(subtitle)
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .monospacedDigit()
-            }
-
-            Spacer(minLength: 12)
-
-            Picker(
-                String(localized: "Scope", bundle: RockxyLocalization.bundle),
-                selection: Binding(
-                    get: { viewModel.scope },
-                    set: { viewModel.scope = $0 }
-                )
-            ) {
-                ForEach(TrafficInsightsScope.allCases, id: \.self) { scope in
-                    Text(scope.displayName).tag(scope)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help(String(
-                localized: "All Traffic: every request in this tab. Visible Traffic: what the current filters show.",
-                bundle: RockxyLocalization.bundle
-            ))
-
-            Picker(
-                String(localized: "Time Window", bundle: RockxyLocalization.bundle),
-                selection: Binding(
-                    get: { viewModel.timeWindow },
-                    set: { viewModel.timeWindow = $0 }
-                )
-            ) {
-                ForEach(TrafficInsightsTimeWindow.allCases, id: \.self) { window in
-                    Text(window.displayName).tag(window)
-                }
-            }
-            .labelsHidden()
-            .fixedSize()
-            .help(String(localized: "Counted back from the latest request", bundle: RockxyLocalization.bundle))
-
-            Toggle(isOn: Binding(
-                get: { viewModel.isLive },
-                set: { viewModel.isLive = $0 }
-            )) {
-                Label(
-                    viewModel.isLive
-                        ? String(localized: "Live", bundle: RockxyLocalization.bundle)
-                        : String(localized: "Paused", bundle: RockxyLocalization.bundle),
-                    systemImage: viewModel.isLive ? "dot.radiowaves.left.and.right" : "pause.fill"
-                )
-                .labelStyle(.titleAndIcon)
-            }
-            .toggleStyle(.button)
-            .help(String(localized: "Pause to freeze the numbers while reading", bundle: RockxyLocalization.bundle))
-
-            if !viewModel.isLive {
-                Button {
-                    viewModel.refreshNow()
-                } label: {
-                    Label(
-                        String(localized: "Refresh", bundle: RockxyLocalization.bundle),
-                        systemImage: "arrow.clockwise"
-                    )
-                    .labelStyle(.iconOnly)
-                }
-                .rockxyGlassButtonStyle()
-                .keyboardShortcut("r", modifiers: [.command])
-                .help(String(localized: "Rebuild now", bundle: RockxyLocalization.bundle))
-            }
-
-            if viewModel.isComputing, viewModel.hasReport {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityLabel(String(localized: "Updating report", bundle: RockxyLocalization.bundle))
-            }
-
-            Menu {
-                Button(String(localized: "Copy Report as Markdown", bundle: RockxyLocalization.bundle)) {
-                    copyReport()
-                }
-                Button(String(localized: "Save Report…", bundle: RockxyLocalization.bundle)) {
-                    saveReport()
-                }
-            } label: {
-                Label(
-                    String(localized: "Export", bundle: RockxyLocalization.bundle),
-                    systemImage: "square.and.arrow.up"
-                )
-                .labelStyle(.iconOnly)
-            }
-            .menuIndicator(.hidden)
-            .menuStyle(.button)
-            .rockxyGlassButtonStyle()
-            .fixedSize()
-            .disabled(!canExport)
-            .help(String(
-                localized: "Markdown with hosts, paths, counts, and timings — no payloads",
-                bundle: RockxyLocalization.bundle
-            ))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .rockxyFunctionalBar()
-        .padding(.horizontal, toolMetrics.contentHorizontalPadding - Theme.Glass.functionalBarHorizontalInset)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
+        TrafficInsightsHeader(
+            viewModel: viewModel,
+            onCopy: copyReport,
+            onSave: saveReport
+        )
     }
 
     // MARK: - Body
@@ -297,28 +168,29 @@ struct TrafficInsightsReportView: View {
                     if !report.findings.isEmpty {
                         findingsCard
                     }
-                    equalHeightRow {
+                    TrafficInsightsSplitRow(
+                        secondaryWidth: Theme.Insights.protocolsCardWidth,
+                        minimumPrimaryWidth: Theme.Insights.timelineMinimumWidth
+                    ) {
                         timelineCard
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         protocolsCard
-                            .frame(width: 400)
-                            .frame(maxHeight: .infinity, alignment: .top)
                     }
-                    adaptiveGrid(minimumWidth: 210) {
+                    TrafficInsightsCardGrid(minimumColumnWidth: Theme.Insights.breakdownMinimumWidth) {
                         statusCard
                         contentCard
                         methodsCard
                         timingCard
                     }
-                    adaptiveGrid(minimumWidth: 400) {
+                    // One grid for all four lists so a wide workspace shows them side by side
+                    // and a narrow one wraps them 2 + 2, never a 3 + 1 orphan.
+                    TrafficInsightsCardGrid(minimumColumnWidth: Theme.Insights.listMinimumWidth) {
                         topAppsCard
                         topHostsCard
-                    }
-                    adaptiveGrid(minimumWidth: 400) {
                         slowestCard
                         largestCard
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, toolMetrics.contentHorizontalPadding)
                 .padding(.top, 8)
                 .padding(.bottom, toolMetrics.contentHorizontalPadding)
@@ -374,7 +246,10 @@ struct TrafficInsightsReportView: View {
     private var summaryRow: some View {
         let totals = report.totals
         let rate = totals.averageRequestsPerSecond
-        return HStack(spacing: Theme.Insights.cardSpacing) {
+        return TrafficInsightsCardGrid(
+            minimumColumnWidth: Theme.Insights.tileMinimumWidth,
+            fillsLastRow: true
+        ) {
             TrafficInsightsStatTile(
                 title: String(localized: "Requests", bundle: RockxyLocalization.bundle),
                 value: TrafficInsightsFormatting.count(totals.requestCount),
@@ -679,24 +554,6 @@ struct TrafficInsightsReportView: View {
         }
     }
 
-    /// Wraps cards onto a second row instead of squeezing them when the workspace is narrow.
-    private func adaptiveGrid(minimumWidth: CGFloat, @ViewBuilder content: () -> some View) -> some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: minimumWidth), spacing: Theme.Insights.cardSpacing, alignment: .top)],
-            alignment: .leading,
-            spacing: Theme.Insights.cardSpacing
-        ) {
-            content()
-        }
-    }
-
-    private func equalHeightRow(@ViewBuilder content: () -> some View) -> some View {
-        HStack(alignment: .top, spacing: Theme.Insights.cardSpacing) {
-            content()
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
     private func legendItem(color: Color, title: String, value: String) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 7, height: 7)
@@ -812,5 +669,182 @@ struct TrafficInsightsReportView: View {
         } catch {
             exportErrorMessage = error.localizedDescription
         }
+    }
+}
+
+// MARK: - TrafficInsightsHeader
+
+/// Scope, time window, live control, and export. Its own view so the progress indicator and
+/// paused timestamp can update without re-evaluating the report cards beneath it.
+private struct TrafficInsightsHeader: View {
+    // MARK: Internal
+
+    let viewModel: TrafficInsightsViewModel
+    let onCopy: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(localized: "Insights", bundle: RockxyLocalization.bundle))
+                    .font(toolMetrics.font(weight: .semibold))
+                Text(subtitle)
+                    .font(toolMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .monospacedDigit()
+            }
+
+            Spacer(minLength: 12)
+
+            Picker(
+                String(localized: "Scope", bundle: RockxyLocalization.bundle),
+                selection: Binding(
+                    get: { viewModel.scope },
+                    set: { viewModel.scope = $0 }
+                )
+            ) {
+                ForEach(TrafficInsightsScope.allCases, id: \.self) { scope in
+                    Text(scope.displayName).tag(scope)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .help(String(
+                localized: "All Traffic: every request in this tab. Visible Traffic: what the current filters show.",
+                bundle: RockxyLocalization.bundle
+            ))
+
+            Picker(
+                String(localized: "Time Window", bundle: RockxyLocalization.bundle),
+                selection: Binding(
+                    get: { viewModel.timeWindow },
+                    set: { viewModel.timeWindow = $0 }
+                )
+            ) {
+                ForEach(TrafficInsightsTimeWindow.allCases, id: \.self) { window in
+                    Text(window.displayName).tag(window)
+                }
+            }
+            .labelsHidden()
+            .fixedSize()
+            .help(String(localized: "Counted back from the latest request", bundle: RockxyLocalization.bundle))
+
+            Toggle(isOn: Binding(
+                get: { viewModel.isLive },
+                set: { viewModel.isLive = $0 }
+            )) {
+                Label(
+                    viewModel.isLive
+                        ? String(localized: "Live", bundle: RockxyLocalization.bundle)
+                        : String(localized: "Paused", bundle: RockxyLocalization.bundle),
+                    systemImage: viewModel.isLive ? "dot.radiowaves.left.and.right" : "pause.fill"
+                )
+                .labelStyle(.titleAndIcon)
+            }
+            .toggleStyle(.button)
+            .help(String(localized: "Pause to freeze the numbers while reading", bundle: RockxyLocalization.bundle))
+
+            if !viewModel.isLive {
+                Button {
+                    viewModel.refreshNow()
+                } label: {
+                    Label(
+                        String(localized: "Refresh", bundle: RockxyLocalization.bundle),
+                        systemImage: "arrow.clockwise"
+                    )
+                    .labelStyle(.iconOnly)
+                }
+                .rockxyGlassButtonStyle()
+                .keyboardShortcut("r", modifiers: [.command])
+                .help(String(localized: "Rebuild now", bundle: RockxyLocalization.bundle))
+            }
+
+            if viewModel.isComputing, viewModel.hasReport {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel(String(localized: "Updating report", bundle: RockxyLocalization.bundle))
+            }
+
+            Menu {
+                Button(String(localized: "Copy Report as Markdown", bundle: RockxyLocalization.bundle), action: onCopy)
+                Button(String(localized: "Save Report…", bundle: RockxyLocalization.bundle), action: onSave)
+            } label: {
+                Label(
+                    String(localized: "Export", bundle: RockxyLocalization.bundle),
+                    systemImage: "square.and.arrow.up"
+                )
+                .labelStyle(.iconOnly)
+            }
+            .menuIndicator(.hidden)
+            .menuStyle(.button)
+            .rockxyGlassButtonStyle()
+            .fixedSize()
+            .disabled(!canExport)
+            .help(String(
+                localized: "Markdown with hosts, paths, counts, and timings — no payloads",
+                bundle: RockxyLocalization.bundle
+            ))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .rockxyFunctionalBar()
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding - Theme.Glass.functionalBarHorizontalInset)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
+
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var report: TrafficInsightsReport {
+        viewModel.report
+    }
+
+    private var canExport: Bool {
+        viewModel.hasReport && !report.isEmpty
+    }
+
+    private var subtitle: String {
+        let totals = report.totals
+        var parts = [TrafficInsightsText.inflected("^[\(totals.requestCount) request](inflect: true)")]
+        if totals.span > 0 {
+            parts.append(TrafficInsightsReportFormatter.formatSpan(totals.span))
+        }
+        if totals.totalBytes > 0 {
+            parts.append(TrafficInsightsFormatting.bytes(totals.totalBytes))
+        }
+        if !viewModel.isLive, let refreshedAt = viewModel.lastRefreshedAt {
+            parts.append(String(
+                localized: "Paused \(TrafficInsightsFormatting.clockTime(refreshedAt))",
+                bundle: RockxyLocalization.bundle
+            ))
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - TrafficInsightsSourceMonitor
+
+/// Zero-size view whose only dependency is the coordinator source token. Batch appends and
+/// filter recomputes invalidate this view alone and forward the token to the view model.
+private struct TrafficInsightsSourceMonitor: View {
+    let coordinator: MainContentCoordinator
+    let viewModel: TrafficInsightsViewModel
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onChange(of: coordinator.trafficInsightsSourceToken) { _, token in
+                viewModel.sourceDidChange(token)
+            }
+            .accessibilityHidden(true)
     }
 }

@@ -312,6 +312,13 @@ enum Theme {
         static let cardPadding: CGFloat = 14
         static let cardSpacing: CGFloat = 12
         static let chartHeight: CGFloat = 200
+        /// Report row layout: minimum widths decide how many cards share a row, so every row
+        /// fills the workspace and cards wrap instead of squeezing.
+        static let tileMinimumWidth: CGFloat = 168
+        static let breakdownMinimumWidth: CGFloat = 210
+        static let listMinimumWidth: CGFloat = 400
+        static let protocolsCardWidth: CGFloat = 400
+        static let timelineMinimumWidth: CGFloat = 440
         static let rankBarHeight: CGFloat = 3
         static let donutInnerRadiusRatio: CGFloat = 0.64
 

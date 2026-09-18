@@ -11,27 +11,41 @@ import Observation
 /// on a detached task, and applies the result only when the run is still the latest one. Every
 /// scope, window, or source change increments the run generation so a slower, older computation
 /// can never overwrite a newer report.
+///
+/// Live traffic is throttled rather than debounced: source changes coalesce into one rebuild,
+/// a rebuild never starts while another is running, and the interval between live rebuilds
+/// grows with the measured build time so a session with tens of thousands of requests neither
+/// starves the report during sustained capture nor keeps a core busy rebuilding it.
 @MainActor @Observable
 final class TrafficInsightsViewModel {
     // MARK: Lifecycle
 
     init(
         debounce: Duration = .milliseconds(350),
-        livePollInterval: Duration = .seconds(2)
+        livePollInterval: Duration = .seconds(2),
+        minimumLiveInterval: Duration = .seconds(1),
+        maximumLiveInterval: Duration = .seconds(5)
     ) {
         self.debounce = debounce
         self.livePollInterval = livePollInterval
+        self.minimumLiveInterval = minimumLiveInterval
+        self.maximumLiveInterval = maximumLiveInterval
     }
 
     // MARK: Internal
 
     static let liveStorageKey = RockxyIdentity.current.defaultsKey("trafficInsights.isLive")
 
+    /// Live rebuilds wait at least this many build durations between starts.
+    static let liveIntervalBuildMultiplier = 3
+
     private(set) var report: TrafficInsightsReport = .empty
     private(set) var hasReport = false
     private(set) var isComputing = false
     private(set) var lastRefreshedAt: Date?
     private(set) var completedRunCount = 0
+    /// Wall-clock duration of the most recent completed build, including the snapshot.
+    private(set) var lastBuildDuration: Duration = .zero
 
     var timelineMetric: TrafficInsightsTimelineMetric = .bytes
     var protocolShareBasis: TrafficInsightsShareBasis = .requests
@@ -83,6 +97,14 @@ final class TrafficInsightsViewModel {
         coordinator != nil
     }
 
+    /// Minimum spacing between live rebuild starts: never below the live floor (a dashboard
+    /// that redraws every card more than once a second only costs frames), never above the
+    /// maximum, and otherwise a multiple of the last build so heavy sessions refresh less often.
+    var liveRefreshInterval: Duration {
+        let scaled = lastBuildDuration * Self.liveIntervalBuildMultiplier
+        return min(max(scaled, minimumLiveInterval, debounce), maximumLiveInterval)
+    }
+
     /// Number of transactions in the selected scope before the time window is applied.
     var scopedTransactionCount: Int {
         guard let coordinator else {
@@ -110,10 +132,12 @@ final class TrafficInsightsViewModel {
         pollingTask?.cancel()
         pollingTask = nil
         runGeneration &+= 1
+        hasPendingLiveRefresh = false
+        isBuildInFlight = false
         isComputing = false
     }
 
-    /// Called by the report view whenever the coordinator source token changes.
+    /// Called whenever the coordinator source token changes.
     func sourceDidChange(_ token: TrafficInsightsSourceToken) {
         guard token != lastSourceToken else {
             return
@@ -180,13 +204,16 @@ final class TrafficInsightsViewModel {
     func refreshAndWait() async {
         refreshTask?.cancel()
         refreshTask = nil
-        await performRefresh()
+        hasPendingLiveRefresh = false
+        await performRefresh(priority: .userInitiated)
     }
 
     // MARK: Private
 
     private let debounce: Duration
     private let livePollInterval: Duration
+    private let minimumLiveInterval: Duration
+    private let maximumLiveInterval: Duration
 
     @ObservationIgnored private weak var coordinator: MainContentCoordinator?
     @ObservationIgnored private var runGeneration: UInt = 0
@@ -194,13 +221,37 @@ final class TrafficInsightsViewModel {
     @ObservationIgnored private var pollingTask: Task<Void, Never>?
     @ObservationIgnored private var cache: TrafficInsightsProtocolCache = .empty
     @ObservationIgnored private var lastSourceToken: TrafficInsightsSourceToken?
+    /// A live source change arrived while a build was running; rebuild once it finishes.
+    @ObservationIgnored private var hasPendingLiveRefresh = false
+    @ObservationIgnored private var lastRefreshStart: ContinuousClock.Instant?
+    @ObservationIgnored private var isBuildInFlight = false
 
+    /// `force` runs regardless of the live switch and supersedes any build in flight; it is the
+    /// path for scope, window, session, and manual refreshes. Live refreshes coalesce instead.
     private func requestRefresh(immediate: Bool, force: Bool = false) {
         guard force || isLive else {
             return
         }
-        refreshTask?.cancel()
-        let delay = immediate ? Duration.zero : debounce
+        if force {
+            hasPendingLiveRefresh = false
+            refreshTask?.cancel()
+            refreshTask = Task { [weak self] in
+                guard !Task.isCancelled else {
+                    return
+                }
+                await self?.performRefresh(priority: .userInitiated)
+            }
+            return
+        }
+        if isBuildInFlight {
+            hasPendingLiveRefresh = true
+            return
+        }
+        // A scheduled live refresh already covers this change.
+        guard refreshTask == nil else {
+            return
+        }
+        let delay = liveRefreshDelay(immediate: immediate)
         refreshTask = Task { [weak self] in
             if delay > .zero {
                 try? await Task.sleep(for: delay)
@@ -208,54 +259,73 @@ final class TrafficInsightsViewModel {
             guard !Task.isCancelled else {
                 return
             }
-            await self?.performRefresh()
+            await self?.performRefresh(priority: .utility)
         }
     }
 
-    private func performRefresh() async {
+    private func liveRefreshDelay(immediate: Bool) -> Duration {
+        let floor = immediate ? Duration.zero : debounce
+        guard let lastRefreshStart else {
+            return floor
+        }
+        let elapsed = ContinuousClock.now - lastRefreshStart
+        return max(floor, liveRefreshInterval - elapsed)
+    }
+
+    private func performRefresh(priority: TaskPriority) async {
         guard let coordinator else {
             report = .empty
             hasReport = true
+            refreshTask = nil
             return
         }
         runGeneration &+= 1
         let generation = runGeneration
+        let startedAt = ContinuousClock.now
+        lastRefreshStart = startedAt
         let samples = coordinator.trafficInsightsSamples(scope: scope)
         var options = TrafficInsightsOptions()
         options.scope = scope
         options.timeWindow = timeWindow
         let cache = cache
         isComputing = true
+        isBuildInFlight = true
 
-        let worker = Task.detached(priority: .userInitiated) {
-            try Task.checkCancellation()
-            let output = TrafficInsightsEngine.buildReport(samples: samples, options: options, cache: cache)
-            try Task.checkCancellation()
-            return output
-        }
-        let output: TrafficInsightsEngine.Output?
-        do {
-            output = try await withTaskCancellationHandler {
-                try await worker.value
-            } onCancel: {
-                worker.cancel()
+        let worker = Task.detached(priority: priority) {
+            TrafficInsightsEngine.buildReport(samples: samples, options: options, cache: cache) {
+                Task.isCancelled
             }
-        } catch {
-            output = nil
+        }
+        let output = await withTaskCancellationHandler {
+            await worker.value
+        } onCancel: {
+            worker.cancel()
         }
 
         guard generation == runGeneration else {
             return
         }
+        isBuildInFlight = false
         isComputing = false
+        refreshTask = nil
+        defer { resumePendingLiveRefreshIfNeeded() }
         guard let output else {
             return
         }
+        lastBuildDuration = ContinuousClock.now - startedAt
         self.cache = output.cache
         report = output.report
         hasReport = true
         lastRefreshedAt = output.report.generatedAt
         completedRunCount += 1
+    }
+
+    private func resumePendingLiveRefreshIfNeeded() {
+        guard hasPendingLiveRefresh else {
+            return
+        }
+        hasPendingLiveRefresh = false
+        requestRefresh(immediate: true)
     }
 
     private func startLivePollingIfNeeded() {

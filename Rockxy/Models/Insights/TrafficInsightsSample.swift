@@ -225,6 +225,22 @@ enum TrafficInsightsContentCategory: String, CaseIterable, Sendable, Hashable {
     }
 
     static func classify(contentType: ContentType?, rawContentTypeHeader: String?, bodyByteCount: Int64) -> Self {
+        // These normalized types can only come from media types that the script, style, and
+        // font checks below would never match, so they skip the header scan entirely.
+        switch contentType {
+        case .json: return .json
+        case .html: return .html
+        case .image: return .image
+        case .xml: return .xml
+        case .form,
+             .multipartForm: return .form
+        case .protobuf: return .protobuf
+        case .text,
+             .binary,
+             .unknown,
+             nil:
+            break
+        }
         let header = rawContentTypeHeader?.lowercased() ?? ""
         if header.contains("javascript") || header.contains("ecmascript") {
             return .javascript
@@ -263,13 +279,32 @@ enum TrafficInsightsContentCategory: String, CaseIterable, Sendable, Hashable {
 /// `String(localized:)` leaves the markup untouched, so inflected copy goes through
 /// `AttributedString` exactly like the request list and export scope summaries.
 nonisolated enum TrafficInsightsText {
+    /// Grammar inflection runs a lexical pass that costs a large fraction of a millisecond, and
+    /// the report resolves dozens of these strings on every render (row labels, tooltips,
+    /// finding titles). Results are memoized by the resolved, still-marked-up string, which
+    /// changes only when a count changes.
     static func inflected(_ value: String.LocalizationValue) -> String {
-        String(AttributedString(
+        let plain = String(localized: value, bundle: RockxyLocalization.bundle, locale: RockxyLocalization.locale)
+        let key = "\(RockxyLocalization.locale.identifier)|\(plain)" as NSString
+        if let cached = inflectionCache.object(forKey: key) {
+            return cached as String
+        }
+        let resolved = String(AttributedString(
             localized: value,
             bundle: RockxyLocalization.bundle,
             locale: RockxyLocalization.locale
         ).characters)
+        inflectionCache.setObject(resolved as NSString, forKey: key)
+        return resolved
     }
+
+    /// Thread-safe; the engine inflects finding titles off the main actor while views inflect
+    /// labels on it.
+    nonisolated(unsafe) private static let inflectionCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 4_096
+        return cache
+    }()
 }
 
 // MARK: - TrafficInsightsSample
@@ -321,18 +356,10 @@ struct TrafficInsightsSample: Sendable, Identifiable {
 
     @MainActor
     init(transaction: HTTPTransaction) {
-        var sent: Int64 = 0
-        var received: Int64 = 0
-        if let connection = transaction.webSocketConnection {
-            for frame in connection.frames {
-                let size = Int64(frame.payload.count)
-                if frame.direction == .sent {
-                    sent += size
-                } else {
-                    received += size
-                }
-            }
-        }
+        // Running totals on the connection: the snapshot must stay O(1) per transaction even
+        // for a socket that has captured thousands of frames.
+        let sent = Int64(transaction.webSocketConnection?.sentPayloadSize ?? 0)
+        let received = Int64(transaction.webSocketConnection?.receivedPayloadSize ?? 0)
         let isTunneled: Bool = if let mode = transaction.sslCapture {
             mode == .tunneled
         } else {
@@ -412,11 +439,11 @@ struct TrafficInsightsSample: Sendable, Identifiable {
     }
 
     var responseContentTypeHeader: String? {
-        response?.headers.first { $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame }?.value
+        response?.headers.first { Self.header($0, isNamed: "Content-Type") }?.value
     }
 
     var responseContentEncoding: String? {
-        response?.headers.first { $0.name.caseInsensitiveCompare("Content-Encoding") == .orderedSame }?
+        response?.headers.first { Self.header($0, isNamed: "Content-Encoding") }?
             .value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
@@ -441,10 +468,18 @@ struct TrafficInsightsSample: Sendable, Identifiable {
 
     /// Stable key for detecting repeated identical fetches: method plus URL without fragment.
     var repeatKey: String {
-        var components = URLComponents(url: request.url, resolvingAgainstBaseURL: false)
-        components?.fragment = nil
-        let normalized = components?.url?.absoluteString ?? request.url.absoluteString
+        // Dropping the fragment textually costs a substring scan instead of a URLComponents
+        // round trip, which matters when every GET in a long session is grouped.
+        let absolute = request.url.absoluteString
+        let normalized = absolute.firstIndex(of: "#").map { String(absolute[..<$0]) } ?? absolute
         return "\(method) \(normalized)"
+    }
+
+    /// Case-insensitive header match with a length pre-check, because the engine resolves
+    /// these for every response and most header names are the wrong length anyway.
+    private static func header(_ header: HTTPHeader, isNamed name: String) -> Bool {
+        header.name.utf8.count == name.utf8.count
+            && header.name.caseInsensitiveCompare(name) == .orderedSame
     }
 
     var displayPath: String {

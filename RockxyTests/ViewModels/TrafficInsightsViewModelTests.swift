@@ -107,6 +107,69 @@ struct TrafficInsightsViewModelTests {
         viewModel.detach()
     }
 
+    @Test("Live source changes coalesce into one throttled rebuild instead of one per batch")
+    func liveSourceChangesCoalesce() async throws {
+        let coordinator = makeCoordinator(hosts: ["a.example.com"])
+        let viewModel = TrafficInsightsViewModel(debounce: .milliseconds(40), minimumLiveInterval: .milliseconds(40))
+        viewModel.attach(to: coordinator)
+        await viewModel.refreshAndWait()
+        let runsBefore = viewModel.completedRunCount
+
+        // Ten batches inside one debounce window, like the 100 ms capture batches.
+        for index in 0 ..< 10 {
+            coordinator.transactions.append(TestFixtures.makeTransaction(url: "https://c.example.com/\(index)"))
+            coordinator.recomputeFilteredTransactions()
+            viewModel.sourceDidChange(coordinator.trafficInsightsSourceToken)
+        }
+
+        var attempts = 0
+        while viewModel.report.totals.requestCount != 11, attempts < 200 {
+            try await Task.sleep(for: .milliseconds(10))
+            attempts += 1
+        }
+        #expect(viewModel.report.totals.requestCount == 11)
+        #expect(viewModel.completedRunCount == runsBefore + 1)
+        viewModel.detach()
+    }
+
+    @Test("Live rebuild spacing grows with the measured build time and stays bounded")
+    func liveIntervalScalesWithBuildTime() async {
+        let coordinator = makeCoordinator(hosts: ["a.example.com"])
+        let viewModel = TrafficInsightsViewModel(
+            debounce: .milliseconds(350),
+            minimumLiveInterval: .seconds(1),
+            maximumLiveInterval: .seconds(5)
+        )
+        // Before any build the live floor applies.
+        #expect(viewModel.liveRefreshInterval == .seconds(1))
+
+        viewModel.attach(to: coordinator)
+        await viewModel.refreshAndWait()
+        // The interval is three builds long, but never shorter than the floor nor longer than
+        // the cap, whatever a loaded test host makes the build take.
+        let scaled = viewModel.lastBuildDuration * TrafficInsightsViewModel.liveIntervalBuildMultiplier
+        #expect(viewModel.lastBuildDuration > .zero)
+        #expect(viewModel.liveRefreshInterval == min(max(scaled, .seconds(1)), .seconds(5)))
+        #expect(viewModel.liveRefreshInterval >= .seconds(1))
+        #expect(viewModel.liveRefreshInterval <= .seconds(5))
+        viewModel.detach()
+    }
+
+    @Test("A cancelled build stops between passes and applies nothing")
+    func cancelledBuildStopsEarly() {
+        let samples = (0 ..< 200).map { index in
+            TrafficInsightsSample(transaction: TestFixtures.makeTransaction(url: "https://h\(index % 7).example.com/\(index)"))
+        }
+        var checks = 0
+        let output = TrafficInsightsEngine.buildReport(samples: samples) {
+            checks += 1
+            return checks >= 2
+        }
+        #expect(output == nil)
+        #expect(checks == 2)
+        #expect(TrafficInsightsEngine.buildReport(samples: samples) { false }?.report.totals.requestCount == 200)
+    }
+
     @Test("Detaching cancels in-flight work so no result is applied afterwards")
     func detachCancelsWork() async throws {
         let coordinator = makeCoordinator(hosts: (0 ..< 200).map { "host-\($0).example.com" })

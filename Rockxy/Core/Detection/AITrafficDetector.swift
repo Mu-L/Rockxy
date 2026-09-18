@@ -16,8 +16,18 @@ nonisolated enum AITrafficDetector {
         isLikelyAI(snapshot: AITrafficSnapshot(transaction: transaction))
     }
 
+    /// Memoized per transaction: the request list rebuilds every row on each capture batch, and
+    /// a body scan per row per batch made that quadratic. The entry is reused only while the
+    /// request and response evidence it was computed from is unchanged.
     static func signal(transaction: HTTPTransaction) -> AITrafficSignal {
-        signal(snapshot: AITrafficSnapshot(transaction: transaction))
+        let key = SignalCacheKey(transaction: transaction)
+        let cacheKey = transaction.id as NSUUID
+        if let cached = signalCache.object(forKey: cacheKey), cached.key == key {
+            return cached.signal
+        }
+        let signal = signal(snapshot: AITrafficSnapshot(transaction: transaction))
+        signalCache.setObject(SignalCacheEntry(key: key, signal: signal), forKey: cacheKey)
+        return signal
     }
 
     static func signal(snapshot: AITrafficSnapshot) -> AITrafficSignal {
@@ -45,21 +55,21 @@ nonisolated enum AITrafficDetector {
 
         let requestPrefix = snapshot.requestBody
             .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
-        if requestPrefix.contains(#""model""#),
-           requestPrefix.contains(#""messages""#)
-            || requestPrefix.contains(#""input""#)
-            || requestPrefix.contains(#""tools""#)
+        if contains(requestPrefix, #""model""#),
+           contains(requestPrefix, #""messages""#)
+            || contains(requestPrefix, #""input""#)
+            || contains(requestPrefix, #""tools""#)
         {
             return true
         }
 
         let responsePrefix = snapshot.responseBody
             .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
-        return responsePrefix.contains(#""usage""#)
-            && (responsePrefix.contains(#""input_tokens""#)
-                || responsePrefix.contains(#""output_tokens""#)
-                || responsePrefix.contains(#""prompt_tokens""#)
-                || responsePrefix.contains(#""completion_tokens""#))
+        return contains(responsePrefix, #""usage""#)
+            && (contains(responsePrefix, #""input_tokens""#)
+                || contains(responsePrefix, #""output_tokens""#)
+                || contains(responsePrefix, #""prompt_tokens""#)
+                || contains(responsePrefix, #""completion_tokens""#))
     }
 
     static func detect(transaction: HTTPTransaction) -> AIInspection? {
@@ -114,6 +124,46 @@ nonisolated enum AITrafficDetector {
     }
 
     // MARK: Private
+
+    private struct SignalCacheKey: Equatable {
+        let requestBodyCount: Int
+        let hasResponse: Bool
+        let responseStatusCode: Int?
+        let responseBodyCount: Int
+        let responseHeaderCount: Int
+
+        init(transaction: HTTPTransaction) {
+            requestBodyCount = transaction.request.body?.count ?? 0
+            hasResponse = transaction.response != nil
+            responseStatusCode = transaction.response?.statusCode
+            responseBodyCount = transaction.response?.body?.count ?? 0
+            responseHeaderCount = transaction.response?.headers.count ?? 0
+        }
+    }
+
+    private final class SignalCacheEntry {
+        let key: SignalCacheKey
+        let signal: AITrafficSignal
+
+        init(key: SignalCacheKey, signal: AITrafficSignal) {
+            self.key = key
+            self.signal = signal
+        }
+    }
+
+    /// `NSCache` is thread-safe and sheds entries under memory pressure; the count limit keeps
+    /// it in step with the largest live session buffer.
+    nonisolated(unsafe) private static let signalCache: NSCache<NSUUID, SignalCacheEntry> = {
+        let cache = NSCache<NSUUID, SignalCacheEntry>()
+        cache.countLimit = 100_000
+        return cache
+    }()
+
+    /// Byte-wise substring search. Foundation's `StringProtocol.contains` walks the text with
+    /// locale-aware comparison and dominated request-list derivation on busy sessions.
+    private static func contains(_ text: String, _ needle: String) -> Bool {
+        text.utf8.firstRange(of: needle.utf8) != nil
+    }
 
     private static func provider(from snapshot: AITrafficSnapshot) -> AIProvider? {
         let host = snapshot.host.lowercased()
