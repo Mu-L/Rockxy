@@ -97,6 +97,16 @@ final class TrafficInsightsViewModel {
         coordinator != nil
     }
 
+    /// Apply the saved default once for a newly created Traffic Tab. Later visits keep that
+    /// tab's own Live/Paused choice even if another tab changes the saved default.
+    func configureInitialLivePreference(_ preference: Bool) {
+        guard !hasConfiguredLivePreference else {
+            return
+        }
+        hasConfiguredLivePreference = true
+        isLive = preference
+    }
+
     /// Minimum spacing between live rebuild starts: never below the live floor (a dashboard
     /// that redraws every card more than once a second only costs frames), never above the
     /// maximum, and otherwise a multiple of the last build so heavy sessions refresh less often.
@@ -121,8 +131,15 @@ final class TrafficInsightsViewModel {
             self.coordinator = coordinator
             cache = .empty
         }
-        lastSourceToken = coordinator.trafficInsightsSourceToken
-        requestRefresh(immediate: true, force: true)
+        let token = coordinator.trafficInsightsSourceToken
+        let sourceWasReplaced = lastSourceToken?.workspaceID != token.workspaceID
+            || lastSourceToken?.sessionGeneration != token.sessionGeneration
+        lastSourceToken = token
+        // A paused report is a snapshot. Merely visiting Traffic and returning must not
+        // silently replace it; a new session or workspace, however, cannot reuse old data.
+        if !hasReport || isLive || sourceWasReplaced {
+            requestRefresh(immediate: true, force: true)
+        }
         startLivePollingIfNeeded()
     }
 
@@ -193,6 +210,11 @@ final class TrafficInsightsViewModel {
 
     func toggleDrillDown(_ drillDown: TrafficInsightsDrillDown) {
         coordinator?.toggleTrafficInsightsDrillDown(drillDown)
+        // A report-driven filter is an explicit user action. Keep a paused Visible report in
+        // sync with the filter the row now shows as active.
+        if !isLive, scope == .visibleTraffic {
+            refreshNow()
+        }
     }
 
     func isDrillDownActive(_ drillDown: TrafficInsightsDrillDown) -> Bool {
@@ -225,6 +247,7 @@ final class TrafficInsightsViewModel {
     @ObservationIgnored private var hasPendingLiveRefresh = false
     @ObservationIgnored private var lastRefreshStart: ContinuousClock.Instant?
     @ObservationIgnored private var isBuildInFlight = false
+    @ObservationIgnored private var hasConfiguredLivePreference = false
 
     /// `force` runs regardless of the live switch and supersedes any build in flight; it is the
     /// path for scope, window, session, and manual refreshes. Live refreshes coalesce instead.

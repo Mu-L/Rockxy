@@ -31,7 +31,7 @@ struct TrafficInsightsReportView: View {
                 TrafficInsightsSourceMonitor(coordinator: coordinator, viewModel: viewModel)
             }
             .onAppear {
-                viewModel.isLive = storedIsLive
+                viewModel.configureInitialLivePreference(storedIsLive)
                 viewModel.attach(to: coordinator)
             }
             .onDisappear {
@@ -141,6 +141,7 @@ struct TrafficInsightsReportView: View {
     private var header: some View {
         TrafficInsightsHeader(
             viewModel: viewModel,
+            onShowTraffic: coordinator.hideTrafficInsights,
             onCopy: copyReport,
             onSave: saveReport
         )
@@ -680,23 +681,61 @@ private struct TrafficInsightsHeader: View {
     // MARK: Internal
 
     let viewModel: TrafficInsightsViewModel
+    let onShowTraffic: () -> Void
     let onCopy: () -> Void
     let onSave: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(String(localized: "Insights", bundle: RockxyLocalization.bundle))
-                    .font(toolMetrics.font(weight: .semibold))
-                Text(subtitle)
-                    .font(toolMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .monospacedDigit()
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+                titleBlock
+                    .frame(minWidth: 160, alignment: .leading)
+                Spacer(minLength: 12)
+                controls(compact: false)
             }
+            VStack(alignment: .leading, spacing: 8) {
+                titleBlock
+                controls(compact: true)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .rockxyFunctionalBar()
+        .padding(.horizontal, toolMetrics.contentHorizontalPadding - Theme.Glass.functionalBarHorizontalInset)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+    }
 
-            Spacer(minLength: 12)
+    // MARK: Private
+
+    @Environment(\.appUIDisplayMetrics) private var appMetrics
+
+    private var toolMetrics: ToolWindowDisplayMetrics {
+        ToolWindowDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(String(localized: "Insights", bundle: RockxyLocalization.bundle))
+                .font(toolMetrics.font(weight: .semibold))
+            Text(subtitle)
+                .font(toolMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .monospacedDigit()
+        }
+    }
+
+    private func controls(compact: Bool) -> some View {
+        HStack(alignment: .center, spacing: toolMetrics.headerSpacing) {
+            Button(action: onShowTraffic) {
+                Label(String(localized: "Traffic", bundle: RockxyLocalization.bundle), systemImage: "list.bullet")
+                    .labelStyle(.iconOnly)
+            }
+            .rockxyGlassButtonStyle()
+            .help(String(localized: "Return to the request list", bundle: RockxyLocalization.bundle))
 
             Picker(
                 String(localized: "Scope", bundle: RockxyLocalization.bundle),
@@ -736,13 +775,13 @@ private struct TrafficInsightsHeader: View {
                 get: { viewModel.isLive },
                 set: { viewModel.isLive = $0 }
             )) {
-                Label(
-                    viewModel.isLive
-                        ? String(localized: "Live", bundle: RockxyLocalization.bundle)
-                        : String(localized: "Paused", bundle: RockxyLocalization.bundle),
-                    systemImage: viewModel.isLive ? "dot.radiowaves.left.and.right" : "pause.fill"
-                )
-                .labelStyle(.titleAndIcon)
+                if compact {
+                    Label(liveTitle, systemImage: liveSymbol)
+                        .labelStyle(.iconOnly)
+                } else {
+                    Label(liveTitle, systemImage: liveSymbol)
+                        .labelStyle(.titleAndIcon)
+                }
             }
             .toggleStyle(.button)
             .help(String(localized: "Pause to freeze the numbers while reading", bundle: RockxyLocalization.bundle))
@@ -788,24 +827,20 @@ private struct TrafficInsightsHeader: View {
                 bundle: RockxyLocalization.bundle
             ))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .rockxyFunctionalBar()
-        .padding(.horizontal, toolMetrics.contentHorizontalPadding - Theme.Glass.functionalBarHorizontalInset)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
-    }
-
-    // MARK: Private
-
-    @Environment(\.appUIDisplayMetrics) private var appMetrics
-
-    private var toolMetrics: ToolWindowDisplayMetrics {
-        ToolWindowDisplayMetrics(appMetrics: appMetrics)
     }
 
     private var report: TrafficInsightsReport {
         viewModel.report
+    }
+
+    private var liveTitle: String {
+        viewModel.isLive
+            ? String(localized: "Live", bundle: RockxyLocalization.bundle)
+            : String(localized: "Paused", bundle: RockxyLocalization.bundle)
+    }
+
+    private var liveSymbol: String {
+        viewModel.isLive ? "dot.radiowaves.left.and.right" : "pause.fill"
     }
 
     private var canExport: Bool {

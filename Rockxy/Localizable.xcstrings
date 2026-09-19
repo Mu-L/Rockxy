@@ -41003,6 +41003,16 @@
         }
       }
     },
+    "Return to the request list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回请求列表"
+          }
+        }
+      }
+    },
     "Show Traffic Insights": {
       "localizations": {
         "zh-Hans": {

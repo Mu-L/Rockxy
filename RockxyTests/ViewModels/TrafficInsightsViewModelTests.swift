@@ -87,6 +87,25 @@ struct TrafficInsightsViewModelTests {
         viewModel.detach()
     }
 
+    @Test("Returning to a paused report preserves its snapshot until refresh")
+    func pausedReportSurvivesNavigation() async {
+        let coordinator = makeCoordinator(hosts: ["a.example.com"])
+        let viewModel = TrafficInsightsViewModel(debounce: .milliseconds(5))
+        viewModel.attach(to: coordinator)
+        await viewModel.refreshAndWait()
+        viewModel.isLive = false
+        viewModel.detach()
+
+        coordinator.transactions.append(TestFixtures.makeTransaction(url: "https://b.example.com/x"))
+        coordinator.recomputeFilteredTransactions()
+        viewModel.attach(to: coordinator)
+        #expect(viewModel.report.totals.requestCount == 1)
+
+        await viewModel.refreshAndWait()
+        #expect(viewModel.report.totals.requestCount == 2)
+        viewModel.detach()
+    }
+
     @Test("Live report picks up debounced source changes")
     func liveReportFollowsSourceChanges() async throws {
         let coordinator = makeCoordinator(hosts: ["a.example.com"])
@@ -295,6 +314,18 @@ struct TrafficInsightsViewModelTests {
         #expect(first.timeWindow == .lastHour)
     }
 
+    @Test("A tab keeps its Live choice when another tab changes the saved default")
+    func livePreferenceIsOnlyAnInitialDefault() {
+        let first = TrafficInsightsViewModel()
+        let second = TrafficInsightsViewModel()
+        first.configureInitialLivePreference(false)
+        second.configureInitialLivePreference(true)
+        first.configureInitialLivePreference(true)
+
+        #expect(!first.isLive)
+        #expect(second.isLive)
+    }
+
     @Test("Drill-downs toggle the same pill, method, and signal filters the list uses")
     func drillDownsToggleListFilters() {
         let coordinator = makeCoordinator(hosts: ["a.example.com", "b.example.com"])
@@ -349,6 +380,7 @@ struct TrafficInsightsViewModelTests {
         #expect(coordinator.selectedTransactionIDs == Set(ids))
         #expect(coordinator.selectedTransaction?.id == ids[0])
         #expect(coordinator.activeMainTab == .traffic)
+        #expect(coordinator.trafficRevealRequest?.transactionID == ids[0])
     }
 
     @Test("Reveal drops advanced rules only when they would hide a requested row")
@@ -405,6 +437,7 @@ struct TrafficInsightsViewModelTests {
         #expect(coordinator.filteredTransactions.count == 3)
         #expect(coordinator.selectedTransactionIDs == Set(ids.prefix(2)))
         #expect(coordinator.selectedTransaction?.id == ids[0])
+        #expect(coordinator.trafficRevealRequest?.transactionID == ids[0])
 
         coordinator.revealTrafficInsightsTransactions([coordinator.transactions[0].id])
         #expect(coordinator.selectedTransaction?.id == coordinator.transactions[0].id)

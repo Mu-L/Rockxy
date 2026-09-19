@@ -356,6 +356,7 @@ struct TrafficInsightsEngineTests {
 
         #expect(report.slowestRequests.map(\.host) == ["a.example.com", "b.example.com", "empty.example.com"])
         #expect(report.largestResponses.map(\.host) == ["b.example.com", "ws.example.com", "a.example.com"])
+        #expect(report.largestResponses.first?.url == "https://b.example.com/test")
     }
 
     @Test("Exact status codes, timing averages, peak rate, and bin transaction IDs are reported")

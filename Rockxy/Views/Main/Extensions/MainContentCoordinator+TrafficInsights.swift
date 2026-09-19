@@ -176,6 +176,8 @@ extension MainContentCoordinator {
         } else {
             selectTransactions(Set(present), primaryID: primary)
         }
+        userDidNavigateTrafficHistory()
+        activeWorkspace.publishTrafficRevealRequest(for: primary)
     }
 }
 

@@ -426,6 +426,7 @@ nonisolated enum TrafficInsightsEngine {
     static func reference(_ sample: ResolvedSample) -> TrafficInsightsTransactionRef {
         TrafficInsightsTransactionRef(
             id: sample.id,
+            url: sample.sample.request.url.absoluteString,
             method: sample.sample.method,
             host: sample.host,
             path: sample.sample.displayPath,

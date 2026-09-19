@@ -393,6 +393,37 @@ private struct TrafficInsightsBinCallout: View {
                     value: TrafficInsightsFormatting.duration(bin.tailDuration)
                 )
             }
+            if metric != .bytes {
+                calloutRow(
+                    color: Theme.Insights.received,
+                    label: String(localized: "Received", bundle: RockxyLocalization.bundle),
+                    value: TrafficInsightsFormatting.bytes(bin.receivedBytes)
+                )
+                calloutRow(
+                    color: Theme.Insights.sent,
+                    label: String(localized: "Sent", bundle: RockxyLocalization.bundle),
+                    value: TrafficInsightsFormatting.bytes(bin.sentBytes)
+                )
+            }
+            if metric != .latency {
+                calloutRow(
+                    color: Theme.Insights.latencyMedian,
+                    label: String(localized: "Median", bundle: RockxyLocalization.bundle),
+                    value: TrafficInsightsFormatting.duration(bin.medianDuration)
+                )
+                calloutRow(
+                    color: Theme.Insights.latencyTail,
+                    label: "p95",
+                    value: TrafficInsightsFormatting.duration(bin.tailDuration)
+                )
+            }
+            if metric != .requests, bin.errorCount > 0 {
+                calloutRow(
+                    color: Theme.Insights.statusClassColor(.serverError),
+                    label: String(localized: "Errors", bundle: RockxyLocalization.bundle),
+                    value: TrafficInsightsFormatting.count(bin.errorCount)
+                )
+            }
             if bin.requestCount > 0 {
                 Text(String(localized: "Click to select", bundle: RockxyLocalization.bundle))
                     .font(toolMetrics.metadataFont())

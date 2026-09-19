@@ -181,6 +181,7 @@ struct TrafficInsightsRankedEntry: Sendable, Equatable, Identifiable {
 /// A transaction the report points back to (slowest request, largest response, finding evidence).
 struct TrafficInsightsTransactionRef: Sendable, Equatable, Identifiable {
     let id: UUID
+    let url: String
     let method: String
     let host: String
     let path: String

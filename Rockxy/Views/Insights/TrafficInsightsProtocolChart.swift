@@ -40,6 +40,10 @@ struct TrafficInsightsProtocolChart: View {
         shares.reduce(0) { $0 + value(of: $1) }
     }
 
+    private var hoveredShare: TrafficInsightsShare<TrafficInsightsProtocol>? {
+        shares.first { $0.key == hoveredProtocol }
+    }
+
     private var accessibilitySummary: String {
         let parts = shares.map { share in
             "\(share.key.displayName) \(TrafficInsightsFormatting.percent(fraction(of: share)))"
@@ -65,18 +69,26 @@ struct TrafficInsightsProtocolChart: View {
         .chartAngleSelection(value: $selectedAngle)
         .chartBackground { _ in
             VStack(spacing: 1) {
-                Text(TrafficInsightsFormatting.count(shares.count))
+                Text(hoveredShare.map { TrafficInsightsFormatting.percent(fraction(of: $0)) }
+                     ?? TrafficInsightsFormatting.count(shares.count))
                     .font(.system(size: toolMetrics.bodyFontSize + 8, weight: .semibold, design: .rounded))
                     .monospacedDigit()
-                Text(
-                    shares.count == 1
-                        ? String(localized: "protocol", bundle: RockxyLocalization.bundle)
-                        : String(localized: "protocols", bundle: RockxyLocalization.bundle)
-                )
+                Text(hoveredShare?.key.displayName ?? (shares.count == 1
+                    ? String(localized: "protocol", bundle: RockxyLocalization.bundle)
+                    : String(localized: "protocols", bundle: RockxyLocalization.bundle)))
                 .font(toolMetrics.metadataFont())
                 .foregroundStyle(.secondary)
+                if let hoveredShare {
+                    Text("\(TrafficInsightsFormatting.count(hoveredShare.requestCount)) · \(TrafficInsightsFormatting.bytes(hoveredShare.bytes))")
+                        .font(toolMetrics.metadataFont())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
             }
+            .frame(maxWidth: 90)
         }
+        .help(hoveredShare.map { legendHelp(for: $0) } ?? accessibilitySummary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
     }

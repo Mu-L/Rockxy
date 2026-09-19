@@ -41,10 +41,20 @@ struct TrafficInsightsBreakdownList<Key: Hashable & Sendable>: View {
                         isActive: target.map(isActive) ?? false,
                         action: target.map { target in { onToggle(target) } }
                     )
-                    .help(help(share.key) ?? "")
+                    .help(tooltip(for: share))
                 }
             }
         }
+    }
+
+    private func tooltip(for share: TrafficInsightsShare<Key>) -> String {
+        var lines = [name(share.key)]
+        lines.append(TrafficInsightsText.inflected("^[\(share.requestCount) request](inflect: true)"))
+        lines.append(TrafficInsightsFormatting.bytes(share.bytes))
+        if let detail = help(share.key), !detail.isEmpty {
+            lines.append(detail)
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
@@ -327,7 +337,7 @@ struct TrafficInsightsOutlierList: View {
         .onHover { isHovering in
             hoveredID = isHovering ? entry.id : (hoveredID == entry.id ? nil : hoveredID)
         }
-        .help("\(entry.method) \(entry.host)\(entry.path)\n\(revealHelp)")
+        .help("\(entry.method) \(entry.url)\n\(revealHelp)")
         .accessibilityLabel(accessibilityLabel(for: entry))
         .accessibilityHint(revealHelp)
         .contextMenu {
@@ -336,7 +346,7 @@ struct TrafficInsightsOutlierList: View {
             }
             Button(String(localized: "Copy URL", bundle: RockxyLocalization.bundle)) {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("\(entry.host)\(entry.path)", forType: .string)
+                NSPasteboard.general.setString(entry.url, forType: .string)
             }
         }
     }
@@ -362,7 +372,7 @@ struct TrafficInsightsOutlierList: View {
 
     private func accessibilityLabel(for entry: TrafficInsightsTransactionRef) -> String {
         let status = entry.statusCode.map(String.init) ?? entry.statusClass.displayName
-        return "\(metricLabel(for: entry)), \(status), \(entry.method) \(entry.host)\(entry.path)"
+        return "\(metricLabel(for: entry)), \(status), \(entry.method) \(entry.url)"
     }
 }
 

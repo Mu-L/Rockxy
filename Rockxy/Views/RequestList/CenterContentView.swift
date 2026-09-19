@@ -99,6 +99,11 @@ struct CenterContentView: View {
                 }
             }
         }
+        .onChange(of: coordinator.selectedTransactionIDs) { _, ids in
+            // Insights can select a whole time bin before the table is remounted. Sync the
+            // full set, not just the primary transaction, into the NSTableView binding.
+            selectedIDs = ids
+        }
         .onChange(of: coordinator.activeWorkspace.id) {
             selectedIDs = coordinator.selectedTransactionIDs
         }
