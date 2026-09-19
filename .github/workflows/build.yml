@@ -90,12 +90,10 @@ jobs:
       - name: Select Xcode
         run: |
           for candidate in \
-            /Applications/Xcode_16.4.app \
-            /Applications/Xcode_16.3.app \
-            /Applications/Xcode_16.2.app \
-            /Applications/Xcode_16.1.app \
-            /Applications/Xcode_16.app \
-            /Applications/Xcode.app; do
+            /Applications/Xcode_26.3.app \
+            /Applications/Xcode_26.2.app \
+            /Applications/Xcode_26.1.1.app \
+            /Applications/Xcode_26.0.1.app; do
             if [ -d "$candidate" ]; then
               sudo xcode-select -s "$candidate/Contents/Developer"
               xcodebuild -version
@@ -147,12 +145,10 @@ jobs:
       - name: Select Xcode
         run: |
           for candidate in \
-            /Applications/Xcode_16.4.app \
-            /Applications/Xcode_16.3.app \
-            /Applications/Xcode_16.2.app \
-            /Applications/Xcode_16.1.app \
-            /Applications/Xcode_16.app \
-            /Applications/Xcode.app; do
+            /Applications/Xcode_26.3.app \
+            /Applications/Xcode_26.2.app \
+            /Applications/Xcode_26.1.1.app \
+            /Applications/Xcode_26.0.1.app; do
             if [ -d "$candidate" ]; then
               sudo xcode-select -s "$candidate/Contents/Developer"
               xcodebuild -version
