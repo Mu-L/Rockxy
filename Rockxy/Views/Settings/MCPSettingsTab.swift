@@ -243,10 +243,16 @@ struct MCPSettingsTab: View {
     private var mcpConfigurationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(String(
-                    localized: "Copy this JSON into a compatible client's MCP configuration.",
-                    bundle: RockxyLocalization.bundle
-                ))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(
+                        localized: "The MCP bridge is inside Rockxy.app on this Mac.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                    Text(String(
+                        localized: "Copy creates client-ready JSON with this Mac's absolute app path, which may include your account name.",
+                        bundle: RockxyLocalization.bundle
+                    ))
+                }
                 .font(settingsMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -263,13 +269,13 @@ struct MCPSettingsTab: View {
                     .font(settingsMetrics.secondaryFont(weight: .medium))
                 }
                 .accessibilityHint(String(
-                    localized: "Copies the bundled Rockxy MCP bridge configuration.",
+                    localized: "Copies JSON with this Mac's absolute Rockxy app path.",
                     bundle: RockxyLocalization.bundle
                 ))
             }
 
             ScrollView(.horizontal) {
-                Text(configJSON)
+                Text(verbatim: "Rockxy.app/Contents/MacOS/rockxy-mcp")
                     .font(settingsMetrics.secondaryFont(monospaced: true))
                     .lineSpacing(4)
                     .fixedSize(horizontal: true, vertical: true)
