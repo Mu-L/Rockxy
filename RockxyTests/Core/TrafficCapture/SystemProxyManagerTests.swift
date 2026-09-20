@@ -501,6 +501,30 @@ struct SystemProxyManagerTests {
         ))
     }
 
+    @Test("timed-out helper restore accepts a verified late completion")
+    func helperRestoreConfirmationWaitsForLateCompletion() async {
+        let counter = ActivationProbeCounter(succeedsOnAttempt: 3)
+
+        let restored = await SystemProxyManager.confirmHelperRestoreAfterTimeout {
+            await counter.probe()
+        }
+
+        #expect(restored)
+        #expect(await counter.attempts == 3)
+    }
+
+    @Test("timed-out helper restore still fails closed when restoration remains unverified")
+    func helperRestoreConfirmationIsBounded() async {
+        let counter = ActivationProbeCounter(succeedsOnAttempt: 5)
+
+        let restored = await SystemProxyManager.confirmHelperRestoreAfterTimeout {
+            await counter.probe()
+        }
+
+        #expect(!restored)
+        #expect(await counter.attempts == 4)
+    }
+
     @Test("activation confirmation tolerates delayed system configuration propagation")
     func activationConfirmationRetries() async {
         let counter = ActivationProbeCounter(succeedsOnAttempt: 3)

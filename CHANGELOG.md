@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Confirmed late helper proxy restoration after an XPC timeout before leaving capture in a recovery state, so stopping capture does not require a second click when macOS finishes the restore moments later.
 - Made Map Local quick-create, response breakpoints, and Copy as Raw/JSON decode gzip, deflate, and Brotli response bodies so compressed JSON is editable and copyable text instead of an opaque binary payload, with the compressed-only headers dropped from the edited response.
 - Attributed locally served responses (Map Local, block, breakpoint abort) to the same client app as forwarded traffic instead of showing them under Unknown.
 - Made No Caching also mark relayed responses uncacheable (strips `ETag`, `Last-Modified`, and `Expires`; sets `Cache-Control: no-cache, no-store, must-revalidate`) so clients cannot serve the next load from their own cache and skip the proxy.

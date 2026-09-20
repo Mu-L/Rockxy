@@ -1419,6 +1419,25 @@ final class SystemProxyManager: @unchecked Sendable {
 
     private func helperRestoreCompletedAfterTransportTimeout() async -> Bool {
         await HelperConnection.shared.resetConnection()
+        // The helper can finish restoring several network services just after the XPC reply
+        // deadline. Keep the listener alive only if repeated read-only checks cannot confirm
+        // that every captured proxy and bypass setting is back to its original value.
+        return await Self.confirmHelperRestoreAfterTimeout { [self] in
+            await helperRestoreStateMatchesCurrentSnapshot()
+        }
+    }
+
+    nonisolated static func confirmHelperRestoreAfterTimeout(
+        probe: @escaping @Sendable () async -> Bool
+    ) async -> Bool {
+        await ProxyActivationConfirmation.confirm(
+            maxAttempts: 4,
+            delay: .milliseconds(300),
+            probe: probe
+        )
+    }
+
+    private func helperRestoreStateMatchesCurrentSnapshot() async -> Bool {
         guard let status = try? await HelperConnection.shared.getProxyStatus(),
               !status.isOverridden else
         {
