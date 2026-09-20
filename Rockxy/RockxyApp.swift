@@ -603,6 +603,7 @@ private struct MainWindowContent: View {
                 set: { lifecycleState.showWelcome = $0 }
             )) {
                 WelcomeView(isFirstLaunch: true, onComplete: { lifecycleState.showWelcome = false },
+                            onClose: { lifecycleState.showWelcome = false },
                             onEnableSystemProxy: { try await coordinator.enableSystemProxyFromWelcome() })
             }
             .sheet(isPresented: Binding(
