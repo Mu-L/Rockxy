@@ -14,11 +14,91 @@ struct OllamaModelInstallerTests {
             "Llama",
             "Gemma",
             "DeepSeek",
-            "Phi",
-            "Mistral",
         ])
         #expect(Set(models.map(\.id)).count == models.count)
         #expect(models.allSatisfy { ($0.approximateDownloadBytes ?? 0) > 0 })
+        #expect(models.allSatisfy { ($0.recommendedUnifiedMemoryBytes ?? 0) > 0 })
+        #expect(models.allSatisfy { !$0.roles.isEmpty })
+        #expect(models.allSatisfy { !OllamaAssistantProvider.denotesCloudModel(id: $0.id) })
+    }
+
+    @Test("Curated catalog covers every role and includes at most one 30B-class model")
+    func curatedCatalogRoles() {
+        let models = AssistantDownloadableModel.recommended
+
+        for role in AssistantLocalModelRole.allCases {
+            #expect(!AssistantDownloadableModel.models(models, withRole: role).isEmpty, "Missing role \(role)")
+        }
+        let gibibyte: Int64 = 1_024 * 1_024 * 1_024
+        let large = models.filter { ($0.approximateDownloadBytes ?? 0) >= 15_000_000_000 }
+        #expect(large.count == 1)
+        #expect(large.first?.id == "qwen3-coder:30b")
+        #expect(large.first?.recommendedUnifiedMemoryBytes == 32 * gibibyte)
+
+        let lowMemory = AssistantDownloadableModel.models(models, withRole: .lowMemory)
+        #expect(lowMemory.allSatisfy { ($0.recommendedUnifiedMemoryBytes ?? .max) <= 8 * gibibyte })
+    }
+
+    @Test("Role filtering preserves catalog order and matches only tagged models")
+    func roleFiltering() {
+        let coding = AssistantDownloadableModel(
+            id: "coder:7b",
+            name: "Coder",
+            roles: [.coding],
+            detail: "fixture"
+        )
+        let balanced = AssistantDownloadableModel(
+            id: "chat:4b",
+            name: "Chat",
+            roles: [.balanced, .lowMemory],
+            detail: "fixture"
+        )
+        let untagged = AssistantDownloadableModel(id: "custom", name: "Custom", detail: "fixture")
+        let models = [coding, balanced, untagged]
+
+        #expect(AssistantDownloadableModel.models(models, withRole: .coding) == [coding])
+        #expect(AssistantDownloadableModel.models(models, withRole: .lowMemory) == [balanced])
+        #expect(AssistantDownloadableModel.models(models, withRole: .reasoning).isEmpty)
+    }
+
+    @Test("Hardware fit classifies physical memory against the recommendation")
+    func hardwareFit() {
+        let gibibyte: Int64 = 1_024 * 1_024 * 1_024
+        let sixteen = 16 * gibibyte
+
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: sixteen,
+            physicalMemoryBytes: UInt64(16 * gibibyte)
+        ) == .recommended)
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: sixteen,
+            physicalMemoryBytes: UInt64(24 * gibibyte)
+        ) == .recommended)
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: sixteen,
+            physicalMemoryBytes: UInt64(12 * gibibyte)
+        ) == .tight)
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: sixteen,
+            physicalMemoryBytes: UInt64(8 * gibibyte)
+        ) == .exceedsMemory)
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: nil,
+            physicalMemoryBytes: UInt64(8 * gibibyte)
+        ) == .unknown)
+        #expect(AssistantDownloadableModel.hardwareFit(
+            recommendedUnifiedMemoryBytes: 0,
+            physicalMemoryBytes: UInt64(8 * gibibyte)
+        ) == .unknown)
+
+        let model = AssistantDownloadableModel(
+            id: "fixture:30b",
+            name: "Fixture",
+            recommendedUnifiedMemoryBytes: 32 * gibibyte,
+            detail: "fixture"
+        )
+        #expect(model.hardwareFit(physicalMemoryBytes: UInt64(24 * gibibyte)) == .tight)
+        #expect(model.hardwareFit(physicalMemoryBytes: UInt64(64 * gibibyte)) == .recommended)
     }
 
     @Test("Ollama pull streams progress and requires an explicit success event")

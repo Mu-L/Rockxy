@@ -1,5 +1,41 @@
 import SwiftUI
 
+// MARK: - MCPSettingsServerState
+
+enum MCPSettingsServerState: Equatable {
+    case disabled
+    case starting
+    case running(port: Int?)
+    case failed(String)
+    case stopped
+
+    // MARK: Internal
+
+    static func resolve(
+        isEnabled: Bool,
+        isStarting: Bool,
+        isRunning: Bool,
+        activePort: Int?,
+        lastError: String?
+    )
+        -> Self
+    {
+        guard isEnabled else {
+            return .disabled
+        }
+        if isStarting {
+            return .starting
+        }
+        if isRunning {
+            return .running(port: activePort)
+        }
+        if let lastError {
+            return .failed(lastError)
+        }
+        return .stopped
+    }
+}
+
 // Settings tab for the MCP (Model Context Protocol) server.
 // Provides enable/disable toggle, connection configuration JSON,
 // privacy controls, and status display.
@@ -48,6 +84,8 @@ struct MCPSettingsTab: View {
     @AppStorage(RockxyIdentity.current.defaultsKey("mcp.serverEnabled")) private var mcpEnabled = false
 
     @AppStorage(RockxyIdentity.current.defaultsKey("mcp.redactSensitiveData")) private var mcpRedactSensitiveData = true
+    @State private var didCopyConfig = false
+    @State private var copyFeedbackGeneration = UUID()
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var mcpCoordinator: MCPServerCoordinator {
@@ -56,6 +94,16 @@ struct MCPSettingsTab: View {
 
     private var settingsMetrics: SettingsDisplayMetrics {
         SettingsDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var serverState: MCPSettingsServerState {
+        MCPSettingsServerState.resolve(
+            isEnabled: mcpEnabled,
+            isStarting: mcpCoordinator.isStarting,
+            isRunning: mcpCoordinator.isRunning,
+            activePort: mcpCoordinator.activePort,
+            lastError: mcpCoordinator.lastError
+        )
     }
 
     // MARK: - Helpers
@@ -113,30 +161,80 @@ struct MCPSettingsTab: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
-            if mcpCoordinator.isRunning, let port = mcpCoordinator.activePort {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 10, height: 10)
-                    Text(String(localized: "Running on port \(String(port))", bundle: RockxyLocalization.bundle))
-                        .font(settingsMetrics.secondaryFont(weight: .medium))
-                        .foregroundStyle(.green)
-                }
-                .padding(.leading, 4)
+            SettingsFieldRow(String(localized: "Status", bundle: RockxyLocalization.bundle)) {
+                serverStatus
             }
 
-            if let error = mcpCoordinator.lastError {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 10, height: 10)
-                    Text(error)
-                        .font(settingsMetrics.secondaryFont())
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.leading, 4)
+            SettingsFieldRow(String(localized: "Client Activity", bundle: RockxyLocalization.bundle)) {
+                clientActivityStatus
             }
+        }
+    }
+
+    @ViewBuilder private var serverStatus: some View {
+        switch serverState {
+        case .disabled:
+            Label(String(localized: "Disabled", bundle: RockxyLocalization.bundle), systemImage: "circle")
+                .foregroundStyle(.secondary)
+        case .starting:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(String(localized: "Starting…", bundle: RockxyLocalization.bundle))
+            }
+            .foregroundStyle(.secondary)
+        case let .running(port):
+            Label {
+                if let port {
+                    Text(String(localized: "Running on port \(port)", bundle: RockxyLocalization.bundle))
+                } else {
+                    Text(String(localized: "Running", bundle: RockxyLocalization.bundle))
+                }
+            } icon: {
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .foregroundStyle(.green)
+        case let .failed(error):
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        case .stopped:
+            Label(String(localized: "Stopped", bundle: RockxyLocalization.bundle), systemImage: "pause.circle.fill")
+                .foregroundStyle(.orange)
+        }
+    }
+
+    @ViewBuilder private var clientActivityStatus: some View {
+        if let activity = mcpCoordinator.latestClientActivity {
+            VStack(alignment: .leading, spacing: 3) {
+                Label {
+                    Text("\(activity.clientName) \(activity.clientVersion)")
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+                .foregroundStyle(.green)
+
+                Text(
+                    String(
+                        localized: "Last validated method: \(activity.lastMethod) · \(activity.lastActivityAt.formatted(date: .abbreviated, time: .shortened))",
+                        bundle: RockxyLocalization.bundle
+                    )
+                )
+                .font(settingsMetrics.metadataFont(monospaced: true))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            }
+        } else if case .running = serverState {
+            Label(
+                String(localized: "Waiting for a client to connect", bundle: RockxyLocalization.bundle),
+                systemImage: "ellipsis.circle"
+            )
+            .foregroundStyle(.secondary)
+        } else {
+            Label(
+                String(localized: "Start the MCP server to receive client activity", bundle: RockxyLocalization.bundle),
+                systemImage: "bolt.horizontal.circle"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -156,13 +254,18 @@ struct MCPSettingsTab: View {
                 Button {
                     copyConfigToClipboard()
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.on.doc")
-                            .font(settingsMetrics.metadataFont())
-                        Text(String(localized: "Copy", bundle: RockxyLocalization.bundle))
-                            .font(settingsMetrics.secondaryFont(weight: .medium))
-                    }
+                    Label(
+                        didCopyConfig
+                            ? String(localized: "Copied", bundle: RockxyLocalization.bundle)
+                            : String(localized: "Copy", bundle: RockxyLocalization.bundle),
+                        systemImage: didCopyConfig ? "checkmark" : "doc.on.doc"
+                    )
+                    .font(settingsMetrics.secondaryFont(weight: .medium))
                 }
+                .accessibilityHint(String(
+                    localized: "Copies the bundled Rockxy MCP bridge configuration.",
+                    bundle: RockxyLocalization.bundle
+                ))
             }
 
             ScrollView(.horizontal) {
@@ -180,6 +283,17 @@ struct MCPSettingsTab: View {
                     .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            Label(
+                String(
+                    localized: "After saving the configuration, connect or relaunch the client. Its first validated handshake will appear in Client Activity above.",
+                    bundle: RockxyLocalization.bundle
+                ),
+                systemImage: "checkmark.circle"
+            )
+            .font(settingsMetrics.metadataFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -188,7 +302,10 @@ struct MCPSettingsTab: View {
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle(
-                String(localized: "Redact Sensitive Data Before Sending to AI", bundle: RockxyLocalization.bundle),
+                String(
+                    localized: "Redact Sensitive Data Before Sending to MCP Clients",
+                    bundle: RockxyLocalization.bundle
+                ),
                 isOn: $mcpRedactSensitiveData
             )
             .toggleStyle(.checkbox)
@@ -202,6 +319,18 @@ struct MCPSettingsTab: View {
             .font(settingsMetrics.secondaryFont())
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+
+            Label(
+                mcpRedactSensitiveData
+                    ? String(localized: "Redaction is active for MCP tool results.", bundle: RockxyLocalization.bundle)
+                    : String(
+                        localized: "Warning: MCP tool results may include captured secrets.",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                systemImage: mcpRedactSensitiveData ? "checkmark.shield.fill" : "exclamationmark.triangle.fill"
+            )
+            .font(settingsMetrics.metadataFont(weight: .medium))
+            .foregroundStyle(mcpRedactSensitiveData ? Color.green : Color.orange)
         }
     }
 
@@ -213,7 +342,7 @@ struct MCPSettingsTab: View {
                 String(
                     localized: """
                     MCP (Model Context Protocol) allows compatible tools to interact with \
-                    Rockxy. The AI can read captured HTTP traffic, inspect request and \
+                    Rockxy. MCP clients can read captured HTTP traffic, inspect request and \
                     response details, export requests as cURL, and view proxy rules and status.
                     """, bundle: RockxyLocalization.bundle
                 )
@@ -229,5 +358,15 @@ struct MCPSettingsTab: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(configJSON, forType: .string)
+        let generation = UUID()
+        copyFeedbackGeneration = generation
+        didCopyConfig = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard copyFeedbackGeneration == generation else {
+                return
+            }
+            didCopyConfig = false
+        }
     }
 }
