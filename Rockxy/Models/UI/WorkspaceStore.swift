@@ -183,6 +183,7 @@ final class WorkspaceStore {
             initialFilter: source.filterCriteria
         )
         duplicate.activeMainTab = source.activeMainTab
+        duplicate.sidebarSelection = source.sidebarSelection
         duplicate.inspectorLayout = source.inspectorLayout
         duplicate.isContextDockVisible = source.isContextDockVisible
         duplicate.contextDockTab = source.contextDockTab

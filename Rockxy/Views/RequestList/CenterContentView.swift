@@ -26,7 +26,13 @@ struct CenterContentView: View {
                 onOpenToolWindow: onOpenToolWindow
             )
 
-            inspectorWorkspace
+            if coordinator.activeMainTab == .insights {
+                TrafficInsightsReportView(coordinator: coordinator)
+                    .id(coordinator.activeWorkspace.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                inspectorWorkspace
+            }
 
             StatusBarView(
                 totalCount: coordinator.filteredTransactions.count,
@@ -92,6 +98,11 @@ struct CenterContentView: View {
                     selectedIDs = []
                 }
             }
+        }
+        .onChange(of: coordinator.selectedTransactionIDs) { _, ids in
+            // Insights can select a whole time bin before the table is remounted. Sync the
+            // full set, not just the primary transaction, into the NSTableView binding.
+            selectedIDs = ids
         }
         .onChange(of: coordinator.activeWorkspace.id) {
             selectedIDs = coordinator.selectedTransactionIDs

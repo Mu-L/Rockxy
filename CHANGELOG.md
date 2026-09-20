@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added Traffic Insights: an Insights destination at the top of the Focus Navigator that turns the active Traffic Tab into a live report — findings with one-click handoffs, traffic over time by bytes, outcome, or latency, protocol share, outcome/content/method breakdowns, top apps and hosts, slowest requests, largest responses, an All/Visible scope that follows the current filters, trailing time windows, pause/resume, and Markdown export.
 - Added persistent application-scoped HTTPS Decrypt and Tunnel rules, with a unified app/host rule list and observed-host picker.
 - Added local Projects with Project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only `.rockxyproject` import and export.
 - Added nearby iPhone transfers as a dedicated iOS workspace so the current Mac traffic remains available.
@@ -35,7 +36,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Recorded the pre-rewrite URL of Map Remote hits in the matched-rule action summary shown by Synopsis and Context Details.
 - Kept the authored wildcard pattern and match semantics on Modify Headers rules so reopening a rule shows what was typed instead of the compiled regular expression.
 - Made AI, Web3 JSON-RPC, and x402 detection, Diff, HAR export, MCP flow previews, Debug Assistant Review Data, and Gist redaction read gzip, deflate, and Brotli response bodies as decoded text; compressed API responses previously reported unavailable fields, diffed as binary, exported with empty HAR content, and could carry unredacted secrets through Gist publishing.
-- Omitted encoded request and response bodies from redacted shares when their contents cannot be decoded and inspected, instead of exporting the unreadable bytes.
 - Fixed the Developer Setup window laying out taller than its frame at the default size, which hid the search field, the first setup targets, and the detail header under the title bar.
 - Stopped Developer Setup from reporting "Local probe unavailable" for guide-only and device targets that never run the validation probe; they now show their real readiness state.
 - Prevented a Modify Headers rule or script header with a space in its name or a line break in its value from aborting the relayed response with an empty reply; such headers are now rejected in the editor and skipped at runtime while the rest of the rule still applies.
@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Relayed plain `http://` traffic to HTTP/HTTPS upstream proxies as absolute-form requests instead of `CONNECT` tunnels, so gateways that only allow `CONNECT` to TLS ports (Squid's default policy) no longer answer every plain-HTTP request with `502`.
 - Switched the sidebar to Library and selected the new entry after "Add favorite app or domain"; from Browse or Focus mode the sheet previously closed with no visible result.
 - Relayed plain HTTP carried inside a CONNECT tunnel (how many clients send `ws://` upgrades and some send `http://` through a proxy) as normal http:// traffic with captured frames and rows — with or without HTTPS interception, since no certificate is involved — instead of an opaque raw tunnel labelled "Certificate Required".
+- Reduced main-thread work during capture: request-list rows no longer re-run AI traffic detection on every batch, and Traffic Insights coalesces live rebuilds to at most once per second, scaling the interval with session size.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
 - Made Clear Session and Follow Live discoverable in a dedicated traffic command bar above protocol filters while keeping filtering and footer tools in their existing workflows.

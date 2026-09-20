@@ -618,26 +618,33 @@ extension MainContentCoordinator {
         publishObservedDomains(for: changedApps)
     }
 
-    func moveObservedDomainFromUnknown(for transaction: HTTPTransaction) {
+    func moveObservedDomainsFromUnknown(for transactions: [HTTPTransaction]) {
         let unknown = normalizedObservedAppName(nil)
-        let destination = normalizedObservedAppName(transaction.clientApp)
-        let host = normalizedObservedHost(transaction.request.host)
-        guard destination != unknown, !host.isEmpty else {
-            return
-        }
+        var changedApps: Set<String> = []
+        for transaction in transactions {
+            let destination = normalizedObservedAppName(transaction.clientApp)
+            let host = normalizedObservedHost(transaction.request.host)
+            guard destination != unknown, !host.isEmpty else {
+                continue
+            }
 
-        if let count = observedDomainCountsByApp[unknown]?[host] {
-            if count <= 1 {
-                observedDomainCountsByApp[unknown]?.removeValue(forKey: host)
-            } else {
-                observedDomainCountsByApp[unknown]?[host] = count - 1
+            if let count = observedDomainCountsByApp[unknown]?[host] {
+                if count <= 1 {
+                    observedDomainCountsByApp[unknown]?.removeValue(forKey: host)
+                } else {
+                    observedDomainCountsByApp[unknown]?[host] = count - 1
+                }
+                if observedDomainCountsByApp[unknown]?.isEmpty == true {
+                    observedDomainCountsByApp.removeValue(forKey: unknown)
+                }
             }
-            if observedDomainCountsByApp[unknown]?.isEmpty == true {
-                observedDomainCountsByApp.removeValue(forKey: unknown)
-            }
+            observedDomainCountsByApp[destination, default: [:]][host, default: 0] += 1
+            changedApps.insert(destination)
         }
-        observedDomainCountsByApp[destination, default: [:]][host, default: 0] += 1
-        publishObservedDomains(for: [unknown, destination])
+        if !changedApps.isEmpty {
+            changedApps.insert(unknown)
+            publishObservedDomains(for: changedApps)
+        }
     }
 
     func installAndTrustCertificateFromInspector() {

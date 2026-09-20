@@ -12,7 +12,7 @@ struct WorkspaceStateTests {
         #expect(workspace.title == String(localized: "All Traffic", bundle: RockxyLocalization.bundle))
         #expect(workspace.isClosable == true)
         #expect(workspace.activeMainTab == .traffic)
-        #expect(workspace.sidebarSelection == nil)
+        #expect(workspace.sidebarSelection == .allApps)
         #expect(workspace.inspectorTab == .headers)
         #expect(workspace.inspectorLayout == .hidden)
         #expect(!workspace.isContextDockVisible)

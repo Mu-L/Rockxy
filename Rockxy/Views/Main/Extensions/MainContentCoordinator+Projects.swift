@@ -383,6 +383,12 @@ extension MainContentCoordinator {
         }
         seedActiveProjectCaptureStateIfNeeded()
         activateCurrentProject()
+        // A saved Insights selection can restore a paused, empty report even while capture
+        // is already receiving requests. Begin each traffic session at the source list;
+        // the user can open Insights when there is something to investigate.
+        if activeMainTab == .traffic || activeMainTab == .insights {
+            selectSidebarItem(.allApps)
+        }
         hasHydratedProjects = true
         beginProjectTabObservation()
     }

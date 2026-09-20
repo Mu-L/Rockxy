@@ -55,8 +55,14 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
 
     let id: UUID
     let timestamp: Date
-    var request: HTTPRequestData
-    var response: HTTPResponseData?
+    var request: HTTPRequestData {
+        didSet { signalEvidenceRevision &+= 1 }
+    }
+    var response: HTTPResponseData? {
+        didSet { signalEvidenceRevision &+= 1 }
+    }
+    /// Changes whenever request or response evidence used by cached list signals changes.
+    @ObservationIgnored private(set) var signalEvidenceRevision: UInt64 = 0
     var state: TransactionState
     var timingInfo: TimingInfo?
     var measuredDuration: TimeInterval?

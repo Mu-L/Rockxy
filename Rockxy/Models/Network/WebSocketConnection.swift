@@ -9,6 +9,8 @@ final class WebSocketConnection: @unchecked Sendable {
         self.upgradeRequest = upgradeRequest
         self._frames = frames
         self._totalPayloadSize = frames.reduce(0) { $0 + $1.payload.count }
+        self._sentPayloadSize = frames.reduce(0) { $0 + ($1.direction == .sent ? $1.payload.count : 0) }
+        self._receivedPayloadSize = frames.reduce(0) { $0 + ($1.direction == .received ? $1.payload.count : 0) }
     }
 
     // MARK: Internal
@@ -17,6 +19,16 @@ final class WebSocketConnection: @unchecked Sendable {
 
     var totalPayloadSize: Int {
         lock.withLock { _totalPayloadSize }
+    }
+
+    /// Payload bytes by direction, kept as running totals so per-connection byte accounting
+    /// never has to walk the frame array.
+    var sentPayloadSize: Int {
+        lock.withLock { _sentPayloadSize }
+    }
+
+    var receivedPayloadSize: Int {
+        lock.withLock { _receivedPayloadSize }
     }
 
     var frames: [WebSocketFrameData] {
@@ -41,8 +53,7 @@ final class WebSocketConnection: @unchecked Sendable {
 
     func addFrame(_ frame: WebSocketFrameData) {
         lock.withLock {
-            _frames.append(frame)
-            _totalPayloadSize += frame.payload.count
+            appendLocked(frame)
         }
     }
 
@@ -74,8 +85,7 @@ final class WebSocketConnection: @unchecked Sendable {
                 _isCaptureLimitReached = true
                 return false
             }
-            _frames.append(frame)
-            _totalPayloadSize += frame.payload.count
+            appendLocked(frame)
             return true
         }
     }
@@ -91,5 +101,19 @@ final class WebSocketConnection: @unchecked Sendable {
     private let lock = NSLock()
     private var _frames: [WebSocketFrameData]
     private var _totalPayloadSize: Int
+    private var _sentPayloadSize: Int
+    private var _receivedPayloadSize: Int
     private var _isCaptureLimitReached = false
+
+    /// Caller holds `lock`.
+    private func appendLocked(_ frame: WebSocketFrameData) {
+        _frames.append(frame)
+        _totalPayloadSize += frame.payload.count
+        switch frame.direction {
+        case .sent:
+            _sentPayloadSize += frame.payload.count
+        case .received:
+            _receivedPayloadSize += frame.payload.count
+        }
+    }
 }

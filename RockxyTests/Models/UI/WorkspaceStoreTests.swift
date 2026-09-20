@@ -269,6 +269,18 @@ struct WorkspaceStoreTests {
         #expect(store.activeWorkspaceID == copy.id)
     }
 
+    @Test("Duplicating an Insights tab preserves its sidebar destination")
+    func duplicateInsightsWorkspace() throws {
+        let store = WorkspaceStore()
+        let original = store.createWorkspace(title: "Report")
+        original.activeMainTab = .insights
+        original.sidebarSelection = .insights
+
+        let copy = try #require(store.duplicateWorkspace(id: original.id))
+        #expect(copy.activeMainTab == .insights)
+        #expect(copy.sidebarSelection == .insights)
+    }
+
     @Test("Duplicate keeps its generated title within the structural bound")
     func duplicateWorkspaceBoundsGeneratedTitle() throws {
         let store = WorkspaceStore()
