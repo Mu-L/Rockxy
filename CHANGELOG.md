@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Recorded the pre-rewrite URL of Map Remote hits in the matched-rule action summary shown by Synopsis and Context Details.
 - Kept the authored wildcard pattern and match semantics on Modify Headers rules so reopening a rule shows what was typed instead of the compiled regular expression.
 - Made AI, Web3 JSON-RPC, and x402 detection, Diff, HAR export, MCP flow previews, Debug Assistant Review Data, and Gist redaction read gzip, deflate, and Brotli response bodies as decoded text; compressed API responses previously reported unavailable fields, diffed as binary, exported with empty HAR content, and could carry unredacted secrets through Gist publishing.
+- Omitted encoded request and response bodies from redacted shares when their contents cannot be decoded and inspected, instead of exporting the unreadable bytes.
 - Fixed the Developer Setup window laying out taller than its frame at the default size, which hid the search field, the first setup targets, and the detail header under the title bar.
 - Stopped Developer Setup from reporting "Local probe unavailable" for guide-only and device targets that never run the validation probe; they now show their real readiness state.
 - Prevented a Modify Headers rule or script header with a space in its name or a line break in its value from aborting the relayed response with an empty reply; such headers are now rejected in the editor and skipped at runtime while the rest of the rule still applies.
