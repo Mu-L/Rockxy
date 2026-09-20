@@ -18,15 +18,16 @@ nonisolated enum AITrafficDetector {
 
     /// Memoized per transaction: the request list rebuilds every row on each capture batch, and
     /// a body scan per row per batch made that quadratic. The entry is reused only while the
-    /// request and response evidence it was computed from is unchanged.
+    /// same transaction's request and response evidence is unchanged.
     static func signal(transaction: HTTPTransaction) -> AITrafficSignal {
-        let key = SignalCacheKey(transaction: transaction)
         let cacheKey = transaction.id as NSUUID
-        if let cached = signalCache.object(forKey: cacheKey), cached.key == key {
+        if let cached = signalCache.object(forKey: cacheKey),
+           cached.transaction === transaction, cached.revision == transaction.signalEvidenceRevision
+        {
             return cached.signal
         }
         let signal = signal(snapshot: AITrafficSnapshot(transaction: transaction))
-        signalCache.setObject(SignalCacheEntry(key: key, signal: signal), forKey: cacheKey)
+        signalCache.setObject(SignalCacheEntry(transaction: transaction, signal: signal), forKey: cacheKey)
         return signal
     }
 
@@ -125,28 +126,14 @@ nonisolated enum AITrafficDetector {
 
     // MARK: Private
 
-    private struct SignalCacheKey: Equatable {
-        let requestBodyCount: Int
-        let hasResponse: Bool
-        let responseStatusCode: Int?
-        let responseBodyCount: Int
-        let responseHeaderCount: Int
-
-        init(transaction: HTTPTransaction) {
-            requestBodyCount = transaction.request.body?.count ?? 0
-            hasResponse = transaction.response != nil
-            responseStatusCode = transaction.response?.statusCode
-            responseBodyCount = transaction.response?.body?.count ?? 0
-            responseHeaderCount = transaction.response?.headers.count ?? 0
-        }
-    }
-
     private final class SignalCacheEntry {
-        let key: SignalCacheKey
+        weak var transaction: HTTPTransaction?
+        let revision: UInt64
         let signal: AITrafficSignal
 
-        init(key: SignalCacheKey, signal: AITrafficSignal) {
-            self.key = key
+        init(transaction: HTTPTransaction, signal: AITrafficSignal) {
+            self.transaction = transaction
+            revision = transaction.signalEvidenceRevision
             self.signal = signal
         }
     }

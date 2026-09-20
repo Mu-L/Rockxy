@@ -94,6 +94,32 @@ struct AITrafficDetectorTests {
         #expect(!ResponseInspectorTab.availableTabs().contains(.ai))
     }
 
+    @Test("Cached AI signal follows same-length request and response edits")
+    func cachedSignalInvalidatesOnEvidenceEdits() {
+        let aiRequest = Data(#"{"model":1,"input":1}"#.utf8)
+        let otherRequest = Data(#"{"other":1,"field":1}"#.utf8)
+        #expect(aiRequest.count == otherRequest.count)
+        let transaction = makeTransaction(url: "https://example.com/invoke", requestBody: aiRequest)
+
+        #expect(AITrafficDetector.signal(transaction: transaction).isLikelyAI)
+        transaction.request.body = otherRequest
+        #expect(!AITrafficDetector.signal(transaction: transaction).isLikelyAI)
+
+        let aiResponse = Data(#"{"usage":1,"input_tokens":1}"#.utf8)
+        let otherResponse = Data(#"{"other":1,"other_tokens":1}"#.utf8)
+        #expect(aiResponse.count == otherResponse.count)
+        transaction.response?.body = aiResponse
+        #expect(AITrafficDetector.signal(transaction: transaction).isLikelyAI)
+        transaction.response?.body = otherResponse
+        #expect(!AITrafficDetector.signal(transaction: transaction).isLikelyAI)
+
+        let replacement = HTTPTransaction(id: transaction.id, request: HTTPRequestData(
+            method: "POST", url: transaction.request.url, httpVersion: "HTTP/1.1",
+            headers: [], body: aiRequest, contentType: .json
+        ))
+        #expect(AITrafficDetector.signal(transaction: replacement).isLikelyAI)
+    }
+
     @Test("AI tab is available only when AI metadata is likely")
     func aiTabAvailabilityFollowsDetection() {
         let requestBody = Data(#"{"model":"gpt-4.1-mini","input":"fixture"}"#.utf8)

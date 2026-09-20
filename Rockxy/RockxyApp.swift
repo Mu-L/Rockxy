@@ -893,11 +893,11 @@ struct RockxyMenuCommands: Commands {
             Divider()
 
             Button(
-                actions?.isShowingTrafficInsights == true
+                proxyActions.isShowingTrafficInsights
                     ? String(localized: "Hide Traffic Insights", bundle: RockxyLocalization.bundle)
                     : String(localized: "Show Traffic Insights", bundle: RockxyLocalization.bundle)
             ) {
-                actions?.toggleTrafficInsights()
+                proxyActions.toggleTrafficInsights()
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
 
