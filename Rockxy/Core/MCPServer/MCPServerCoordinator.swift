@@ -12,6 +12,11 @@ final class MCPServerCoordinator {
 
     init(sessionStoreFactory: @escaping @MainActor () throws -> SessionStore = { try SessionStore() }) {
         self.sessionStoreFactory = sessionStoreFactory
+        clientActivityStore.onChange = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.refreshClientActivity()
+            }
+        }
     }
 
     // MARK: Internal
@@ -24,6 +29,13 @@ final class MCPServerCoordinator {
     private(set) var activePort: Int?
     private(set) var lastError: String?
     private(set) var isStarting = false
+
+    /// Latest non-sensitive client activity for the current server run, for UI display.
+    /// Cleared whenever the server starts or stops.
+    private(set) var latestClientActivity: MCPClientActivity?
+
+    /// Thread-safe source of `latestClientActivity`; written by the NIO handler.
+    let clientActivityStore = MCPClientActivityStore()
 
     /// Called when the app's main coordinator is available to wire live data providers.
     func attachProviders(
@@ -81,8 +93,11 @@ final class MCPServerCoordinator {
             Self.logger.debug("MCP server start skipped because it is already running or starting")
             return
         }
+        lastError = nil
         isStarting = true
         defer { isStarting = false }
+        clientActivityStore.reset()
+        latestClientActivity = nil
 
         let config = MCPServerConfiguration(
             port: settings.mcpServerPort
@@ -113,7 +128,8 @@ final class MCPServerCoordinator {
 
         let server = MCPServer(
             configuration: config,
-            toolRegistry: registry
+            toolRegistry: registry,
+            activityStore: clientActivityStore
         )
 
         do {
@@ -145,6 +161,8 @@ final class MCPServerCoordinator {
 
     func stop() async {
         stopRequested = true
+        clientActivityStore.reset()
+        latestClientActivity = nil
         guard let server = mcpServer else {
             if !isStarting {
                 stopRequested = false
@@ -174,10 +192,15 @@ final class MCPServerCoordinator {
     )
 
     private let sessionStoreFactory: @MainActor () throws -> SessionStore
+
     private var mcpServer: MCPServer?
     private var redactionState: MCPRedactionState?
     private var cachedSessionStore: SessionStore?
     private weak var flowProvider: (any MCPLiveFlowProvider)?
     private weak var stateProvider: (any MCPProxyStateProvider)?
     private var stopRequested = false
+
+    private func refreshClientActivity() {
+        latestClientActivity = clientActivityStore.latest
+    }
 }

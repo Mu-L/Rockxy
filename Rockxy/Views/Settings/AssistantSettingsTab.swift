@@ -69,10 +69,21 @@ struct AssistantSettingsTab: View {
     @State private var viewModel = AssistantSettingsViewModel()
     @State private var pendingModelRemoval: AssistantModel?
     @State private var isRuntimeSetupPresented = false
+    @State private var selectedModelRole: AssistantLocalModelRole?
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var settingsMetrics: SettingsDisplayMetrics {
         SettingsDisplayMetrics(appMetrics: appMetrics)
+    }
+
+    private var filteredRecommendedModels: [AssistantDownloadableModel] {
+        guard let selectedModelRole else {
+            return AssistantDownloadableModel.recommended
+        }
+        return AssistantDownloadableModel.models(
+            AssistantDownloadableModel.recommended,
+            withRole: selectedModelRole
+        )
     }
 
     private var accessSection: some View {
@@ -129,54 +140,88 @@ struct AssistantSettingsTab: View {
             }
         }
 
-        SettingsIndentedContent {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(
-                    String(
-                        localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions.",
-                        bundle: RockxyLocalization.bundle
-                    )
+        VStack(alignment: .leading, spacing: 12) {
+            Text(
+                String(
+                    localized: "Run the model on this Mac with no API usage fees. Rockxy checks the local runtime before model and traffic actions.",
+                    bundle: RockxyLocalization.bundle
                 )
-                .font(settingsMetrics.secondaryFont())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)
+            )
+            .font(settingsMetrics.secondaryFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)
 
-                ollamaRuntimeStatus
-
-                if viewModel.isOllamaReady {
-                    Text(String(localized: "Installed Models", bundle: RockxyLocalization.bundle))
-                        .font(settingsMetrics.secondaryFont(weight: .medium))
-
-                    if viewModel.installedOllamaModels.isEmpty {
-                        Label(
-                            String(localized: "No local models installed yet.", bundle: RockxyLocalization.bundle),
-                            systemImage: "shippingbox"
-                        )
-                        .font(settingsMetrics.secondaryFont())
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(
-                            Color(nsColor: .textBackgroundColor).opacity(0.4),
-                            in: RoundedRectangle(cornerRadius: 7)
-                        )
-                    } else {
-                        ForEach(viewModel.installedOllamaModels) { model in
-                            installedModelRow(model)
-                        }
+            SettingsFieldRow(String(localized: "Local Runtime", bundle: RockxyLocalization.bundle)) {
+                Picker(
+                    String(localized: "Local Runtime", bundle: RockxyLocalization.bundle),
+                    selection: Binding(
+                        get: { viewModel.selectedLocalRuntimeID },
+                        set: viewModel.selectLocalRuntime
+                    )
+                ) {
+                    ForEach(AssistantLocalRuntimePreset.all) { preset in
+                        Text(preset.name).tag(preset.id)
                     }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: settingsMetrics.fieldWidth(420))
+            }
 
-                    Text(String(localized: "Curated Local Models", bundle: RockxyLocalization.bundle))
-                        .font(settingsMetrics.secondaryFont(weight: .medium))
+            localRuntimeSummary
 
-                    ForEach(AssistantDownloadableModel.recommended) { model in
-                        downloadableModelRow(model)
+            if viewModel.selectedLocalRuntimeID == .ollama, viewModel.isOllamaReady {
+                Text(String(localized: "Installed Models", bundle: RockxyLocalization.bundle))
+                    .font(settingsMetrics.secondaryFont(weight: .medium))
+
+                if viewModel.installedOllamaModels.isEmpty {
+                    Label(
+                        String(localized: "No local models installed yet.", bundle: RockxyLocalization.bundle),
+                        systemImage: "shippingbox"
+                    )
+                    .font(settingsMetrics.secondaryFont())
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(
+                        Color(nsColor: .textBackgroundColor).opacity(0.4),
+                        in: RoundedRectangle(cornerRadius: 7)
+                    )
+                } else {
+                    ForEach(viewModel.installedOllamaModels) { model in
+                        installedModelRow(model)
                     }
-
-                    customModelDownload
                 }
 
+                HStack(spacing: 12) {
+                    Text(String(localized: "Curated Local Models", bundle: RockxyLocalization.bundle))
+                        .font(settingsMetrics.secondaryFont(weight: .medium))
+                    Spacer(minLength: 12)
+                    Picker(
+                        String(localized: "Recommended For", bundle: RockxyLocalization.bundle),
+                        selection: $selectedModelRole
+                    ) {
+                        Text(String(localized: "All Purposes", bundle: RockxyLocalization.bundle))
+                            .tag(nil as AssistantLocalModelRole?)
+                        ForEach(AssistantLocalModelRole.allCases, id: \.self) { role in
+                            Text(localModelRoleTitle(role)).tag(Optional(role))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                    .frame(width: settingsMetrics.fieldWidth(170))
+                }
+
+                ForEach(filteredRecommendedModels) { model in
+                    downloadableModelRow(model)
+                }
+
+                customModelDownload
+            }
+
+            if viewModel.selectedLocalRuntimeID == .ollama {
                 HStack(spacing: 8) {
                     if viewModel.isRefreshingModelLibrary {
                         ProgressView().controlSize(.small)
@@ -193,20 +238,82 @@ struct AssistantSettingsTab: View {
                         .controlSize(.small)
                     }
                 }
+            }
 
-                Label(
-                    String(
+            Label(
+                viewModel.selectedLocalRuntimeID == .ollama
+                    ? String(
                         localized: "Model files remain managed by Ollama. Downloads can require several GB of disk and memory; model license terms vary.",
                         bundle: RockxyLocalization.bundle
+                    )
+                    : String(
+                        localized: "Rockxy connects to this runtime but does not install, load, or remove its models.",
+                        bundle: RockxyLocalization.bundle
                     ),
-                    systemImage: "externaldrive"
+                systemImage: viewModel.selectedLocalRuntimeID == .ollama ? "externaldrive" : "lock.shield"
+            )
+            .font(settingsMetrics.metadataFont())
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var localRuntimeSummary: some View {
+        let preset = viewModel.selectedLocalRuntimePreset
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: localRuntimeIcon(preset.integrationTier))
+                    .foregroundStyle(localRuntimeColor(preset.integrationTier))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(preset.name)
+                            .font(settingsMetrics.secondaryFont(weight: .medium))
+                        Text(localRuntimeTierTitle(preset.integrationTier))
+                            .font(settingsMetrics.metadataFont(weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        Spacer(minLength: 12)
+
+                        if let documentationURL = preset.documentationURL {
+                            Link(
+                                String(localized: "Setup Guide", bundle: RockxyLocalization.bundle),
+                                destination: documentationURL
+                            )
+                            .controlSize(.small)
+                            .fixedSize(horizontal: true, vertical: false)
+                        }
+                    }
+                    Text(preset.setupSummary)
+                        .font(settingsMetrics.metadataFont())
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(preset.apiSurface) · \(viewModel.selectedLocalRuntimeEndpoint)")
+                        .font(settingsMetrics.metadataFont(monospaced: true))
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                }
+                .layoutPriority(1)
+            }
+
+            if preset.id == .ollama {
+                Divider()
+                ollamaRuntimeStatus
+            } else {
+                Label(
+                    String(
+                        localized: "Start the runtime first, then refresh models and test the connection below.",
+                        bundle: RockxyLocalization.bundle
+                    ),
+                    systemImage: "arrow.down"
                 )
                 .font(settingsMetrics.metadataFont())
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private var ollamaRuntimeStatus: some View {
@@ -689,6 +796,12 @@ struct AssistantSettingsTab: View {
                     Text(model.catalogDetail)
                         .font(settingsMetrics.metadataFont())
                         .foregroundStyle(.secondary)
+                    Label(
+                        localModelFitTitle(model),
+                        systemImage: localModelFitIcon(model)
+                    )
+                    .font(settingsMetrics.metadataFont())
+                    .foregroundStyle(localModelFitColor(model))
                     Text(model.id)
                         .font(settingsMetrics.metadataFont(monospaced: true))
                         .foregroundStyle(.tertiary)
@@ -797,6 +910,93 @@ struct AssistantSettingsTab: View {
             .fixedSize(horizontal: true, vertical: false)
     }
 
+    private func localRuntimeTierTitle(_ tier: AssistantLocalRuntimeIntegrationTier) -> String {
+        switch tier {
+        case .managed:
+            String(localized: "Managed by Rockxy", bundle: RockxyLocalization.bundle)
+        case .optimized:
+            String(localized: "Optimized preset", bundle: RockxyLocalization.bundle)
+        case .compatible:
+            String(localized: "Compatible endpoint", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func localRuntimeIcon(_ tier: AssistantLocalRuntimeIntegrationTier) -> String {
+        switch tier {
+        case .managed: "checkmark.seal.fill"
+        case .optimized: "slider.horizontal.3"
+        case .compatible: "network"
+        }
+    }
+
+    private func localRuntimeColor(_ tier: AssistantLocalRuntimeIntegrationTier) -> Color {
+        switch tier {
+        case .managed: .green
+        case .optimized: .accentColor
+        case .compatible: .secondary
+        }
+    }
+
+    private func localModelRoleTitle(_ role: AssistantLocalModelRole) -> String {
+        switch role {
+        case .balanced:
+            String(localized: "Balanced", bundle: RockxyLocalization.bundle)
+        case .coding:
+            String(localized: "Coding", bundle: RockxyLocalization.bundle)
+        case .reasoning:
+            String(localized: "Reasoning", bundle: RockxyLocalization.bundle)
+        case .lowMemory:
+            String(localized: "Low Memory", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func localModelFit(_ model: AssistantDownloadableModel) -> AssistantLocalModelHardwareFit {
+        model.hardwareFit(physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory)
+    }
+
+    private func localModelFitTitle(_ model: AssistantDownloadableModel) -> String {
+        let memory = model.recommendedUnifiedMemoryBytes.map {
+            ByteCountFormatter.string(fromByteCount: $0, countStyle: .memory)
+        }
+        switch localModelFit(model) {
+        case .recommended:
+            return String(
+                localized: "Fits this Mac · \(memory ?? "memory checked") recommended",
+                bundle: RockxyLocalization.bundle
+            )
+        case .tight:
+            return String(
+                localized: "Tight fit · \(memory ?? "more memory") recommended",
+                bundle: RockxyLocalization.bundle
+            )
+        case .exceedsMemory:
+            return String(
+                localized: "Memory intensive · \(memory ?? "more memory") recommended",
+                bundle: RockxyLocalization.bundle
+            )
+        case .unknown:
+            return String(localized: "Memory requirement unknown", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func localModelFitIcon(_ model: AssistantDownloadableModel) -> String {
+        switch localModelFit(model) {
+        case .recommended: "checkmark.circle.fill"
+        case .tight: "gauge.with.dots.needle.67percent"
+        case .exceedsMemory: "exclamationmark.triangle.fill"
+        case .unknown: "questionmark.circle"
+        }
+    }
+
+    private func localModelFitColor(_ model: AssistantDownloadableModel) -> Color {
+        switch localModelFit(model) {
+        case .recommended: .green
+        case .tight: .orange
+        case .exceedsMemory: .red
+        case .unknown: .secondary
+        }
+    }
+
     private func providerDisplayTitle(_ provider: AssistantProviderKind) -> String {
         guard !provider.isImplemented else {
             return provider.title
@@ -868,13 +1068,16 @@ final class AssistantSettingsViewModel {
         let saved = manager.settings.assistantProviderConfiguration
         savedConfiguration = saved
         savedConfigurations = manager.settings.assistantProviderConfigurations
-        configuration = saved ?? AssistantProviderConfiguration(kind: .ollama)
+        let initialConfiguration = saved ?? AssistantProviderConfiguration(kind: .ollama)
+        configuration = initialConfiguration
+        selectedLocalRuntimeID = Self.localRuntimeID(for: initialConfiguration)
         isEnabled = manager.settings.debugAssistantModelAccessEnabled
     }
 
     // MARK: Internal
 
     var configuration: AssistantProviderConfiguration
+    private(set) var selectedLocalRuntimeID: AssistantLocalRuntimePreset.ID
     private(set) var savedConfiguration: AssistantProviderConfiguration?
     private(set) var savedConfigurations: [AssistantProviderConfiguration]
     var credentialInput = ""
@@ -902,6 +1105,18 @@ final class AssistantSettingsViewModel {
             return false
         }
         return !savedConfiguration.kind.requiresCredential || hasStoredCredential
+    }
+
+    var selectedLocalRuntimePreset: AssistantLocalRuntimePreset {
+        AssistantLocalRuntimePreset.preset(id: selectedLocalRuntimeID)
+    }
+
+    var selectedLocalRuntimeEndpoint: String {
+        let preset = selectedLocalRuntimePreset
+        if configuration.kind == preset.providerKind {
+            return configuration.baseURL
+        }
+        return preset.defaultBaseURL ?? String(localized: "Custom endpoint", bundle: RockxyLocalization.bundle)
     }
 
     var isOllamaReady: Bool {
@@ -1005,6 +1220,9 @@ final class AssistantSettingsViewModel {
         }
         invalidateConnectionAction()
         configuration = AssistantProviderConfiguration(kind: kind)
+        if kind == .ollama || kind == .openAICompatible {
+            selectedLocalRuntimeID = Self.localRuntimeID(for: configuration)
+        }
         credentialInput = ""
         hasStoredCredential = false
         models = []
@@ -1012,6 +1230,26 @@ final class AssistantSettingsViewModel {
         hasError = false
         refreshCredentialState()
         if kind == .ollama {
+            models = installedOllamaModels
+            refreshModelLibrary()
+        }
+    }
+
+    func selectLocalRuntime(_ id: AssistantLocalRuntimePreset.ID) {
+        let preset = AssistantLocalRuntimePreset.preset(id: id)
+        guard selectedLocalRuntimeID != id || configuration.kind != preset.providerKind else {
+            return
+        }
+        invalidateConnectionAction()
+        configuration = preset.applied(to: configuration)
+        selectedLocalRuntimeID = id
+        credentialInput = ""
+        hasStoredCredential = false
+        models = []
+        statusMessage = nil
+        hasError = false
+        refreshCredentialState()
+        if id == .ollama {
             models = installedOllamaModels
             refreshModelLibrary()
         }
@@ -1025,6 +1263,9 @@ final class AssistantSettingsViewModel {
         manager.selectAssistantConfiguration(configurationID)
         savedConfiguration = selected
         configuration = selected
+        if selected.kind == .ollama || selected.kind == .openAICompatible {
+            selectedLocalRuntimeID = Self.localRuntimeID(for: selected)
+        }
         credentialInput = ""
         models = []
         statusMessage = nil
@@ -1486,6 +1727,7 @@ final class AssistantSettingsViewModel {
             refreshSavedConfigurations()
             savedConfiguration = manager.settings.assistantProviderConfiguration
             configuration = savedConfiguration ?? AssistantProviderConfiguration(kind: .ollama)
+            selectedLocalRuntimeID = Self.localRuntimeID(for: configuration)
             credentialInput = ""
             models = []
             isEnabled = manager.settings.debugAssistantModelAccessEnabled
@@ -1542,6 +1784,17 @@ final class AssistantSettingsViewModel {
             preconditionFailure("The built-in Ollama URL must remain valid")
         }
         return defaultURL
+    }
+
+    private static func localRuntimeID(
+        for configuration: AssistantProviderConfiguration
+    )
+        -> AssistantLocalRuntimePreset.ID
+    {
+        guard configuration.kind == .ollama || configuration.kind == .openAICompatible else {
+            return .ollama
+        }
+        return AssistantLocalRuntimePreset.matching(configuration)?.id ?? .openAICompatible
     }
 
     private func startAndVerifyOllama(at applicationURL: URL) async throws {
@@ -1748,6 +2001,7 @@ final class AssistantSettingsViewModel {
             && token.configurationID == configuration.id
             && token.providerKind == configuration.kind
             && token.baseURL == configuration.baseURL
+            && token.model == configuration.model
     }
 
     private func setSuccess(_ message: String) {
@@ -1771,6 +2025,7 @@ private struct AssistantProviderConnectionToken {
         configurationID = configuration.id
         providerKind = configuration.kind
         baseURL = configuration.baseURL
+        model = configuration.model
     }
 
     // MARK: Internal
@@ -1779,4 +2034,5 @@ private struct AssistantProviderConnectionToken {
     let configurationID: UUID
     let providerKind: AssistantProviderKind
     let baseURL: String
+    let model: String
 }

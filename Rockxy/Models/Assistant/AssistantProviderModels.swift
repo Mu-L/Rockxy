@@ -386,6 +386,7 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
         id: UUID = UUID(),
         kind: AssistantProviderKind,
         baseURL: String? = nil,
+        localRuntimePresetID: AssistantLocalRuntimePreset.ID? = nil,
         model: String? = nil,
         region: String? = nil,
         contextWindowTokens: Int? = nil,
@@ -396,6 +397,7 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
         self.id = id
         self.kind = kind
         self.baseURL = baseURL ?? kind.defaultBaseURL
+        self.localRuntimePresetID = localRuntimePresetID
         self.model = model ?? kind.defaultModel
         self.region = region
         self.contextWindowTokens = Self.normalizedContextWindowTokens(
@@ -414,6 +416,10 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         kind = try container.decode(AssistantProviderKind.self, forKey: .kind)
         baseURL = try container.decodeIfPresent(String.self, forKey: .baseURL) ?? kind.defaultBaseURL
+        localRuntimePresetID = try container.decodeIfPresent(
+            AssistantLocalRuntimePreset.ID.self,
+            forKey: .localRuntimePresetID
+        )
         model = try container.decodeIfPresent(String.self, forKey: .model) ?? kind.defaultModel
         region = try container.decodeIfPresent(String.self, forKey: .region)
         contextWindowTokens = try Self.normalizedContextWindowTokens(
@@ -439,6 +445,8 @@ struct AssistantProviderConfiguration: Codable, Equatable, Identifiable {
     var id: UUID
     var kind: AssistantProviderKind
     var baseURL: String
+    /// Provider-neutral identity for a named local-runtime preset. The endpoint remains editable.
+    var localRuntimePresetID: AssistantLocalRuntimePreset.ID?
     var model: String
     var region: String?
     var contextWindowTokens: Int?

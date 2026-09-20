@@ -197,6 +197,8 @@ struct SettingsWindowReadabilityTests {
         #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
         #expect(source.components(separatedBy: "settingsMetrics.fieldWidth(520)").count - 1 == 1)
         #expect(source.components(separatedBy: ".layoutPriority(1)").count - 1 >= 3)
+        #expect(source.contains("VStack(alignment: .leading, spacing: 12)"))
+        #expect(!source.contains("SettingsIndentedContent {\n            VStack(alignment: .leading, spacing: 12)"))
         #expect(source
             .contains("modelAction(model)\n                    .fixedSize(horizontal: true, vertical: false)"))
     }
@@ -212,6 +214,21 @@ struct SettingsWindowReadabilityTests {
         #expect(source.contains("ScrollView(.horizontal)"))
         #expect(source.contains(".fixedSize(horizontal: true, vertical: true)"))
         #expect(source.contains(".textSelection(.enabled)"))
+        #expect(source.contains("Client Activity"))
+        #expect(source.contains("Last validated method:"))
+        #expect(source.contains("Redaction is active for MCP tool results."))
+    }
+
+    @Test("Assistant local runtimes keep the native settings hierarchy readable")
+    func assistantLocalRuntimeCatalogUsesAdaptiveRows() throws {
+        let source = try readProjectFile("Rockxy/Views/Settings/AssistantSettingsTab.swift")
+
+        #expect(source.contains("AssistantLocalRuntimePreset.all"))
+        #expect(source.contains("SettingsFieldRow(String(localized: \"Local Runtime\""))
+        #expect(source.contains("String(localized: \"Recommended For\""))
+        #expect(source.contains(".frame(maxWidth: settingsMetrics.fieldWidth(680), alignment: .leading)"))
+        #expect(source.contains("localModelFitTitle"))
+        #expect(!source.contains("LazyVGrid("))
     }
 
     @Test("Appearance settings changes the bundle-driven app language without restarting")
