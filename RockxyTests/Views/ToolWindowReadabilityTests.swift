@@ -239,6 +239,11 @@ struct ToolWindowReadabilityTests {
         #expect(source.contains("3. Connection"))
         #expect(source.contains("Download & Use"))
         #expect(source.contains("Global Default"))
+        #expect(source.contains("AssistantLocalRuntimePreset.all"))
+        #expect(source.contains("Recommended For"))
+        #expect(source.contains("localModelFitTitle"))
+        #expect(source.contains("Managed by Rockxy"))
+        #expect(source.contains("Compatible endpoint"))
         #expect(source.contains("Image(systemName: \"arrow.clockwise\")"))
         #expect(source.contains(".accessibilityLabel(String("))
         #expect(source.contains("localized: \"Refresh Available Models\""))
@@ -649,6 +654,20 @@ struct ToolWindowReadabilityTests {
             #expect(scalesControls, "\(file) should scale control containers from display metrics")
             #expect(source.contains("toolMetrics.font("), "\(file) should apply readable fonts to controls")
         }
+    }
+
+    @Test("Pending listener changes offer a restart action instead of a dead-end notice")
+    func listenerRestartNoticeOffersRestart() throws {
+        let source = try readProjectFile("Rockxy/Views/Settings/AdvancedProxySettingsView.swift")
+        let coordinator = try readProjectFile("Rockxy/Views/Main/Extensions/MainContentCoordinator+ProxyControl.swift")
+        let start = try #require(source.range(of: "private var restartNoticeRow: some View {"))
+        let end = try #require(source.range(of: "// MARK: - Helper Tool", range: start.upperBound ..< source.endIndex))
+        let notice = source[start.lowerBound ..< end.lowerBound]
+
+        #expect(notice.contains("Button(String(localized: \"Restart Proxy\", bundle: RockxyLocalization.bundle))"))
+        #expect(notice.contains("coordinator.restartProxy()"))
+        #expect(notice.contains(".disabled(coordinator.isProxyStopping || coordinator.isProxyStarting)"))
+        #expect(coordinator.contains("func restartProxy()"))
     }
 
     @Test("Settings-launched windows keep fixed shells while scaling typography")
@@ -1149,7 +1168,8 @@ struct ToolWindowReadabilityTests {
         #expect(editorSource.contains("RoundedRectangle(cornerRadius: 6)"))
         #expect(editorSource.contains(".stroke(Color(nsColor: .separatorColor), lineWidth: 1)"))
         #expect(editorSource.contains(#"String(localized: "Path and query", bundle: RockxyLocalization.bundle)"#))
-        #expect(editorSource.contains(#"String(localized: "Host, path, and query", bundle: RockxyLocalization.bundle)"#))
+        #expect(editorSource
+            .contains(#"String(localized: "Host, path, and query", bundle: RockxyLocalization.bundle)"#))
         #expect(editorSource.contains("httpSchemePrefix(itemId: itemId)"))
         #expect(editorSource.contains("canApplySelectedChanges = validation.isValid"))
         #expect(editorSource.contains("syncRawMessageFromDraft(itemId: selectedItemId, force: true)"))
@@ -1336,6 +1356,7 @@ struct ToolWindowReadabilityTests {
 
     private enum ResolveError: Error, CustomStringConvertible {
         case rootNotFound(filePath: String)
+        case relativePathNotFound(filePath: String)
 
         // MARK: Internal
 
@@ -1343,6 +1364,8 @@ struct ToolWindowReadabilityTests {
             switch self {
             case let .rootNotFound(filePath):
                 "Could not locate RockxyTests directory from \(filePath)"
+            case let .relativePathNotFound(filePath):
+                "Could not locate the project-relative source path in \(filePath)"
             }
         }
     }
@@ -1354,7 +1377,7 @@ struct ToolWindowReadabilityTests {
     }
 
     private func projectSwiftFiles(under relativePath: String) throws -> [String] {
-        let root = try resolveProjectRoot()
+        let root = try resolveProjectRoot().resolvingSymlinksInPath()
         let url = root.appendingPathComponent(relativePath)
         let enumerator = FileManager.default.enumerator(
             at: url,
@@ -1366,8 +1389,11 @@ struct ToolWindowReadabilityTests {
             guard fileURL.pathExtension == "swift" else {
                 continue
             }
-            let relative = fileURL.path.replacingOccurrences(of: root.path + "/", with: "")
-            files.append(relative)
+            let marker = "/\(relativePath)/"
+            guard let range = fileURL.path.range(of: marker, options: .backwards) else {
+                throw ResolveError.relativePathNotFound(filePath: fileURL.path)
+            }
+            files.append(String(fileURL.path[range.lowerBound...].dropFirst()))
         }
         return files.sorted()
     }

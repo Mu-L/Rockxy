@@ -23,6 +23,8 @@ The upgrade request itself appears as a normal HTTP transaction in the traffic l
 
 For HTTPS WebSocket connections (`wss://`), Rockxy decrypts frames using the same MITM approach as regular HTTPS traffic — the [HTTPS Interception](/features/https-interception) setup is required.
 
+Plain `ws://` connections are captured whether the client sends the upgrade as an absolute-form request or tunnels it through `CONNECT` (browsers and most WebSocket libraries do the latter). When HTTPS interception is active, Rockxy looks at the first bytes of every tunnel: TLS is decrypted, a plain HTTP request line is relayed as `http://` traffic with its frames, and anything else stays a raw tunnel.
+
 ## Frame Inspector
 
 Select a WebSocket connection in the traffic list. The **WebSocket** tab auto-selects in the response inspector. Each frame displays:

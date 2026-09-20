@@ -83,10 +83,35 @@ enum ProxyHandlerShared {
         return { transaction in
             transaction.matchedRuleID = matchedRuleID
             transaction.matchedRuleName = matchedRuleName
-            transaction.matchedRuleActionSummary = matchedRuleActionSummary
+            // A handler may already have attached a request-specific summary (for example
+            // the pre-rewrite URL of a Map Remote hit); keep it over the generic rule text.
+            if transaction.matchedRuleActionSummary == nil {
+                transaction.matchedRuleActionSummary = matchedRuleActionSummary
+            }
             transaction.matchedRulePattern = matchedRulePattern
             downstream(transaction)
         }
+    }
+
+    /// Wraps a callback so a Map Remote transaction records where the client originally
+    /// sent the request. The request list and inspector show the rewritten destination;
+    /// without this the original URL would be lost, leaving no way to confirm which
+    /// address the rule redirected.
+    nonisolated static func makeMapRemoteProvenanceCallback(
+        originalURL: URL,
+        downstream: @escaping @Sendable (HTTPTransaction) -> Void
+    )
+        -> @Sendable (HTTPTransaction) -> Void
+    {
+        let summary = mapRemoteActionSummary(originalURL: originalURL)
+        return { transaction in
+            transaction.matchedRuleActionSummary = summary
+            downstream(transaction)
+        }
+    }
+
+    nonisolated static func mapRemoteActionSummary(originalURL: URL) -> String {
+        "Map Remote (from \(originalURL.absoluteString))"
     }
 
     /// Rebuild the outbound `HTTPRequestHead` from a (possibly script-mutated)
@@ -132,18 +157,23 @@ enum ProxyHandlerShared {
         //
         // - Chunked uploads: drop any Content-Length (they're mutually exclusive
         //   per RFC 9112 §6) and keep the chunked framing.
-        // - Otherwise: write Content-Length matching the mutated body size,
-        //   even if the original request had no body / no Content-Length. This
-        //   prevents downstream servers from hanging on a missing length when a
-        //   script added a body to a previously bodyless request.
+        // - A non-empty body, or a request that already declared a length: write
+        //   Content-Length matching the mutated body size. This prevents downstream
+        //   servers from hanging on a missing length when a script added a body to a
+        //   previously bodyless request.
+        // - A bodyless request that never declared a length keeps that shape. Adding
+        //   `Content-Length: 0` to a GET breaks WebSocket handshakes — servers refuse
+        //   an upgrade that advertises a body — and is not what the client sent.
         let isChunked = headers["Transfer-Encoding"].contains(where: {
             $0.lowercased().contains("chunked")
         })
+        let size = requestData.body?.count ?? 0
         if isChunked {
             headers.remove(name: "Content-Length")
-        } else {
-            let size = requestData.body?.count ?? 0
+        } else if size > 0 || originalHead.headers.contains(name: "Content-Length") {
             headers.replaceOrAdd(name: "Content-Length", value: "\(size)")
+        } else {
+            headers.remove(name: "Content-Length")
         }
 
         return HTTPRequestHead(

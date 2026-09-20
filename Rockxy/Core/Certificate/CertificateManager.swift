@@ -130,8 +130,8 @@ actor CertificateManager {
     /// the call site: reporting a cached positive result after the trust settings behind it
     /// disappeared, and reporting keychain metadata alone as a validated green state.
     ///
-    /// - Parameter trustPresent: admin trust-settings metadata for the current CA. This is a
-    ///   prefilter only, so its presence can never by itself mean "trusted".
+    /// - Parameter trustPresent: client-compatible user trust metadata for the current CA. This
+    ///   is a prefilter only, so its presence can never by itself mean "trusted".
     /// - Parameter cachedValidation: the result of the last real `SecTrust` evaluation for the
     ///   currently adopted CA, or `nil` when none has run for it.
     nonisolated static func trustEvaluationDecision(
@@ -373,7 +373,7 @@ actor CertificateManager {
     /// running the expensive `validateSystemTrust()` — it avoids the problem
     /// where a stale cached `false` in `isRootCATrusted()` blocks recovery.
     ///
-    /// Fail-closed: an unreadable admin domain answers `false` here. Callers that could act on
+    /// Fail-closed: an unreadable user domain answers `false` here. Callers that could act on
     /// that answer — status resolution and `installAndTrust` — use the strict read instead, so a
     /// failed read never becomes a reason to write trust settings.
     func hasTrustSettingsPresent() -> Bool {
@@ -391,14 +391,11 @@ actor CertificateManager {
     /// Ensures the root CA exists, installs it, and marks it trusted for TLS — always in this
     /// app process, through the native Security API.
     ///
-    /// Trust is not a privilege problem, it is an *interaction* problem. Writing `.admin` trust
-    /// settings goes through Authorization Services, which needs a session that can ask a human;
-    /// a launchd root daemon has none. Routed through the helper, the request arrived, the
-    /// certificate was added to the System keychain, and the trust write then failed with
-    /// "authorization denied" — an installed, still-untrusted root, and no way to prompt for the
-    /// approval macOS was waiting for. Root is not the missing piece, a GUI session is. So the
-    /// installation runs here, unconditionally: a reachable, current helper takes the same path as
-    /// an absent one, and no helper installation RPC is sent from this call at all.
+    /// The app-side path stores the certificate in the login Keychain and writes its positive trust
+    /// record in the matching `.user` domain. A legacy cross-domain shape — login certificate with
+    /// `.admin` trust only — passes SecTrust in Safari but is not discovered by Chromium's built-in
+    /// verifier, so it is intentionally treated as needing repair. The helper installation RPC is
+    /// not used here because its System-keychain path has different ownership and lifecycle rules.
     ///
     /// The operation only ever *adds*. No certificate is deleted, swept, or rolled back on any
     /// path: not the previous Rockxy root, not a login-keychain copy of it, not on a failed add,
@@ -444,8 +441,8 @@ actor CertificateManager {
         }
 
         // Preflight, before the add, the trust write, and the authorization dialog:
-        // if the Keychain or the admin trust domain cannot be read, this call cannot tell whether
-        // the work is already done. Asking for administrator approval on the strength of a failed
+        // if the Keychain or the user trust domain cannot be read, this call cannot tell whether
+        // the work is already done. Starting another trust write on the strength of a failed
         // read is exactly the second prompt this guard exists to prevent, so it stops here with a
         // reason the UI can offer a recheck for.
         let initialTrust = resolveSystemTrust(performValidation: true)
@@ -454,8 +451,8 @@ actor CertificateManager {
         }
 
         // Idempotency: a CA that is already genuinely system-trusted needs no reinstall and above
-        // all no admin prompt. This runs the real SecTrust evaluation, so it cannot short-circuit
-        // on keychain metadata alone.
+        // all no trust rewrite. Both client-compatible metadata and the real SecTrust evaluation
+        // must pass, so legacy admin-only metadata cannot short-circuit this repair.
         if initialTrust.isSystemTrustValidated {
             Self.logger.info("Root CA is already system-trusted — skipping reinstall")
             postCertificateStatusChanged()
@@ -496,8 +493,8 @@ actor CertificateManager {
         }
         #endif
 
-        // The only installation step: add to the login keychain and write admin trust through the
-        // macOS authorization dialog. From here on every exit republishes status, so no surface
+        // The only installation step: add to the login keychain and write matching user trust.
+        // From here on every exit republishes status, so no surface
         // keeps reporting the pre-install answer after work that may have been applied.
         mayHaveMutatedTrustState = true
         do {
@@ -1011,8 +1008,8 @@ actor CertificateManager {
     /// mid-install is rejected instead of racing it.
     private var isInstallingTrust = false
 
-    /// True when the last status answer could not read storage or the admin trust domain. Kept so
-    /// the diagnostic that failure recorded is dropped as soon as a real read succeeds.
+    /// True when the last status answer could not read storage or the required user trust domain.
+    /// Kept so the diagnostic that failure recorded is dropped as soon as a real read succeeds.
     private var hadUnreadableStatus = false
 
     /// True while `reset()` or `removeRootCATrust()` is suspended in the authorization dialog or
@@ -1620,24 +1617,24 @@ actor CertificateManager {
         #if DEBUG
         if let statusReadOverrideForTests {
             let status = try statusReadOverrideForTests()
-            return (status.isInstalledInKeychain, status.hasAdminTrustSettings)
+            return (status.isInstalledInKeychain, status.hasClientCompatibleTrustSettings)
         }
         #endif
         return try (installedStateForAdoptedRoot(), strictTrustSettingsPresent())
     }
 
-    /// Admin trust-settings metadata for the adopted root CA, or a throw when the domain could
-    /// not be read. The exact DER is preferred; the label is only used when nothing is adopted.
+    /// Client-compatible user trust metadata for the adopted root CA, or a throw when the domain
+    /// could not be read. The exact DER is preferred; the label is only used when nothing is adopted.
     private func strictTrustSettingsPresent() throws -> Bool {
         #if DEBUG
         if let statusReadOverrideForTests {
-            return try statusReadOverrideForTests().hasAdminTrustSettings
+            return try statusReadOverrideForTests().hasClientCompatibleTrustSettings
         }
         #endif
         if let cert = rootCACertificate {
-            return try KeychainHelper.adminTrustsRootStrict(certData: certToDER(cert))
+            return try KeychainHelper.userTrustsRootStrict(certData: certToDER(cert))
         }
-        return try KeychainHelper.adminTrustsRootStrict(label: Self.keychainCertLabel)
+        return try KeychainHelper.userTrustsRootStrict(label: Self.keychainCertLabel)
     }
 
     private func computeFingerprint(_ certificate: Certificate) -> String? {
@@ -1709,10 +1706,7 @@ actor CertificateManager {
 /// The leaf identity and the exact issuer that signed it. TLS interception sends both so a
 /// client never has to guess between multiple historical Rockxy roots with the same subject.
 nonisolated struct GeneratedHostCertificate {
-    let certificate: Certificate
-    let privateKey: P256.Signing.PrivateKey
-    let issuerCertificate: Certificate
-    let provesRootCATrust: Bool
+    // MARK: Lifecycle
 
     init(
         certificate: Certificate,
@@ -1725,6 +1719,13 @@ nonisolated struct GeneratedHostCertificate {
         self.issuerCertificate = issuerCertificate
         self.provesRootCATrust = provesRootCATrust
     }
+
+    // MARK: Internal
+
+    let certificate: Certificate
+    let privateKey: P256.Signing.PrivateKey
+    let issuerCertificate: Certificate
+    let provesRootCATrust: Bool
 
     /// Serves the exact issuer after the leaf so clients cannot choose a stale Rockxy root that
     /// happens to share the same subject name. TLS permits the independently trusted root to be
@@ -1822,13 +1823,13 @@ nonisolated enum TrustEvaluationDecision: Equatable {
 
 // MARK: - StatusReadResultForTests
 
-/// One injected answer for the strict Keychain-presence and admin-trust reads.
+/// One injected answer for the strict Keychain-presence and client-compatible trust reads.
 ///
 /// A throwing override models an unreadable Keychain or trust domain; returning a value models a
 /// readable answer, including a readable negative.
 nonisolated struct StatusReadResultForTests: Sendable {
     let isInstalledInKeychain: Bool
-    let hasAdminTrustSettings: Bool
+    let hasClientCompatibleTrustSettings: Bool
 }
 #endif
 
@@ -1845,7 +1846,7 @@ nonisolated struct RootCAStatusReadFailure: Equatable {
         /// The persisted certificate or key could not be read, so nothing about the root CA —
         /// including whether one exists — is known.
         case persistedMaterial
-        /// The root CA is known, but the Keychain or the admin trust domain could not be read.
+        /// The root CA is known, but the Keychain or required user trust domain could not be read.
         case installedTrustState
     }
 

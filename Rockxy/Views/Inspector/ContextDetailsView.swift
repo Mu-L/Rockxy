@@ -84,7 +84,7 @@ struct ContextDetailsView: View {
             ContextDockEmptyState.resolve(
                 hasCapturedTraffic: !coordinator.transactions.isEmpty,
                 hasVisibleResults: !coordinator.filteredTransactions.isEmpty,
-                isCapturing: coordinator.isProxyRunning
+                isCapturing: coordinator.proxyDisplayState.hasCaptureSessionContext
             )
         )
     }
@@ -112,10 +112,8 @@ struct ContextDetailsView: View {
             WorkspaceFooterBar(horizontalPadding: 12) {
                 HStack {
                     Label(
-                        coordinator.isProxyRunning
-                            ? String(localized: "Capture Running", bundle: RockxyLocalization.bundle)
-                            : String(localized: "Capture Stopped", bundle: RockxyLocalization.bundle),
-                        systemImage: coordinator.isProxyRunning ? "record.circle" : "stop.circle"
+                        coordinator.proxyDisplayState.captureTitle,
+                        systemImage: coordinator.proxyDisplayState.captureSystemImage
                     )
                     Spacer()
                 }

@@ -26,6 +26,63 @@ nonisolated enum WebSocketDetector {
     }
 }
 
+// MARK: - WebSocketLifecycle
+
+/// Delivers the terminal transaction and upstream-channel release exactly once even though
+/// either half of a proxied WebSocket may observe channel inactivity first.
+final class WebSocketLifecycle: @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(
+        onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
+        onChannelClosed: @escaping @Sendable () -> Void = {}
+    ) {
+        self.onTransactionComplete = onTransactionComplete
+        self.onChannelClosed = onChannelClosed
+    }
+
+    // MARK: Internal
+
+    func complete(_ transaction: HTTPTransaction) {
+        guard claimTerminalState() else {
+            return
+        }
+        // The session was delivered as `.active` when the upgrade completed and has been
+        // observed by the UI since, so its terminal state is written on the main actor
+        // before the closing delivery updates the existing row.
+        Task { @MainActor in
+            transaction.state = .completed
+            transaction.webSocketFrameVersion += 1
+        }
+        onTransactionComplete(transaction)
+        onChannelClosed()
+    }
+
+    func failSetup() {
+        guard claimTerminalState() else {
+            return
+        }
+        onChannelClosed()
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
+    private let onChannelClosed: @Sendable () -> Void
+    private var isComplete = false
+
+    private func claimTerminalState() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isComplete else {
+            return false
+        }
+        isComplete = true
+        return true
+    }
+}
+
 // MARK: - WebSocketFrameHandler
 
 /// Captures and relays WebSocket frames in one direction (client->server or server->client).
@@ -39,13 +96,14 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
         peerChannel: Channel?,
         webSocketConnection: WebSocketConnection,
         parentTransaction: HTTPTransaction,
-        onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void
+        onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
+        lifecycle: WebSocketLifecycle? = nil
     ) {
         self.direction = direction
         self.peerChannel = peerChannel
         self.webSocketConnection = webSocketConnection
         self.parentTransaction = parentTransaction
-        self.onTransactionComplete = onTransactionComplete
+        self.lifecycle = lifecycle ?? WebSocketLifecycle(onTransactionComplete: onTransactionComplete)
     }
 
     // MARK: Internal
@@ -67,7 +125,7 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
 
     nonisolated func channelInactive(context: ChannelHandlerContext) {
         peerChannel?.close(promise: nil)
-        onTransactionComplete(parentTransaction)
+        lifecycle.complete(parentTransaction)
     }
 
     // MARK: Private
@@ -75,7 +133,7 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
     private let direction: FrameDirection
     private let peerChannel: Channel?
     private let webSocketConnection: WebSocketConnection
-    private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
+    private let lifecycle: WebSocketLifecycle
     private let parentTransaction: HTTPTransaction
 
     /// Unmasks the frame payload (WebSocket client frames are always masked per RFC 6455)
@@ -133,7 +191,23 @@ final class WebSocketFrameHandler: ChannelInboundHandler, @unchecked Sendable {
         guard let peer = peerChannel else {
             return
         }
-        peer.writeAndFlush(NIOAny(frame), promise: nil)
+        // NIO's decoder intentionally preserves the masked bytes and mask key. Its encoder,
+        // however, expects unmasked application data and applies the key while writing. Passing
+        // a decoded client frame through unchanged therefore masks the payload a second time and
+        // puts plaintext on the wire. Normalize the payload before the peer encoder sees it,
+        // while preserving the client's key in the client-to-server direction and never sending
+        // a masked frame to a client.
+        let forwardedFrame = WebSocketFrame(
+            fin: frame.fin,
+            rsv1: frame.rsv1,
+            rsv2: frame.rsv2,
+            rsv3: frame.rsv3,
+            opcode: frame.opcode,
+            maskKey: direction == .sent ? frame.maskKey : nil,
+            data: frame.unmaskedData,
+            extensionData: frame.unmaskedExtensionData
+        )
+        peer.writeAndFlush(NIOAny(forwardedFrame), promise: nil)
     }
 
     nonisolated private func mapOpcode(_ opcode: WebSocketOpcode) -> FrameOpcode {
@@ -158,7 +232,8 @@ nonisolated enum WebSocketPipelineConfigurator {
         clientChannel: Channel,
         serverChannel: Channel,
         requestData: HTTPRequestData,
-        onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void
+        onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
+        lifecycle: WebSocketLifecycle? = nil
     )
         -> EventLoopFuture<Void>
     {
@@ -168,31 +243,41 @@ nonisolated enum WebSocketPipelineConfigurator {
             state: .active,
             webSocketConnection: wsConnection
         )
+        let lifecycle = lifecycle ?? WebSocketLifecycle(onTransactionComplete: onTransactionComplete)
 
         let clientHandler = WebSocketFrameHandler(
             direction: .sent,
             peerChannel: serverChannel,
             webSocketConnection: wsConnection,
             parentTransaction: transaction,
-            onTransactionComplete: onTransactionComplete
+            onTransactionComplete: onTransactionComplete,
+            lifecycle: lifecycle
         )
         let serverHandler = WebSocketFrameHandler(
             direction: .received,
             peerChannel: clientChannel,
             webSocketConnection: wsConnection,
             parentTransaction: transaction,
-            onTransactionComplete: onTransactionComplete
+            onTransactionComplete: onTransactionComplete,
+            lifecycle: lifecycle
         )
 
-        let clientFuture = ProxyPipeline.configureWebSocketPipeline(
+        let clientFuture = ProxyPipeline.configureClientWebSocketPipeline(
             channel: clientChannel,
             handler: clientHandler
         )
-        let serverFuture = ProxyPipeline.configureWebSocketPipeline(
+        let serverFuture = ProxyPipeline.configureUpstreamWebSocketPipeline(
             channel: serverChannel,
             handler: serverHandler
         )
 
-        return clientFuture.and(serverFuture).map { _ in }
+        // The accepted and upstream channels may live on different event loops.
+        // Complete the combined transition on the client loop so callers can safely
+        // chain this future from the flushed 101 response promise.
+        return clientFuture.and(serverFuture.hop(to: clientChannel.eventLoop)).map { _ in
+            // Deliver the open session now so the row appears while it is live and frames
+            // render as they arrive; the closing delivery later updates the same row.
+            onTransactionComplete(transaction)
+        }
     }
 }

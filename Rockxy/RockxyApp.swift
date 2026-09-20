@@ -629,9 +629,10 @@ private struct MainWindowContent: View {
                     }
                 }
 
-                if !onboardingCompletedOnce {
-                    lifecycleState.showWelcome = true
-                } else if showWelcomeOnLaunch {
+                // "Show on startup" is an explicit opt-out that must win even while setup is
+                // incomplete: a device-only workflow may never enable the system proxy, and the
+                // sheet stays reachable from Help > Welcome to Rockxy.
+                if showWelcomeOnLaunch {
                     lifecycleState.showWelcome = true
                 }
             }
@@ -658,46 +659,6 @@ private enum ProjectLinks {
     static var repositoryURL: URL? {
         URL(string: repository)
     }
-}
-
-// MARK: - ExternalProxyMenuState
-
-@MainActor
-private final class ExternalProxyMenuState: ObservableObject {
-    // MARK: Lifecycle
-
-    init(notificationCenter: NotificationCenter = .default) {
-        self.notificationCenter = notificationCenter
-        self.isEnabled = UpstreamProxyStore.shared.configuration.isEnabled
-        observer = notificationCenter.addObserver(
-            forName: .upstreamProxyConfigurationDidChange,
-            object: nil,
-            queue: .main
-        ) { _ in
-            Task { @MainActor [weak self] in
-                self?.refresh()
-            }
-        }
-    }
-
-    deinit {
-        if let observer {
-            notificationCenter.removeObserver(observer)
-        }
-    }
-
-    // MARK: Internal
-
-    @Published private(set) var isEnabled: Bool
-
-    func refresh() {
-        isEnabled = UpstreamProxyStore.shared.configuration.isEnabled
-    }
-
-    // MARK: Private
-
-    private let notificationCenter: NotificationCenter
-    private var observer: NSObjectProtocol?
 }
 
 // MARK: - RockxyMenuCommands
@@ -732,6 +693,9 @@ struct RockxyMenuCommands: Commands {
     @FocusedValue(\.commandActions) private var actions: MainContentCommandActions?
     @ObservedObject private var updater = AppUpdater.shared
 
+    /// The focused-scene value is nil whenever a tool window (Settings, Map Local, Compose, …)
+    /// is key. Menu commands still target the single main workspace in that case instead of
+    /// silently doing nothing, so ⌘O / ⌥⌘N / ⌘K keep working from any window.
     private var proxyActions: MainContentCommandActions { actions ?? MainContentCommandActions(coordinator: coordinator) }
 
     @AppStorage(NoCacheHeaderMutator.userDefaultsKey) private var isNoCachingEnabled = false
@@ -741,7 +705,7 @@ struct RockxyMenuCommands: Commands {
 
     @CommandsBuilder private var appMenu: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button(String(localized: "About Rockxy", bundle: RockxyLocalization.bundle)) {
+            Button(String(localized: "About \(RockxyIdentity.current.displayName)", bundle: RockxyLocalization.bundle)) {
                 showAboutPanel()
             }
         }
@@ -770,64 +734,60 @@ struct RockxyMenuCommands: Commands {
     private var fileMenu: some Commands {
         CommandGroup(replacing: .newItem) {
             Button(String(localized: "New Tab", bundle: RockxyLocalization.bundle)) {
-                actions?.newWorkspaceTab()
+                proxyActions.newWorkspaceTab()
             }
             .keyboardShortcut("t", modifiers: [.command])
-            .disabled(actions?.canCreateWorkspaceTab != true)
+            .disabled(!proxyActions.canCreateWorkspaceTab)
 
             Button(String(localized: "Close Tab", bundle: RockxyLocalization.bundle)) {
-                actions?.closeWorkspaceTab()
+                proxyActions.closeWorkspaceTab()
             }
             .keyboardShortcut("w", modifiers: [.command])
-            .disabled(actions?.canCloseWorkspaceTab != true)
+            .disabled(!proxyActions.canCloseWorkspaceTab)
 
             Button(String(localized: "Rename Tab…", bundle: RockxyLocalization.bundle)) {
-                if let actions {
-                    actions.renameWorkspaceTab()
-                } else {
-                    RockxyWorkspaceWindowManager.shared.beginRenameForCurrentWorkspace()
-                }
+                proxyActions.renameWorkspaceTab()
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
-            .disabled(!(actions?.canRenameWorkspaceTab ?? RockxyWorkspaceWindowManager.shared.canRenameWorkspaceTab))
+            .disabled(!proxyActions.canRenameWorkspaceTab)
 
             Button(String(localized: "New Session", bundle: RockxyLocalization.bundle)) {
-                actions?.clearSession()
+                proxyActions.clearSession()
             }
 
             Divider()
 
             Button(String(localized: "Open Session…", bundle: RockxyLocalization.bundle)) {
-                actions?.openSession()
+                proxyActions.openSession()
             }
             .keyboardShortcut("o", modifiers: [.command])
 
             Button(String(localized: "Save Session…", bundle: RockxyLocalization.bundle)) {
-                actions?.saveSession()
+                proxyActions.saveSession()
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
 
             Divider()
 
             Button(String(localized: "Import HAR…", bundle: RockxyLocalization.bundle)) {
-                actions?.importHAR()
+                proxyActions.importHAR()
             }
             .keyboardShortcut("i", modifiers: [.command, .shift])
 
             Button(String(localized: "Export HAR…", bundle: RockxyLocalization.bundle)) {
-                actions?.exportHAR()
+                proxyActions.exportHAR()
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
 
             Button(String(localized: "Export OpenAPI YAML…", bundle: RockxyLocalization.bundle)) {
-                actions?.exportOpenAPIYAML()
+                proxyActions.exportOpenAPIYAML()
             }
-            .disabled(actions?.canExportOpenAPI != true)
+            .disabled(!proxyActions.canExportOpenAPI)
 
             Button(String(localized: "Export OpenAPI HTML…", bundle: RockxyLocalization.bundle)) {
-                actions?.exportOpenAPIHTML()
+                proxyActions.exportOpenAPIHTML()
             }
-            .disabled(actions?.canExportOpenAPI != true)
+            .disabled(!proxyActions.canExportOpenAPI)
         }
     }
 
@@ -836,24 +796,24 @@ struct RockxyMenuCommands: Commands {
             Divider()
 
             Button(String(localized: "Copy URL", bundle: RockxyLocalization.bundle)) {
-                actions?.copyURL()
+                proxyActions.copyURL()
             }
             .keyboardShortcut("u", modifiers: [.command, .option])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Button(String(localized: "Copy as cURL", bundle: RockxyLocalization.bundle)) {
-                actions?.copyAsCURL()
+                proxyActions.copyAsCURL()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Button(String(localized: "Focus on URL", bundle: RockxyLocalization.bundle)) {
-                actions?.focusSearchField()
+                proxyActions.focusSearchField()
             }
             .keyboardShortcut("l", modifiers: [.command])
 
             Button(String(localized: "Find in Capture", bundle: RockxyLocalization.bundle)) {
-                actions?.focusSearchField()
+                proxyActions.focusSearchField()
             }
             .keyboardShortcut("f", modifiers: [.command])
         }
@@ -862,51 +822,51 @@ struct RockxyMenuCommands: Commands {
     private var projectMenu: some Commands {
         CommandMenu(String(localized: "Project", bundle: RockxyLocalization.bundle)) {
             Button(String(localized: "New Project…", bundle: RockxyLocalization.bundle)) {
-                actions?.newProject()
+                proxyActions.newProject()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
-            .disabled(actions?.canCreateProject != true)
+            .disabled(!proxyActions.canCreateProject)
 
             Button(String(localized: "Rename Project…", bundle: RockxyLocalization.bundle)) {
-                actions?.renameActiveProject()
+                proxyActions.renameActiveProject()
             }
-            .disabled(actions?.canEditProjects != true)
+            .disabled(!proxyActions.canEditProjects)
 
             Button(String(localized: "Manage Projects…", bundle: RockxyLocalization.bundle)) {
-                actions?.manageProjects()
+                proxyActions.manageProjects()
             }
 
             Divider()
 
             Button(String(localized: "Export Project Configuration…", bundle: RockxyLocalization.bundle)) {
-                actions?.exportProjectConfiguration()
+                proxyActions.exportProjectConfiguration()
             }
-            .disabled(actions?.canEditProjects != true)
+            .disabled(!proxyActions.canEditProjects)
 
             Button(String(localized: "Import Project Configuration…", bundle: RockxyLocalization.bundle)) {
-                actions?.importProjectConfiguration()
+                proxyActions.importProjectConfiguration()
             }
-            .disabled(actions?.canCreateProject != true)
+            .disabled(!proxyActions.canCreateProject)
 
             Divider()
 
-            ForEach(actions?.projects ?? []) { project in
+            ForEach(proxyActions.projects) { project in
                 Button {
-                    actions?.switchProject(id: project.id)
+                    proxyActions.switchProject(id: project.id)
                 } label: {
-                    if project.id == actions?.activeProjectID {
+                    if project.id == proxyActions.activeProjectID {
                         Label(project.name, systemImage: "checkmark")
                     } else {
                         Text(project.name)
                     }
                 }
-                .disabled(actions?.canEditProjects != true)
+                .disabled(!proxyActions.canEditProjects)
             }
 
-            if actions?.projectsNeedRecovery == true {
+            if proxyActions.projectsNeedRecovery {
                 Divider()
                 Button(String(localized: "Repair Projects…", bundle: RockxyLocalization.bundle)) {
-                    actions?.showProjectRecovery()
+                    proxyActions.showProjectRecovery()
                 }
             }
         }
@@ -915,7 +875,7 @@ struct RockxyMenuCommands: Commands {
     private var viewMenu: some Commands {
         CommandGroup(after: .toolbar) {
             Button(String(localized: "Filter Domain or App", bundle: RockxyLocalization.bundle)) {
-                actions?.toggleFilterBar()
+                proxyActions.toggleFilterBar()
             }
             .keyboardShortcut("f", modifiers: [.command, .shift])
 
@@ -924,151 +884,162 @@ struct RockxyMenuCommands: Commands {
             Toggle(
                 String(localized: "Follow Live Traffic", bundle: RockxyLocalization.bundle),
                 isOn: Binding(
-                    get: { actions?.isFollowingLiveTraffic == true },
-                    set: { actions?.setFollowingLiveTraffic($0) }
+                    get: { proxyActions.isFollowingLiveTraffic },
+                    set: { proxyActions.setFollowingLiveTraffic($0) }
                 )
             )
             .keyboardShortcut("l", modifiers: [.command, .shift])
 
             Divider()
 
+            Button(
+                proxyActions.isShowingTrafficInsights
+                    ? String(localized: "Hide Traffic Insights", bundle: RockxyLocalization.bundle)
+                    : String(localized: "Show Traffic Insights", bundle: RockxyLocalization.bundle)
+            ) {
+                proxyActions.toggleTrafficInsights()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+
+            Divider()
+
             Button(String(localized: "Toggle Source List Panel", bundle: RockxyLocalization.bundle)) {
-                actions?.toggleSourceList()
+                proxyActions.toggleSourceList()
             }
             .keyboardShortcut("[", modifiers: [.command, .control])
 
             Divider()
 
             Button(
-                actions?.isBottomInspectorVisible == true
+                proxyActions.isBottomInspectorVisible
                     ? String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle)
                     : String(localized: "Show Bottom Inspector", bundle: RockxyLocalization.bundle)
             ) {
-                actions?.toggleInspectorBottom()
+                proxyActions.toggleInspectorBottom()
             }
             .keyboardShortcut("]", modifiers: [.command, .control])
-            .disabled(actions?.canToggleBottomInspector != true)
+            .disabled(!proxyActions.canToggleBottomInspector)
 
             Button(
-                actions?.isContextDockVisible == true
+                proxyActions.isContextDockVisible
                     ? String(localized: "Hide Context Dock", bundle: RockxyLocalization.bundle)
                     : String(localized: "Show Context Dock", bundle: RockxyLocalization.bundle)
             ) {
-                actions?.toggleInspectorRight()
+                proxyActions.toggleInspectorRight()
             }
             .keyboardShortcut("\\", modifiers: [.command, .control])
 
             Divider()
 
             Button(String(localized: "Select Next Tab", bundle: RockxyLocalization.bundle)) {
-                actions?.nextWorkspaceTab()
+                proxyActions.nextWorkspaceTab()
             }
             .keyboardShortcut("]", modifiers: [.command, .shift])
 
             Button(String(localized: "Select Previous Tab", bundle: RockxyLocalization.bundle)) {
-                actions?.previousWorkspaceTab()
+                proxyActions.previousWorkspaceTab()
             }
             .keyboardShortcut("[", modifiers: [.command, .shift])
 
             Divider()
 
             Button(String(localized: "Jump to First Request", bundle: RockxyLocalization.bundle)) {
-                actions?.selectFirstTransaction()
+                proxyActions.selectFirstTransaction()
             }
-            .disabled(actions?.hasVisibleTransactions != true)
+            .disabled(!proxyActions.hasVisibleTransactions)
 
             Button(String(localized: "Jump to Last Request", bundle: RockxyLocalization.bundle)) {
-                actions?.selectLastTransaction()
+                proxyActions.selectLastTransaction()
             }
-            .disabled(actions?.hasVisibleTransactions != true)
+            .disabled(!proxyActions.hasVisibleTransactions)
         }
     }
 
     private var flowMenu: some Commands {
         CommandMenu(String(localized: "Flow", bundle: RockxyLocalization.bundle)) {
             Button(String(localized: "Compose…", bundle: RockxyLocalization.bundle)) {
-                actions?.composeFreshRequest()
+                proxyActions.composeFreshRequest()
             }
             .keyboardShortcut("n", modifiers: [.command, .option])
 
             Divider()
 
             Button(String(localized: "Repeat", bundle: RockxyLocalization.bundle)) {
-                actions?.replayRequest()
+                proxyActions.replayRequest()
             }
             .keyboardShortcut("r", modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Button(String(localized: "Edit and Repeat…", bundle: RockxyLocalization.bundle)) {
-                actions?.editAndRepeat()
+                proxyActions.editAndRepeat()
             }
             .keyboardShortcut("e", modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Divider()
 
             Menu(String(localized: "Export", bundle: RockxyLocalization.bundle)) {
                 Button(String(localized: "Export as HAR…", bundle: RockxyLocalization.bundle)) {
-                    actions?.exportHAR()
+                    proxyActions.exportHAR()
                 }
 
                 Button(String(localized: "Export as OpenAPI YAML…", bundle: RockxyLocalization.bundle)) {
-                    actions?.exportOpenAPIYAML()
+                    proxyActions.exportOpenAPIYAML()
                 }
-                .disabled(actions?.canExportOpenAPI != true)
+                .disabled(!proxyActions.canExportOpenAPI)
 
                 Button(String(localized: "Export as OpenAPI HTML…", bundle: RockxyLocalization.bundle)) {
-                    actions?.exportOpenAPIHTML()
+                    proxyActions.exportOpenAPIHTML()
                 }
-                .disabled(actions?.canExportOpenAPI != true)
+                .disabled(!proxyActions.canExportOpenAPI)
 
                 Divider()
 
                 Button(String(localized: "Publish Selected to Gist…", bundle: RockxyLocalization.bundle)) {
-                    actions?.publishSelectedToGist()
+                    proxyActions.publishSelectedToGist()
                 }
-                .disabled(actions?.canPublishGist != true)
+                .disabled(!proxyActions.canPublishGist)
             }
 
             Divider()
 
             Button(String(localized: "Add Note…", bundle: RockxyLocalization.bundle)) {
-                actions?.addComment()
+                proxyActions.addComment()
             }
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Menu(String(localized: "Highlight", bundle: RockxyLocalization.bundle)) {
                 ForEach(HighlightColor.allCases, id: \.self) { color in
                     Button(color.rawValue.capitalized) {
-                        actions?.setHighlight(color)
+                        proxyActions.setHighlight(color)
                     }
                 }
                 Divider()
                 Button(String(localized: "Remove Highlight", bundle: RockxyLocalization.bundle)) {
-                    actions?.setHighlight(nil)
+                    proxyActions.setHighlight(nil)
                 }
             }
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Divider()
 
             Button(String(localized: "Clear Session", bundle: RockxyLocalization.bundle)) {
-                actions?.clearSession()
+                proxyActions.clearSession()
             }
             .keyboardShortcut("k", modifiers: [.command])
 
             Button(String(localized: "Clear Session and Filters", bundle: RockxyLocalization.bundle)) {
-                actions?.clearCaptureAndFilters()
+                proxyActions.clearCaptureAndFilters()
             }
             .keyboardShortcut("k", modifiers: [.command, .shift])
 
             Divider()
 
             Button(String(localized: "Delete", bundle: RockxyLocalization.bundle)) {
-                actions?.deleteSelected()
+                proxyActions.deleteSelected()
             }
             .keyboardShortcut(.delete, modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
         }
     }
 
@@ -1146,10 +1117,10 @@ struct RockxyMenuCommands: Commands {
             .keyboardShortcut("b", modifiers: [.command, .shift])
 
             Button(String(localized: "Add Breakpoint Rule", bundle: RockxyLocalization.bundle)) {
-                actions?.addBreakpointRuleForSelection()
+                proxyActions.addBreakpointRuleForSelection()
             }
             .keyboardShortcut("b", modifiers: [.command])
-            .disabled(actions?.hasSelectedTransaction != true)
+            .disabled(!proxyActions.hasSelectedTransaction)
 
             Button(String(localized: "Breakpoint Queue…", bundle: RockxyLocalization.bundle)) {
                 openWindow(id: "breakpoints")
@@ -1218,10 +1189,10 @@ struct RockxyMenuCommands: Commands {
             Divider()
 
             Button(String(localized: "Compare Selected", bundle: RockxyLocalization.bundle)) {
-                actions?.compareSelected()
+                proxyActions.compareSelected()
             }
             .keyboardShortcut("d", modifiers: [.command, .option])
-            .disabled(actions?.canCompareSelected != true)
+            .disabled(!proxyActions.canCompareSelected)
         }
     }
 
@@ -1354,9 +1325,9 @@ struct RockxyMenuCommands: Commands {
             Divider()
 
             Button(String(localized: "Force Reset Rockxy Helper…", bundle: RockxyLocalization.bundle)) {
-                let commandActions = actions
+                let commandActions = proxyActions
                 HelperRecoveryPresenter.presentForceReset {
-                    commandActions?.stopProxy()
+                    commandActions.stopProxy()
                 }
             }
 

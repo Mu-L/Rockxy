@@ -16,11 +16,23 @@ enum DiffLineType: Equatable, Sendable {
 struct DiffLine: Identifiable, Equatable, Sendable {
     // MARK: Lifecycle
 
-    init(lineNumber: Int, content: String, type: DiffLineType) {
+    /// `lineNumber` is the position in the merged diff stream; `oldLineNumber` and
+    /// `newLineNumber` are the line's positions in the left and right inputs, which is what a
+    /// reader matches against the original text. They default to the merged position so callers
+    /// that build lines by hand keep working.
+    init(
+        lineNumber: Int,
+        content: String,
+        type: DiffLineType,
+        oldLineNumber: Int? = nil,
+        newLineNumber: Int? = nil
+    ) {
         self.id = UUID()
         self.lineNumber = lineNumber
         self.content = content
         self.type = type
+        self.oldLineNumber = oldLineNumber ?? (type == .added ? nil : lineNumber)
+        self.newLineNumber = newLineNumber ?? (type == .removed ? nil : lineNumber)
     }
 
     // MARK: Internal
@@ -29,6 +41,8 @@ struct DiffLine: Identifiable, Equatable, Sendable {
     let lineNumber: Int
     let content: String
     let type: DiffLineType
+    let oldLineNumber: Int?
+    let newLineNumber: Int?
 
     static func == (lhs: DiffLine, rhs: DiffLine) -> Bool {
         lhs.lineNumber == rhs.lineNumber && lhs.content == rhs.content && lhs.type == rhs.type
@@ -97,20 +111,42 @@ struct DiffResult: Sendable {
     }
 
     /// Builds paired rows for side-by-side rendering from a section's diff lines.
-    /// Unchanged lines appear on both sides. Removed lines appear left-only (right=nil).
-    /// Added lines appear right-only (left=nil).
+    /// Unchanged lines appear on both sides. A run of removed lines is paired with the run of
+    /// added lines that follows it, so a changed line reads as one row (old on the left, new on
+    /// the right); any surplus on either side gets a spacer opposite it.
     static func sideBySideRows(from lines: [DiffLine]) -> [SideBySideRow] {
         var rows: [SideBySideRow] = []
+        var pendingRemoved: [DiffLine] = []
+        var pendingAdded: [DiffLine] = []
+
+        func flushPending() {
+            let count = max(pendingRemoved.count, pendingAdded.count)
+            for index in 0 ..< count {
+                rows.append(SideBySideRow(
+                    left: index < pendingRemoved.count ? pendingRemoved[index] : nil,
+                    right: index < pendingAdded.count ? pendingAdded[index] : nil
+                ))
+            }
+            pendingRemoved.removeAll()
+            pendingAdded.removeAll()
+        }
+
         for line in lines {
             switch line.type {
             case .unchanged:
+                flushPending()
                 rows.append(SideBySideRow(left: line, right: line))
             case .removed:
-                rows.append(SideBySideRow(left: line, right: nil))
+                // A removed line after an added run starts a new change block.
+                if !pendingAdded.isEmpty {
+                    flushPending()
+                }
+                pendingRemoved.append(line)
             case .added:
-                rows.append(SideBySideRow(left: nil, right: line))
+                pendingAdded.append(line)
             }
         }
+        flushPending()
         return rows
     }
 }
@@ -135,35 +171,55 @@ enum DiffEngine {
         var newIdx = 0
         var lineNumber = 1
 
+        func appendRemoved() {
+            result.append(DiffLine(
+                lineNumber: lineNumber,
+                content: boundedOld[oldIdx],
+                type: .removed,
+                oldLineNumber: oldIdx + 1
+            ))
+            oldIdx += 1
+            lineNumber += 1
+        }
+
+        func appendAdded() {
+            result.append(DiffLine(
+                lineNumber: lineNumber,
+                content: boundedNew[newIdx],
+                type: .added,
+                newLineNumber: newIdx + 1
+            ))
+            newIdx += 1
+            lineNumber += 1
+        }
+
         for commonLine in lcs {
             guard !Task.isCancelled else {
                 return []
             }
             while oldIdx < boundedOld.count, boundedOld[oldIdx] != commonLine {
-                result.append(DiffLine(lineNumber: lineNumber, content: boundedOld[oldIdx], type: .removed))
-                oldIdx += 1
-                lineNumber += 1
+                appendRemoved()
             }
             while newIdx < boundedNew.count, boundedNew[newIdx] != commonLine {
-                result.append(DiffLine(lineNumber: lineNumber, content: boundedNew[newIdx], type: .added))
-                newIdx += 1
-                lineNumber += 1
+                appendAdded()
             }
-            result.append(DiffLine(lineNumber: lineNumber, content: commonLine, type: .unchanged))
+            result.append(DiffLine(
+                lineNumber: lineNumber,
+                content: commonLine,
+                type: .unchanged,
+                oldLineNumber: oldIdx + 1,
+                newLineNumber: newIdx + 1
+            ))
             oldIdx += 1
             newIdx += 1
             lineNumber += 1
         }
 
         while oldIdx < boundedOld.count {
-            result.append(DiffLine(lineNumber: lineNumber, content: boundedOld[oldIdx], type: .removed))
-            oldIdx += 1
-            lineNumber += 1
+            appendRemoved()
         }
         while newIdx < boundedNew.count {
-            result.append(DiffLine(lineNumber: lineNumber, content: boundedNew[newIdx], type: .added))
-            newIdx += 1
-            lineNumber += 1
+            appendAdded()
         }
 
         return result

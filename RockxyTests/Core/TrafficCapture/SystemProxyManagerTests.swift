@@ -68,6 +68,16 @@ struct SystemProxyManagerTests {
 
     // MARK: - State Management
 
+    @Test("ownership detection only probes helper XPC when a helper is installed")
+    func ownershipDetectionSkipsMissingHelper() {
+        // Without a helper the XPC status probe can only wait for its 10 s timeout, which is
+        // what used to stall quitting and readiness checks on machines that never installed it.
+        #expect(!SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .notInstalled))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedCompatible))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .requiresApproval))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedOutdated))
+    }
+
     @Test("routing readiness requires every fallback service to match")
     func routingReadinessRejectsPartialFallbackMatch() {
         let matching = ServiceProxySnapshot(
@@ -387,6 +397,31 @@ struct SystemProxyManagerTests {
         ) == false)
     }
 
+    @Test("a successful direct restore retires the session watchdog only after its backup clears")
+    func successfulDirectRestoreRetiresWatchdogAfterBackupClears() {
+        #expect(SystemProxyManager.shouldRetireDirectWatchdog(
+            restored: true,
+            survivingPreservedServices: []
+        ))
+        #expect(!SystemProxyManager.shouldRetireDirectWatchdog(
+            restored: false,
+            survivingPreservedServices: []
+        ))
+        #expect(!SystemProxyManager.shouldRetireDirectWatchdog(
+            restored: true,
+            survivingPreservedServices: ["Wi-Fi"]
+        ))
+    }
+
+    @Test("startup retires completed watchdog records but preserves unresolved sessions")
+    func startupRetiresOnlyResolvedWatchdogs() {
+        #expect(DirectStaleRecoveryOutcome.noBackup.shouldRetireKnownWatchdogs)
+        #expect(DirectStaleRecoveryOutcome.cleared.shouldRetireKnownWatchdogs)
+        #expect(DirectStaleRecoveryOutcome.restored.shouldRetireKnownWatchdogs)
+        #expect(!DirectStaleRecoveryOutcome.preserved.shouldRetireKnownWatchdogs)
+        #expect(!DirectStaleRecoveryOutcome.restoreIncomplete.shouldRetireKnownWatchdogs)
+    }
+
     @Test("helper override confirmation requires active state on the requested port")
     func helperOverrideConfirmationRequiresExactLiveState() {
         #expect(SystemProxyManager.helperOverrideIsConfirmed(
@@ -405,6 +440,89 @@ struct SystemProxyManagerTests {
             requestedPort: 8_888,
             status: nil
         ) == false)
+    }
+
+    @Test("timed-out helper restore requires every captured proxy and bypass field to match")
+    func helperRestoreReconciliationRequiresExactCapturedState() {
+        let restored = ServiceProxySnapshot(
+            httpEnabled: false,
+            httpHost: "127.0.0.1",
+            httpPort: 8_888,
+            httpsEnabled: false,
+            httpsHost: "127.0.0.1",
+            httpsPort: 8_888,
+            socksEnabled: false,
+            socksHost: "",
+            socksPort: 0,
+            pacEnabled: true,
+            pacURL: "https://example.test/proxy.pac",
+            autoDiscoveryEnabled: false
+        )
+        let stillOverridden = ServiceProxySnapshot(
+            httpEnabled: true,
+            httpHost: "127.0.0.1",
+            httpPort: 8_888,
+            httpsEnabled: true,
+            httpsHost: "127.0.0.1",
+            httpsPort: 8_888,
+            socksEnabled: false,
+            socksHost: "",
+            socksPort: 0,
+            pacEnabled: false,
+            pacURL: "",
+            autoDiscoveryEnabled: false
+        )
+        let expectedProxy = ["Wi-Fi": restored]
+        let expectedBypass = ["Wi-Fi": ["localhost", "*.local"]]
+
+        #expect(SystemProxyManager.helperRestoreStateMatches(
+            expectedProxyState: expectedProxy,
+            expectedBypassDomains: expectedBypass,
+            currentProxyState: expectedProxy,
+            currentBypassDomains: expectedBypass
+        ))
+        #expect(!SystemProxyManager.helperRestoreStateMatches(
+            expectedProxyState: expectedProxy,
+            expectedBypassDomains: expectedBypass,
+            currentProxyState: ["Wi-Fi": stillOverridden],
+            currentBypassDomains: expectedBypass
+        ))
+        #expect(!SystemProxyManager.helperRestoreStateMatches(
+            expectedProxyState: expectedProxy,
+            expectedBypassDomains: expectedBypass,
+            currentProxyState: expectedProxy,
+            currentBypassDomains: ["Wi-Fi": ["localhost"]]
+        ))
+        #expect(!SystemProxyManager.helperRestoreStateMatches(
+            expectedProxyState: [:],
+            expectedBypassDomains: [:],
+            currentProxyState: [:],
+            currentBypassDomains: [:]
+        ))
+    }
+
+    @Test("timed-out helper restore accepts a verified late completion")
+    func helperRestoreConfirmationWaitsForLateCompletion() async {
+        let counter = ActivationProbeCounter(succeedsOnAttempt: 3)
+
+        let restored = await SystemProxyManager.confirmHelperRestoreAfterTimeout {
+            await counter.probe()
+        }
+
+        #expect(restored)
+        #expect(await counter.attempts == 3)
+    }
+
+    @Test("timed-out helper restore still fails closed when restoration remains unverified")
+    func helperRestoreConfirmationIsBounded() async {
+        let counter = ActivationProbeCounter(succeedsOnAttempt: 5)
+
+        let restored = await SystemProxyManager.confirmHelperRestoreAfterTimeout {
+            await counter.probe()
+        }
+
+        #expect(!restored)
+        #expect(await counter.attempts == 4)
     }
 
     @Test("activation confirmation tolerates delayed system configuration propagation")
@@ -867,18 +985,27 @@ struct SystemProxyManagerTests {
     }
 }
 
+// MARK: - ActivationProbeCounter
+
 private actor ActivationProbeCounter {
+    // MARK: Lifecycle
+
     init(succeedsOnAttempt: Int) {
         self.succeedsOnAttempt = succeedsOnAttempt
     }
 
+    // MARK: Internal
+
     private(set) var attempts = 0
-    private let succeedsOnAttempt: Int
 
     func probe() -> Bool {
         attempts += 1
         return attempts >= succeedsOnAttempt
     }
+
+    // MARK: Private
+
+    private let succeedsOnAttempt: Int
 }
 
 // MARK: - DirectOverrideStepError

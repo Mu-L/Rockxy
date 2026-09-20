@@ -19,6 +19,10 @@ struct ModifyHeaderRuleBuilderTests {
         #expect(rule.name == "https://example.com/api/*")
         #expect(rule.matchCondition.method == "POST")
         #expect(rule.matchCondition.urlPattern == #"https:\/\/example\.com\/api\/.*"#)
+        // The authored wildcard and its semantics survive so the editor can restore them.
+        #expect(rule.matchCondition.sourceURLPattern == "https://example.com/api/*")
+        #expect(rule.matchCondition.matchType == .wildcard)
+        #expect(rule.matchCondition.includeSubpaths == true)
     }
 
     @Test("Exact wildcard matching appends URL boundary")
@@ -93,5 +97,9 @@ struct ModifyHeaderRuleBuilderTests {
         #expect(rule.priority == 7)
         #expect(rule.matchCondition.method == "GET")
         #expect(rule.matchCondition.urlPattern == ".*api\\.example\\.com.*")
+        #expect(rule.matchCondition.sourceURLPattern == ".*api\\.example\\.com.*")
+        #expect(rule.matchCondition.matchType == .regex)
+        // Subpath inclusion is a wildcard-only concept and must not leak into regex rules.
+        #expect(rule.matchCondition.includeSubpaths == false)
     }
 }

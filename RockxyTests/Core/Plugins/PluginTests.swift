@@ -31,6 +31,35 @@ struct PluginTests {
         #expect(!entries.isEmpty)
     }
 
+    @Test("HARExporter writes the decoded body as content text with wire and content sizes")
+    func harExporterDecodesCompressedContent() throws {
+        let plain = #"{"ok":true}"#
+        let compressed = try (Data(plain.utf8) as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction()
+        transaction.response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed,
+            contentType: .json
+        )
+
+        let data = try HARExporter().export(transactions: [transaction])
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let log = try #require(json["log"] as? [String: Any])
+        let entry = try #require((log["entries"] as? [[String: Any]])?.first)
+        let response = try #require(entry["response"] as? [String: Any])
+        let content = try #require(response["content"] as? [String: Any])
+
+        #expect(content["text"] as? String == plain)
+        #expect(content["encoding"] == nil)
+        #expect(content["size"] as? Int == plain.utf8.count)
+        #expect(response["bodySize"] as? Int == compressed.count)
+    }
+
     @Test("HARExporter entry count matches transaction count")
     func harExporterEntryCount() throws {
         let exporter = HARExporter()

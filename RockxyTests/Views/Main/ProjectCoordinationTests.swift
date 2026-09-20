@@ -49,6 +49,32 @@ struct ProjectCoordinationTests {
         #expect(allTraffic.filteredTransactions.count == 2)
         let apiWorkspace = coordinator.workspaceStore.workspaces.first { $0.title == "APIs" }
         #expect(apiWorkspace?.filteredTransactions.map(\.id) == [api.id])
+        #expect(allTraffic.sidebarSelection == .allApps)
+    }
+
+    @Test("launch starts at Apps even when Insights was saved as the active view")
+    func startupUsesAppsAfterSavedInsights() async {
+        let savedTab = ProjectTabSnapshot(
+            title: "All Traffic",
+            isClosable: false,
+            mainTabRawValue: MainTab.insights.rawValue
+        )
+        let project = Project(
+            name: "Alpha",
+            createdAt: Self.fixedDate,
+            updatedAt: Self.fixedDate,
+            activeTabID: savedTab.id,
+            tabs: [savedTab]
+        )
+        let repository = FakeProjectRepo(loadResult: .success(
+            ProjectCatalog(activeProjectID: project.id, projects: [project])
+        ))
+        let coordinator = MainContentCoordinator(projectCatalogRepository: repository)
+
+        await coordinator.hydrateProjectsOnLaunch()
+
+        #expect(coordinator.activeMainTab == .traffic)
+        #expect(coordinator.sidebarSelection == .allApps)
     }
 
     @Test("a failed load leaves current workspaces unchanged and blocks autosave")

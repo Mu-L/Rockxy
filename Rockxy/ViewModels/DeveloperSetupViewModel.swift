@@ -485,7 +485,11 @@ final class DeveloperSetupViewModel {
             return
         }
         let validationSpec = probeReady ? currentValidationSpec : nil
-        let nextIssue = probeReady
+        // Only a target that actually validates through the local probe can be blocked by
+        // the probe. Guide-only and device targets never start one, so they must surface
+        // their real state (manual validation, certificate trust, device endpoint) instead
+        // of a "probe unavailable" issue whose Retry can never succeed.
+        let nextIssue = probeReady || !supportsValidation
             ? Self.validationIssue(for: target, snapshot: snapshot, workflow: workflow, validation: validationSpec)
             : .localProbeUnavailable
         activeIssue = nextIssue

@@ -23,4 +23,7 @@ enum SidebarItem: Hashable, Codable {
     case allPinned
     case allSaved
     case allNotes
+    /// The Traffic Insights report for the active Traffic Tab. Selecting it clears the
+    /// sidebar scope (like Apps or Domains) and switches the center content to the report.
+    case insights
 }

@@ -242,25 +242,12 @@ private struct AIAssistantDockView: View {
         AppSettingsManager.shared.settings.assistantProviderConfiguration
     }
 
-    private var configuredModelIsAvailable: Bool {
-        AppSettingsManager.shared.settings.debugAssistantModelAccessEnabled
-            && assistantConfiguration?.isComplete == true
-    }
-
-    private var configuredModelLabel: String {
-        guard let assistantConfiguration, assistantConfiguration.isComplete else {
-            return String(localized: "No Configured Model", bundle: RockxyLocalization.bundle)
-        }
-        return String(localized: "Global Default · \(assistantConfiguration.kind.title) · \(assistantConfiguration.model)", bundle: RockxyLocalization.bundle)
-    }
-
-    private var modelSelectionLabel: String {
-        guard coordinator.activeWorkspace.debugAssistantUsesConfiguredModel,
-              configuredModelIsAvailable else
-        {
-            return String(localized: "Built-in", bundle: RockxyLocalization.bundle)
-        }
-        return assistantConfiguration?.model ?? String(localized: "Model", bundle: RockxyLocalization.bundle)
+    private var modelPresentation: AssistantModelSelectionPresentation {
+        AssistantModelSelectionPresentation(
+            configuration: assistantConfiguration,
+            isModelAccessEnabled: AppSettingsManager.shared.settings.debugAssistantModelAccessEnabled,
+            usesConfiguredModel: coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
+        )
     }
 
     private var selectedTransactions: [HTTPTransaction] {
@@ -784,12 +771,19 @@ private struct AIAssistantDockView: View {
                         coordinator.activeWorkspace.debugAssistantUsesConfiguredModel = true
                     } label: {
                         Label(
-                            configuredModelLabel,
+                            modelPresentation.configuredModelLabel,
                             systemImage: coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
                                 ? "checkmark" : "circle"
                         )
                     }
-                    .disabled(!configuredModelIsAvailable)
+                    .disabled(!modelPresentation.isConfiguredModelAvailable)
+
+                    if let destinationLabel = modelPresentation.destinationLabel {
+                        Label(
+                            destinationLabel,
+                            systemImage: modelPresentation.destinationSystemImage
+                        )
+                    }
 
                     Divider()
 
@@ -803,7 +797,7 @@ private struct AIAssistantDockView: View {
                         )
                     }
                 } label: {
-                    Label(modelSelectionLabel, systemImage: "cpu")
+                    Label(modelPresentation.selectionLabel, systemImage: modelPresentation.selectionSystemImage)
                         .lineLimit(1)
                 }
                 .menuStyle(.borderlessButton)
@@ -1092,7 +1086,7 @@ private struct AIAssistantDockView: View {
                     isCurrentResult: isCurrentResult(result),
                     showsContinueWithModel: isCurrentResult(result)
                         && coordinator.activeWorkspace.debugAssistantUsesConfiguredModel
-                        && configuredModelIsAvailable,
+                        && modelPresentation.isConfiguredModelAvailable,
                     isPreparingReview: coordinator.activeWorkspace.isPreparingDebugAssistantReview,
                     canRevealRequest: true,
                     canRetry: canRetry,

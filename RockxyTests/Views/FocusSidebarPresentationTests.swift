@@ -7,6 +7,18 @@ import Testing
 struct FocusSidebarPresentationTests {
     // MARK: Internal
 
+    @Test("Adding a favorite reveals it in the Library navigator instead of dismissing silently")
+    func addFavoriteRevealsLibraryEntry() throws {
+        let source = try readProjectFile("Rockxy/Views/Sidebar/AddFavoriteView.swift")
+        let start = try #require(source.range(of: "private func addSelectedFavorite() {"))
+        let end = try #require(source.range(of: "private func buildAppCandidates()", range: start.upperBound ..< source.endIndex))
+        let body = source[start.lowerBound ..< end.lowerBound]
+
+        #expect(body.contains("coordinator.addFavorite(favorite)"))
+        #expect(body.contains("coordinator.focusNavigatorMode = .library"))
+        #expect(body.contains("coordinator.selectSidebarItem(favorite)"))
+    }
+
     @Test("Focus section actions use visible native buttons")
     func focusSectionActionsUseVisibleNativeButtons() throws {
         let source = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")

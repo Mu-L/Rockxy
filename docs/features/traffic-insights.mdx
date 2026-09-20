@@ -1,0 +1,58 @@
+---
+title: "Traffic Insights"
+description: "A live report over the active Traffic Tab: findings, traffic over time, protocol share, outcomes, top apps and hosts, and outliers — all local, all clickable."
+---
+
+# Traffic Insights
+
+**Insights** is the first item in the Focus Navigator. Select it and the center content becomes a live report over the active Traffic Tab. Every number stays on this Mac, and every host, app, or request in the report is a shortcut back into the request list.
+
+## Entry Points
+
+| Action | How to Access |
+|--------|---------------|
+| Show the report | Sidebar **Overview > Insights**, or **View > Show Traffic Insights** (`Cmd+Shift+D`) |
+| Return to the request list | Select any app, domain, or favorite in the sidebar, or **View > Hide Traffic Insights** |
+| Drill into evidence | Click a **Focus Host**, **Focus App**, or **Show … Requests** button, a Top Apps / Top Hosts row, or a slowest / largest row |
+
+The choice is saved with the Traffic Tab, so a Project reopens on the report if that is where you left it.
+
+## Scope and Time Window
+
+- **All Traffic** reads every request captured into the Traffic Tab.
+- **Visible Traffic** (the default) honors the current search, protocol pills, advanced filter rules, Traffic Signals, Focus Sets, and Noise Control — the same set the request list shows. Selecting Insights clears the sidebar app/domain scope so the report starts from the whole tab.
+- **Time Window** trails the most recent captured request (Entire Session, Last Minute, 5 Minutes, 15 Minutes, Last Hour), so an imported or paused session still reports its final activity.
+- **Live / Paused** freezes the report while you read it. Paused reports rebuild with the Refresh button or `Cmd+R`.
+
+## What the Report Shows
+
+| Section | Answers | Hover | Click |
+|---|---|---|---|
+| Headline tiles | How much, how fast, how healthy: requests with average and peak rate, bytes by direction, error rate, median and p95 latency, hosts and apps | Definition of the number | — |
+| Findings | What deserves attention right now — one line each, ordered by severity | The reasoning behind the finding | Focus the host or app, select the evidence requests, or open HTTPS Decryption |
+| Traffic Over Time | When traffic happened and how heavy it was: bytes by direction, requests stacked by outcome, or median/p95 latency per interval | Exact values for that interval | Select every request captured in that interval |
+| Protocols | What kind of traffic this is, by requests or bytes | Count, bytes, and whether a list filter exists | Toggle the matching protocol pill |
+| Outcomes | Success vs. failure, with the exact status codes next to each class | Status codes with counts | Toggle the 2xx/3xx/4xx/5xx pill or the Errors signal |
+| Content Types | What the decrypted responses carry | Bytes for the type | Toggle the matching content pill |
+| Methods | Read-heavy or write-heavy? | — | Filter the list to that method |
+| Time per Request | Where the time goes: DNS, TCP, TLS, waiting, transfer averaged across timed requests | Sample count and exclusions | — |
+| Top Apps, Top Hosts | Who generates the traffic, by bytes, with requests, errors, and median latency | Full numbers by direction | Focus the app or host in the request list |
+| Slowest Requests, Largest Responses | The outliers worth opening first | Full method and URL | Select the request |
+
+## Findings
+
+Findings are computed from the captured requests only; no model or network call is involved. Current rules:
+
+- 5xx and 4xx concentration per host, failed requests (including TLS handshake failures)
+- Hosts whose p95 latency reaches 2 s, and hosts with repeated slow TLS handshakes
+- Text responses over 100 KB without `Content-Encoding`
+- Static assets served without cache headers
+- Identical `GET` requests repeated five or more times
+- Plain HTTP traffic, tunneled (undecrypted) HTTPS hosts, uploads over 5 MB
+- Requests changed by Map Local, Map Remote, Modify Headers, and similar rules
+
+Each finding is a single line; hover it for the reasoning, and use its button to focus the host or app, select the evidence requests, or open HTTPS Decryption.
+
+## Export
+
+The Export menu in the report header copies or saves the report as Markdown. The export contains hosts, paths, counts, sizes, and timings only — never headers, cookies, or bodies.

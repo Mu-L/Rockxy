@@ -15,17 +15,25 @@ struct WebSocketInspectorView: View {
         let _ = transaction.webSocketFrameVersion
         Group {
             if let connection = transaction.webSocketConnection {
-                VStack(spacing: 0) {
-                    connectionSummary(connection)
-                    Divider()
-                    directionFilter(connection)
-                    Divider()
-                    frameList(connection)
-                    if selectedFrame != nil {
+                // The summary, filter, detail header, and payload picker alone outgrow a short
+                // bottom inspector, and an oversized stack pushes the inspector's own URL bar and
+                // tab strip out of view. Scrolling the tab instead keeps that chrome fixed; the
+                // frame list gets a bounded height so it scrolls on its own inside the tab.
+                ScrollView(.vertical) {
+                    VStack(spacing: 0) {
+                        connectionSummary(connection)
                         Divider()
-                        frameDetail
+                        directionFilter(connection)
+                        Divider()
+                        frameList(connection)
+                            .frame(height: frameListHeight(for: connection))
+                        if selectedFrame != nil {
+                            Divider()
+                            frameDetail
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
                 InspectorEmptyStateView(
                     String(localized: "No WebSocket Data", bundle: RockxyLocalization.bundle),
@@ -49,6 +57,16 @@ struct WebSocketInspectorView: View {
     // MARK: Private
 
     private static let maxPayloadPreviewBytes = 512
+    /// Bounds for the frame list inside the scrolling tab: a few rows minimum so the selection
+    /// context never vanishes, and a cap so long sessions scroll within the list.
+    private static let frameRowHeight: CGFloat = 26
+    private static let minimumFrameListRows = 3
+    private static let maximumFrameListRows = 8
+
+    private func frameListHeight(for connection: WebSocketConnection) -> CGFloat {
+        let rows = max(Self.minimumFrameListRows, min(Self.maximumFrameListRows, filteredFrames(connection).count))
+        return CGFloat(rows) * Self.frameRowHeight + 8
+    }
 
     @State private var selectedFrameID: UUID?
     @State private var directionFilterValue: FrameDirection?

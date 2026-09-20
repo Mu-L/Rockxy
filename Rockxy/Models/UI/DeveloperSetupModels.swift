@@ -303,7 +303,8 @@ enum SetupIssue: String, CaseIterable, Equatable, Identifiable {
             String(
                 localized: """
                 Physical devices cannot reach Rockxy while the proxy only listens on localhost. \
-                Turn off Only Listen on localhost, restart the proxy, and use the Device Proxy host plus active port.
+                Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, \
+                restart the proxy, and use the Device Proxy host plus active port.
                 """, bundle: RockxyLocalization.bundle
             )
         case .noTrafficDetected:

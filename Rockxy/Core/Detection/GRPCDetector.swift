@@ -167,6 +167,10 @@ nonisolated enum GRPCDetector {
     }
 
     private static func headerValue(named name: String, in headers: [HTTPHeader]) -> String? {
-        headers.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.value
+        // Length check first: this runs for every request-list row on every batch, and most
+        // header names are the wrong length before a case-insensitive compare is needed.
+        let length = name.utf8.count
+        return headers.first { $0.name.utf8.count == length && $0.name.caseInsensitiveCompare(name) == .orderedSame }?
+            .value
     }
 }

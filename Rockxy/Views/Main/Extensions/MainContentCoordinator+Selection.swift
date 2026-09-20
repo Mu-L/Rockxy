@@ -161,6 +161,15 @@ extension MainContentCoordinator {
     func selectSidebarItem(_ item: SidebarItem?) {
         sidebarSelection = item
 
+        // Any traffic-scoped selection leaves the Insights report. The report row clears the
+        // sidebar scope like Apps or Domains and swaps the center content; search, protocol,
+        // advanced, signal, focus-set, and noise filters keep applying to its Visible scope.
+        if item == .insights {
+            activeMainTab = .insights
+        } else if activeMainTab == .insights {
+            activeMainTab = .traffic
+        }
+
         guard let item else {
             filterCriteria.sidebarDomain = nil
             filterCriteria.sidebarPathPrefix = nil
@@ -194,7 +203,8 @@ extension MainContentCoordinator {
             filterCriteria.exactTransactionID = nil
             recomputeFilteredTransactions()
         case .allApps,
-             .allDomains:
+             .allDomains,
+             .insights:
             filterCriteria.sidebarDomain = nil
             filterCriteria.sidebarPathPrefix = nil
             filterCriteria.sidebarApp = nil

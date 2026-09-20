@@ -90,6 +90,7 @@ jobs:
       - name: Select Xcode
         run: |
           for candidate in \
+            /Applications/Xcode_26.3.app \
             /Applications/Xcode_16.4.app \
             /Applications/Xcode_16.3.app \
             /Applications/Xcode_16.2.app \
@@ -113,6 +114,52 @@ jobs:
             -destination 'platform=macOS' \
             -parallel-testing-enabled NO \
             -resultBundlePath build/test-results/Rockxy.xcresult \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            test
+
+  compatibility-macos27:
+    name: macOS 27 Compatibility
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.head.ref == 'develop' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # immutable commit
+        with:
+          persist-credentials: false
+      - name: Prepare CI developer config
+        run: |
+          cat > Configuration/Developer.xcconfig <<'EOF'
+          #include "LocalDev.xcconfig"
+
+          ROCKXY_TEAM_ID =
+          CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          EOF
+      - name: Verify macOS 27 toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+          test "$(sw_vers -productVersion | cut -d. -f1)" = "27"
+          test "$(xcrun --sdk macosx --show-sdk-version | cut -d. -f1)" = "27"
+      - name: Run tests on macOS 27 SDK
+        run: |
+          mkdir -p build/test-results
+          xcodebuild -project Rockxy.xcodeproj \
+            -scheme Rockxy \
+            -destination 'platform=macOS' \
+            -parallel-testing-enabled NO \
+            -resultBundlePath build/test-results/Rockxy-macos27.xcresult \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -147,6 +194,7 @@ jobs:
       - name: Select Xcode
         run: |
           for candidate in \
+            /Applications/Xcode_26.3.app \
             /Applications/Xcode_16.4.app \
             /Applications/Xcode_16.3.app \
             /Applications/Xcode_16.2.app \

@@ -151,10 +151,13 @@ actor TrafficSessionManager {
 
         let port = proxyPort
         let enrichCallback = onClientAppEnriched
+        let unresolvedSourcePorts = Set(batch.compactMap { transaction in
+            transaction.clientApp == nil ? transaction.sourcePort : nil
+        })
+        guard !unresolvedSourcePorts.isEmpty else {
+            return
+        }
         Task {
-            let unresolvedSourcePorts = Set(batch.compactMap { transaction in
-                transaction.clientApp == nil ? transaction.sourcePort : nil
-            })
             let portMap = await ProcessResolver.shared.resolveProcessesAsync(
                 proxyPort: port,
                 requiring: unresolvedSourcePorts

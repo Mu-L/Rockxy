@@ -58,6 +58,50 @@ struct HistoryRetentionTests {
         #expect(coordinator.filteredRows.first?.clientApp == "Safari")
     }
 
+    @Test("A WebSocket session re-delivered on close updates its row instead of duplicating it")
+    @MainActor
+    func webSocketRedeliveryUpdatesExistingRow() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+        let request = TestFixtures.makeRequest(method: "GET", url: "ws://chat.example.com/socket")
+        let session = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: WebSocketConnection(upgradeRequest: request)
+        )
+
+        // Delivered once when the upgrade completes: the row is visible and active.
+        coordinator.processActiveProjectTestBatch([session])
+        #expect(coordinator.transactions.count == 1)
+        #expect(coordinator.transactions.first?.state == .active)
+
+        // Delivered again when the socket closes: the same row becomes completed.
+        coordinator.processActiveProjectTestBatch([session])
+        #expect(coordinator.transactions.count == 1)
+        #expect(coordinator.transactions.first?.id == session.id)
+        #expect(coordinator.transactions.first?.state == .completed)
+    }
+
+    @Test("Bulk client attribution moves every observed host count")
+    @MainActor
+    func bulkClientAttributionUpdatesObservedDomains() {
+        let coordinator = MainContentCoordinator()
+        let first = TestFixtures.makeTransaction(url: "https://api.example.com/first")
+        let second = TestFixtures.makeTransaction(url: "https://api.example.com/second")
+        coordinator.transactions = [first, second]
+        coordinator.appendObservedDomainsByApp(from: [first, second])
+        coordinator.updateAllWorkspaces(with: [first, second])
+
+        first.clientApp = "Safari"
+        second.clientApp = "Safari"
+        coordinator.handleClientAppEnrichment([first, second])
+
+        let unknown = String(localized: "Unknown", bundle: RockxyLocalization.bundle)
+        #expect(coordinator.observedDomainCountsByApp[unknown] == nil)
+        #expect(coordinator.observedDomainCountsByApp["Safari"]?["api.example.com"] == 2)
+        #expect(coordinator.observedDomainsByApp["Safari"] == ["api.example.com"])
+    }
+
     @Test("Capture batches keep the request table on its incremental append path")
     @MainActor
     func captureBatchUsesIncrementalIndexes() {
@@ -75,6 +119,32 @@ struct HistoryRetentionTests {
         #expect(coordinator.appNodes.first?.requestCount == 1_000)
         #expect(coordinator.observedDomainsByApp[String(localized: "Unknown", bundle: RockxyLocalization.bundle)]?
             .count == 20)
+    }
+
+    @Test("Capture batches update the error total before and after eviction")
+    @MainActor
+    func captureBatchesMaintainErrorCount() {
+        let coordinator = MainContentCoordinator(policy: SmallHistoryPolicy())
+        coordinator.isRecording = true
+        coordinator.processActiveProjectTestBatch([
+            TestFixtures.makeTransaction(statusCode: 503),
+            TestFixtures.makeTransaction(statusCode: 200)
+        ])
+        #expect(coordinator.errorCount == 1)
+
+        coordinator.processActiveProjectTestBatch([
+            TestFixtures.makeTransaction(statusCode: 404),
+            TestFixtures.makeTransaction(statusCode: 200)
+        ])
+        #expect(coordinator.errorCount == 2)
+
+        coordinator.processActiveProjectTestBatch((0 ..< 10).map { _ in
+            TestFixtures.makeTransaction(statusCode: 200)
+        })
+        let retainedErrors = coordinator.transactions.count {
+            ($0.response?.statusCode ?? 0) >= 400
+        }
+        #expect(coordinator.errorCount == retainedErrors)
     }
 
     @Test("Saturated capture evicts with headroom instead of rebuilding every batch")

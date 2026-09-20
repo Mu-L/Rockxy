@@ -238,12 +238,40 @@ struct ScriptingRegressionTests {
         #expect(forward.headers.first(name: "Content-Length") == "5")
     }
 
-    @Test("Removing the body sets Content-Length: 0 even if original had none")
+    @Test("Removing the body sets Content-Length: 0 when the original declared a length")
     func framingRemovedBodyZeroContentLength() {
         let req = makeRequest(method: "POST", body: nil)
-        let originalHead = HTTPRequestHead(version: .http1_1, method: .POST, uri: "/path")
+        let originalHead = HTTPRequestHead(
+            version: .http1_1,
+            method: .POST,
+            uri: "/path",
+            headers: HTTPHeaders([("Content-Length", "5")])
+        )
         let forward = ProxyHandlerShared.buildForwardHead(from: req, originalHead: originalHead)
         #expect(forward.headers.first(name: "Content-Length") == "0")
+    }
+
+    @Test("A bodyless request that never declared a length is forwarded without Content-Length")
+    func framingBodylessRequestKeepsNoContentLength() {
+        // A WebSocket upgrade is the common case: servers refuse an upgrade GET that
+        // advertises `Content-Length: 0`, so the proxy must not invent one.
+        let req = makeRequest(
+            method: "GET",
+            headers: [
+                HTTPHeader(name: "Upgrade", value: "websocket"),
+                HTTPHeader(name: "Connection", value: "Upgrade"),
+            ],
+            body: nil
+        )
+        let originalHead = HTTPRequestHead(
+            version: .http1_1,
+            method: .GET,
+            uri: "/socket",
+            headers: HTTPHeaders([("Upgrade", "websocket"), ("Connection", "Upgrade")])
+        )
+        let forward = ProxyHandlerShared.buildForwardHead(from: req, originalHead: originalHead)
+        #expect(!forward.headers.contains(name: "Content-Length"))
+        #expect(forward.headers.first(name: "Upgrade") == "websocket")
     }
 
     @Test("Chunked uploads keep Transfer-Encoding and have no Content-Length")

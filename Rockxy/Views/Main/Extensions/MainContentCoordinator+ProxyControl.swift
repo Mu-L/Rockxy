@@ -20,6 +20,10 @@ struct ProxyOverrideReconciliation: Equatable, Sendable {
 /// proxy completed it. A small lock keeps NIO callbacks safe to compare with the
 /// main-actor health-check task without introducing asynchronous callback races.
 final class CaptureProbeTracker: @unchecked Sendable {
+    // MARK: Internal
+
+    nonisolated static let headerName = "X-Rockxy-Capture-Probe"
+
     func begin(token: String) -> UInt64 {
         lock.lock()
         defer { lock.unlock() }
@@ -40,8 +44,8 @@ final class CaptureProbeTracker: @unchecked Sendable {
         guard let token = transaction.request.headers.first(where: {
             $0.name.caseInsensitiveCompare(Self.headerName) == .orderedSame
         })?.value,
-            diagnosticTokens.contains(token)
-        else {
+            diagnosticTokens.contains(token) else
+        {
             return false
         }
 
@@ -80,9 +84,10 @@ final class CaptureProbeTracker: @unchecked Sendable {
         diagnosticTokenOrder.removeAll()
     }
 
-    nonisolated static let headerName = "X-Rockxy-Capture-Probe"
+    // MARK: Private
 
     private static let maximumRetainedTokens = 8
+
     private let lock = NSLock()
     private var generation: UInt64 = 0
     private var expectedToken: String?
@@ -106,8 +111,8 @@ extension MainContentCoordinator {
     func retryHTTPSInterception() {
         guard isProxyRunning,
               !isProxyStopping,
-              !isRetryingHTTPSInterception
-        else {
+              !isRetryingHTTPSInterception else
+        {
             return
         }
         let clientIdentifiers = readiness.tlsRetryClientIdentifiers
@@ -141,8 +146,8 @@ extension MainContentCoordinator {
                   httpsInterceptionRetryGeneration == retryGeneration,
                   isProxyRunning,
                   !isProxyStopping,
-                  readiness.isCaptureActive
-            else {
+                  readiness.isCaptureActive else
+            {
                 return
             }
             guard readiness.canInterceptHTTPS else {
@@ -266,19 +271,7 @@ extension MainContentCoordinator {
                 startBandwidthTimer()
                 startLogCapture()
 
-                evictionObserver = NotificationCenter.default.addObserver(
-                    forName: .bufferEvictionRequested,
-                    object: nil,
-                    queue: .main
-                ) { [weak self] notification in
-                    guard let self else {
-                        return
-                    }
-                    let count = notification.userInfo?["count"] as? Int ?? Int(5e3)
-                    Task { @MainActor in
-                        self.evictOldestTransactions(count: count)
-                    }
-                }
+                installEvictionObserver()
 
                 readiness.startObserving()
                 readiness.setSystemRoutingExpected(true)
@@ -309,6 +302,22 @@ extension MainContentCoordinator {
                 Self.logger.error("Failed to start proxy: \(error.localizedDescription)")
                 proxyError = error.localizedDescription
                 activeProxyPort = settings.proxyPort
+            }
+        }
+    }
+
+    private func installEvictionObserver() {
+        evictionObserver = NotificationCenter.default.addObserver(
+            forName: .bufferEvictionRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else {
+                return
+            }
+            let count = notification.userInfo?["count"] as? Int ?? Int(5e3)
+            Task { @MainActor in
+                self.evictOldestTransactions(count: count)
             }
         }
     }
@@ -357,6 +366,26 @@ extension MainContentCoordinator {
             readiness.setSystemRoutingReady(false)
             readiness.setProxyEnableFailed(message: error.localizedDescription)
             throw error
+        }
+    }
+
+    /// Stops the listener and starts it again with the saved listener settings, so a port or
+    /// listen-address change takes effect without hunting for Stop/Start in the Tools menu.
+    func restartProxy() {
+        guard isProxyRunning, !isProxyStopping, !isProxyStarting else {
+            return
+        }
+        stopProxy()
+        Task { @MainActor in
+            let deadline = ContinuousClock.now.advanced(by: .seconds(15))
+            while isProxyStopping || isProxyRunning {
+                guard ContinuousClock.now < deadline else {
+                    Self.logger.error("Restart aborted: the proxy did not stop in time")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            startProxy()
         }
     }
 
@@ -484,8 +513,8 @@ extension MainContentCoordinator {
                 guard !Task.isCancelled,
                       let self,
                       self.isProxyRunning,
-                      self.activeProxyPort == proxyPort
-                else {
+                      self.activeProxyPort == proxyPort else
+                {
                     return
                 }
                 Self.logger.warning("Capture health check failed: \(error.localizedDescription)")
@@ -497,8 +526,8 @@ extension MainContentCoordinator {
     nonisolated static func performCaptureHealthProbe(
         session: DeveloperSetupProbeSession,
         proxyPort: Int
-    ) async throws
-        -> Bool
+    )
+        async throws -> Bool
     {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let responsePromise = group.next().makePromise(of: Bool.self)
@@ -923,16 +952,38 @@ extension MainContentCoordinator {
             routedBatches[context.projectID, default: []].append(transaction)
         }
 
-        for (projectID, projectBatch) in routedBatches {
+        for (projectID, routedBatch) in routedBatches {
             var history = transactionsByProjectID[projectID] ?? []
             var sequence = nextSequenceNumberByProjectID[projectID]
                 ?? ((history.map(\.sequenceNumber).max() ?? -1) + 1)
-            for transaction in projectBatch {
+            // A WebSocket session is delivered when it opens (so the row and frames are
+            // visible live) and again when it closes with its final state. The second
+            // delivery updates the row that is already in history instead of appending
+            // a duplicate.
+            var projectBatch: [HTTPTransaction] = []
+            var updatedTransactions: [HTTPTransaction] = []
+            for transaction in routedBatch {
+                if transaction.webSocketConnection != nil,
+                   history.contains(where: { $0.id == transaction.id })
+                {
+                    // The lifecycle only re-delivers a session when it has closed.
+                    transaction.state = .completed
+                    updatedTransactions.append(transaction)
+                    continue
+                }
                 transaction.sequenceNumber = sequence
                 sequence += 1
                 history.append(transaction)
+                projectBatch.append(transaction)
             }
             nextSequenceNumberByProjectID[projectID] = sequence
+            if !updatedTransactions.isEmpty, projectID == projectStore.activeProjectID {
+                refreshRowsAfterMutation()
+            }
+            guard !projectBatch.isEmpty else {
+                transactionsByProjectID[projectID] = history
+                continue
+            }
 
             let overflow = max(0, history.count - liveHistoryLimit)
             let evictionCount: Int
@@ -970,7 +1021,11 @@ extension MainContentCoordinator {
             }
 
             recordTrafficMetrics(for: projectBatch)
-            recomputeErrorCount()
+            if evictionCount > 0 {
+                recomputeErrorCount()
+            } else {
+                errorCount += projectBatch.count { ($0.response?.statusCode ?? 0) >= 400 }
+            }
             followLatestVisibleTransaction(from: projectBatch)
             headerColumnStore.updateDiscoveredHeaders(fromBatch: projectBatch)
         }
@@ -987,10 +1042,7 @@ extension MainContentCoordinator {
             enrichedTransactions.map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
-        let enrichedIDs = Set(enrichedByID.keys)
-        for transaction in enrichedTransactions {
-            moveObservedDomainFromUnknown(for: transaction)
-        }
+        moveObservedDomainsFromUnknown(for: enrichedTransactions)
 
         for workspace in workspaceStore.workspaces {
             updateAppGroupingForEnrichedTransactions(enrichedTransactions, in: workspace)
@@ -1000,13 +1052,13 @@ extension MainContentCoordinator {
                 recomputeFilteredTransactions(for: workspace)
             } else {
                 var didUpdateRows = false
-                for index in workspace.filteredRows.indices
-                    where enrichedIDs.contains(workspace.filteredRows[index].id)
-                {
-                    guard let transaction = enrichedByID[workspace.filteredRows[index].id] else {
+                for (id, transaction) in enrichedByID {
+                    guard let entry = workspace.trafficSelectionIndex[id],
+                          workspace.filteredRows.indices.contains(entry.rowIndex),
+                          workspace.filteredRows[entry.rowIndex].id == id else {
                         continue
                     }
-                    workspace.filteredRows[index] = RequestListRow(
+                    workspace.filteredRows[entry.rowIndex] = RequestListRow(
                         from: transaction,
                         sslState: sslState(for: transaction)
                     )
@@ -1102,19 +1154,20 @@ extension MainContentCoordinator {
     }
 }
 
-// MARK: - CaptureHealthProbeResponseHandler
+// MARK: - CaptureHealthProbeError
 
 enum CaptureHealthProbeError: Error {
     case connectionClosed
     case timeout
 }
 
+// MARK: - CaptureHealthProbeResponseHandler
+
 /// Sends an absolute-form HTTP request directly to the active proxy listener. Foundation's
 /// URL loading system may bypass configured proxies for loopback destinations, which would
 /// make the readiness check report a false success without traversing Rockxy.
 final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked Sendable {
-    typealias InboundIn = HTTPClientResponsePart
-    typealias OutboundOut = HTTPClientRequestPart
+    // MARK: Lifecycle
 
     init(
         requestHead: HTTPRequestHead,
@@ -1123,6 +1176,11 @@ final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked
         self.requestHead = requestHead
         self.responsePromise = responsePromise
     }
+
+    // MARK: Internal
+
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundOut = HTTPClientRequestPart
 
     func channelActive(context: ChannelHandlerContext) {
         context.write(wrapOutboundOut(.head(requestHead)), promise: nil)
@@ -1154,6 +1212,8 @@ final class CaptureHealthProbeResponseHandler: ChannelInboundHandler, @unchecked
     func timeout() {
         fail(CaptureHealthProbeError.timeout)
     }
+
+    // MARK: Private
 
     private let requestHead: HTTPRequestHead
     private let responsePromise: EventLoopPromise<Bool>

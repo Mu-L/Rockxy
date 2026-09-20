@@ -121,7 +121,15 @@ struct RootCADownloadServerLifecycleTests {
         let startTask = Task {
             try await server.start(certificatePEM: "certificate")
         }
-        await Task.yield()
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(2))
+        while clock.now < deadline {
+            if await server.lifecycleGeneration > 0 {
+                break
+            }
+            await Task.yield()
+        }
+        #expect(await server.lifecycleGeneration > 0)
 
         await server.stop()
         _ = try? await startTask.value

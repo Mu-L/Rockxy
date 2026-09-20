@@ -120,7 +120,8 @@ extension MainContentCoordinator {
              .allDomains,
              .allPinned,
              .allSaved,
-             .allNotes:
+             .allNotes,
+             .insights:
             true
         case .filter,
              .ruleGroup,

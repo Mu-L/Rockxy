@@ -8,6 +8,8 @@ import Testing
 /// Tests use shared singleton state, so must run serially.
 @Suite(.serialized, .sharedPolicyState)
 struct ReadinessCoordinatorTests {
+    // MARK: Internal
+
     // MARK: - Warning State Machine (fully deterministic, no machine-state dependency)
 
     @Test("no warning when capture is not active")
@@ -555,6 +557,187 @@ struct ReadinessCoordinatorTests {
         #expect(!manager.isAutoPassthrough("old-ca.example", clientIdentifier: "app.one"))
     }
 
+    @Test("an unreadable certificate status is not evidence of a new certificate epoch")
+    func unknownCertReadinessDoesNotBeginEpoch() {
+        #expect(!ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .trusted,
+            currentReadiness: .unknown,
+            previousFingerprint: "same",
+            currentFingerprint: nil
+        ))
+        #expect(!ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .unknown,
+            currentReadiness: .trusted,
+            previousFingerprint: nil,
+            currentFingerprint: "same"
+        ))
+        #expect(!ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .unknown,
+            currentReadiness: .unknown,
+            previousFingerprint: "same",
+            currentFingerprint: "rotated"
+        ))
+        #expect(ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .trusted,
+            currentReadiness: .installedNotTrusted,
+            previousFingerprint: "same",
+            currentFingerprint: "same"
+        ))
+        #expect(ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .installedNotTrusted,
+            currentReadiness: .trusted,
+            previousFingerprint: "same",
+            currentFingerprint: "same"
+        ))
+        #expect(ReadinessCoordinator.beginsNewCertificateEpoch(
+            previousReadiness: .trusted,
+            currentReadiness: .trusted,
+            previousFingerprint: "same",
+            currentFingerprint: "rotated"
+        ))
+    }
+
+    @Test("a trusted → unknown → trusted flap keeps retry evidence and fallbacks")
+    @MainActor
+    func transientUnknownReadinessPreservesRetryEvidence() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-unknown-flap-\(UUID().uuidString)", isDirectory: true)
+        let manager = SSLProxyingManager(
+            storageURL: directory.appendingPathComponent("settings.json"),
+            passthroughStorageURL: directory.appendingPathComponent("passthrough.json")
+        )
+        let coordinator = ReadinessCoordinator.shared
+        defer {
+            coordinator.setCaptureActive(false)
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "same"),
+            sslProxyingManager: manager
+        )
+        for host in ["one.example", "two.example", "three.example"] {
+            manager.markHostForPassthrough(host, clientIdentifier: "app.one")
+        }
+        coordinator.setCaptureActive(true, sslProxyingManager: manager)
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+        #expect(coordinator.certReadiness == .trusted)
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.unknown, fingerprint: nil),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.certReadiness == .unknown)
+        #expect(coordinator.lastKnownCertReadiness == .trusted)
+        #expect(coordinator.lastKnownCertFingerprint == "same")
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+        #expect(manager.isAutoPassthrough("one.example", clientIdentifier: "app.one"))
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "same"),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.certReadiness == .trusted)
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+        #expect(manager.isAutoPassthrough("one.example", clientIdentifier: "app.one"))
+        #expect(!manager.forceGlobalPassthrough)
+    }
+
+    @Test("genuine trust loss and recovery across an unknown flap still begin a new epoch")
+    @MainActor
+    func trustTransitionAcrossUnknownFlapBeginsEpoch() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-unknown-trust-loss-\(UUID().uuidString)", isDirectory: true)
+        let manager = SSLProxyingManager(
+            storageURL: directory.appendingPathComponent("settings.json"),
+            passthroughStorageURL: directory.appendingPathComponent("passthrough.json")
+        )
+        let coordinator = ReadinessCoordinator.shared
+        defer {
+            coordinator.setCaptureActive(false)
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "same"),
+            sslProxyingManager: manager
+        )
+        for host in ["one.example", "two.example", "three.example"] {
+            manager.markHostForPassthrough(host, clientIdentifier: "app.one")
+        }
+        coordinator.setCaptureActive(true, sslProxyingManager: manager)
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+
+        // trusted → unknown → installedNotTrusted is a real trust loss, not a flap.
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.unknown, fingerprint: nil),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.installedNotTrusted, fingerprint: "same"),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.certReadiness == .installedNotTrusted)
+        #expect(coordinator.lastKnownCertReadiness == .installedNotTrusted)
+        #expect(coordinator.tlsRetryClientIdentifiers.isEmpty)
+        #expect(manager.forceGlobalPassthrough)
+
+        // installedNotTrusted → unknown → trusted is a real trust recovery: fallbacks are cleared.
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.unknown, fingerprint: nil),
+            sslProxyingManager: manager
+        )
+        #expect(manager.isAutoPassthrough("one.example", clientIdentifier: "app.one"))
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "same"),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.certReadiness == .trusted)
+        #expect(!manager.isAutoPassthrough("one.example", clientIdentifier: "app.one"))
+        #expect(!manager.forceGlobalPassthrough)
+    }
+
+    @Test("a fingerprint rotation across an unknown flap begins a new epoch")
+    @MainActor
+    func fingerprintRotationAcrossUnknownFlapBeginsEpoch() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rockxy-unknown-rotation-\(UUID().uuidString)", isDirectory: true)
+        let manager = SSLProxyingManager(
+            storageURL: directory.appendingPathComponent("settings.json"),
+            passthroughStorageURL: directory.appendingPathComponent("passthrough.json")
+        )
+        let coordinator = ReadinessCoordinator.shared
+        defer {
+            coordinator.setCaptureActive(false)
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "old"),
+            sslProxyingManager: manager
+        )
+        for host in ["one.example", "two.example", "three.example"] {
+            manager.markHostForPassthrough(host, clientIdentifier: "app.one")
+        }
+        coordinator.setCaptureActive(true, sslProxyingManager: manager)
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.unknown, fingerprint: nil),
+            sslProxyingManager: manager
+        )
+        #expect(coordinator.tlsRetryClientIdentifiers == ["app.one"])
+        coordinator.applyCertificateSnapshot(
+            makeCertSnapshot(.trusted, fingerprint: "new"),
+            sslProxyingManager: manager
+        )
+
+        #expect(coordinator.lastKnownCertFingerprint == "new")
+        #expect(coordinator.tlsRetryClientIdentifiers.isEmpty)
+        #expect(!manager.isAutoPassthrough("one.example", clientIdentifier: "app.one"))
+    }
+
     @Test("helperStatusChanged notification refreshes helper state")
     @MainActor
     func helperNotificationRefreshesState() async throws {
@@ -776,6 +959,52 @@ struct ReadinessCoordinatorTests {
         #expect(coordinator.selectedTransactionIDs.isEmpty)
         #expect(coordinator.workspaceStore.workspaces[0].selectedTransactionIDs.isEmpty)
         #expect(workspace.selectedTransactionIDs.isEmpty)
+    }
+
+    // MARK: Private
+
+    @MainActor
+    private func waitForInjectedHelperState(
+        coordinator: ReadinessCoordinator,
+        manager: HelperManager,
+        status: HelperManager.HelperStatus,
+        signingIssue: HelperManager.SigningIssue?
+    )
+        async throws
+    {
+        // Full-suite runs may have a delayed app-activation deep refresh that
+        // probes the real local helper. Re-inject while waiting so this test
+        // remains about notification propagation, not machine helper state.
+        manager.injectHelperStateForTests(status: status, signingIssue: signingIssue)
+
+        for _ in 0 ..< 40 {
+            if coordinator.helperReadiness == status,
+               coordinator.helperSigningIssue == signingIssue
+            {
+                return
+            }
+            if manager.status != status || manager.signingIssue != signingIssue {
+                manager.injectHelperStateForTests(status: status, signingIssue: signingIssue)
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private func makeCertSnapshot(_ readiness: CertReadiness, fingerprint: String?) -> RootCAStatusSnapshot {
+        RootCAStatusSnapshot(
+            hasGeneratedCertificate: readiness != .notGenerated,
+            isInstalledInKeychain: readiness == .installedNotTrusted || readiness == .trusted,
+            hasTrustSettings: readiness == .installedNotTrusted || readiness == .trusted,
+            isSystemTrustValidated: readiness == .trusted,
+            notValidBefore: nil,
+            notValidAfter: nil,
+            fingerprintSHA256: fingerprint,
+            commonName: "Rockxy Root CA",
+            lastValidationErrorMessage: nil,
+            statusReadFailure: readiness == .unknown
+                ? RootCAStatusReadFailure(scope: .installedTrustState, message: "trust domain unreadable")
+                : nil
+        )
     }
 }
 

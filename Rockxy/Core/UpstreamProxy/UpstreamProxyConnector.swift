@@ -57,6 +57,7 @@ nonisolated enum UpstreamProxyConnector {
                         proxyHost: proxyHost,
                         proxyPort: proxyPort,
                         proxyType: type,
+                        targetScheme: targetScheme,
                         targetHost: targetHost,
                         targetPort: targetPort,
                         credentials: configuration.credentials,
@@ -71,6 +72,7 @@ nonisolated enum UpstreamProxyConnector {
                 proxyHost: configuration.configuration.host,
                 proxyPort: configuration.configuration.port,
                 proxyType: .http,
+                targetScheme: targetScheme,
                 targetHost: targetHost,
                 targetPort: targetPort,
                 credentials: configuration.credentials,
@@ -83,6 +85,7 @@ nonisolated enum UpstreamProxyConnector {
                 proxyHost: configuration.configuration.host,
                 proxyPort: configuration.configuration.port,
                 proxyType: .https,
+                targetScheme: targetScheme,
                 targetHost: targetHost,
                 targetPort: targetPort,
                 credentials: configuration.credentials,
@@ -95,6 +98,7 @@ nonisolated enum UpstreamProxyConnector {
                 proxyHost: configuration.configuration.host,
                 proxyPort: configuration.configuration.port,
                 proxyType: .socks5,
+                targetScheme: targetScheme,
                 targetHost: targetHost,
                 targetPort: targetPort,
                 credentials: configuration.credentials,
@@ -121,11 +125,18 @@ nonisolated enum UpstreamProxyConnector {
 
     // MARK: Private
 
+    /// Plain-HTTP targets are sent to an HTTP(S) proxy in absolute form on the proxy
+    /// connection; only TLS targets and SOCKS routes need a tunnel handshake first.
+    nonisolated static func usesAbsoluteFormRelay(proxyType: UpstreamProxyType, targetScheme: String) -> Bool {
+        (proxyType == .http || proxyType == .https) && targetScheme.lowercased() == "http"
+    }
+
     private static func proxyConnect(
         eventLoop: EventLoop,
         proxyHost: String,
         proxyPort: Int,
         proxyType: UpstreamProxyType,
+        targetScheme: String,
         targetHost: String,
         targetPort: Int,
         credentials: UpstreamProxyCredentials?,
@@ -134,7 +145,35 @@ nonisolated enum UpstreamProxyConnector {
     )
         -> EventLoopFuture<Channel>
     {
-        ClientBootstrap(group: eventLoop)
+        if usesAbsoluteFormRelay(proxyType: proxyType, targetScheme: targetScheme) {
+            return ClientBootstrap(group: eventLoop)
+                .connectTimeout(timeout)
+                .connect(host: proxyHost, port: proxyPort)
+                .flatMap { channel in
+                    let transport: EventLoopFuture<Void> = proxyType == .https
+                        ? addTLSHandler(channel: channel, proxyHost: proxyHost)
+                        : channel.eventLoop.makeSucceededVoidFuture()
+                    return transport.flatMap {
+                        channelInitializer(channel)
+                    }.flatMap {
+                        // Appended after the relay's HTTP client handlers so the head is rewritten
+                        // before the encoder serialises it.
+                        channel.pipeline.addHandler(AbsoluteFormRequestHandler(
+                            targetScheme: targetScheme,
+                            targetHost: targetHost,
+                            targetPort: targetPort,
+                            credentials: credentials
+                        ))
+                    }.map {
+                        channel
+                    }.flatMapError { error in
+                        channel.close(promise: nil)
+                        return eventLoop.makeFailedFuture(error)
+                    }
+                }
+        }
+
+        return ClientBootstrap(group: eventLoop)
             .connectTimeout(timeout)
             .connect(host: proxyHost, port: proxyPort)
             .flatMap { channel in

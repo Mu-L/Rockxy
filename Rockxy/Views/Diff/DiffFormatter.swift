@@ -219,13 +219,15 @@ enum DiffFormatter {
             headersText.isEmpty ? String(localized: "(no headers)", bundle: RockxyLocalization.bundle) : headersText
         ))
 
-        // Response body
-        if let body = response.body {
+        // Response body — decoded through `Content-Encoding` like the inspector, so two
+        // gzip JSON responses diff as text instead of two opaque binary summaries.
+        if let rawBody = response.body {
             let contentType = response.headers.first { $0.name.lowercased() == "content-type" }?.value
+            let contentEncoding = response.headers.first { $0.name.lowercased() == "content-encoding" }?.value
             sections.append((
                 String(localized: "Body", bundle: RockxyLocalization.bundle),
                 formatBody(
-                    body,
+                    BodyDecoder.decode(rawBody, encoding: contentEncoding),
                     contentType: contentType,
                     captureWasTruncated: response.bodyTruncated
                 )

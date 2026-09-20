@@ -25,12 +25,14 @@ final class MCPServerHandler: ChannelInboundHandler, @unchecked Sendable {
         configuration: MCPServerConfiguration,
         sessionManager: MCPSessionManager,
         toolRegistry: MCPToolRegistry,
-        storedToken: String
+        storedToken: String,
+        activityStore: MCPClientActivityStore = MCPClientActivityStore()
     ) {
         self.configuration = configuration
         self.sessionManager = sessionManager
         self.toolRegistry = toolRegistry
         self.storedToken = storedToken
+        self.activityStore = activityStore
     }
 
     // MARK: Internal
@@ -90,8 +92,10 @@ final class MCPServerHandler: ChannelInboundHandler, @unchecked Sendable {
     private let sessionManager: MCPSessionManager
     private let toolRegistry: MCPToolRegistry
     private let storedToken: String
+    private let activityStore: MCPClientActivityStore
 
     private var activeSessionID: String?
+    private var activeClientActivity: MCPClientActivity?
     private var requestMethod: HTTPMethod?
     private var requestURI: String?
     private var requestHeaders: HTTPHeaders?
@@ -295,12 +299,16 @@ private extension MCPServerHandler {
         case "initialize":
             handleInitialize(context: context, request: request)
         case "notifications/initialized":
+            recordClientMethod(request.method)
             sendResponse(context: context, status: .accepted, body: nil)
         case "tools/list":
+            recordClientMethod(request.method)
             handleToolsList(context: context, request: request)
         case "tools/call":
+            recordClientMethod(request.method)
             handleToolsCall(context: context, request: request)
         case "ping":
+            recordClientMethod(request.method)
             handlePing(context: context, request: request)
         default:
             sendJsonRpcError(
@@ -387,6 +395,13 @@ private extension MCPServerHandler {
         mcpHandlerLogger.info(
             "MCP initialized for client \(initParams.clientInfo.name, privacy: .public) v\(initParams.clientInfo.version, privacy: .public), session \(sessionID, privacy: .public)"
         )
+        let clientActivity = MCPClientActivity(
+            clientName: initParams.clientInfo.name,
+            clientVersion: initParams.clientInfo.version,
+            initializedAt: Date()
+        )
+        activeClientActivity = clientActivity
+        activityStore.record(clientActivity)
 
         sendJsonRpcResult(
             context: context,
@@ -394,6 +409,15 @@ private extension MCPServerHandler {
             result: result,
             extraHeaders: [("Mcp-Session-Id", sessionID)]
         )
+    }
+
+    func recordClientMethod(_ method: String) {
+        guard var activity = activeClientActivity else {
+            return
+        }
+        activity.recordMethod(method, at: Date())
+        activeClientActivity = activity
+        activityStore.record(activity)
     }
 
     func handleToolsList(context: ChannelHandlerContext, request: JsonRpcRequest) {

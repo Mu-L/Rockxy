@@ -742,6 +742,8 @@ private struct ModifyHeaderEditSheet: View {
             _operations = State(initialValue: [EditableHeaderOperation()])
         case let .edit(rule):
             _name = State(initialValue: rule.name)
+            // Legacy rules saved before authored metadata existed only carry the compiled
+            // regex; newer rules override this below with the pattern the user typed.
             _urlPattern = State(initialValue: rule.matchCondition.urlPattern ?? ".*")
             let normalizedMethod = rule.matchCondition.method?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -749,8 +751,22 @@ private struct ModifyHeaderEditSheet: View {
             _httpMethod = State(
                 initialValue: normalizedMethod.flatMap(HTTPMethodFilter.init(rawValue:)) ?? .any
             )
-            _matchType = State(initialValue: .regex)
-            _includeSubpaths = State(initialValue: false)
+            if let sourcePattern = rule.matchCondition.sourceURLPattern,
+               let storedMatchType = rule.matchCondition.matchType
+            {
+                // Restore the authored pattern and semantics; the compiled regex stays
+                // a runtime artifact the user never has to read back.
+                _urlPattern = State(initialValue: sourcePattern)
+                _matchType = State(initialValue: storedMatchType)
+                _includeSubpaths = State(
+                    initialValue: storedMatchType == .wildcard
+                        ? rule.matchCondition.includeSubpaths ?? false
+                        : false
+                )
+            } else {
+                _matchType = State(initialValue: .regex)
+                _includeSubpaths = State(initialValue: false)
+            }
             if case let .modifyHeader(ops) = rule.action {
                 _operations = State(initialValue: [EditableHeaderOperation].from(ops))
             } else {

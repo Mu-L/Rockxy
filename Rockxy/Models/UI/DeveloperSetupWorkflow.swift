@@ -341,7 +341,10 @@ enum DeveloperSetupWorkflowCatalog {
                 title: String(localized: "Proxy status", bundle: RockxyLocalization.bundle),
                 description: snapshot.proxyRunning
                     ?
-                    String(localized: "Rockxy is listening on \(snapshot.effectiveListenAddress):\(snapshot.activePort).", bundle: RockxyLocalization.bundle)
+                    String(
+                        localized: "Rockxy is listening on \(snapshot.effectiveListenAddress):\(String(snapshot.activePort)).",
+                        bundle: RockxyLocalization.bundle
+                    )
                     : String(localized: "Start Rockxy before you point \(target.title) traffic at the local proxy.", bundle: RockxyLocalization.bundle),
                 actionTitle: snapshot.proxyStepActionTitle,
                 actionKind: .verifyProxy,

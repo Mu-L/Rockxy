@@ -199,6 +199,11 @@ struct DirectProxyWatchdogInstallationTests {
         #expect(steps == ["submit:watchdog.new", "remove:watchdog.old"])
         #expect(outcome.isInstalled)
         #expect(outcome.activeLabel == "watchdog.new")
+        guard case let .installed(_, _, retainedSupersededLabel) = outcome else {
+            Issue.record("Expected an installed watchdog")
+            return
+        }
+        #expect(retainedSupersededLabel == nil)
     }
 
     @Test("A first arming submits without removing anything")
@@ -228,6 +233,47 @@ struct DirectProxyWatchdogInstallationTests {
         // rather than a gap in cover — and it exits itself once the backup is resolved.
         #expect(outcome.isInstalled)
         #expect(outcome.activeLabel == "watchdog.new")
+        guard case let .installed(_, _, retainedSupersededLabel) = outcome else {
+            Issue.record("Expected an installed watchdog")
+            return
+        }
+        #expect(retainedSupersededLabel == "watchdog.old")
+    }
+}
+
+// MARK: - DirectProxyWatchdogJobDiscoveryTests
+
+struct DirectProxyWatchdogJobDiscoveryTests {
+    @Test("Discovery includes the legacy label and UUID session labels only")
+    func discoveryIsStrictlyScoped() {
+        let baseLabel = "com.amunx.rockxy.community.direct-proxy-watchdog"
+        let sessionLabel = "\(baseLabel).1E5F233A-521D-447C-9946-55F62DEE004A"
+        let output = """
+        -\t0\t\(baseLabel)
+        -\t0\t\(sessionLabel)
+        -\t0\t\(baseLabel).not-a-uuid
+        321\t0\tcom.amunx.rockxy.community.direct-proxy-watchdogger
+        999\t0\tcom.example.unrelated
+        """
+
+        #expect(DirectProxyWatchdogJobDiscovery.labels(
+            in: output,
+            baseLabel: baseLabel
+        ) == [baseLabel, sessionLabel])
+    }
+
+    @Test("Discovery de-duplicates repeated launchctl rows")
+    func discoveryDeduplicatesRows() {
+        let baseLabel = "com.amunx.rockxy.community.direct-proxy-watchdog"
+        let output = """
+        - 0 \(baseLabel)
+        - 0 \(baseLabel)
+        """
+
+        #expect(DirectProxyWatchdogJobDiscovery.labels(
+            in: output,
+            baseLabel: baseLabel
+        ) == [baseLabel])
     }
 }
 

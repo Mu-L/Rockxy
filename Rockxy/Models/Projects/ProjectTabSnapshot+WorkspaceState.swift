@@ -47,6 +47,9 @@ extension ProjectTabSnapshot {
             allowsAutomaticInspectorReveal: true
         )
         state.activeMainTab = MainTab(rawValue: mainTabRawValue) ?? .traffic
+        if state.activeMainTab == .insights {
+            state.sidebarSelection = .insights
+        }
         state.contextDockTab = ContextDockTabCoding.tab(for: contextDockTabRawValue)
         state.focusNavigatorMode = FocusNavigatorMode(rawValue: focusNavigatorModeRawValue) ?? .browse
         state.activeTrafficSignal = activeTrafficSignalRawValue.flatMap { TrafficSignal(rawValue: $0) }

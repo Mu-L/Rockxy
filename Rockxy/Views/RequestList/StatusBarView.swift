@@ -421,7 +421,7 @@ private struct FooterProxyOverridePopover: View {
 
     private var statusText: String {
         String(
-            localized: "System Proxy is Overridden by Rockxy (IP=\(proxyHost) Port=\(proxyPort)) (Toggle by: ⌥⌘O)",
+            localized: "System Proxy is Overridden by Rockxy (IP=\(proxyHost) Port=\(String(proxyPort))) (Toggle by: ⌥⌘O)",
             bundle: RockxyLocalization.bundle
         )
     }

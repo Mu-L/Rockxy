@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 @testable import Rockxy
 import Testing
 
@@ -154,5 +155,29 @@ struct NoCachingTests {
         #expect(result.contains { $0.name == "Accept" && $0.value == "*/*" })
         #expect(result.contains { $0.name == "Cache-Control" && $0.value == "no-cache, no-store, must-revalidate" })
         #expect(result.contains { $0.name == "Pragma" && $0.value == "no-cache" })
+    }
+
+    @Test("response mutation strips freshness validators and marks the response uncacheable")
+    func responseMutationMarksUncacheable() {
+        var headers = HTTPHeaders([
+            ("Content-Type", "application/json"),
+            ("ETag", "\"abc\""),
+            ("Last-Modified", "Mon, 15 Jan 2025 10:00:00 GMT"),
+            ("Expires", "Tue, 16 Jan 2025 10:00:00 GMT"),
+            ("Cache-Control", "public, max-age=3600"),
+            ("Pragma", "cache"),
+            ("Set-Cookie", "a=1"),
+        ])
+
+        NoCacheHeaderMutator.applyToResponse(&headers)
+
+        #expect(!headers.contains(name: "ETag"))
+        #expect(!headers.contains(name: "Last-Modified"))
+        #expect(headers["Cache-Control"] == ["no-cache, no-store, must-revalidate"])
+        #expect(headers["Pragma"] == ["no-cache"])
+        #expect(headers["Expires"] == ["0"])
+        // Unrelated headers survive untouched.
+        #expect(headers["Content-Type"] == ["application/json"])
+        #expect(headers["Set-Cookie"] == ["a=1"])
     }
 }

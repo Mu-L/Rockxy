@@ -9,6 +9,8 @@ import NIOWebSocket
 /// application handler) stays consistent across plain HTTP, HTTPS intercept, and
 /// WebSocket upgrade paths.
 nonisolated enum ProxyPipeline {
+    // MARK: Internal
+
     // MARK: - HTTP
 
     nonisolated static func configureHTTPPipeline(
@@ -17,7 +19,7 @@ nonisolated enum ProxyPipeline {
     )
         -> EventLoopFuture<Void>
     {
-        channel.pipeline.configureHTTPServerPipeline().flatMap {
+        configureHTTPServerHandlers(channel: channel).flatMap {
             channel.pipeline.addHandler(handler)
         }
     }
@@ -35,7 +37,7 @@ nonisolated enum ProxyPipeline {
     {
         let sslHandler = NIOSSLServerHandler(context: sslContext)
         return channel.pipeline.addHandler(sslHandler).flatMap {
-            channel.pipeline.configureHTTPServerPipeline()
+            configureHTTPServerHandlers(channel: channel)
         }.flatMap {
             channel.pipeline.addHandler(handler)
         }
@@ -70,7 +72,51 @@ nonisolated enum ProxyPipeline {
     // MARK: - WebSocket
 
     /// Replaces HTTP codecs with WebSocket frame decoder/encoder for upgraded connections.
-    nonisolated static func configureWebSocketPipeline(
+    nonisolated static func configureClientWebSocketPipeline(
+        channel: Channel,
+        handler: some ChannelHandler & Sendable
+    )
+        -> EventLoopFuture<Void>
+    {
+        configureWebSocketPipeline(channel: channel, handler: handler).flatMap {
+            removeClientHTTPHandlers(from: channel.pipeline, on: channel.eventLoop)
+        }
+    }
+
+    nonisolated static func configureUpstreamWebSocketPipeline(
+        channel: Channel,
+        handler: some ChannelHandler & Sendable
+    )
+        -> EventLoopFuture<Void>
+    {
+        configureWebSocketPipeline(channel: channel, handler: handler).flatMap {
+            removeUpstreamHTTPHandlers(from: channel.pipeline, on: channel.eventLoop)
+        }
+    }
+
+    // MARK: Private
+
+    nonisolated private static func configureHTTPServerHandlers(
+        channel: Channel
+    )
+        -> EventLoopFuture<Void>
+    {
+        let responseEncoder = HTTPResponseEncoder()
+        let requestDecoder = ByteToMessageHandler(
+            HTTPRequestDecoder(leftOverBytesStrategy: .forwardBytes)
+        )
+        return channel.pipeline.addHandler(responseEncoder).flatMap {
+            channel.pipeline.addHandler(requestDecoder)
+        }.flatMap {
+            channel.pipeline.addHandler(HTTPServerPipelineHandler())
+        }.flatMap {
+            channel.pipeline.addHandler(NIOHTTPResponseHeadersValidator())
+        }.flatMap {
+            channel.pipeline.addHandler(HTTPServerProtocolErrorHandler())
+        }
+    }
+
+    nonisolated private static func configureWebSocketPipeline(
         channel: Channel,
         handler: some ChannelHandler & Sendable
     )
@@ -83,5 +129,48 @@ nonisolated enum ProxyPipeline {
         }.flatMap {
             channel.pipeline.addHandler(handler)
         }
+    }
+
+    nonisolated private static func removeClientHTTPHandlers(
+        from pipeline: ChannelPipeline,
+        on eventLoop: EventLoop
+    )
+        -> EventLoopFuture<Void>
+    {
+        func removeIfPresent(_ type: (some RemovableChannelHandler).Type) -> EventLoopFuture<Void> {
+            pipeline.context(handlerType: type).flatMap {
+                pipeline.removeHandler(context: $0)
+            }.flatMapError { _ in
+                eventLoop.makeSucceededVoidFuture()
+            }
+        }
+
+        return removeIfPresent(HTTPProxyHandler.self)
+            .flatMap { removeIfPresent(HTTPSProxyRelayHandler.self) }
+            .flatMap { removeIfPresent(HTTPServerProtocolErrorHandler.self) }
+            .flatMap { removeIfPresent(NIOHTTPResponseHeadersValidator.self) }
+            .flatMap { removeIfPresent(HTTPServerPipelineHandler.self) }
+            .flatMap { removeIfPresent(HTTPResponseEncoder.self) }
+            .flatMap { removeIfPresent(ByteToMessageHandler<HTTPRequestDecoder>.self) }
+    }
+
+    nonisolated private static func removeUpstreamHTTPHandlers(
+        from pipeline: ChannelPipeline,
+        on eventLoop: EventLoop
+    )
+        -> EventLoopFuture<Void>
+    {
+        func removeIfPresent(_ type: (some RemovableChannelHandler).Type) -> EventLoopFuture<Void> {
+            pipeline.context(handlerType: type).flatMap {
+                pipeline.removeHandler(context: $0)
+            }.flatMapError { _ in
+                eventLoop.makeSucceededVoidFuture()
+            }
+        }
+
+        return removeIfPresent(UpstreamResponseHandler.self)
+            .flatMap { removeIfPresent(NIOHTTPRequestHeadersValidator.self) }
+            .flatMap { removeIfPresent(HTTPRequestEncoder.self) }
+            .flatMap { removeIfPresent(ByteToMessageHandler<HTTPResponseDecoder>.self) }
     }
 }
