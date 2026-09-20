@@ -133,6 +133,38 @@ struct BreakpointRequestData {
         return (text, true)
     }
 
+    /// Projects a paused response into the editor, transparently decoding `Content-Encoding`
+    /// so a gzip/deflate/Brotli JSON body is editable text instead of a protected binary blob.
+    /// When the bytes are decoded, `Content-Encoding` and the compressed `Content-Length` are
+    /// dropped from the editable headers: the relayed body is exactly the text the editor
+    /// shows and `BreakpointResponseBuilder` recomputes `Content-Length` from it. Bodies that
+    /// cannot be decoded keep their original bytes and headers, so the protected-body path
+    /// still forwards the origin payload untouched.
+    static func editableResponseProjection(
+        body: Data?,
+        headers: [EditableHeader]
+    )
+        -> (text: String, isEditable: Bool, headers: [EditableHeader])
+    {
+        guard let body, !body.isEmpty else {
+            let projection = editableBodyProjection(from: body)
+            return (projection.text, projection.isEditable, headers)
+        }
+        let contentEncoding = headers.first { $0.name.caseInsensitiveCompare("Content-Encoding") == .orderedSame }?
+            .value
+        let decoded = BodyDecoder.decodeReportingChange(body, encoding: contentEncoding)
+        let projection = editableBodyProjection(from: decoded.data)
+        guard decoded.didDecode, projection.isEditable else {
+            let original = editableBodyProjection(from: body)
+            return (original.text, original.isEditable, headers)
+        }
+        let editableHeaders = headers.filter { header in
+            header.name.caseInsensitiveCompare("Content-Encoding") != .orderedSame
+                && header.name.caseInsensitiveCompare("Content-Length") != .orderedSame
+        }
+        return (projection.text, true, editableHeaders)
+    }
+
     /// Applies an origin-form request target while preserving its percent-
     /// encoded delimiters and the current connection authority.
     static func applyingOriginForm(_ value: String, to currentURL: String) -> String? {

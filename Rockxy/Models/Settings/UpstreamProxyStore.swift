@@ -1,5 +1,6 @@
 import Foundation
 import NIOCore
+import NIOHTTP1
 import NIOPosix
 import Observation
 import os
@@ -240,9 +241,14 @@ final class UpstreamProxyStore {
 
         do {
             let routeCapture = PACRouteCapture()
+            // A 443 target exercises the CONNECT handshake; any other port is a plain-HTTP
+            // target that HTTP proxies serve in absolute form, so the probe sends a real GET
+            // and waits for the proxy's reply instead of trusting a bare TCP connect.
+            let targetScheme = testTarget.port == 443 ? "https" : "http"
+            let probe = UpstreamProxyProbeResponseHandler()
             let channel = try await UpstreamProxyConnector.connect(
                 eventLoop: group.next(),
-                targetScheme: "http",
+                targetScheme: targetScheme,
                 targetHost: testTarget.host,
                 targetPort: testTarget.port,
                 configuration: snapshot,
@@ -260,8 +266,21 @@ final class UpstreamProxyStore {
                     }
                 }
             ) { channel in
-                channel.eventLoop.makeSucceededVoidFuture()
+                guard targetScheme == "http" else {
+                    return channel.eventLoop.makeSucceededVoidFuture()
+                }
+                return channel.pipeline.addHTTPClientHandlers().flatMap {
+                    channel.pipeline.addHandler(probe)
+                }
             }.get()
+            if targetScheme == "http" {
+                try await Self.sendProbeRequest(
+                    on: channel,
+                    host: testTarget.host,
+                    port: testTarget.port,
+                    probe: probe
+                )
+            }
             try? await channel.close().get()
             let duration = start.duration(to: ContinuousClock.now)
             return .success(UpstreamProxyTestResult(
@@ -276,6 +295,29 @@ final class UpstreamProxyStore {
         } catch {
             return .failure(.invalidConfiguration(error.localizedDescription))
         }
+    }
+
+    /// Sends `GET /` to the test target through the freshly connected channel and waits for a
+    /// response head. Any status counts: the point is that the route (direct or via the proxy)
+    /// speaks HTTP back, which a plain TCP connect to the proxy cannot show.
+    private static func sendProbeRequest(
+        on channel: Channel,
+        host: String,
+        port: Int,
+        probe: UpstreamProxyProbeResponseHandler
+    ) async throws {
+        var headers = HTTPHeaders()
+        headers.add(name: "Host", value: port == 80 ? host : "\(host):\(port)")
+        headers.add(name: "Connection", value: "close")
+        let head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "/", headers: headers)
+        channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+        try await channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil))).get()
+
+        let timeout = channel.eventLoop.scheduleTask(in: ProxyTimeouts.upstreamHandshake) {
+            probe.fail(UpstreamProxyError.timeout)
+        }
+        defer { timeout.cancel() }
+        _ = try await probe.responseStatus(on: channel.eventLoop).get()
     }
 
     private func enforcePolicy(
@@ -388,4 +430,67 @@ private final class PACRouteCapture: @unchecked Sendable {
 
     private let lock = NSLock()
     private var capturedRoute: UpstreamPACRoute?
+}
+
+// MARK: - UpstreamProxyProbeResponseHandler
+
+/// Completes once the first response head arrives on the probe channel.
+final class UpstreamProxyProbeResponseHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = HTTPClientResponsePart
+
+    func responseStatus(on eventLoop: EventLoop) -> EventLoopFuture<Int> {
+        lock.lock()
+        defer { lock.unlock() }
+        if let promise {
+            return promise.futureResult
+        }
+        let created = eventLoop.makePromise(of: Int.self)
+        promise = created
+        if let outcome {
+            switch outcome {
+            case let .success(status): created.succeed(status)
+            case let .failure(error): created.fail(error)
+            }
+        }
+        return created.futureResult
+    }
+
+    func fail(_ error: Error) {
+        settle(.failure(error))
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        if case let .head(head) = unwrapInboundIn(data) {
+            settle(.success(Int(head.status.code)))
+        }
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        settle(.failure(error))
+        context.close(promise: nil)
+    }
+
+    func channelInactive(context: ChannelHandlerContext) {
+        settle(.failure(UpstreamProxyError.malformedResponse))
+    }
+
+    private let lock = NSLock()
+    private var promise: EventLoopPromise<Int>?
+    private var outcome: Result<Int, Error>?
+
+    private func settle(_ result: Result<Int, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard outcome == nil else {
+            return
+        }
+        outcome = result
+        guard let promise else {
+            return
+        }
+        switch result {
+        case let .success(status): promise.succeed(status)
+        case let .failure(error): promise.fail(error)
+        }
+    }
 }

@@ -120,6 +120,12 @@ To remove the root CA and disable HTTPS interception:
 3. Right-click and select **Delete**
 4. Restart any apps that cached the TLS session
 
+### Upstream certificate validation
+
+Rockxy verifies the certificate of every server it connects to on your behalf against the system trust store, so a forged origin cannot hide behind the proxy. Staging and internal servers often use a self-signed certificate or a private CA that only the mobile app trusts; those handshakes fail with strict validation.
+
+Turn on **Settings > Tools > Accept untrusted upstream certificates** to decrypt such servers. Rockxy then stops verifying the upstream server (the client-facing certificate is unchanged), so leave it off on networks you do not control.
+
 ## Troubleshooting
 
 ### Certificate not trusted

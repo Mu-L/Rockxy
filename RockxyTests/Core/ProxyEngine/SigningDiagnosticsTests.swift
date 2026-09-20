@@ -375,6 +375,10 @@ struct SigningPreflightCacheTests {
     func invalidationDuringFlightRetriesCurrentGeneration() async {
         let cache = SigningPreflightCache()
         let callCount = OSAllocatedUnfairLock(initialState: 0)
+        // Hand-shake with the first diagnosis instead of sleeping: it must be in flight when the
+        // cache is invalidated, and it must not finish before that happens.
+        let firstDiagnosisStarted = DispatchSemaphore(value: 0)
+        let invalidationDone = DispatchSemaphore(value: 0)
 
         cache.provider = {
             let count = callCount.withLock { value -> Int in
@@ -383,16 +387,19 @@ struct SigningPreflightCacheTests {
             }
             if count == 1 {
                 // The first (soon-to-be-stale) diagnosis blocks while it is invalidated.
-                Thread.sleep(forTimeInterval: 0.1)
+                firstDiagnosisStarted.signal()
+                _ = invalidationDone.wait(timeout: .now() + 5)
                 return .signingIdentityMismatch(appSigner: "Stale", helperSigner: "Stale")
             }
             return .healthy
         }
 
         async let firstEvaluation = cache.evaluate()
-        // Let the first detached diagnosis start, then invalidate mid-flight.
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        await Task.detached {
+            _ = firstDiagnosisStarted.wait(timeout: .now() + 5)
+        }.value
         cache.invalidate()
+        invalidationDone.signal()
 
         let result = await firstEvaluation
         #expect(result == .healthy)

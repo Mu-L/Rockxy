@@ -40213,6 +40213,654 @@
         }
       }
     },
+    "After saving the configuration, connect or relaunch the client. Its first validated handshake will appear in Client Activity above.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存配置后，连接或重新启动客户端。首次通过验证的握手将显示在上方的“客户端活动”中。"
+          }
+        }
+      }
+    },
+    "All Purposes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有用途"
+          }
+        }
+      }
+    },
+    "Balanced": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "均衡"
+          }
+        }
+      }
+    },
+    "Balanced starter model for explaining requests, responses, and failures": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适合解释请求、响应和故障的均衡入门模型"
+          }
+        }
+      }
+    },
+    "Client Activity": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "客户端活动"
+          }
+        }
+      }
+    },
+    "Code-focused model for reading payloads, headers, and client code paths": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "专注代码的模型，适合分析负载、标头和客户端代码路径"
+          }
+        }
+      }
+    },
+    "Coding": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编程"
+          }
+        }
+      }
+    },
+    "Compatible endpoint": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "兼容端点"
+          }
+        }
+      }
+    },
+    "Copies the bundled Rockxy MCP bridge configuration.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制随 Rockxy 捆绑提供的 MCP 桥接配置。"
+          }
+        }
+      }
+    },
+    "Custom endpoint": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义端点"
+          }
+        }
+      }
+    },
+    "Enable the local API server in GPT4All settings and load a model before connecting.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 GPT4All 设置中启用本地 API 服务器，并在连接前加载模型。"
+          }
+        }
+      }
+    },
+    "Enter the base URL of any runtime that serves the Chat Completions API on this Mac or over HTTPS.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入此 Mac 上或通过 HTTPS 提供 Chat Completions API 的任意运行时基础 URL。"
+          }
+        }
+      }
+    },
+    "Fits this Mac · %@ recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适合此 Mac · 建议 %@"
+          }
+        }
+      }
+    },
+    "Install Ollama and keep it running. Rockxy checks the runtime, lists installed models, and can download or remove models for you.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装并保持 Ollama 运行。Rockxy 会检查运行时、列出已安装模型，并可为你下载或移除模型。"
+          }
+        }
+      }
+    },
+    "Large coding model for Macs with 32 GB or more unified memory": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适用于配备 32 GB 或更多统一内存的 Mac 的大型编程模型"
+          }
+        }
+      }
+    },
+    "Last validated method: %@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Last validated method: %1$@ · %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近验证的方法：%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Load a model in LM Studio, start its local server from the Developer tab, then pick the loaded model here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 LM Studio 中加载模型，从“Developer”标签页启动本地服务器，然后在此处选择已加载的模型。"
+          }
+        }
+      }
+    },
+    "Local Runtime": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地运行时"
+          }
+        }
+      }
+    },
+    "Local endpoint": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地端点"
+          }
+        }
+      }
+    },
+    "Local · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 · %@"
+          }
+        }
+      }
+    },
+    "Low Memory": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "低内存"
+          }
+        }
+      }
+    },
+    "MCP (Model Context Protocol) allows compatible tools to interact with Rockxy. MCP clients can read captured HTTP traffic, inspect request and response details, export requests as cURL, and view proxy rules and status.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP（模型上下文协议）允许兼容工具与 Rockxy 交互。MCP 客户端可以读取捕获的 HTTP 流量、检查请求和响应详情、将请求导出为 cURL，并查看代理规则和状态。"
+          }
+        }
+      }
+    },
+    "Managed by Rockxy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由 Rockxy 管理"
+          }
+        }
+      }
+    },
+    "Memory intensive · %@ recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内存需求较高 · 建议 %@"
+          }
+        }
+      }
+    },
+    "Memory requirement unknown": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内存需求未知"
+          }
+        }
+      }
+    },
+    "Optimized preset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "优化预设"
+          }
+        }
+      }
+    },
+    "Other OpenAI-compatible runtime": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他 OpenAI 兼容运行时"
+          }
+        }
+      }
+    },
+    "Reasoning": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推理"
+          }
+        }
+      }
+    },
+    "Recommended For": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推荐用途"
+          }
+        }
+      }
+    },
+    "Redact Sensitive Data Before Sending to MCP Clients": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 MCP 客户端发送前对敏感数据进行脱敏"
+          }
+        }
+      }
+    },
+    "Redaction is active for MCP tool results.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 工具结果已启用脱敏。"
+          }
+        }
+      }
+    },
+    "Remote · %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "远程 · %@"
+          }
+        }
+      }
+    },
+    "Rockxy connects to this runtime but does not install, load, or remove its models.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 连接到此运行时，但不会安装、加载或移除其中的模型。"
+          }
+        }
+      }
+    },
+    "Run LocalAI with at least one installed model and keep its API reachable on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行至少安装了一个模型的 LocalAI，并确保其 API 可在此 Mac 上访问。"
+          }
+        }
+      }
+    },
+    "Run llama-server with a GGUF model. The model list reflects whatever the server loaded at launch.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 GGUF 模型运行 llama-server。模型列表反映服务器启动时实际加载的模型。"
+          }
+        }
+      }
+    },
+    "Run mlx_lm.server with a model on Apple silicon. Enter the model name manually if the server does not list it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Apple 芯片上使用模型运行 mlx_lm.server。如果服务器未列出模型，请手动输入模型名称。"
+          }
+        }
+      }
+    },
+    "Setup Guide": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置指南"
+          }
+        }
+      }
+    },
+    "Smallest starter model for lower-memory Macs and quick summaries": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适用于低内存 Mac 和快速摘要的最小入门模型"
+          }
+        }
+      }
+    },
+    "Start the local API server from Jan's settings and enable the model you want to use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 Jan 设置中启动本地 API 服务器，并启用要使用的模型。"
+          }
+        }
+      }
+    },
+    "Start the runtime first, then refresh models and test the connection below.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先启动运行时，然后在下方刷新模型并测试连接。"
+          }
+        }
+      }
+    },
+    "Start the MCP server to receive client activity": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动 MCP 服务器以接收客户端活动"
+          }
+        }
+      }
+    },
+    "Step-by-step reasoning model for tracing multi-request failures": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用于追踪多请求故障的逐步推理模型"
+          }
+        }
+      }
+    },
+    "Tight fit · %@ recommended": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较紧张 · 建议 %@"
+          }
+        }
+      }
+    },
+    "Waiting for a client to connect": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待客户端连接"
+          }
+        }
+      }
+    },
+    "Warning: MCP tool results may include captured secrets.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "警告：MCP 工具结果可能包含捕获的机密信息。"
+          }
+        }
+      }
+    },
+    "Captured traffic stays in memory for the current session and is discarded when Rockxy quits. Flows you pin, save, or annotate are stored in an unencrypted SQLite database on your Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捕获的流量仅保存在当前会话的内存中，Rockxy 退出时会被丢弃。你固定、保存或添加备注的流量会存储在 Mac 上未加密的 SQLite 数据库中。"
+          }
+        }
+      }
+    },
+    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, then restart the proxy.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听本地主机”，然后重启代理。"
+          }
+        }
+      }
+    },
+    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, restart the proxy, and use the Device Proxy host plus active port.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
+          }
+        }
+      }
+    },
+    "Stored request and response bodies larger than 1 MB are saved as separate files.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已存储的请求和响应正文若大于 1 MB，会另存为单独文件。"
+          }
+        }
+      }
+    },
+    "Rockxy is listening on %@:%@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Rockxy is listening on %1$@:%2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 正在监听 %1$@:%2$@。"
+          }
+        }
+      }
+    },
+    "Running on port %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在端口 %@ 上运行"
+          }
+        }
+      }
+    },
+    "System Proxy is Overridden by Rockxy (IP=%@ Port=%@) (Toggle by: ⌥⌘O)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$@) (Toggle by: ⌥⌘O)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$@）（切换快捷键：⌥⌘O）"
+          }
+        }
+      }
+    },
+    "Go (net/http)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go (net/http)"
+          }
+        }
+      }
+    },
+    "JavaScript (fetch)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JavaScript (fetch)"
+          }
+        }
+      }
+    },
+    "Python (requests)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Python (requests)"
+          }
+        }
+      }
+    },
+    "Swift (URLSession)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swift (URLSession)"
+          }
+        }
+      }
+    },
+    "Restart Proxy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新启动代理"
+          }
+        }
+      }
+    },
+    "Restart proxy with saved listener settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用已保存的监听设置重新启动代理"
+          }
+        }
+      }
+    },
+    "Upstream Servers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上游服务器"
+          }
+        }
+      }
+    },
+    "Accept untrusted upstream certificates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受不受信任的上游证书"
+          }
+        }
+      }
+    },
+    "Decrypt HTTPS to staging or internal servers whose certificate is self-signed or issued by a private CA. Rockxy stops verifying the server it connects to, so only enable this on networks you control.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密到证书为自签名或由私有 CA 签发的测试/内部服务器的 HTTPS。Rockxy 将不再验证所连接的服务器，因此只应在你控制的网络中启用。"
+          }
+        }
+      }
+    },
+    "Header Name may only use letters, digits, and !#$%&'*+-.^_`|~ (no spaces)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头名称只能使用字母、数字以及 !#$%&'*+-.^_`|~（不能包含空格）"
+          }
+        }
+      }
+    },
+    "Header Value cannot contain line breaks or control characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头值不能包含换行符或控制字符"
+          }
+        }
+      }
+    },
     "%lld err": {
       "localizations": {
         "zh-Hans": {

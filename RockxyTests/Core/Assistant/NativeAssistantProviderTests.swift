@@ -231,6 +231,37 @@ struct NativeAssistantProviderTests {
     }
 
     @MainActor
+    @Test("Connection result cannot confirm a model changed while the check is in flight")
+    func staleConnectionResultAfterModelChangeIsIgnored() async throws {
+        let runtime = DelayedSettingsAssistantRuntime()
+        let viewModel = AssistantSettingsViewModel(
+            manager: FixtureAssistantSettingsManager(),
+            credentialStorage: EmptyAssistantCredentialStorage(),
+            runtime: runtime
+        )
+        viewModel.configuration.model = "model-before-check"
+
+        viewModel.testConnection()
+        for _ in 0 ..< 500 {
+            if await runtime.hasConnectionStarted {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(await runtime.hasConnectionStarted)
+
+        viewModel.configuration.model = "model-after-check"
+        await runtime.completeConnection()
+        for _ in 0 ..< 10 {
+            await Task.yield()
+        }
+
+        #expect(viewModel.configuration.model == "model-after-check")
+        #expect(viewModel.statusMessage == nil)
+        #expect(!viewModel.isBusy)
+    }
+
+    @MainActor
     @Test("Model availability detail matches local and remote providers")
     func modelAvailabilityDetailMatchesProvider() {
         let viewModel = AssistantSettingsViewModel(
@@ -476,6 +507,7 @@ private actor DelayedSettingsAssistantRuntime: AssistantProviderRuntimeProtocol 
     // MARK: Internal
 
     var hasStarted = false
+    var hasConnectionStarted = false
 
     func discoverModels(
         configuration _: AssistantProviderConfiguration
@@ -493,12 +525,11 @@ private actor DelayedSettingsAssistantRuntime: AssistantProviderRuntimeProtocol 
     )
         async throws -> AssistantConnectionTestResult
     {
-        AssistantConnectionTestResult(
-            provider: configuration.kind.title,
-            endpointHost: configuration.endpointHost,
-            model: configuration.model,
-            discoveredModelCount: 0
-        )
+        hasConnectionStarted = true
+        return try await withCheckedThrowingContinuation { continuation in
+            connectionContinuation = continuation
+            pendingConnectionConfiguration = configuration
+        }
     }
 
     func stream(
@@ -515,7 +546,23 @@ private actor DelayedSettingsAssistantRuntime: AssistantProviderRuntimeProtocol 
         discoveryContinuation = nil
     }
 
+    func completeConnection() {
+        guard let configuration = pendingConnectionConfiguration else {
+            return
+        }
+        connectionContinuation?.resume(returning: AssistantConnectionTestResult(
+            provider: configuration.kind.title,
+            endpointHost: configuration.endpointHost,
+            model: configuration.model,
+            discoveredModelCount: 0
+        ))
+        connectionContinuation = nil
+        pendingConnectionConfiguration = nil
+    }
+
     // MARK: Private
 
     private var discoveryContinuation: CheckedContinuation<[AssistantModel], Error>?
+    private var connectionContinuation: CheckedContinuation<AssistantConnectionTestResult, Error>?
+    private var pendingConnectionConfiguration: AssistantProviderConfiguration?
 }

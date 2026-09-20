@@ -129,14 +129,22 @@ struct DeveloperSetupWindowView: View {
         )
     }
 
+    /// The device endpoint is what someone types into a phone's proxy settings, so it must show
+    /// the port alongside the host; the caption already promises "this host and port".
     private var deviceProxyHostText: String {
-        viewModel.snapshot.reachableLANAddress ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        guard let host = viewModel.snapshot.reachableLANAddress else {
+            return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        }
+        return "\(host):\(String(viewModel.snapshot.activePort))"
     }
 
     private var deviceProxyCaption: String {
         if viewModel.snapshot.effectiveListenAddress == "127.0.0.1" {
             return String(
-                localized: "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.",
+                localized: """
+                Devices outside this Mac cannot reach localhost-only mode. Turn off Only listen on localhost \
+                in Settings > General > Advanced Proxy Setting…, then restart the proxy.
+                """,
                 bundle: RockxyLocalization.bundle
             )
         }
@@ -326,12 +334,20 @@ struct DeveloperSetupWindowView: View {
     // MARK: Detail column
 
     private var detailColumn: some View {
-        VStack(spacing: 0) {
-            centerContent
-            if let message = feedbackMessage {
-                Divider()
-                feedbackBar(message)
+        // Resolve the column against the space the split view actually offers. Measured
+        // through its own ideal size, the stacked scroll view + feedback bar reported the
+        // scroll content's natural height, the window adopted that taller layout, and the
+        // sidebar search field, first targets, and detail header ended up hidden above the
+        // title bar at the default window size.
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                centerContent
+                if let message = feedbackMessage {
+                    Divider()
+                    feedbackBar(message)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
     }
 

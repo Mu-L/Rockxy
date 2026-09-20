@@ -22,9 +22,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added WebSocket Protobuf heuristic decoding infrastructure for inspecting binary frame payloads without requiring schema uploads.
 - Added Tools menu windows for External Proxy Settings, SOCKS Proxy Settings, Protobuf mapping rules, and Protobuf schema list management.
 - Added an on-demand Protobuf view to the WebSocket frame inspector for heuristic field-tree rendering.
+- Compose now imports a cURL command pasted or typed into the URL field, filling method, URL, headers, query, and body in place.
+- Added **Settings > Tools > Accept untrusted upstream certificates** (off by default) so HTTPS to self-signed or private-CA staging servers can be decrypted instead of failing upstream validation.
+- Added a **Restart Proxy** button to the Advanced Proxy Settings notice that appears when saved listener settings (port, listen address) are waiting for a restart.
+- Added **Copy as** code snippets for Swift (URLSession), Python (requests), JavaScript (fetch), and Go (net/http) to the request context menu.
 
 ### Fixed
 
+- Made Map Local quick-create, response breakpoints, and Copy as Raw/JSON decode gzip, deflate, and Brotli response bodies so compressed JSON is editable and copyable text instead of an opaque binary payload, with the compressed-only headers dropped from the edited response.
+- Attributed locally served responses (Map Local, block, breakpoint abort) to the same client app as forwarded traffic instead of showing them under Unknown.
+- Made No Caching also mark relayed responses uncacheable (strips `ETag`, `Last-Modified`, and `Expires`; sets `Cache-Control: no-cache, no-store, must-revalidate`) so clients cannot serve the next load from their own cache and skip the proxy.
+- Delivered decoded gzip, deflate, and Brotli response bodies to `onResponse` scripts (multi-arg and single-arg APIs) and dropped `Content-Encoding` on relay, so documented JSON body edits work on compressed APIs; the new-script template now shows the string body contract.
+- Recorded the pre-rewrite URL of Map Remote hits in the matched-rule action summary shown by Synopsis and Context Details.
+- Kept the authored wildcard pattern and match semantics on Modify Headers rules so reopening a rule shows what was typed instead of the compiled regular expression.
+- Made AI, Web3 JSON-RPC, and x402 detection, Diff, HAR export, MCP flow previews, Debug Assistant Review Data, and Gist redaction read gzip, deflate, and Brotli response bodies as decoded text; compressed API responses previously reported unavailable fields, diffed as binary, exported with empty HAR content, and could carry unredacted secrets through Gist publishing.
+- Fixed the Developer Setup window laying out taller than its frame at the default size, which hid the search field, the first setup targets, and the detail header under the title bar.
+- Stopped Developer Setup from reporting "Local probe unavailable" for guide-only and device targets that never run the validation probe; they now show their real readiness state.
+- Prevented a Modify Headers rule or script header with a space in its name or a line break in its value from aborting the relayed response with an empty reply; such headers are now rejected in the editor and skipped at runtime while the rest of the rule still applies.
+- Kept the paused request's scheme and host in the Breakpoint URL field after editing the request line in the Raw tab, instead of showing a blank authority.
+- Made plain `ws://` upgrades sent through the proxy as absolute-form requests reach the server; the relay no longer adds `Content-Length: 0` to bodyless requests that never declared a length, which made WebSocket servers refuse the handshake.
+- Showed WebSocket sessions in the request list while they are open, with frames rendering live, and marked them Completed/Closed when the socket closes instead of leaving them Active forever.
+- Kept the original `startedDateTime` of imported HAR entries when the archive omits fractional seconds; those sessions previously showed every request at the import time.
+- Rendered listen ports as plain digits in the MCP status, Developer Setup proxy step, and system-proxy override banner instead of locale-grouped numbers such as `9,090`.
+- Made the MCP `export_flow_curl` tool redact sensitive query parameters and body credentials the same way flow details do; previously only header values were masked, so tokens in the URL or JSON body reached the AI client in clear text.
+- Kept File, Project, View, and Flow menu commands (Compose, Open/Save Session, Import/Export HAR, Clear Session, Repeat, …) working while Settings or a tool window is frontmost; they previously did nothing until the main window was clicked again.
+- Honored the Welcome sheet's "Show on startup" opt-out while setup is incomplete; it stays reachable from Help > Getting Started.
+- Allowed Repeat, Edit and Repeat, and Compose to send plain `http://` requests; App Transport Security previously rejected every non-TLS replay to LAN or staging servers.
+- Recorded each Repeat as a new traffic-list row attributed to Rockxy so the replayed response can be inspected, diffed, and exported; previously only a toast with the status code appeared.
+- Made the Diff viewer show each side's own line numbers and place a changed line on one row (old left, new right) instead of staggering removed and added lines with merged-stream numbering.
+- Stopped Repeat and Edit and Repeat from re-sending the captured `Host`, `Content-Length`, and `Proxy-*` headers; a URL edited to point at another host previously still carried the original `Host` and hit the wrong virtual host.
+- Kept the WebSocket inspector's URL bar and tab strip in view when the bottom inspector is short: the WebSocket tab now scrolls as a whole with a bounded frame list instead of overflowing the pane once a frame is selected.
+- Quick Preview no longer offers "Decode Base64" for selections whose decoded bytes are unreadable control characters.
+- Refused requests and CONNECT tunnels that target the proxy's own listen port with `508 Loop Detected`; a single self-addressed request previously re-entered the proxy until the connection cap tripped, leaving dozens of 503 rows.
+- Stopped quitting and readiness checks from waiting 10 seconds on a helper XPC probe when the helper tool is not installed.
+- Told Developer Setup device targets where the "Only listen on localhost" switch lives (Settings > General > Advanced Proxy Setting…) instead of naming a control without a location.
+- Showed the Developer Setup Device Endpoint as `host:port` instead of the bare LAN address, so the value can be typed into a phone's proxy settings as-is.
+- Answered the client with `502 Bad Gateway` and recorded a failed row when the upstream server rejects the TLS handshake or closes before responding; the client previously hung until its own timeout and the request never appeared in the list.
+- Relayed plain `http://` traffic to HTTP/HTTPS upstream proxies as absolute-form requests instead of `CONNECT` tunnels, so gateways that only allow `CONNECT` to TLS ports (Squid's default policy) no longer answer every plain-HTTP request with `502`.
+- Switched the sidebar to Library and selected the new entry after "Add favorite app or domain"; from Browse or Focus mode the sheet previously closed with no visible result.
+- Relayed plain HTTP carried inside a CONNECT tunnel (how many clients send `ws://` upgrades and some send `http://` through a proxy) as normal http:// traffic with captured frames and rows — with or without HTTPS interception, since no certificate is involved — instead of an opaque raw tunnel labelled "Certificate Required".
 - Reduced main-thread work during capture: request-list rows no longer re-run AI traffic detection on every batch, and Traffic Insights coalesces live rebuilds to at most once per second, scaling the interval with session size.
 - Aligned HTTPS behavior actions, Help, Developer Setup, keyboard references, imports, and MCP status with the application-aware decryption flow.
 - Improved sidebar grouping cleanup when selected domain/app groups disappear, keeping active filters and sidebar state aligned.
@@ -760,7 +796,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Redesign rule editor with Proxyman-style dropdowns and enlarged window
+- Redesign rule editor with native dropdowns and an enlarged window
 
 ### Fixed
 
@@ -1015,7 +1051,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - JSON tree view with collapsible nodes, syntax-colored values (strings, numbers, booleans, null), and disclosure triangles
 - Theme constants for table, JSON syntax, filter pills, status bar, and inspector styling
 - `clientApp` property on HTTPTransaction for tracking originating application
-- Proxyman-style app-centric sidebar with Favorites (Pinned, Saved), All (Apps grouped by client app with nested domains, Domains tree), and Analytics sections
+- App-centric sidebar with Favorites (Pinned, Saved), All (Apps grouped by client app with nested domains, Domains tree), and Analytics sections
 - Sidebar bottom bar with add and filter shortcut buttons
 - Toolbar status indicator showing proxy connection state (green dot + listening address) in center toolbar
 - Protocol filter bar with pill buttons for content types (HTTP, HTTPS, WebSocket, JSON, XML, JS, CSS, GraphQL, Document, Media, Other) and status codes (1xx-5xx)
@@ -1144,7 +1180,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix proxy blocking all internet traffic — add 5-second connection timeouts to all upstream `ClientBootstrap` calls, 30-second read timeout to `UpstreamResponseHandler`, and 120-second max connection lifetime to prevent hung connections from exhausting resources
 - Fix leaked connections on failed TLS handshakes — `PostHandshakeHandler.errorCaught` now closes the channel after recording the failed transaction (was leaving it open with `autoRead = false`, leaking one connection per cert-pinned host)
 - Fix lost HTTPS transactions when upstream server closes without TLS `close_notify` — complete and record the transaction from whatever response data was already received instead of silently dropping it
-- Fix failed TLS handshakes (cert pinning) invisible in UI — record as failed transactions so they appear in the request list like Proxyman
+- Fix failed TLS handshakes (cert pinning) invisible in UI — record as failed transactions so they appear in the request list
 - Fix noisy `uncleanShutdown` errors flooding console — handle as normal TLS connection close, downgrade upstream close log from error to debug
 - Fix HTTPS interception "EOF during handshake" on all connections — change root CA trust from `.user` to `.admin` domain so Safari, Chrome, and system services honor the trust setting; include root CA in server certificate chain for macOS TLS compatibility; replay buffered TLS data after async pipeline reconfiguration to prevent ClientHello loss; add SecTrust chain validation diagnostic at proxy startup
 - Fix CONNECT tunnel TLS handshake failure (`WRONG_VERSION_NUMBER`) — replace broken `channel.pipeline.fireChannelRead` replay with forward-based `ProtocolDetectorHandler` that sits before NIOSSLServerHandler and forwards TLS data naturally via `context.fireChannelRead`
@@ -1172,7 +1208,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix both windows showing simultaneously on first launch — consolidate welcome window management in MainWindowContent only
 - Detect VPN/tunnel primary interface (utun, ppp) and show warning banner that traffic may not be captured
 - Fix HTTPS traffic not captured — remove HTTP codecs from NIO pipeline before CONNECT tunnel transition to TLS; without this, TLS ClientHello bytes were misinterpreted as HTTP
-- Fix empty SSL Proxying List blocking all HTTPS interception — default to intercept-all when no rules configured, matching Proxyman behavior
+- Fix empty SSL Proxying List blocking all HTTPS interception — default to intercept-all when no rules are configured
 - Fix helper tool always showing "notInstalled" — check SMAppService status at app startup so `SystemProxyManager` reads accurate helper state
 - Fix welcome screen showing on every launch — load root CA certificate into memory before checking trust status on startup
 - Fix traffic not displaying — await session manager setup before proxy server starts accepting connections, preventing race condition where `onBatchReady` callback was nil
@@ -1226,7 +1262,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - NSTableView cell reuse for status dot and client cells — eliminates per-row view allocation during scrolling
 - TLS failure transactions hidden from traffic list by default — reduces noise from cert-pinned hosts
 - Helper tool auto-updates on version mismatch — `HelperManager.checkStatus()` detects outdated helper and triggers uninstall/reinstall cycle automatically instead of requiring manual update
-- System proxy now configures all enabled network services instead of a single detected service, matching Charles/Proxyman behavior
+- System proxy now configures all enabled network services instead of a single detected service
 - Detect primary network interface via routing table (`route -n get 0.0.0.0`) for accurate diagnostics
 - Add TCP connection logging to proxy server NIO pipeline for connection-level diagnostics
 - Upgrade helper tool status logging from debug to info level for Xcode console visibility
@@ -1243,19 +1279,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - ContentView initializes favorites and auto-starts proxy on launch when configured
 - Sidebar section headers now use colored text (amber for Favorites, gray for All/Analytics) with increased header prominence
 - App icons in sidebar replaced with colored gradient rounded squares showing the app's first letter
-- Sidebar SF Symbol icons updated to filled variants matching Proxyman (pin.fill, tray.full.fill, square.stack.3d.up.fill, exclamationmark.triangle.fill)
+- Sidebar SF Symbol icons updated to filled variants (pin.fill, tray.full.fill, square.stack.3d.up.fill, exclamationmark.triangle.fill)
 - Added Theme.Sidebar color definitions for section headers and app icon gradients
 - Incremental `NSTableView` updates — use `insertRows(at:)` for append-only batches instead of full `reloadData()`, eliminating UI jank on high-traffic sessions
 - O(1) domain tree lookup — dictionary-backed index replaces O(n) `firstIndex(where:)` scan per transaction
 - Cached sidebar `appNodes` — incrementally updated in `processBatch()` instead of recomputing from all transactions on every render
 - Move GraphQL detection to `TrafficSessionManager` actor — runs on background thread instead of blocking main thread during batch processing
 - Time-throttled auto-analytics — max once per 2 seconds instead of every 100 transactions
-- Proxy server now runs independently of system proxy — matches Proxyman behavior where system proxy is best-effort
+- Proxy server now runs independently of system proxy; system proxy configuration is best-effort
 - Proxy toolbar pill shows orange when system proxy is not configured
 - `stopProxy()` now guards against re-entry to prevent race conditions with double cleanup
 - Helper tool ConnectionValidator now compares code signing certificate chains instead of relying on build-time team ID injection — self-referencing, zero-configuration, immune to Info.plist tampering
 - Redesigned app layout from 3-column NavigationSplitView to 2-column with VSplitView center (table + inspector)
-- Redesigned inspector panel with Proxyman-style HSplitView layout: URL bar on top, request tabs (left) and response tabs (right)
+- Redesigned inspector panel with an HSplitView layout: URL bar on top, request tabs (left) and response tabs (right)
 - Split inspector into dedicated request/response views with independent tab bars
 - Added new inspector sub-views: QueryInspectorView, SetCookieInspectorView, AuthInspectorView, SynopsisInspectorView
 - Filtering engine now supports protocol and status code filters

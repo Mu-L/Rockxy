@@ -55,6 +55,84 @@ struct SensitiveDataRedactorTests {
 
     // MARK: - Form body
 
+    @Test("Transaction redaction decodes a compressed response so secrets inside it are redacted")
+    func transactionRedactionDecodesCompressedResponse() throws {
+        let redactor = SensitiveDataRedactor()
+        let plain = Data(#"{"user":"stephen","access_token":"secret-token"}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction(statusCode: 200)
+        transaction.response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+                HTTPHeader(name: "Content-Length", value: "\(compressed.count)"),
+            ],
+            body: compressed,
+            contentType: .json
+        )
+
+        let redacted = try #require(redactor.redactTransaction(transaction).response)
+        let body = try #require(redacted.body.flatMap { String(data: $0, encoding: .utf8) })
+
+        // Without decoding, the compressed bytes would have carried the secret through unredacted.
+        #expect(body.contains("stephen"))
+        #expect(!body.contains("secret-token"))
+        #expect(!redacted.headers.contains { $0.name.lowercased() == "content-encoding" })
+        #expect(!redacted.headers.contains { $0.name.lowercased() == "content-length" })
+        #expect(redacted.headers.contains { $0.name == "Content-Type" })
+    }
+
+    @Test("Transaction redaction decodes compressed requests before export")
+    func transactionRedactionDecodesCompressedRequest() throws {
+        let plain = Data(#"{"access_token":"synthetic-secret","user":"stephen"}"#.utf8)
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction(statusCode: 200)
+        transaction.request.body = compressed
+        transaction.request.headers.append(HTTPHeader(name: "Content-Encoding", value: "deflate"))
+        transaction.request.headers.append(HTTPHeader(name: "Content-Length", value: "\(compressed.count)"))
+
+        let redacted = SensitiveDataRedactor().redactTransaction(transaction).request
+        let body = try #require(redacted.body.flatMap { String(data: $0, encoding: .utf8) })
+        #expect(body.contains("stephen"))
+        #expect(!body.contains("synthetic-secret"))
+        #expect(!redacted.headers.contains { ["content-encoding", "content-length"].contains($0.name.lowercased()) })
+    }
+
+    @Test("Undecodable encoded response body is omitted from redacted exports")
+    func undecodableEncodedResponseIsOmitted() throws {
+        let transaction = TestFixtures.makeTransaction(statusCode: 200)
+        let encoded = Data(#"{"access_token":"synthetic-secret"}"#.utf8)
+        transaction.response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+                HTTPHeader(name: "Content-Length", value: "\(encoded.count)"),
+            ],
+            body: encoded,
+            contentType: .json
+        )
+
+        let redacted = try #require(SensitiveDataRedactor().redactTransaction(transaction).response)
+        #expect(redacted.body == nil)
+        #expect(redacted.bodyTruncated)
+        #expect(!redacted.headers.contains { ["content-encoding", "content-length"].contains($0.name.lowercased()) })
+        #expect(SensitiveDataRedactor(isEnabled: false).redactTransaction(transaction).response?.body == encoded)
+
+        transaction.response?.body = Data(repeating: 0x41, count: SensitiveDataRedactor.maxDecodableBodyBytes + 1)
+        let oversized = try #require(SensitiveDataRedactor().redactTransaction(transaction).response)
+        #expect(oversized.body == nil)
+
+        transaction.request.body = encoded
+        transaction.request.headers.append(HTTPHeader(name: "Content-Encoding", value: "deflate"))
+        let redactedRequest = SensitiveDataRedactor().redactTransaction(transaction).request
+        #expect(redactedRequest.body == nil)
+        #expect(!redactedRequest.headers.contains { $0.name.lowercased() == "content-encoding" })
+    }
+
     @Test("Form body redacts a sensitive key and keeps an ordinary field")
     func formBodyRedaction() {
         let redactor = SensitiveDataRedactor()

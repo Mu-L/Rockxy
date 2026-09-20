@@ -15,6 +15,22 @@ struct ModifyHeaderWindowViewModelTests {
         #expect(operation.type.editorLabel == "Set")
     }
 
+    @Test("editor rejects header names and values that cannot be encoded")
+    func editorRejectsUnencodableHeaders() {
+        var operation = EditableHeaderOperation(type: .add, headerName: "X Custom", headerValue: "1")
+        #expect(!operation.isValid)
+
+        operation = EditableHeaderOperation(type: .add, headerName: "X-Custom", headerValue: "ok\r\nX-Evil: 1")
+        #expect(!operation.isValid)
+
+        operation = EditableHeaderOperation(type: .add, headerName: "X-Custom", headerValue: "ok")
+        #expect(operation.isValid)
+
+        // Removal only needs a valid name.
+        operation = EditableHeaderOperation(type: .remove, headerName: "Server", headerValue: "")
+        #expect(operation.isValid)
+    }
+
     @Test("saveRule waits for persistence path and reloads saved Modify Header rule")
     func saveRulePersistsBeforeReturning() async {
         await withSharedRuleStateRestored {

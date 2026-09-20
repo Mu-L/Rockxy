@@ -93,12 +93,22 @@ enum QuickPreviewDetector {
             }
             if let data = Data(base64Encoded: padded),
                let decoded = String(data: data, encoding: .utf8),
-               !decoded.isEmpty
+               !decoded.isEmpty,
+               isReadableText(decoded)
             {
                 return decoded
             }
         }
         return nil
+    }
+
+    /// Short plain words often happen to be valid Base64 whose bytes still form UTF-8 (control
+    /// characters included). Only offer a decode when the result is something a person can read.
+    static func isReadableText(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy { scalar in
+            !CharacterSet.controlCharacters.contains(scalar)
+                || scalar == "\n" || scalar == "\r" || scalar == "\t"
+        }
     }
 
     static func parseKeyValueRows(_ text: String) -> [QuickPreviewKeyValueRow] {

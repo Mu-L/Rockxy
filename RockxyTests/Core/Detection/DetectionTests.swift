@@ -380,6 +380,33 @@ struct DetectionTests {
         #expect(batch.methods == ["eth_chainId", "eth_blockNumber"])
     }
 
+    @Test("Web3RPCDetector reads a compressed provider response")
+    func detectWeb3CompressedResponse() throws {
+        let request = try web3Request(
+            body: ["jsonrpc": "2.0", "id": 9, "method": "eth_call", "params": []]
+        )
+        let plain = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0", "id": 9, "error": ["code": -32_602, "message": "invalid argument 0"],
+        ])
+        let compressed = try (plain as NSData).compressed(using: .zlib) as Data
+        let response = HTTPResponseData(
+            statusCode: 200,
+            statusMessage: "OK",
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed,
+            contentType: .json
+        )
+
+        let info = try #require(Web3RPCDetector.detect(request: request, response: response))
+
+        // Provider error fields come from the decoded payload; the size stays the wire size.
+        #expect(info.error?.code == -32_602)
+        #expect(info.responsePayloadSize == compressed.count)
+    }
+
     @Test("Web3RPCDetector extracts provider error")
     func detectWeb3ProviderError() throws {
         let request = try web3Request(body: ["jsonrpc": "2.0", "id": 9, "method": "eth_call", "params": []])

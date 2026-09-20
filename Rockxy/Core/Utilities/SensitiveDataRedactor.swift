@@ -14,6 +14,9 @@ struct SensitiveDataRedactor {
 
     // MARK: Internal
 
+    /// Largest captured (wire) body decompressed so its text can be redacted.
+    static let maxDecodableBodyBytes = 10 * 1_024 * 1_024
+
     static let sensitiveHeaders: Set<String> = [
         "authorization",
         "proxy-authorization",
@@ -181,6 +184,38 @@ struct SensitiveDataRedactor {
         return didRedact ? (components.url ?? url) : url
     }
 
+    /// Decodes a bounded compressed body so redaction can inspect its text.
+    private static func readableBody(_ body: Data?, headers: [HTTPHeader]) -> (body: Data?, didDecode: Bool) {
+        guard let body, !body.isEmpty, body.count <= maxDecodableBodyBytes else {
+            return (body, false)
+        }
+        let contentEncoding = headers.first { $0.name.lowercased() == "content-encoding" }?.value
+        let decoded = BodyDecoder.decodeReportingChange(body, encoding: contentEncoding)
+        return decoded.didDecode ? (decoded.data, true) : (body, false)
+    }
+
+    private func redactedBodyAndHeaders(
+        body: Data?,
+        headers: [HTTPHeader],
+        contentType: ContentType?
+    ) -> (body: Data?, headers: [HTTPHeader], omitted: Bool) {
+        let readable = Self.readableBody(body, headers: headers)
+        let hasContentEncoding = headers.contains { $0.name.lowercased() == "content-encoding" }
+        let omitUninspectableBody = hasContentEncoding && body != nil
+            && (!readable.didDecode || readable.body.flatMap { String(data: $0, encoding: .utf8) } == nil)
+        let retainedHeaders = (readable.didDecode || omitUninspectableBody)
+            ? headers.filter { header in
+                let name = header.name.lowercased()
+                return name != "content-encoding" && name != "content-length"
+            }
+            : headers
+        return (
+            omitUninspectableBody ? nil : redactBody(readable.body, contentType: contentType),
+            redactHeaders(retainedHeaders),
+            omitUninspectableBody
+        )
+    }
+
     func redactBody(_ body: Data?, contentType: ContentType?) -> Data? {
         guard isEnabled, let body else {
             return body
@@ -212,21 +247,35 @@ struct SensitiveDataRedactor {
             return transaction
         }
 
+        let redactedRequest = redactedBodyAndHeaders(
+            body: transaction.request.body,
+            headers: transaction.request.headers,
+            contentType: transaction.request.contentType
+        )
         let request = HTTPRequestData(
             method: transaction.request.method,
             url: redactURL(transaction.request.url),
             httpVersion: transaction.request.httpVersion,
-            headers: redactHeaders(transaction.request.headers),
-            body: redactBody(transaction.request.body, contentType: transaction.request.contentType),
+            headers: redactedRequest.headers,
+            body: redactedRequest.body,
             contentType: transaction.request.contentType
         )
         let response = transaction.response.map { response in
-            HTTPResponseData(
+            // Redaction can only see into text, so a compressed body is decoded first and the
+            // headers that described the compressed representation are dropped to keep the
+            // published transaction coherent. An encoded body that cannot be decoded is
+            // omitted rather than exported with secrets that redaction could not inspect.
+            let redactedResponse = redactedBodyAndHeaders(
+                body: response.body,
+                headers: response.headers,
+                contentType: response.contentType
+            )
+            return HTTPResponseData(
                 statusCode: response.statusCode,
                 statusMessage: response.statusMessage,
-                headers: redactHeaders(response.headers),
-                body: redactBody(response.body, contentType: response.contentType),
-                bodyTruncated: response.bodyTruncated,
+                headers: redactedResponse.headers,
+                body: redactedResponse.body,
+                bodyTruncated: response.bodyTruncated || redactedResponse.omitted,
                 contentType: response.contentType
             )
         }

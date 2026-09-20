@@ -64,6 +64,46 @@ struct HARImporterTests {
         #expect(text == "Hello World")
     }
 
+    @Test("Keeps startedDateTime when the archive omits fractional seconds")
+    func parsesWholeSecondStartedDateTime() throws {
+        let harJSON: [String: Any] = [
+            "log": [
+                "version": "1.2",
+                "creator": ["name": "test", "version": "1.0"],
+                "entries": [
+                    [
+                        "startedDateTime": "2025-01-15T10:00:00Z",
+                        "time": 0,
+                        "request": [
+                            "method": "GET",
+                            "url": "https://example.com/whole-second",
+                            "httpVersion": "HTTP/1.1",
+                            "headers": [] as [[String: Any]]
+                        ] as [String: Any],
+                        "response": ["status": 200, "statusText": "OK"] as [String: Any]
+                    ] as [String: Any],
+                    [
+                        "startedDateTime": "2025-01-15T17:30:15+07:00",
+                        "time": 0,
+                        "request": [
+                            "method": "GET",
+                            "url": "https://example.com/offset",
+                            "httpVersion": "HTTP/1.1",
+                            "headers": [] as [[String: Any]]
+                        ] as [String: Any],
+                        "response": ["status": 200, "statusText": "OK"] as [String: Any]
+                    ] as [String: Any]
+                ]
+            ] as [String: Any]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: harJSON)
+        let transactions = try importer.importData(data)
+
+        #expect(transactions.count == 2)
+        #expect(transactions[0].timestamp.timeIntervalSince1970 == 1_736_935_200)
+        #expect(transactions[1].timestamp.timeIntervalSince1970 == 1_736_937_015)
+    }
+
     @Test("Rejects invalid JSON")
     func rejectsInvalidJSON() throws {
         let badData = "not json".data(using: .utf8)!

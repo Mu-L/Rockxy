@@ -68,6 +68,16 @@ struct SystemProxyManagerTests {
 
     // MARK: - State Management
 
+    @Test("ownership detection only probes helper XPC when a helper is installed")
+    func ownershipDetectionSkipsMissingHelper() {
+        // Without a helper the XPC status probe can only wait for its 10 s timeout, which is
+        // what used to stall quitting and readiness checks on machines that never installed it.
+        #expect(!SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .notInstalled))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedCompatible))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .requiresApproval))
+        #expect(SystemProxyManager.shouldProbeHelperForOverride(helperStatus: .installedOutdated))
+    }
+
     @Test("routing readiness requires every fallback service to match")
     func routingReadinessRejectsPartialFallbackMatch() {
         let matching = ServiceProxySnapshot(

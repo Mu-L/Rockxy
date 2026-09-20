@@ -66,6 +66,18 @@ struct WelcomeViewReadabilityTests {
         #expect(app.contains("if certInstalled, certTrusted, helperOK, proxyOK {"))
     }
 
+    @Test("Show on startup opt-out is honored even while setup is incomplete")
+    func startupOptOutWinsOverIncompleteSetup() throws {
+        let app = try readProjectFile("Rockxy/RockxyApp.swift")
+        let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")
+
+        #expect(view.contains("Toggle(isOn: $showWelcomeOnLaunch)"))
+        #expect(app.contains("if showWelcomeOnLaunch {\n                    lifecycleState.showWelcome = true"))
+        #expect(!app.contains("if !onboardingCompletedOnce {\n                    lifecycleState.showWelcome = true"))
+        // The sheet stays reachable from the Help menu once the user opts out.
+        #expect(app.contains("Button(String(localized: \"Getting Started…\", bundle: RockxyLocalization.bundle))"))
+    }
+
     @Test("incomplete Welcome has an explicit safe dismissal without completing onboarding")
     func incompleteSetupCanBeDismissed() throws {
         let view = try readProjectFile("Rockxy/Views/Welcome/WelcomeView.swift")

@@ -37,6 +37,35 @@ struct DiffFormatterTests {
         #expect(sections[0].1.contains("200"))
     }
 
+    @Test("Response formatting decodes a compressed body into diffable text")
+    func responseFormattingDecodesCompressedBody() throws {
+        let plain = #"{"users":[{"id":1}]}"#
+        let compressed = try (Data(plain.utf8) as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction(
+            method: "GET",
+            url: "https://api.example.com/users",
+            statusCode: 200
+        )
+        transaction.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed
+        )
+
+        let sections = DiffFormatter.format(transaction: transaction, target: .response)
+        let body = try #require(sections.first { $0.0 == "Body" }?.1)
+
+        // Pretty-printed JSON, not a binary summary of the compressed bytes.
+        #expect(body.contains("\"users\""))
+        #expect(body.contains("\"id\""))
+        // The captured headers stay as they were on the wire.
+        let headers = try #require(sections.first { $0.0 == "Headers" }?.1)
+        #expect(headers.contains("Content-Encoding: deflate"))
+    }
+
     @Test("Timing formatting produces timing section")
     func timingFormatting() {
         let transaction = TestFixtures.makeTransactionWithTiming()

@@ -28,4 +28,6 @@ enum MCPLimits {
 
     /// Maximum body preview size included in tool call responses (1 MB).
     static let maxBodyPreviewSize = 1 * 1_024 * 1_024
+    /// Largest captured (wire) body that is decompressed before a preview is built.
+    static let maxDecodedBodyBytes = 4 * 1_024 * 1_024
 }

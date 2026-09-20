@@ -138,7 +138,7 @@ struct BreakpointTemplateStoreTests {
 
         #expect(applied.phase == .request)
         #expect(applied.method == "PUT")
-        #expect(applied.url == "/v1/profile")
+        #expect(applied.url == "https://example.com/v1/profile")
         #expect(applied.headers.map(\.name) == ["X-Test"])
         #expect(applied.body == "updated")
     }

@@ -67,7 +67,10 @@ struct CustomTLSSelectionTests {
     @Test("client TLS configuration includes matching identity and keeps full verification")
     func clientTLSConfigurationIncludesIdentity() throws {
         let identity = try makeIdentity(host: "mtls.example.com")
-        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(clientIdentity: identity)
+        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: identity,
+            acceptsUntrustedCertificates: false
+        )
 
         #expect(config.certificateVerification == .fullVerification)
         #expect(config.certificateChain.count == 1)
@@ -76,11 +79,34 @@ struct CustomTLSSelectionTests {
 
     @Test("client TLS configuration omits identity when there is no match and keeps full verification")
     func clientTLSConfigurationWithoutIdentity() throws {
-        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(clientIdentity: nil)
+        let config = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: false
+        )
 
         #expect(config.certificateVerification == .fullVerification)
         #expect(config.certificateChain.isEmpty)
         #expect(config.privateKey == nil)
+    }
+
+    @Test("upstream verification is only relaxed by the explicit untrusted-certificate opt-in")
+    func upstreamTrustPolicyControlsVerification() throws {
+        // The policy defaults to strict verification even when nothing was ever saved.
+        #expect(UpstreamTrustPolicy.certificateVerification(acceptingUntrusted: false) == .fullVerification)
+        #expect(UpstreamTrustPolicy.certificateVerification(acceptingUntrusted: true) == .none)
+
+        let strict = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: false
+        )
+        #expect(strict.certificateVerification == .fullVerification)
+
+        let relaxed = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
+            clientIdentity: nil,
+            acceptsUntrustedCertificates: true
+        )
+        #expect(relaxed.certificateVerification == .none)
+        #expect(UpstreamTrustPolicy.userDefaultsKey.hasSuffix("acceptUntrustedUpstreamCertificates"))
     }
 
     @Test("default generated certificate remains available when no custom server match exists")

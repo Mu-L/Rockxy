@@ -13,6 +13,27 @@ struct OllamaAssistantProvider: AssistantModelProvider {
     let kind = AssistantProviderKind.ollama
     let capabilities = AssistantProviderCapabilities.ollama
 
+    /// Whether an `/api/tags` entry is served by a remote Ollama host rather than this
+    /// runtime. Ollama reports `remote_host`/`remote_model` for cloud-backed models; the
+    /// `cloud` tag family (`name:cloud`, `name:120b-cloud`) is also unambiguous.
+    static func isRemoteInventoryItem(id: String, remoteHost: String?, remoteModel: String?) -> Bool {
+        if isNonEmpty(remoteHost) || isNonEmpty(remoteModel) {
+            return true
+        }
+        return denotesCloudModel(id: id)
+    }
+
+    /// `true` only when the tag portion of an Ollama model ID unambiguously marks an
+    /// Ollama cloud model. Custom names that merely contain "cloud" stay local.
+    static func denotesCloudModel(id: String) -> Bool {
+        let normalized = id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let separator = normalized.lastIndex(of: ":") else {
+            return false
+        }
+        let tag = normalized[normalized.index(after: separator)...]
+        return tag == "cloud" || tag.hasSuffix("-cloud")
+    }
+
     func discoverModels() async throws -> [AssistantModel] {
         do {
             let inventory = try await modelInventory()
@@ -20,7 +41,8 @@ struct OllamaAssistantProvider: AssistantModelProvider {
             enriched.reserveCapacity(inventory.count)
             for model in inventory {
                 try Task.checkCancellation()
-                enriched.append((try? await modelMetadata(for: model)) ?? model)
+                let enrichedModel = await (try? modelMetadata(for: model)) ?? model
+                enriched.append(enrichedModel)
             }
             return enriched
         } catch {
@@ -104,10 +126,15 @@ struct OllamaAssistantProvider: AssistantModelProvider {
     // MARK: Private
 
     private static let connectionTimeout: TimeInterval = 5
+
     private static let requestTimeout: TimeInterval = 90
 
     private let baseURL: URL
     private let transport: any AssistantHTTPTransport
+
+    private static func isNonEmpty(_ value: String?) -> Bool {
+        !(value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
 
     private func endpoint(_ path: String) -> URL {
         var normalized = baseURL
@@ -169,6 +196,14 @@ struct OllamaAssistantProvider: AssistantModelProvider {
         }
         return values.compactMap { value -> AssistantModel? in
             guard let id = value["name"] as? String, !id.isEmpty else {
+                return nil
+            }
+            // Cloud-backed entries would silently send reviewed traffic off this Mac.
+            guard !Self.isRemoteInventoryItem(
+                id: id,
+                remoteHost: value["remote_host"] as? String,
+                remoteModel: value["remote_model"] as? String
+            ) else {
                 return nil
             }
             let details = value["details"] as? [String: Any]

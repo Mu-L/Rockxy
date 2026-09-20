@@ -73,3 +73,22 @@ enum ScriptHeaderDictionary {
         return 0
     }
 }
+
+// MARK: - Wire safety
+
+extension ScriptHeaderDictionary {
+    /// Converts script-authored headers back into the model, dropping any header that could
+    /// not be encoded on the wire (a name that is not an RFC 7230 token, or a value with
+    /// CR/LF/NUL). A script bug would otherwise make NIO abort the relay and the client would
+    /// see an empty reply with no hint that the script caused it.
+    static func wireSafeHeaders(from storage: [String: String]) -> [HTTPHeader] {
+        storage.compactMap { name, value in
+            guard BreakpointRequestData.isValidHTTPHeaderName(name),
+                  BreakpointRequestData.isValidHTTPHeaderValue(value) else
+            {
+                return nil
+            }
+            return HTTPHeader(name: name, value: value)
+        }
+    }
+}

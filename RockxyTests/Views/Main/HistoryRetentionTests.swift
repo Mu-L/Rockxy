@@ -58,6 +58,30 @@ struct HistoryRetentionTests {
         #expect(coordinator.filteredRows.first?.clientApp == "Safari")
     }
 
+    @Test("A WebSocket session re-delivered on close updates its row instead of duplicating it")
+    @MainActor
+    func webSocketRedeliveryUpdatesExistingRow() {
+        let coordinator = MainContentCoordinator()
+        coordinator.isRecording = true
+        let request = TestFixtures.makeRequest(method: "GET", url: "ws://chat.example.com/socket")
+        let session = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: WebSocketConnection(upgradeRequest: request)
+        )
+
+        // Delivered once when the upgrade completes: the row is visible and active.
+        coordinator.processActiveProjectTestBatch([session])
+        #expect(coordinator.transactions.count == 1)
+        #expect(coordinator.transactions.first?.state == .active)
+
+        // Delivered again when the socket closes: the same row becomes completed.
+        coordinator.processActiveProjectTestBatch([session])
+        #expect(coordinator.transactions.count == 1)
+        #expect(coordinator.transactions.first?.id == session.id)
+        #expect(coordinator.transactions.first?.state == .completed)
+    }
+
     @Test("Bulk client attribution moves every observed host count")
     @MainActor
     func bulkClientAttributionUpdatesObservedDomains() {
