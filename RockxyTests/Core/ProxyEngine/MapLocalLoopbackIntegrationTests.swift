@@ -49,6 +49,24 @@ struct MapLocalLoopbackIntegrationTests {
         }
     }
 
+    @Test("An origin that closes before responding yields a fast 502 and a failed row")
+    func originClosingEarlyReturns502() async throws {
+        try await MapLocalLoopbackHarness.run { harness in
+            let started = ContinuousClock.now
+            let response = try await harness.get("/close-without-response")
+            let elapsed = ContinuousClock.now - started
+
+            #expect(response.status == 502)
+            #expect(response.headerValue(MapLocalLoopbackHarness.originMarkerHeader) == nil)
+            #expect(elapsed < .seconds(5), "client waited \(elapsed) for the upstream close")
+
+            try await Task.sleep(for: .milliseconds(300))
+            let failed = await harness.capturedTransactions().first { $0.request.url.path == "/close-without-response" }
+            #expect(failed?.state == .failed)
+            #expect(failed?.response?.statusCode == 502)
+        }
+    }
+
     @Test("Non-matching URL passes through the proxy to the origin")
     func nonMatchingURLReachesOrigin() async throws {
         try await MapLocalLoopbackHarness.run { harness in
@@ -360,13 +378,15 @@ private actor MapLocalLoopbackHarness {
         proxyServer: ProxyServer,
         proxyPort: Int,
         origin: MapLocalOriginFixtureServer,
-        fixtureDirectory: URL
+        fixtureDirectory: URL,
+        recorder: LoopbackTransactionRecorder
     ) {
         self.engine = engine
         self.proxyServer = proxyServer
         self.proxyPort = proxyPort
         self.origin = origin
         self.fixtureDirectory = fixtureDirectory
+        self.recorder = recorder
     }
 
     // MARK: Internal
@@ -383,9 +403,11 @@ private actor MapLocalLoopbackHarness {
         let origin = try await MapLocalOriginFixtureServer.start()
         let engine = RuleEngine()
         let proxyPort = try Self.reserveLoopbackPort()
+        let recorder = LoopbackTransactionRecorder()
         let proxyServer = ProxyServer(
             configuration: ProxyConfiguration(port: proxyPort, listenAddress: "127.0.0.1", listenIPv6: false),
-            ruleEngine: engine
+            ruleEngine: engine,
+            onTransactionComplete: { recorder.record($0) }
         )
 
         do {
@@ -401,7 +423,8 @@ private actor MapLocalLoopbackHarness {
             proxyServer: proxyServer,
             proxyPort: proxyPort,
             origin: origin,
-            fixtureDirectory: fixtureDirectory
+            fixtureDirectory: fixtureDirectory,
+            recorder: recorder
         )
     }
 
@@ -422,6 +445,10 @@ private actor MapLocalLoopbackHarness {
         await proxyServer.stop()
         await origin.stop()
         try? FileManager.default.removeItem(at: fixtureDirectory)
+    }
+
+    func capturedTransactions() -> [HTTPTransaction] {
+        recorder.snapshot()
     }
 
     func addRule(_ rule: ProxyRule) async {
@@ -514,6 +541,7 @@ private actor MapLocalLoopbackHarness {
     private let proxyServer: ProxyServer
     private let proxyPort: Int
     private let origin: MapLocalOriginFixtureServer
+    private let recorder: LoopbackTransactionRecorder
 
     private static func reserveLoopbackPort() throws -> Int {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
@@ -641,6 +669,25 @@ private final class MapLocalPortBox: @unchecked Sendable {
     private var storedValue = 0
 }
 
+// MARK: - LoopbackTransactionRecorder
+
+private final class LoopbackTransactionRecorder: @unchecked Sendable {
+    func record(_ transaction: HTTPTransaction) {
+        lock.lock()
+        transactions.append(transaction)
+        lock.unlock()
+    }
+
+    func snapshot() -> [HTTPTransaction] {
+        lock.lock()
+        defer { lock.unlock() }
+        return transactions
+    }
+
+    private let lock = NSLock()
+    private var transactions: [HTTPTransaction] = []
+}
+
 // MARK: - MapLocalOriginHandler
 
 private final class MapLocalOriginHandler: ChannelInboundHandler, @unchecked Sendable {
@@ -674,6 +721,11 @@ private final class MapLocalOriginHandler: ChannelInboundHandler, @unchecked Sen
 
     private func respond(context: ChannelHandlerContext) {
         let path = requestPath ?? "/"
+        // Simulates an origin that drops the connection before writing any response byte.
+        if path == "/close-without-response" {
+            context.close(promise: nil)
+            return
+        }
         var buffer = context.channel.allocator.buffer(capacity: path.utf8.count + 8)
         buffer.writeString("origin:\(path)")
 

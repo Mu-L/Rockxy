@@ -406,9 +406,9 @@ final class ComposeViewModel {
         clearRestoreConfirmation()
         method = transaction.request.method
         url = transaction.request.url.absoluteString
-        headers = transaction.request.headers.map {
-            EditableReplayHeader(name: $0.name, value: $0.value)
-        }
+        headers = transaction.request.headers
+            .filter { !RequestReplay.isTransportManagedHeader($0.name) }
+            .map { EditableReplayHeader(name: $0.name, value: $0.value) }
         if let bodyData = transaction.request.body {
             if let bodyText = String(data: bodyData, encoding: .utf8) {
                 body = bodyText
@@ -597,6 +597,25 @@ final class ComposeViewModel {
             """
             syncURLToQuery(force: true)
         }
+    }
+
+    /// Imports the URL field's text when it is a cURL command, so a command pasted straight into
+    /// the URL bar behaves like the explicit import. Returns `false` when the field holds a
+    /// plain URL. A failed parse rethrows without leaving a stale formatting notice behind, so
+    /// callers can stay silent while the command is still being typed.
+    func importCurlCommandFromURLFieldIfNeeded() throws -> Bool {
+        let candidate = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard candidate == "curl" || candidate.hasPrefix("curl ") else {
+            return false
+        }
+        let previousFormattingError = lastFormattingError
+        do {
+            try importCurlCommand(candidate)
+        } catch {
+            lastFormattingError = previousFormattingError
+            throw error
+        }
+        return true
     }
 
     func importCurlCommand(_ command: String) throws {

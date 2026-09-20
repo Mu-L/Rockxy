@@ -36,6 +36,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         bypassProxyManager: BypassProxyManager,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         shouldBypassUserModifications: @escaping @Sendable (HTTPRequestData) -> Bool = { _ in false },
         clientIdentityHandle: ClientIdentityHandle? = nil,
@@ -54,6 +55,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         self.bypassProxyManager = bypassProxyManager
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.shouldBypassUserModifications = shouldBypassUserModifications
         self.clientIdentityHandle = clientIdentityHandle
@@ -138,6 +140,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
     private let bypassProxyManager: BypassProxyManager
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let shouldBypassUserModifications: @Sendable (HTTPRequestData) -> Bool
     private let clientIdentityHandle: ClientIdentityHandle?
@@ -521,8 +524,17 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
             fallbackScheme: "http",
             fallbackHost: "localhost"
         )
+        let provenanceCallback = ProxyHandlerShared.makeMapRemoteProvenanceCallback(
+            originalURL: requestData.url,
+            downstream: callback
+        )
 
-        forwardRequest(context: context, head: rewrite.head, requestData: rewrite.requestData, callback: callback)
+        forwardRequest(
+            context: context,
+            head: rewrite.head,
+            requestData: rewrite.requestData,
+            callback: provenanceCallback
+        )
     }
 
     nonisolated private func handleMapLocal(
@@ -727,6 +739,19 @@ extension HTTPProxyHandler {
         let host = parsed.host
         let port = parsed.port
 
+        if let descriptor = clientConnectionDescriptor,
+           ProxyLoopGuard.targetsOwnListener(
+               host: host,
+               port: port,
+               proxyPort: descriptor.proxyPort,
+               proxyHost: descriptor.proxyHost
+           )
+        {
+            proxyHandlerLogger.warning("SECURITY: Refused CONNECT that targets the proxy listener itself")
+            sendErrorResponse(context: context, status: 508, requestData: requestData)
+            return
+        }
+
         var responseHead = HTTPResponseHead(version: head.version, status: .ok)
         responseHead.headers.add(name: "content-length", value: "0")
         context.write(wrapOutboundOut(.head(responseHead)), promise: nil)
@@ -761,6 +786,7 @@ extension HTTPProxyHandler {
                 bypassProxyManager: self.bypassProxyManager,
                 customCertificateManager: self.customCertificateManager,
                 upstreamProxySnapshotProvider: self.upstreamProxySnapshotProvider,
+                upstreamTrustProvider: self.upstreamTrustProvider,
                 captureContextProvider: self.captureContextProvider,
                 tunnelCaptureContext: requestData.captureContext,
                 clientSourcePort: self.clientSourcePort,
@@ -824,7 +850,8 @@ extension HTTPProxyHandler {
         var head = head
         var requestData = requestData
 
-        if !bypassUserModifications, NoCacheHeaderMutator.isEnabled {
+        let disablesCaching = !bypassUserModifications && NoCacheHeaderMutator.isEnabled
+        if disablesCaching {
             requestData.headers = NoCacheHeaderMutator.apply(to: requestData.headers)
             head.headers = HTTPHeaders(requestData.headers.map { ($0.name, $0.value) })
         }
@@ -838,6 +865,19 @@ extension HTTPProxyHandler {
         }
 
         let port: Int = requestData.url.port ?? (requestData.url.scheme == "https" ? 443 : 80)
+
+        if let descriptor = clientConnectionDescriptor,
+           ProxyLoopGuard.targetsOwnListener(
+               host: host,
+               port: port,
+               proxyPort: descriptor.proxyPort,
+               proxyHost: descriptor.proxyHost
+           )
+        {
+            proxyHandlerLogger.warning("SECURITY: Refused request that targets the proxy listener itself")
+            sendErrorResponse(context: context, status: 508, requestData: requestData, callback: callback)
+            return
+        }
 
         let connectTime = DispatchTime.now()
 
@@ -859,7 +899,8 @@ extension HTTPProxyHandler {
             if useTLS {
                 do {
                     let tlsConfig = try HTTPSProxyRelayHandler.makeClientTLSConfiguration(
-                        clientIdentity: self.customCertificateManager.clientIdentity(for: host)
+                        clientIdentity: self.customCertificateManager.clientIdentity(for: host),
+                        acceptsUntrustedCertificates: self.upstreamTrustProvider()
                     )
                     let sslContext = try NIOSSLContext(configuration: tlsConfig)
                     let sslHandler = try NIOSSLClientHandler(
@@ -896,6 +937,7 @@ extension HTTPProxyHandler {
                     connectTime: connectTime,
                     tcpTime: tcpTime,
                     responseHeaderOperations: responseHeaderOperations,
+                    disablesResponseCaching: disablesCaching,
                     networkConditionProfile: networkConditionProfile,
                     bypassUserModifications: bypassUserModifications,
                     onUpstreamClosed: { limiter.release(host: host, port: port) },
@@ -919,6 +961,7 @@ extension HTTPProxyHandler {
         connectTime: DispatchTime,
         tcpTime: DispatchTime,
         responseHeaderOperations: [HeaderOperation]? = nil,
+        disablesResponseCaching: Bool = false,
         networkConditionProfile: NetworkConditionProfile? = nil,
         bypassUserModifications: Bool = false,
         onUpstreamClosed: @escaping @Sendable () -> Void,
@@ -935,6 +978,7 @@ extension HTTPProxyHandler {
             breakpointPhase: pendingBreakpointPhase,
             breakpointRuleName: pendingBreakpointRuleName,
             headerResponseOperations: responseHeaderOperations,
+            disablesResponseCaching: disablesResponseCaching,
             networkConditionProfile: networkConditionProfile,
             scriptPluginManager: bypassUserModifications ? nil : scriptPluginManager,
             onBreakpointHit: bypassUserModifications ? nil : onBreakpointHit,

@@ -25,8 +25,8 @@ Upstream Proxy lets Rockxy chain outbound requests through another proxy server 
 | Mode | Community Support | Notes |
 |------|-------------------|-------|
 | Automatic Proxy Configuration (PAC) | Supported | Evaluates an HTTP/HTTPS PAC URL per target and follows the first supported route. |
-| HTTP proxy | Supported | Uses HTTP `CONNECT` for tunneled targets. |
-| HTTPS proxy | Supported | Connects to the proxy over TLS and verifies the proxy hostname certificate. |
+| HTTP proxy | Supported | Sends plain `http://` targets in absolute form (`GET http://host/path`) on the proxy connection and uses HTTP `CONNECT` only for TLS targets, matching the policy of Squid-style gateways that refuse `CONNECT` to port 80. |
+| HTTPS proxy | Supported | Connects to the proxy over TLS and verifies the proxy hostname certificate; the same absolute-form/`CONNECT` split applies. |
 | SOCKS5 proxy | Capped by app policy | The core connector supports SOCKS5, but the Community policy keeps it unavailable. |
 | Proxy authentication | Capped by app policy | Credentials are held in memory and passwords are stored only in Keychain when the policy allows authentication. |
 

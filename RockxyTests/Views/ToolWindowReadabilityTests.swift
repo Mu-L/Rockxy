@@ -656,6 +656,20 @@ struct ToolWindowReadabilityTests {
         }
     }
 
+    @Test("Pending listener changes offer a restart action instead of a dead-end notice")
+    func listenerRestartNoticeOffersRestart() throws {
+        let source = try readProjectFile("Rockxy/Views/Settings/AdvancedProxySettingsView.swift")
+        let coordinator = try readProjectFile("Rockxy/Views/Main/Extensions/MainContentCoordinator+ProxyControl.swift")
+        let start = try #require(source.range(of: "private var restartNoticeRow: some View {"))
+        let end = try #require(source.range(of: "// MARK: - Helper Tool", range: start.upperBound ..< source.endIndex))
+        let notice = source[start.lowerBound ..< end.lowerBound]
+
+        #expect(notice.contains("Button(String(localized: \"Restart Proxy\", bundle: RockxyLocalization.bundle))"))
+        #expect(notice.contains("coordinator.restartProxy()"))
+        #expect(notice.contains(".disabled(coordinator.isProxyStopping || coordinator.isProxyStarting)"))
+        #expect(coordinator.contains("func restartProxy()"))
+    }
+
     @Test("Settings-launched windows keep fixed shells while scaling typography")
     func settingsLaunchedWindowsKeepFixedShellsWhileScalingTypography() throws {
         let files = [

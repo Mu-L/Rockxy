@@ -10,19 +10,36 @@ enum BodyDecoder {
     // MARK: Internal
 
     static func decode(_ data: Data, encoding: String?) -> Data {
+        decodeReportingChange(data, encoding: encoding).data
+    }
+
+    /// Decodes `data` and reports whether every `Content-Encoding` stage was applied, i.e.
+    /// the returned bytes are the fully decoded body. Callers that hand the decoded body to
+    /// an editor (Map Local drafts, breakpoints) use the flag to drop the now-inaccurate
+    /// `Content-Encoding` header. An unknown encoding or a failed stage reports `false`;
+    /// the bytes then follow the same best-effort fallback as `decode`, so callers that
+    /// need the untouched payload should keep their original copy when the flag is `false`.
+    static func decodeReportingChange(_ data: Data, encoding: String?) -> (data: Data, didDecode: Bool) {
         guard let encoding else {
-            return data
+            return (data, false)
         }
         let encodings = encoding
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .filter { !$0.isEmpty }
         guard !encodings.isEmpty else {
-            return data
+            return (data, false)
         }
-        return encodings.reversed().reduce(data) { body, encoding in
-            decodeSingle(body, encoding: encoding)
+        var body = data
+        var everyStageDecoded = true
+        for encoding in encodings.reversed() {
+            guard let decoded = decodeSingle(body, encoding: encoding) else {
+                everyStageDecoded = false
+                continue
+            }
+            body = decoded
         }
+        return (body, everyStageDecoded)
     }
 
     // MARK: Private
@@ -31,16 +48,18 @@ enum BodyDecoder {
 
     private static let maxDecompressedSize = 50 * 1_024 * 1_024 // 50MB
 
-    private static func decodeSingle(_ data: Data, encoding: String) -> Data {
+    /// Returns `nil` when the encoding is unrecognized or decompression fails so the
+    /// caller keeps the current bytes, matching the pre-existing fall-back behavior.
+    private static func decodeSingle(_ data: Data, encoding: String) -> Data? {
         switch encoding {
         case "gzip":
-            return decompressGzip(data) ?? data
+            return decompressGzip(data)
         case "deflate":
-            return decompress(data, algorithm: COMPRESSION_ZLIB) ?? data
+            return decompress(data, algorithm: COMPRESSION_ZLIB)
         case "br":
-            return decompress(data, algorithm: COMPRESSION_BROTLI) ?? data
+            return decompress(data, algorithm: COMPRESSION_BROTLI)
         default:
-            return data
+            return nil
         }
     }
 

@@ -342,12 +342,7 @@ struct UpstreamProxySettingsViewModelTests {
     }
 
     private static func makeDefaults() -> UserDefaults {
-        let suiteName = "Rockxy.UpstreamProxySettingsViewModelTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            preconditionFailure("Unable to create isolated Upstream Proxy settings defaults")
-        }
-        defaults.removePersistentDomain(forName: suiteName)
-        return defaults
+        IsolatedDefaultsSuite.make(prefix: "Rockxy.UpstreamProxySettingsViewModelTests")
     }
 
     private func makeDefaults() -> UserDefaults {

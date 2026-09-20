@@ -58,6 +58,30 @@ struct RequestReplayTests {
         #expect(value.contains("two"))
     }
 
+    @Test("request builder drops headers the transport derives itself")
+    func transportManagedHeadersDropped() throws {
+        let request = HTTPRequestData(
+            method: "POST",
+            url: try #require(URL(string: "https://staging.example.com/items")),
+            httpVersion: "HTTP/1.1",
+            headers: [
+                HTTPHeader(name: "Host", value: "api.example.com"),
+                HTTPHeader(name: "Content-Length", value: "2"),
+                HTTPHeader(name: "Proxy-Connection", value: "Keep-Alive"),
+                HTTPHeader(name: "Proxy-Authorization", value: "Basic abc"),
+                HTTPHeader(name: "Authorization", value: "Bearer keep"),
+            ],
+            body: Data("{}".utf8)
+        )
+
+        let built = RequestReplay.makeURLRequest(from: request)
+        #expect(built.value(forHTTPHeaderField: "Host") == nil)
+        #expect(built.value(forHTTPHeaderField: "Content-Length") == nil)
+        #expect(built.value(forHTTPHeaderField: "Proxy-Connection") == nil)
+        #expect(built.value(forHTTPHeaderField: "Proxy-Authorization") == nil)
+        #expect(built.value(forHTTPHeaderField: "Authorization") == "Bearer keep")
+    }
+
     @Test("fast replay rejects CONNECT tunnels and WebSocket sessions")
     func unsupportedTransportsRejected() {
         let http = TestFixtures.makeTransaction(method: "GET")
@@ -67,5 +91,65 @@ struct RequestReplayTests {
         #expect(MainContentCoordinator.canReplay(http))
         #expect(!MainContentCoordinator.canReplay(connect))
         #expect(!MainContentCoordinator.canReplay(webSocket))
+    }
+
+    @Test("fast replay results become their own session row attributed to Rockxy")
+    func replayResultBecomesSessionRow() throws {
+        let original = TestFixtures.makeTransaction(method: "POST", url: "http://staging.example.com/api/login")
+        original.clientApp = "curl"
+        original.request = HTTPRequestData(
+            method: "POST",
+            url: try #require(URL(string: "http://staging.example.com/api/login")),
+            httpVersion: "HTTP/1.1",
+            headers: [HTTPHeader(name: "X-Trace", value: "t1")],
+            body: Data("{\"user\":\"stephen\"}".utf8),
+            contentType: .json,
+            captureContext: TrafficCaptureContext(projectID: UUID(), sessionID: UUID(), generation: 7)
+        )
+        let response = HTTPResponseData(
+            statusCode: 201,
+            statusMessage: "Created",
+            headers: [HTTPHeader(name: "Content-Type", value: "application/json")],
+            body: Data("{}".utf8),
+            contentType: .json
+        )
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+
+        let replay = MainContentCoordinator.makeReplayTransaction(
+            from: original,
+            response: response,
+            startedAt: startedAt,
+            state: .completed,
+            now: startedAt.addingTimeInterval(0.25)
+        )
+
+        #expect(replay.id != original.id)
+        #expect(replay.timestamp == startedAt)
+        #expect(replay.state == .completed)
+        #expect(replay.response?.statusCode == 201)
+        #expect(replay.request.method == "POST")
+        #expect(replay.request.url == original.request.url)
+        #expect(replay.request.headers.map(\.value) == ["t1"])
+        #expect(replay.request.body == original.request.body)
+        // The stale Project context must not travel with the copy or the row is dropped.
+        #expect(replay.captureContext == nil)
+        #expect(replay.clientApp == RockxyIdentity.current.displayName)
+        #expect(replay.timingInfo?.totalDuration == 0.25)
+
+        let failed = MainContentCoordinator.makeReplayTransaction(
+            from: original,
+            response: nil,
+            startedAt: startedAt,
+            state: .failed
+        )
+        #expect(failed.state == .failed)
+        #expect(failed.response == nil)
+    }
+
+    @Test("plain http replays are not blocked by App Transport Security")
+    func plainHTTPAllowedByATS() throws {
+        let plist = try #require(Bundle.main.infoDictionary)
+        let ats = try #require(plist["NSAppTransportSecurity"] as? [String: Any])
+        #expect(ats["NSAllowsArbitraryLoads"] as? Bool == true)
     }
 }

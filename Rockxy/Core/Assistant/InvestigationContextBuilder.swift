@@ -80,8 +80,10 @@ struct InvestigationContextBuilder {
             contentType: snapshot.request.contentType,
             limits: limits
         )
+        // Review Data must show the payload the way the inspector does; a compressed body
+        // would otherwise be omitted as binary and the investigation would lose the response.
         let responseBody = sanitizedBody(
-            snapshot.response?.body,
+            snapshot.response?.decodedBody(limit: limits.maxBodyBytes),
             contentType: snapshot.response?.contentType,
             limits: limits
         )

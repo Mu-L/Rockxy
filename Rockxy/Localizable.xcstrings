@@ -3863,12 +3863,12 @@
         }
       }
     },
-    "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac.": {
+    "Captured traffic stays in memory for the current session and is discarded when Rockxy quits. Flows you pin, save, or annotate are stored in an unencrypted SQLite database on your Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有捕获的 HTTP/HTTPS 请求、响应、标头和正文都会存储在 Mac 上未加密的 SQLite 数据库中。"
+            "value": "捕获的流量仅保存在当前会话的内存中，Rockxy 退出时会被丢弃。你固定、保存或添加备注的流量会存储在 Mac 上未加密的 SQLite 数据库中。"
           }
         }
       }
@@ -10960,12 +10960,12 @@
         }
       }
     },
-    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.": {
+    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, then restart the proxy.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请关闭“仅监听本地主机”，然后重启代理。"
+            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听本地主机”，然后重启代理。"
           }
         }
       }
@@ -24029,12 +24029,12 @@
         }
       }
     },
-    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only Listen on localhost, restart the proxy, and use the Device Proxy host plus active port.": {
+    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only listen on localhost in Settings > General > Advanced Proxy Setting…, restart the proxy, and use the Device Proxy host plus active port.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
+            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请在“设置 > 通用 > 高级代理设置…”中关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
           }
         }
       }
@@ -27722,12 +27722,12 @@
         }
       }
     },
-    "Responses larger than 1 MB are saved as separate files.": {
+    "Stored request and response bodies larger than 1 MB are saved as separate files.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "大于 1 MB 的响应会另存为单独文件。"
+            "value": "已存储的请求和响应正文若大于 1 MB，会另存为单独文件。"
           }
         }
       }
@@ -28891,18 +28891,18 @@
         }
       }
     },
-    "Rockxy is listening on %@:%lld.": {
+    "Rockxy is listening on %@:%@.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Rockxy is listening on %1$@:%2$lld."
+            "value": "Rockxy is listening on %1$@:%2$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 正在监听 %1$@:%2$lld。"
+            "value": "Rockxy 正在监听 %1$@:%2$@。"
           }
         }
       }
@@ -30212,12 +30212,12 @@
         }
       }
     },
-    "Running on port %lld": {
+    "Running on port %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在端口 %lld 上运行"
+            "value": "正在端口 %@ 上运行"
           }
         }
       }
@@ -34209,18 +34209,18 @@
         }
       }
     },
-    "System Proxy is Overridden by Rockxy (IP=%@ Port=%lld) (Toggle by: ⌥⌘O)": {
+    "System Proxy is Overridden by Rockxy (IP=%@ Port=%@) (Toggle by: ⌥⌘O)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$lld) (Toggle by: ⌥⌘O)"
+            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$@) (Toggle by: ⌥⌘O)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$lld）（切换快捷键：⌥⌘O）"
+            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$@）（切换快捷键：⌥⌘O）"
           }
         }
       }
@@ -40209,6 +40209,198 @@
           "stringUnit": {
             "state": "translated",
             "value": "macOS 系统流量未路由到 Rockxy。监听器仍可接收手动配置的应用流量，但浏览器流量不会自动被捕获。"
+          }
+        }
+      }
+    },
+    "Go (net/http)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go (net/http)"
+          }
+        }
+      }
+    },
+    "JavaScript (fetch)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JavaScript (fetch)"
+          }
+        }
+      }
+    },
+    "Python (requests)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Python (requests)"
+          }
+        }
+      }
+    },
+    "Swift (URLSession)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swift (URLSession)"
+          }
+        }
+      }
+    },
+    "Restart Proxy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新启动代理"
+          }
+        }
+      }
+    },
+    "Restart proxy with saved listener settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用已保存的监听设置重新启动代理"
+          }
+        }
+      }
+    },
+    "Upstream Servers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上游服务器"
+          }
+        }
+      }
+    },
+    "Accept untrusted upstream certificates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接受不受信任的上游证书"
+          }
+        }
+      }
+    },
+    "Decrypt HTTPS to staging or internal servers whose certificate is self-signed or issued by a private CA. Rockxy stops verifying the server it connects to, so only enable this on networks you control.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解密到证书为自签名或由私有 CA 签发的测试/内部服务器的 HTTPS。Rockxy 将不再验证所连接的服务器，因此只应在你控制的网络中启用。"
+          }
+        }
+      }
+    },
+    "Header Name may only use letters, digits, and !#$%&'*+-.^_`|~ (no spaces)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头名称只能使用字母、数字以及 !#$%&'*+-.^_`|~（不能包含空格）"
+          }
+        }
+      }
+    },
+    "Header Value cannot contain line breaks or control characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标头值不能包含换行符或控制字符"
+          }
+        }
+      }
+    },
+    "All captured HTTP/HTTPS requests, responses, headers, and bodies are stored in an unencrypted SQLite database on your Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有捕获的 HTTP/HTTPS 请求、响应、标头和正文都会存储在 Mac 上未加密的 SQLite 数据库中。"
+          }
+        }
+      }
+    },
+    "Devices outside this Mac cannot reach localhost-only mode. Turn off Only Listen on localhost, then restart the proxy.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 之外的设备无法访问“仅监听本地主机”模式。请关闭“仅监听本地主机”，然后重启代理。"
+          }
+        }
+      }
+    },
+    "Physical devices cannot reach Rockxy while the proxy only listens on localhost. Turn off Only Listen on localhost, restart the proxy, and use the Device Proxy host plus active port.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当代理仅监听 localhost 时，实体设备无法连接 Rockxy。请关闭“仅监听 localhost”，重新启动代理，然后使用“设备代理”主机和当前端口。"
+          }
+        }
+      }
+    },
+    "Responses larger than 1 MB are saved as separate files.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大于 1 MB 的响应会另存为单独文件。"
+          }
+        }
+      }
+    },
+    "Rockxy is listening on %@:%lld.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Rockxy is listening on %1$@:%2$lld."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 正在监听 %1$@:%2$lld。"
+          }
+        }
+      }
+    },
+    "Running on port %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在端口 %lld 上运行"
+          }
+        }
+      }
+    },
+    "System Proxy is Overridden by Rockxy (IP=%@ Port=%lld) (Toggle by: ⌥⌘O)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$lld) (Toggle by: ⌥⌘O)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$lld）（切换快捷键：⌥⌘O）"
           }
         }
       }

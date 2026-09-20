@@ -193,6 +193,7 @@ Save your captured traffic for later analysis or sharing.
 - **Import HAR** — **File > Import HAR...** (`Cmd+Shift+I`) loads a HAR file into the traffic list.
 - **Open Session** — **File > Open Session...** (`Cmd+O`) restores a previously saved `.rockxysession` file.
 - **Copy as cURL** — right-click any request > **Copy as cURL** for a ready-to-run command.
+- **Copy as code** — right-click any request > **Copy as** > **Swift (URLSession)**, **Python (requests)**, **JavaScript (fetch)**, or **Go (net/http)** for a snippet that reproduces the request in that language. Transport-managed headers (`Host`, `Content-Length`, `Proxy-*`) are left out because each client library derives them.
 
 See [Sessions & HAR](/features/sessions) for full details on save/export workflows.
 

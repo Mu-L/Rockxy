@@ -55,6 +55,10 @@ extension MainContentCoordinator {
         copyToClipboard(raw)
     }
 
+    func copyAsCodeSnippet(for transaction: HTTPTransaction, language: CodeSnippetLanguage) {
+        copyToClipboard(CodeSnippetGenerator.snippet(for: transaction.request, language: language))
+    }
+
     func copyAsHAREntry(for transaction: HTTPTransaction) {
         guard let har = RequestCopyFormatter.harEntry(for: transaction) else {
             return

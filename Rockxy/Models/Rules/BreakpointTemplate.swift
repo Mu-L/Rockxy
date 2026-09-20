@@ -226,7 +226,7 @@ struct BreakpointTemplateApplication: Equatable {
         switch parsedMessage {
         case let .request(request):
             next.method = request.method
-            next.url = request.target
+            next.url = BreakpointRawMessage.resolvedURL(target: request.target, currentURL: draft.url)
             next.headers = request.headers.map { EditableHeader(name: $0.name, value: $0.value) }
             next.body = request.body
             next.phase = .request
@@ -500,6 +500,19 @@ enum BreakpointRawMessage {
         }
     }
 
+    /// The draft URL after a raw request line is applied. An origin-form target keeps the
+    /// draft's current scheme and authority, so the URL field and the paused row continue
+    /// to show where the request goes; the captured connection authority is what the proxy
+    /// uses anyway. An absolute-form target, or a draft without an absolute URL, is taken as
+    /// written.
+    static func resolvedURL(target: String, currentURL: String) -> String {
+        let lowered = target.lowercased()
+        guard !lowered.hasPrefix("http://"), !lowered.hasPrefix("https://") else {
+            return target
+        }
+        return BreakpointRequestData.applyingOriginForm(target, to: currentURL) ?? target
+    }
+
     static func applying(
         _ rawMessage: String,
         kind: BreakpointTemplateKind,
@@ -527,7 +540,7 @@ enum BreakpointRawMessage {
         switch parsed {
         case let .request(request):
             next.method = request.method
-            next.url = request.target
+            next.url = resolvedURL(target: request.target, currentURL: draft.url)
             next.headers = request.headers.map { EditableHeader(name: $0.name, value: $0.value) }
             next.body = request.body
             next.phase = .request

@@ -337,6 +337,31 @@ struct RequestCopyFormatterTests {
         #expect(result.contains("HTTP/1.1 200 OK"))
     }
 
+    @Test("rawResponse and json decode a compressed body instead of dropping it")
+    func rawResponseDecodesCompressedBody() throws {
+        let text = #"{"compressed":true}"#
+        let compressed = try (Data(text.utf8) as NSData).compressed(using: .zlib) as Data
+        let transaction = TestFixtures.makeTransaction(statusCode: 200)
+        transaction.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            headers: [
+                HTTPHeader(name: "Content-Type", value: "application/json"),
+                HTTPHeader(name: "Content-Encoding", value: "deflate"),
+            ],
+            body: compressed
+        )
+
+        let raw = try #require(RequestCopyFormatter.rawResponse(for: transaction))
+        #expect(raw.hasSuffix("\r\n\r\n\(text)"))
+        // Headers stay as captured, matching the inspector's raw view convention.
+        #expect(raw.contains("Content-Encoding: deflate"))
+
+        let json = try #require(RequestCopyFormatter.json(for: transaction))
+        let decoded = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let response = try #require(decoded["response"] as? [String: Any])
+        #expect(response["body"] as? String == text)
+    }
+
     @Test("rawResponse includes headers")
     func rawResponseHeaders() throws {
         let transaction = TestFixtures.makeTransaction(statusCode: 200)

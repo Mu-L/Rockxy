@@ -22,10 +22,10 @@ enum ScriptTemplates {
       // Update or Add new queries
       // request.queries["name"] = "Rockxy";
 
-      // Body
-      // var body = request.body;
-      // body["new-key"] = "new-value"
-      // request.body = body;
+      // Body (a string; parse it when you need structured edits)
+      // var body = JSON.parse(request.body);
+      // body["new-key"] = "new-value";
+      // request.body = JSON.stringify(body);
 
       // Done
       return request;
@@ -43,10 +43,10 @@ enum ScriptTemplates {
       // Update status Code
       // response.statusCode = 500;
 
-      // Update Body
-      // var body = response.body;
+      // Update Body (a string; compressed responses arrive already decoded)
+      // var body = JSON.parse(response.body);
       // body["new-key"] = "Rockxy";
-      // response.body = body;
+      // response.body = JSON.stringify(body);
 
       // Or map a local file as a body
       // response.bodyFilePath = "~/Desktop/myfile.json"

@@ -24,11 +24,13 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     init(
         host: String,
         port: Int,
+        scheme: String = "https",
         ruleEngine: RuleEngine,
         scriptPluginManager: ScriptPluginManager? = nil,
         connectionLimiter: ConnectionLimiter,
         customCertificateManager: CustomCertificateManager = .shared,
         upstreamProxySnapshotProvider: @escaping @Sendable () -> UpstreamProxyResolvedConfiguration? = { nil },
+        upstreamTrustProvider: @escaping @Sendable () -> Bool = { UpstreamTrustPolicy.acceptsUntrustedCertificates },
         captureContextProvider: @escaping @Sendable () -> TrafficCaptureContext? = { nil },
         clientSourcePort: UInt16? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
@@ -38,11 +40,13 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     ) {
         self.host = host
         self.port = port
+        self.scheme = scheme
         self.ruleEngine = ruleEngine
         self.scriptPluginManager = scriptPluginManager
         self.connectionLimiter = connectionLimiter
         self.customCertificateManager = customCertificateManager
         self.upstreamProxySnapshotProvider = upstreamProxySnapshotProvider
+        self.upstreamTrustProvider = upstreamTrustProvider
         self.captureContextProvider = captureContextProvider
         self.clientSourcePort = clientSourcePort
         // Every transaction this handler emits was decrypted inside an intercepted tunnel, so
@@ -50,8 +54,9 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         // it as intercepted regardless of how the host policy later changes. The stamp runs on
         // the event loop before the downstream callback hands the transaction off, preserving
         // the existing happens-before ordering used for other pre-delivery fields.
+        let isDecryptedTunnel = scheme == "https"
         self.onTransactionComplete = { transaction in
-            if transaction.sslCapture == nil {
+            if transaction.sslCapture == nil, isDecryptedTunnel {
                 transaction.sslCapture = .intercepted
             }
             onTransactionComplete(transaction)
@@ -65,9 +70,14 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
 
-    nonisolated static func makeClientTLSConfiguration(clientIdentity: CustomTLSIdentity?) throws -> TLSConfiguration {
+    nonisolated static func makeClientTLSConfiguration(
+        clientIdentity: CustomTLSIdentity?,
+        acceptsUntrustedCertificates: Bool = UpstreamTrustPolicy.acceptsUntrustedCertificates
+    ) throws -> TLSConfiguration {
         var clientTLSConfig = TLSConfiguration.makeClientConfiguration()
-        clientTLSConfig.certificateVerification = .fullVerification
+        clientTLSConfig.certificateVerification = UpstreamTrustPolicy.certificateVerification(
+            acceptingUntrusted: acceptsUntrustedCertificates
+        )
         if let clientIdentity {
             clientTLSConfig.certificateChain = try clientIdentity.certificateSources
             clientTLSConfig.privateKey = try clientIdentity.privateKeySource
@@ -142,11 +152,15 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
 
     private let host: String
     private let port: Int
+    /// `https` for a decrypted TLS tunnel, `http` when the CONNECT tunnel carried plain HTTP
+    /// (a `ws://` upgrade or an http:// request sent through CONNECT).
+    private let scheme: String
     private let ruleEngine: RuleEngine
     private let scriptPluginManager: ScriptPluginManager?
     private let connectionLimiter: ConnectionLimiter
     private let customCertificateManager: CustomCertificateManager
     private let upstreamProxySnapshotProvider: @Sendable () -> UpstreamProxyResolvedConfiguration?
+    private let upstreamTrustProvider: @Sendable () -> Bool
     private let captureContextProvider: @Sendable () -> TrafficCaptureContext?
     private let clientSourcePort: UInt16?
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
@@ -156,6 +170,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
     ))?
     private let breakpointBridgeTracker: BreakpointBridgeTracker?
 
+    private var pendingDisablesResponseCaching = false
     private var pendingBreakpointPhase: BreakpointRulePhase?
     private var pendingBreakpointRuleName: String?
     /// The unstructured Task bridging an in-flight request breakpoint to the
@@ -206,7 +221,10 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         var requestData = buildRequestData(from: head)
 
         var head = head
-        if NoCacheHeaderMutator.isEnabled {
+        // Decided once per request so the relayed response is marked uncacheable exactly
+        // when its request was made fresh; consumed by `connectToUpstream`.
+        pendingDisablesResponseCaching = NoCacheHeaderMutator.isEnabled
+        if pendingDisablesResponseCaching {
             requestData.headers = NoCacheHeaderMutator.apply(to: requestData.headers)
             head.headers = HTTPHeaders(requestData.headers.map { ($0.name, $0.value) })
         }
@@ -345,11 +363,12 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         } else {
             nil
         }
-        let fallbackURL = URL(string: "https://localhost/")!
-        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: "https")
+        // swiftlint:disable:next force_unwrapping
+        let fallbackURL = URL(string: "\(scheme)://localhost/")!
+        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: scheme)
         let requestTarget = head.uri.hasPrefix("/") ? head.uri : "/\(head.uri)"
-        let parsedURL = URL(string: "https://\(authority)\(requestTarget)")
-            ?? URL(string: "https://\(authority)/")
+        let parsedURL = URL(string: "\(scheme)://\(authority)\(requestTarget)")
+            ?? URL(string: "\(scheme)://\(authority)/")
             ?? fallbackURL
         return HTTPRequestData(
             method: head.method.rawValue,
@@ -389,9 +408,39 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
         let connectTime = DispatchTime.now()
         let limiter = connectionLimiter
 
+        if scheme != "https" {
+            UpstreamProxyConnector.connect(
+                eventLoop: context.eventLoop,
+                targetScheme: scheme,
+                targetHost: host,
+                targetPort: port,
+                configuration: upstreamProxySnapshotProvider()
+            ) { channel in
+                channel.pipeline.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes)
+            }
+            .whenComplete { result in
+                self.handleUpstreamConnection(
+                    result: result,
+                    context: context,
+                    head: head,
+                    requestData: requestData,
+                    graphQLInfo: graphQLInfo,
+                    startTime: startTime,
+                    connectTime: connectTime,
+                    upstreamHost: upstreamHost,
+                    upstreamPort: upstreamPort,
+                    responseHeaderOperations: responseHeaderOperations,
+                    networkConditionProfile: networkConditionProfile,
+                    callback: callback
+                )
+            }
+            return
+        }
+
         do {
             let clientTLSConfig = try Self.makeClientTLSConfiguration(
-                clientIdentity: customCertificateManager.clientIdentity(for: upstreamHost)
+                clientIdentity: customCertificateManager.clientIdentity(for: upstreamHost),
+                acceptsUntrustedCertificates: upstreamTrustProvider()
             )
             let sslContext = try NIOSSLContext(configuration: clientTLSConfig)
 
@@ -472,6 +521,7 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
                 breakpointPhase: self.pendingBreakpointPhase,
                 breakpointRuleName: self.pendingBreakpointRuleName,
                 headerResponseOperations: responseHeaderOperations,
+                disablesResponseCaching: self.pendingDisablesResponseCaching,
                 networkConditionProfile: networkConditionProfile,
                 scriptPluginManager: self.scriptPluginManager,
                 onBreakpointHit: self.onBreakpointHit,
@@ -828,9 +878,13 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
             configuration: configuration,
             originalHead: head,
             requestData: requestData,
-            fallbackScheme: "https",
+            fallbackScheme: scheme,
             fallbackHost: host,
             fallbackPort: port
+        )
+        let callback = ProxyHandlerShared.makeMapRemoteProvenanceCallback(
+            originalURL: requestData.url,
+            downstream: callback
         )
         let remoteHost = rewrite.upstreamHost
         let remotePort = rewrite.upstreamPort
@@ -847,7 +901,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
             let connectTime = DispatchTime.now()
             do {
                 let clientTLSConfig = try Self.makeClientTLSConfiguration(
-                    clientIdentity: customCertificateManager.clientIdentity(for: remoteHost)
+                    clientIdentity: customCertificateManager.clientIdentity(for: remoteHost),
+                    acceptsUntrustedCertificates: upstreamTrustProvider()
                 )
                 let sslContext = try NIOSSLContext(configuration: clientTLSConfig)
 
@@ -1023,8 +1078,8 @@ final class HTTPSProxyRelayHandler: ChannelInboundHandler, RemovableChannelHandl
             return
         }
 
-        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: "https")
-        let urlString = "https://\(authority)\(head.uri)"
+        let authority = ProxyHandlerShared.authority(host: host, port: port, scheme: scheme)
+        let urlString = "\(scheme)://\(authority)\(head.uri)"
         let bodyProjection = BreakpointRequestData.editableBodyProjection(from: requestData.body)
         let breakpointData = BreakpointRequestData(
             method: head.method.rawValue,

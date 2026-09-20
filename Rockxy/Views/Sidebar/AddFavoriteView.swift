@@ -292,12 +292,20 @@ struct AddFavoriteView: View {
         guard let item = selectedItem else {
             return
         }
-        switch item {
+        let favorite: SidebarItem = switch item {
         case let .app(name):
-            coordinator.addFavorite(.app(name: name, bundleId: nil))
+            .app(name: name, bundleId: nil)
         case let .domain(domain):
-            coordinator.addFavorite(.domainNode(domain: domain))
+            .domainNode(domain: domain)
         }
+        coordinator.addFavorite(favorite)
+        // Favorites live in the Library navigator. Reveal the new entry there and select it so
+        // adding from Browse or Focus mode has a visible result instead of a silent dismissal.
+        guard coordinator.favorites.contains(favorite) else {
+            return
+        }
+        coordinator.focusNavigatorMode = .library
+        coordinator.selectSidebarItem(favorite)
     }
 
     private func buildAppCandidates() -> [AppCandidate] {

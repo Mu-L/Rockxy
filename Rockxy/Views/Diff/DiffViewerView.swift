@@ -206,11 +206,11 @@ struct DiffViewerView: View {
                         let rows = DiffResult.sideBySideRows(from: section.lines)
                         ForEach(rows) { row in
                             HStack(spacing: 0) {
-                                sideBySideCell(row.left)
+                                sideBySideCell(row.left, side: .left)
                                     .frame(width: paneWidth, alignment: .leading)
                                     .clipped()
                                 Divider()
-                                sideBySideCell(row.right)
+                                sideBySideCell(row.right, side: .right)
                                     .frame(width: paneWidth, alignment: .leading)
                                     .clipped()
                             }
@@ -222,11 +222,20 @@ struct DiffViewerView: View {
         }
     }
 
+    private enum DiffSide {
+        case left
+        case right
+    }
+
     @ViewBuilder
-    private func sideBySideCell(_ line: DiffLine?) -> some View {
+    private func sideBySideCell(_ line: DiffLine?, side: DiffSide) -> some View {
         if let line {
-            diffLineRow(line, allowsHorizontalOverflow: false)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            diffLineRow(
+                line,
+                allowsHorizontalOverflow: false,
+                numbers: [side == .left ? line.oldLineNumber : line.newLineNumber]
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Color.clear
                 .frame(maxWidth: .infinity)
@@ -243,7 +252,11 @@ struct DiffViewerView: View {
                     ForEach(result.sections) { section in
                         sectionHeader(section.title)
                         ForEach(section.lines) { line in
-                            diffLineRow(line, allowsHorizontalOverflow: true)
+                            diffLineRow(
+                                line,
+                                allowsHorizontalOverflow: true,
+                                numbers: [line.oldLineNumber, line.newLineNumber]
+                            )
                         }
                     }
                 }
@@ -264,13 +277,22 @@ struct DiffViewerView: View {
             .background(.quaternary.opacity(0.2))
     }
 
-    private func diffLineRow(_ line: DiffLine, allowsHorizontalOverflow: Bool) -> some View {
+    /// `numbers` carries the gutter columns: one per-side number in side-by-side mode, the
+    /// old and new numbers in unified mode. A nil entry renders as an empty gutter cell so
+    /// added/removed lines keep their columns aligned.
+    private func diffLineRow(
+        _ line: DiffLine,
+        allowsHorizontalOverflow: Bool,
+        numbers: [Int?]
+    ) -> some View {
         HStack(spacing: 0) {
-            Text("\(line.lineNumber)")
-                .font(toolMetrics.metadataFont(monospaced: true))
-                .foregroundStyle(.tertiary)
-                .frame(width: toolMetrics.fieldWidth(36), alignment: .trailing)
-                .padding(.trailing, 4)
+            ForEach(Array(numbers.enumerated()), id: \.offset) { _, number in
+                Text(number.map { "\($0)" } ?? "")
+                    .font(toolMetrics.metadataFont(monospaced: true))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: toolMetrics.fieldWidth(36), alignment: .trailing)
+                    .padding(.trailing, 4)
+            }
 
             Text(prefix(for: line.type))
                 .font(toolMetrics.secondaryFont(monospaced: true))

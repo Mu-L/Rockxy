@@ -36,6 +36,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         breakpointPhase: BreakpointRulePhase? = nil,
         breakpointRuleName: String? = nil,
         headerResponseOperations: [HeaderOperation]? = nil,
+        disablesResponseCaching: Bool = false,
         networkConditionProfile: NetworkConditionProfile? = nil,
         scriptPluginManager: ScriptPluginManager? = nil,
         onBreakpointHit: (@Sendable (BreakpointRequestData) async -> (BreakpointDecision, BreakpointRequestData))? =
@@ -45,6 +46,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         onChannelClosed: @escaping @Sendable () -> Void = {}
     ) {
         self.requestData = requestData
+        self.disablesResponseCaching = disablesResponseCaching
         self.graphQLInfo = graphQLInfo
         self.startTime = startTime
         self.connectTime = connectTime
@@ -179,7 +181,36 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         completed = true
         if responseHead != nil {
             buildAndCompleteTransaction()
+        } else {
+            failClientBeforeResponse(reason: "Upstream closed the connection before responding")
         }
+    }
+
+    /// The upstream went away (TLS handshake rejected, connection reset, server closed early)
+    /// before a single response byte arrived. Without this the client would sit on an open
+    /// socket until its own timeout and the request would never appear in the list.
+    nonisolated private func failClientBeforeResponse(reason: String) {
+        upstreamLogger.warning("Upstream failed before responding for \(self.requestData.url): \(reason)")
+        if clientContext.channel.isActive {
+            var head = HTTPResponseHead(version: .http1_1, status: .badGateway)
+            head.headers.add(name: "Connection", value: "close")
+            head.headers.add(name: "Content-Length", value: "0")
+            clientContext.write(NIOAny(HTTPServerResponsePart.head(head)), promise: nil)
+            clientContext.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil))).whenComplete { [clientContext] _ in
+                clientContext.close(promise: nil)
+            }
+        }
+
+        let transaction = HTTPTransaction(
+            request: requestData,
+            response: HTTPResponseData(statusCode: 502, statusMessage: reason, headers: []),
+            state: .failed
+        )
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds &- startTime.uptimeNanoseconds
+        transaction.measuredDuration = Double(elapsedNanoseconds) / 1_000_000_000
+        transaction.sourcePort = sourcePort
+        transaction.clientApp = Self.extractAppFromUserAgent(requestData.headers)
+        onTransactionComplete(transaction)
     }
 
     nonisolated func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -198,6 +229,11 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             // Apply response header modifications, but skip WebSocket upgrades
             if !isWebSocketUpgrade, let ops = headerResponseOperations, !ops.isEmpty {
                 HeaderMutator.apply(ops, to: &modifiedHead.headers)
+            }
+            // No Caching was decided when the request was forwarded, so the response is
+            // marked uncacheable for the client exactly when its request was made fresh.
+            if !isWebSocketUpgrade, disablesResponseCaching {
+                NoCacheHeaderMutator.applyToResponse(&modifiedHead.headers)
             }
 
             responseHead = modifiedHead
@@ -325,6 +361,9 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             completed = true
             relayResponseEnd()
             buildAndCompleteTransaction()
+        } else if !completed, !Self.isUncleanTLSShutdown(error) {
+            completed = true
+            failClientBeforeResponse(reason: Self.upstreamFailureReason(for: error))
         }
         if Self.isUncleanTLSShutdown(error) {
             upstreamLogger.debug(
@@ -334,6 +373,23 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
             upstreamLogger.debug("Upstream closed: \(error.localizedDescription)")
         }
         context.close(promise: nil)
+    }
+
+    /// A short, user-facing reason for the failed row. Certificate problems are the case a
+    /// developer most needs to recognise, so they get a dedicated message.
+    nonisolated static func upstreamFailureReason(for error: Error) -> String {
+        if let sslError = error as? NIOSSLError {
+            switch sslError {
+            case .handshakeFailed:
+                return "Upstream TLS handshake failed (certificate rejected)"
+            default:
+                return "Upstream TLS error"
+            }
+        }
+        if error is NIOSSLExtraError {
+            return "Upstream TLS handshake failed (certificate rejected)"
+        }
+        return "Upstream connection failed before responding"
     }
 
     // MARK: Private
@@ -349,6 +405,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
     private let breakpointPhase: BreakpointRulePhase?
     private let breakpointRuleName: String?
     private let headerResponseOperations: [HeaderOperation]?
+    private let disablesResponseCaching: Bool
     private let networkConditionProfile: NetworkConditionProfile?
     private let scriptPluginManager: ScriptPluginManager?
     private let hasResponseScript: Bool
@@ -590,16 +647,21 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         } else {
             nil
         }
-        let bodyProjection = BreakpointRequestData.editableBodyProjection(from: bodyData)
+        // Compressed origin bodies are decoded for the editor; the editable headers then
+        // describe the plain body so an executed edit is relayed with consistent framing.
+        let projection = BreakpointRequestData.editableResponseProjection(
+            body: bodyData,
+            headers: responseHeaders
+        )
 
         let breakpointData = BreakpointRequestData(
             method: requestData.method,
             url: requestData.url.absoluteString,
-            headers: responseHeaders,
-            body: bodyProjection.text,
+            headers: projection.headers,
+            body: projection.text,
             statusCode: Int(head.status.code),
             phase: .response,
-            isBodyEditable: bodyProjection.isEditable,
+            isBodyEditable: projection.isEditable,
             matchedRuleName: breakpointRuleName
         )
 

@@ -22,7 +22,7 @@ enum X402Detector {
         let hasPaymentProof = requestHeaders.contains("x-payment")
             || requestHeaders.contains("authorization")
         let hasPaymentResponse = responseHeaders.contains("x-payment-response")
-        let bodySummary = summarizeBody(response?.body)
+        let bodySummary = summarizeBody(response?.decodedBody(limit: maxPayloadBytes))
         let isStatus402 = responseStatus == 402
         let isX402Like = bodySummary.isX402Like
             || requestHeaders.contains("x-payment")

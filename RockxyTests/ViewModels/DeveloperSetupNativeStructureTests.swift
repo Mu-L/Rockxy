@@ -8,6 +8,17 @@ import Testing
 struct DeveloperSetupNativeStructureTests {
     // MARK: Internal
 
+    @Test("Device Endpoint shows host and port, never the bare LAN address")
+    func deviceEndpointShowsHostAndPort() throws {
+        let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupWindowView.swift")
+        let start = try #require(source.range(of: "private var deviceProxyHostText: String {"))
+        let end = try #require(source.range(of: "private var deviceProxyCaption: String {"))
+        let body = source[start.lowerBound ..< end.lowerBound]
+
+        #expect(body.contains(#""\(host):\(String(viewModel.snapshot.activePort))""#))
+        #expect(!body.contains("viewModel.snapshot.reachableLANAddress ?? String(localized: \"Unavailable\""))
+    }
+
     @Test("Hub uses native adaptive split structure, not a fixed dashboard shell")
     func hubUsesNativeAdaptiveStructure() throws {
         let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupWindowView.swift")
@@ -43,6 +54,11 @@ struct DeveloperSetupNativeStructureTests {
         #expect(source.contains("LazyVGrid") == false)
         #expect(source.contains("bottomStatusText") == false)
         #expect(source.contains("inspectorPresented = false"))
+        // The detail column must resolve against the split view's offered size. When it was a
+        // plain stack, the window adopted the scroll content's natural height and the sidebar
+        // search field and first targets were pushed under the title bar at 1000x640.
+        #expect(source.contains("GeometryReader { proxy in"))
+        #expect(source.contains(".frame(width: proxy.size.width, height: proxy.size.height)"))
 
         // Toolbar owns a single Set Up menu with the guide/terminal actions; the
         // old Copy + Start Capture Check toolbar buttons are gone.
