@@ -266,7 +266,7 @@ actor RootCADownloadServer {
 
     // MARK: Private
 
-    private var lifecycleGeneration = 0
+    private(set) var lifecycleGeneration = 0
     private var eventLoopGroup: MultiThreadedEventLoopGroup?
     private var serverChannel: Channel?
 

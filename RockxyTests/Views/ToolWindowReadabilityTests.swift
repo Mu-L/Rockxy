@@ -1356,6 +1356,7 @@ struct ToolWindowReadabilityTests {
 
     private enum ResolveError: Error, CustomStringConvertible {
         case rootNotFound(filePath: String)
+        case relativePathNotFound(filePath: String)
 
         // MARK: Internal
 
@@ -1363,6 +1364,8 @@ struct ToolWindowReadabilityTests {
             switch self {
             case let .rootNotFound(filePath):
                 "Could not locate RockxyTests directory from \(filePath)"
+            case let .relativePathNotFound(filePath):
+                "Could not locate the project-relative source path in \(filePath)"
             }
         }
     }
@@ -1374,7 +1377,7 @@ struct ToolWindowReadabilityTests {
     }
 
     private func projectSwiftFiles(under relativePath: String) throws -> [String] {
-        let root = try resolveProjectRoot()
+        let root = try resolveProjectRoot().resolvingSymlinksInPath()
         let url = root.appendingPathComponent(relativePath)
         let enumerator = FileManager.default.enumerator(
             at: url,
@@ -1386,8 +1389,11 @@ struct ToolWindowReadabilityTests {
             guard fileURL.pathExtension == "swift" else {
                 continue
             }
-            let relative = fileURL.path.replacingOccurrences(of: root.path + "/", with: "")
-            files.append(relative)
+            let marker = "/\(relativePath)/"
+            guard let range = fileURL.path.range(of: marker, options: .backwards) else {
+                throw ResolveError.relativePathNotFound(filePath: fileURL.path)
+            }
+            files.append(String(fileURL.path[range.lowerBound...].dropFirst()))
         }
         return files.sorted()
     }

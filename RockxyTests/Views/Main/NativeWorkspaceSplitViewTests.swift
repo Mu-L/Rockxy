@@ -710,14 +710,16 @@ struct NativeWorkspaceSplitViewTests {
         let transaction = TestFixtures.makeTransaction()
         coordinator.selectedTransaction = transaction
         coordinator.selectedTransactionIDs = [transaction.id]
+        coordinator.setBottomInspectorVisible(true)
         let bottomItem = try #require(toolbar.managedToolbar.items.first {
             $0.itemIdentifier == NativeWorkspaceToolbar.bottomInspectorIdentifier
         })
-        for _ in 0 ..< 6 where !bottomItem.isEnabled {
+        let expectedBottomToolTip = String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle)
+        for _ in 0 ..< 6 where !bottomItem.isEnabled || bottomItem.toolTip != expectedBottomToolTip {
             await Task.yield()
         }
         #expect(bottomItem.isEnabled)
-        #expect(bottomItem.toolTip == String(localized: "Hide Bottom Inspector", bundle: RockxyLocalization.bundle))
+        #expect(bottomItem.toolTip == expectedBottomToolTip)
 
         let contextItem = try #require(toolbar.managedToolbar.items.first {
             $0.itemIdentifier == NativeWorkspaceToolbar.contextDockIdentifier
