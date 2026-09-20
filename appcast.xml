@@ -6,24 +6,26 @@
     <description>Rockxy release channel</description>
     <language>en</language>
     <item>
-      <title>Version 0.38.3 (build 58)</title>
-      <pubDate>Fri, 11 Sep 2026 00:00:00 +0000</pubDate>
-      <rockxy:releaseDate>2026-09-11T00:00:00Z</rockxy:releaseDate>
+      <title>Version 0.38.4 (build 59)</title>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 +0000</pubDate>
+      <rockxy:releaseDate>2026-09-14T00:00:00Z</rockxy:releaseDate>
       <enclosure
-        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.38.3/Rockxy-0.38.3-58.dmg"
-        sparkle:version="58"
-        sparkle:shortVersionString="0.38.3"
-        sparkle:edSignature="RtSQEZpiBsXKDbEaLyGTEi2f91IyqD1nDdwk12rk6e85wEQO3nq2bANNOt9wpgKCJ9CXteBt5Um8nEUcPHQ0Dg=="
-        length="39461745"
+        url="https://github.com/RockxyApp/Rockxy/releases/download/v0.38.4/Rockxy-0.38.4-59.dmg"
+        sparkle:version="59"
+        sparkle:shortVersionString="0.38.4"
+        sparkle:edSignature="NRfleZPttCUBYMFl2hj+6Awv0Af8AO//0TS54z2siHJDGqnzPnIRKLnCCNPFyL2jMB7UPPCY0uIA38WsFHMuAw=="
+        length="39601150"
         type="application/octet-stream" />
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.38.3</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/RockxyApp/Rockxy/releases/tag/v0.38.4</sparkle:releaseNotesLink>
       <description><![CDATA[
 <h3>Fixed</h3>
 <ul>
-  <li>Preserved existing macOS helper approval across compatible Rockxy updates, avoiding another approval prompt after the app is replaced.</li>
-  <li>Retained trusted helper connections across app bundle updates and safely waited for older helper processes to finish before using the refreshed helper.</li>
-  <li>Kept unrelated startup services responsive during helper recovery and added bounded retries for temporary connection interruptions.</li>
+  <li>Made HTTPS decryption recover reliably after certificate rejection, trust changes, certificate rotation, and app relaunch.</li>
+  <li>Kept recovery scoped to the affected app and connection, preventing one client&#x27;s TLS fallback from disrupting other traffic.</li>
+  <li>Preserved tunnel data during HTTPS recovery so requests can continue without dropped bytes.</li>
+  <li>Improved first-use capture and proxy recovery when certificate trust or system proxy setup is incomplete.</li>
+  <li>Preserved WebSocket sessions after reload, including handshakes with no captured frames, so they are not mistaken for ordinary HTTP requests.</li>
 </ul>
       ]]></description>
     </item>

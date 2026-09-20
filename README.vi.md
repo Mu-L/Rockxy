@@ -63,13 +63,15 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.38.3** — 2026-09-11
+**v0.38.4** — 2026-09-14
 
 ### Fixed
 
-- Preserved existing macOS helper approval across compatible Rockxy updates, avoiding another approval prompt after the app is replaced.
-- Retained trusted helper connections across app bundle updates and safely waited for older helper processes to finish before using the refreshed helper.
-- Kept unrelated startup services responsive during helper recovery and added bounded retries for temporary connection interruptions.
+- Made HTTPS decryption recover reliably after certificate rejection, trust changes, certificate rotation, and app relaunch.
+- Kept recovery scoped to the affected app and connection, preventing one client's TLS fallback from disrupting other traffic.
+- Preserved tunnel data during HTTPS recovery so requests can continue without dropped bytes.
+- Improved first-use capture and proxy recovery when certificate trust or system proxy setup is incomplete.
+- Preserved WebSocket sessions after reload, including handshakes with no captured frames, so they are not mistaken for ordinary HTTP requests.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
