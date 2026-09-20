@@ -276,13 +276,14 @@ struct TrafficInsightsViewModelTests {
 
         coordinator.toggleTrafficInsights()
         #expect(coordinator.activeMainTab == .traffic)
-        #expect(coordinator.sidebarSelection == nil)
+        #expect(coordinator.sidebarSelection == .allApps)
 
         coordinator.toggleTrafficInsights()
         #expect(coordinator.activeMainTab == .insights)
 
         coordinator.hideTrafficInsights()
         #expect(coordinator.activeMainTab == .traffic)
+        #expect(coordinator.sidebarSelection == .allApps)
         coordinator.hideTrafficInsights()
         #expect(coordinator.activeMainTab == .traffic)
     }

@@ -65,7 +65,7 @@ final class WorkspaceState: Identifiable {
 
     // Navigation
     var activeMainTab: MainTab = .traffic
-    var sidebarSelection: SidebarItem?
+    var sidebarSelection: SidebarItem? = .allApps
     var inspectorTab: InspectorTab = .headers
     var inspectorLayout: InspectorLayout
     var isContextDockVisible: Bool

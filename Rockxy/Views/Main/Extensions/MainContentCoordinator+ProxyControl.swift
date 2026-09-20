@@ -979,7 +979,11 @@ extension MainContentCoordinator {
             }
 
             recordTrafficMetrics(for: projectBatch)
-            recomputeErrorCount()
+            if evictionCount > 0 {
+                recomputeErrorCount()
+            } else {
+                errorCount += projectBatch.count { ($0.response?.statusCode ?? 0) >= 400 }
+            }
             followLatestVisibleTransaction(from: projectBatch)
             headerColumnStore.updateDiscoveredHeaders(fromBatch: projectBatch)
         }
@@ -996,10 +1000,7 @@ extension MainContentCoordinator {
             enrichedTransactions.map { ($0.id, $0) },
             uniquingKeysWith: { _, latest in latest }
         )
-        let enrichedIDs = Set(enrichedByID.keys)
-        for transaction in enrichedTransactions {
-            moveObservedDomainFromUnknown(for: transaction)
-        }
+        moveObservedDomainsFromUnknown(for: enrichedTransactions)
 
         for workspace in workspaceStore.workspaces {
             updateAppGroupingForEnrichedTransactions(enrichedTransactions, in: workspace)
@@ -1009,13 +1010,13 @@ extension MainContentCoordinator {
                 recomputeFilteredTransactions(for: workspace)
             } else {
                 var didUpdateRows = false
-                for index in workspace.filteredRows.indices
-                    where enrichedIDs.contains(workspace.filteredRows[index].id)
-                {
-                    guard let transaction = enrichedByID[workspace.filteredRows[index].id] else {
+                for (id, transaction) in enrichedByID {
+                    guard let entry = workspace.trafficSelectionIndex[id],
+                          workspace.filteredRows.indices.contains(entry.rowIndex),
+                          workspace.filteredRows[entry.rowIndex].id == id else {
                         continue
                     }
-                    workspace.filteredRows[index] = RequestListRow(
+                    workspace.filteredRows[entry.rowIndex] = RequestListRow(
                         from: transaction,
                         sslState: sslState(for: transaction)
                     )

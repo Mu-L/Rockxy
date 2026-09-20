@@ -50,13 +50,13 @@ extension MainContentCoordinator {
         selectSidebarItem(.insights)
     }
 
-    /// Returns to the request list. The sidebar scope was already cleared when Insights was
-    /// selected, so "All Traffic" is the honest destination.
+    /// Returns to the request list with the Apps overview selected. Insights already cleared
+    /// any app or domain scope, so this still shows every request in the Traffic Tab.
     func hideTrafficInsights() {
         guard activeMainTab == .insights else {
             return
         }
-        selectSidebarItem(nil)
+        selectSidebarItem(.allApps)
     }
 
     func toggleTrafficInsights() {
