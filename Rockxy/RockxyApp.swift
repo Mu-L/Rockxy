@@ -603,6 +603,7 @@ private struct MainWindowContent: View {
                 set: { lifecycleState.showWelcome = $0 }
             )) {
                 WelcomeView(isFirstLaunch: true, onComplete: { lifecycleState.showWelcome = false },
+                            onClose: { lifecycleState.showWelcome = false },
                             onEnableSystemProxy: { try await coordinator.enableSystemProxyFromWelcome() })
             }
             .sheet(isPresented: Binding(
@@ -616,6 +617,12 @@ private struct MainWindowContent: View {
                     return
                 }
                 setupChecked = true
+
+                // Present onboarding before asynchronous setup checks. Otherwise closing the
+                // sheet during a check can be undone when that check finishes.
+                if showWelcomeOnLaunch {
+                    lifecycleState.showWelcome = true
+                }
 
                 // Migration backfill: if all setup steps are already satisfied, mark onboarding complete
                 if !onboardingCompletedOnce {
@@ -632,9 +639,6 @@ private struct MainWindowContent: View {
                 // "Show on startup" is an explicit opt-out that must win even while setup is
                 // incomplete: a device-only workflow may never enable the system proxy, and the
                 // sheet stays reachable from Help > Welcome to Rockxy.
-                if showWelcomeOnLaunch {
-                    lifecycleState.showWelcome = true
-                }
             }
     }
 

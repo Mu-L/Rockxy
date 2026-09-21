@@ -25,6 +25,7 @@ struct WelcomeView: View {
 
     var isFirstLaunch = false
     var onComplete: (() -> Void)?
+    var onClose: (() -> Void)?
     var onEnableSystemProxy: (@MainActor () async throws -> Void)?
 
     var body: some View {
@@ -36,7 +37,7 @@ struct WelcomeView: View {
             footerSection
         }
         .frame(width: windowWidth, height: windowHeight)
-        .interactiveDismissDisabled(viewModel.isBusy)
+        .interactiveDismissDisabled(viewModel.isPerformingAction)
         .task {
             await viewModel.loadInitialStatus()
         }
@@ -385,12 +386,16 @@ struct WelcomeView: View {
             Button(String(localized: "Close", bundle: RockxyLocalization.bundle), role: .cancel) {
                 // Dismissing setup is not completing it. Keep the readiness milestones and
                 // onboarding preference intact so incomplete setup remains discoverable.
-                dismiss()
+                if let onClose {
+                    onClose()
+                } else {
+                    dismiss()
+                }
             }
             .rockxyGlassButtonStyle()
             .controlSize(.large)
             .keyboardShortcut(.cancelAction)
-            .disabled(viewModel.isBusy)
+            .disabled(viewModel.isPerformingAction)
 
             if viewModel.canGetStarted {
                 Button(String(localized: "Debug My App…", bundle: RockxyLocalization.bundle)) {
