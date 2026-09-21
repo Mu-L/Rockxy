@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="macOS에서 실행 중인 Rockxy" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -291,17 +295,24 @@ Python, Node.js, Go, Rust, cURL, Docker 및 브라우저용 프록시 스니펫�
 
 Rockxy는 일반 HTTP debugging workflow 안에서 AI, Web3 RPC, x402 protocol-aware inspection을 제공합니다.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### AI 트래픽 검사
 
 Rockxy는 일반 capture workflow 안에서 인식된 AI request를 감지합니다. 선택한 model call, streaming state, 존재할 때의 usage 필드, warning, retrieval hint, tool-call summary를 민감한 payload를 다른 서비스에 붙여넣지 않고 검사합니다.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Web3/RPC 검사
 
 Rockxy는 블록체인 시대의 네트워크 호출을 읽기 쉬운 디버깅 증거로 바꿉니다. EVM 및 Solana 스타일 HTTP JSON-RPC traffic을 provider host, request ID, method, batch summary, error, chain, transaction, payload, debug-intent detail과 함께 inspect하되 Rockxy를 wallet이나 block explorer로 만들지 않습니다.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### x402 Payment Flow Hints
 

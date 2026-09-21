@@ -77,6 +77,11 @@
   </a>
 </p>
 
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
+
 ---
 
 <!-- BEGIN GENERATED: latest-release -->
@@ -310,15 +315,24 @@ JS hooks on requests and responses for the cases a static rule can't cover — r
 
 Rockxy ships protocol-aware AI, Web3 RPC, and x402 inspection inside the normal HTTP debugging workflow.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### AI Traffic Inspection
 
 Rockxy detects recognized AI requests inside the normal capture workflow. Inspect selected model calls, streaming state, usage fields when present, warnings, retrieval hints, and tool-call summaries without pasting sensitive payloads into another service.
+
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
 
 ### Web3/RPC Inspection
 
 Rockxy turns blockchain-era network calls into readable debugging evidence. Inspect EVM and Solana-style HTTP JSON-RPC traffic with provider host, request ID, method, batch summary, error, chain, transaction, payload, and debug-intent details without turning Rockxy into a wallet or block explorer.
+
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
 

@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy running on macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -291,17 +295,24 @@ Python, Node.js, Go, Rust, cURL, Docker এবং ব্রাউজারগু
 
 Rockxy সাধারণ HTTP debugging workflow-এর মধ্যে protocol-aware AI, Web3 RPC ও x402 inspection দেয়।
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### এআই ট্রাফিক পরিদর্শন
 
 Rockxy সাধারণ ক্যাপচার ওয়ার্কফ্লোর মধ্যে স্বীকৃত AI অনুরোধ সনাক্ত করে। নির্বাচিত মডেল কল, streaming অবস্থা, উপস্থিত থাকলে usage ফিল্ড, সতর্কতা, retrieval hints এবং tool-call সারাংশ সংবেদনশীল payload অন্য পরিষেবাতে পেস্ট না করে পরিদর্শন করুন।
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Web3/RPC পরিদর্শন
 
 Rockxy ব্লকচেইন-যুগের নেটওয়ার্ক কলকে পাঠযোগ্য ডিবাগিং প্রমাণে রূপান্তরিত করে। EVM ও Solana-style HTTP JSON-RPC traffic provider host, request ID, method, batch summary, error, chain, transaction, payload ও debug-intent detailসহ inspect করুন, Rockxy-কে wallet বা block explorer না বানিয়ে।
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### x402 পেমেন্ট ফ্লো হিন্ট
 

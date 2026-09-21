@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy running on macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -291,17 +295,24 @@ JS перехватывает запросы и ответы в тех случ�
 
 Rockxy предоставляет protocol-aware inspection для AI, Web3 RPC и x402 в обычном workflow отладки HTTP.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### Инспекция AI-трафика
 
 Rockxy обнаруживает распознанные запросы AI в рамках обычного workflow захвата. Проверяйте выбранные вызовы моделей, потоковое состояние, поля usage при их наличии, предупреждения, retrieval hints и сводки tool-call, не вставляя конфиденциальные payload в другой сервис.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Проверка Web3/RPC
 
 Rockxy превращает сетевые вызовы эпохи блокчейна в читаемые доказательства отладки. Проверяйте трафик HTTP JSON-RPC в стиле EVM и Solana с provider host, request ID, method, batch summary, error, chain, transaction, payload и debug-intent, не превращая Rockxy в кошелёк или обозреватель блоков.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### Подсказки потока платежей x402
 
