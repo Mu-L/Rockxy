@@ -67,15 +67,32 @@
 <!-- BEGIN GENERATED: latest-release -->
 ## Latest Tagged Release
 
-**v0.38.4** — 2026-09-14
+**v0.39.0** — 2026-09-21
+
+### Added
+
+- Explore live Traffic Insights with findings, trends, protocol and outcome breakdowns, top apps and hosts, request handoffs, and Markdown export.
+- Keep separate local Projects with their own traffic history, layouts, and filters; import or export project configuration when moving between Macs.
+- Choose which apps and hosts Rockxy decrypts or tunnels, and receive nearby iPhone captures in a separate workspace.
+- Identify AI, Web3, x402, gRPC, GraphQL, and WebSocket traffic more quickly with protocol labels, filters, and focused inspection.
+- Build advanced filters, route through an upstream proxy, and inspect WebSocket Protobuf payloads without uploading schemas.
+- Import cURL into Compose and copy requests as Swift, Python, JavaScript, or Go code.
+- Opt in to untrusted upstream certificates for development servers and restart the proxy after listener-setting changes.
 
 ### Fixed
 
-- Made HTTPS decryption recover reliably after certificate rejection, trust changes, certificate rotation, and app relaunch.
-- Kept recovery scoped to the affected app and connection, preventing one client's TLS fallback from disrupting other traffic.
-- Preserved tunnel data during HTTPS recovery so requests can continue without dropped bytes.
-- Improved first-use capture and proxy recovery when certificate trust or system proxy setup is incomplete.
-- Preserved WebSocket sessions after reload, including handshakes with no captured frames, so they are not mistaken for ordinary HTTP requests.
+- Made capture startup, stop, helper recovery, and system-proxy restoration more reliable when macOS responds late or a helper is unavailable.
+- Restored plain HTTP replay, recorded repeated requests in the traffic list, and removed stale transport headers when replaying to another host.
+- Decoded compressed responses across rules, scripts, Diff, HAR export, and inspection; redacted or omitted sensitive encoded content before sharing.
+- Kept WebSocket sessions and frames visible while connected, fixed plain `ws://` routing, and kept the inspector usable in short panes.
+- Returned a clear failure when an upstream connection dies and rejected requests that would loop back into Rockxy's own proxy.
+- Fixed Developer Setup layout and device endpoint guidance, rule editing, no-cache behavior, and client-app attribution for locally served responses.
+- Kept the MCP setup screen free of personal filesystem paths while preserving a working copied client configuration.
+- Improved Diff line alignment, sidebar navigation, keyboard commands, and Welcome startup behavior.
+
+### Changed
+
+- Moved Clear Session and Follow Live into a traffic command bar, and reduced request-list work during capture.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 <!-- END GENERATED: latest-release -->
