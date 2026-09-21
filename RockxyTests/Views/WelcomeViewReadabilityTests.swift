@@ -59,6 +59,7 @@ struct WelcomeViewReadabilityTests {
         let app = try readProjectFile("Rockxy/RockxyApp.swift")
 
         #expect(app.contains("onEnableSystemProxy:"))
+        #expect(app.contains("onClose: { lifecycleState.showWelcome = false }"))
         #expect(app.contains("try await coordinator.enableSystemProxyFromWelcome()"))
         #expect(app.contains("let certInstalled = await CertificateManager.shared.isRootCAInstalled()"))
         #expect(app.contains("let helperOK = HelperManager.shared.status == .installedCompatible"))
@@ -73,6 +74,9 @@ struct WelcomeViewReadabilityTests {
 
         #expect(view.contains("Toggle(isOn: $showWelcomeOnLaunch)"))
         #expect(app.contains("if showWelcomeOnLaunch {\n                    lifecycleState.showWelcome = true"))
+        let welcomePresentation = try #require(app.range(of: "if showWelcomeOnLaunch {\n                    lifecycleState.showWelcome = true"))
+        let setupChecks = try #require(app.range(of: "if !onboardingCompletedOnce {"))
+        #expect(welcomePresentation.lowerBound < setupChecks.lowerBound)
         #expect(!app.contains("if !onboardingCompletedOnce {\n                    lifecycleState.showWelcome = true"))
         // The sheet stays reachable from the Help menu once the user opts out.
         #expect(app.contains("Button(String(localized: \"Getting Started…\", bundle: RockxyLocalization.bundle))"))
