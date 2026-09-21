@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy running on macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -274,17 +278,24 @@ JS, statik bir kuralın kapsayamayacağı durumlar için istek ve yanıtlara ba�
 
 Rockxy normal HTTP debugging workflow içinde AI, Web3 RPC ve x402 için protocol-aware inspection sunar.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### Yapay Zeka Trafik Denetimi
 
 Rockxy normal yakalama iş akışı içinde tanınan AI isteklerini algılar. Seçilen model çağrılarını, streaming durumunu, mevcut olduğunda usage alanlarını, uyarıları, retrieval hint'lerini ve tool-call özetlerini hassas payload'ları başka bir hizmete yapıştırmadan inceleyin.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Web3/RPC Denetimi
 
 Rockxy blockchain çağındaki ağ çağrılarını okunabilir hata ayıklama kanıtına dönüştürür. EVM ve Solana tarzı HTTP JSON-RPC trafiğini provider host, request ID, method, batch summary, error, chain, transaction, payload ve debug-intent detayıyla inceleyin; Rockxy'yi bir cüzdana veya blok gezginine dönüştürmeden.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### x402 Ödeme Akışı İpuçları
 

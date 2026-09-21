@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy 在 macOS 上运行" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -274,17 +278,24 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 Rockxy 已在常规 HTTP 调试工作流中提供协议感知的 AI、Web3 RPC 与 x402 检查。
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### AI 流量检查
 
 Rockxy 在常规捕获工作流中识别 AI 请求。检查选中的模型调用、流式状态、可用的 usage 字段、警告、retrieval hint 和 tool-call 摘要，无需将敏感 payload 粘贴到其他服务。
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Web3/RPC 检查
 
 Rockxy 将区块链时代的网络调用变成可读调试证据。检查 EVM 与 Solana 风格的 HTTP JSON-RPC 流量，包括 provider host、request ID、method、batch 摘要、错误、chain、transaction、payload 和 debug intent，而不会把 Rockxy 变成钱包或 block explorer。
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### x402 支付流程提示
 

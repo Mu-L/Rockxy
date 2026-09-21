@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy running on macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -274,17 +278,24 @@ JS agăță solicitări și răspunsuri pentru cazurile pe care o regulă static
 
 Rockxy oferă inspecție conștientă de protocol pentru AI, Web3 RPC și x402 în workflow-ul normal de depanare HTTP.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### Inspecția de trafic AI
 
 Rockxy detectează solicitările AI recunoscute în cadrul fluxului de lucru normal de captare. Inspectați apelurile de model selectate, starea de streaming, câmpurile usage când sunt prezente, avertismentele, retrieval hints și rezumatele tool-call fără a lipi payload-uri sensibile într-un alt serviciu.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Inspecție Web3/RPC
 
 Rockxy transformă apelurile de rețea din era blockchain în dovezi de depanare lizibile. Inspectați traficul HTTP JSON-RPC în stil EVM și Solana cu provider host, request ID, method, batch summary, error, chain, transaction, payload și debug-intent, fără a transforma Rockxy într-un portofel sau explorator de blocuri.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### Indicii pentru fluxul de plăți x402
 
