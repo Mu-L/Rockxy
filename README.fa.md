@@ -59,6 +59,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy running on macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -276,17 +280,24 @@ JS روی درخواست‌ها و پاسخ‌ها برای مواردی که ی
 
 Rockxy بازرسی protocol-aware برای AI، Web3 RPC و x402 را در workflow معمول debugging HTTP ارائه می‌دهد.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### بازرسی ترافیک هوش مصنوعی
 
 Rockxy درخواست‌های AI شناخته‌شده را در گردش‌کار معمول capture شناسایی می‌کند. تماس‌های مدل انتخاب‌شده، وضعیت streaming، فیلدهای usage در صورت وجود، هشدارها، retrieval hints و خلاصه‌های tool-call را بدون چسباندن payloadهای حساس به سرویس دیگر بررسی کنید.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### بازرسی Web3/RPC
 
 Rockxy تماس‌های شبکه دوران بلاک‌چین را به شواهد اشکال‌زدایی قابل‌خواندن تبدیل می‌کند. ترافیک HTTP JSON-RPC به‌سبک EVM و Solana را با provider host، request ID، method، batch summary، error، chain، transaction، payload و debug-intent بررسی کنید، بدون تبدیل Rockxy به کیف پول یا کاوشگر بلاک.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### راهنمای جریان پرداخت x402
 

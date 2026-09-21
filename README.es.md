@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy ejecutándose en macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -274,17 +278,24 @@ Hooks JS en requests y responses para casos que una regla estática no cubre: re
 
 Rockxy ofrece inspección consciente del protocolo para AI, Web3 RPC y x402 dentro del workflow normal de depuración HTTP.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### AI Traffic Inspection
 
 Rockxy detecta requests AI reconocidas dentro del workflow normal de captura. Inspecciona model calls seleccionados, estado de streaming, campos de usage cuando están presentes, warnings, retrieval hints y resúmenes de tool-call sin pegar payloads sensibles en otro servicio.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Web3/RPC Inspection
 
 Rockxy convierte las llamadas de red de la era blockchain en evidencia de depuración legible. Inspecciona tráfico HTTP JSON-RPC estilo EVM y Solana con provider host, request ID, method, batch summary, error, chain, transaction, payload y debug intent, sin convertir Rockxy en wallet o block explorer.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### x402 Payment Flow Hints
 

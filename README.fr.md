@@ -57,6 +57,10 @@
     <img src="docs/images/Rockxy-Demo-Preview.png" alt="Rockxy en cours d'ex&eacute;cution sur macOS" width="800" />
   </a>
 </p>
+<p align="center">
+  <img src="docs/images/features/Rockxy-Light-0360.png" alt="Rockxy workspace in light appearance" width="49%" />
+  <img src="docs/images/features/Rockxy-Dark-0360.png" alt="Rockxy workspace in dark appearance" width="49%" />
+</p>
 
 ---
 
@@ -274,17 +278,24 @@ Hooks JS sur les requ&ecirc;tes et r&eacute;ponses pour les cas qu'une r&egrave;
 
 Rockxy fournit l'inspection protocol-aware IA, Web3 RPC et x402 dans le workflow normal de d&eacute;bogage HTTP.
 
+<p align="center">
+  <img src="docs/images/features/RockxyforAI-Light-0360.png" alt="Rockxy AI and Web3 traffic capture in light appearance" width="49%" />
+  <img src="docs/images/features/RockxyforAI-Dark-0360.png" alt="Rockxy AI and Web3 traffic capture in dark appearance" width="49%" />
+</p>
+
 ### Inspection du trafic IA
 
 Rockxy d&eacute;tecte les requ&ecirc;tes IA reconnues dans le workflow de capture normal. Inspectez les appels de mod&egrave;le s&eacute;lectionn&eacute;s, l'&eacute;tat streaming, les champs usage lorsqu'ils sont pr&eacute;sents, les avertissements, les retrieval hints et les r&eacute;sum&eacute;s de tool-calls sans coller de payloads sensibles dans un autre service.
 
 `AI Requests` · `Model Inspector` · `Streaming State` · `Tool Calls` · `Retrieval Hints` · `Usage Signals`
+<img src="docs/images/features/DemoAICapture-0360.png" alt="Rockxy inspecting an AI API streaming response with provider, model, tool events, timing, redacted authorization, and rate-limit context" width="820" />
 
 ### Inspection Web3/RPC
 
 Rockxy transforme les appels r&eacute;seau de l'&egrave;re blockchain en evidence de d&eacute;bogage lisible. Inspectez le trafic HTTP JSON-RPC de type EVM et Solana avec provider host, request ID, m&eacute;thode, r&eacute;sum&eacute; batch, erreur, chain, transaction, payload et debug intent, sans transformer Rockxy en wallet ou block explorer.
 
 `JSON-RPC` · `Solana RPC` · `Request ID` · `RPC Errors` · `Batch Summary` · `Network Evidence`
+<img src="docs/images/features/DemoWeb3Capture-0360.png" alt="Rockxy inspecting an Ethereum eth_getBalance Web3 request with chain context, request metadata, response details, timing, and rule impact" width="820" />
 
 ### Indices de flow de paiement x402
 
