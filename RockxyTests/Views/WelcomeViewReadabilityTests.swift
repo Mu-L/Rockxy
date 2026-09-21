@@ -35,7 +35,7 @@ struct WelcomeViewReadabilityTests {
         #expect(view.contains("localized: \"Checking system readiness\""))
         #expect(view.contains("ForEach(Array(steps.enumerated())"))
         #expect(view.contains("ViewThatFits(in: .horizontal)"))
-        #expect(view.contains(".interactiveDismissDisabled(viewModel.isBusy)"))
+        #expect(view.contains(".interactiveDismissDisabled(viewModel.isPerformingAction)"))
     }
 
     @Test("helper failures have a confirmed recovery path without changing the other steps")
@@ -85,9 +85,10 @@ struct WelcomeViewReadabilityTests {
         let end = try #require(view.range(of: "if viewModel.canGetStarted", range: start.upperBound ..< view.endIndex))
         let closeAction = String(view[start.lowerBound ..< end.lowerBound])
 
+        #expect(closeAction.contains("onClose()"))
         #expect(closeAction.contains("dismiss()"))
         #expect(closeAction.contains(".keyboardShortcut(.cancelAction)"))
-        #expect(closeAction.contains(".disabled(viewModel.isBusy)"))
+        #expect(closeAction.contains(".disabled(viewModel.isPerformingAction)"))
         #expect(!closeAction.contains("onboardingCompletedOnce ="))
         #expect(!closeAction.contains("finish("))
         #expect(!closeAction.contains("onComplete"))
