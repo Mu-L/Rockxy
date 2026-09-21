@@ -35,7 +35,7 @@ struct WelcomeViewReadabilityTests {
         #expect(view.contains("localized: \"Checking system readiness\""))
         #expect(view.contains("ForEach(Array(steps.enumerated())"))
         #expect(view.contains("ViewThatFits(in: .horizontal)"))
-        #expect(view.contains(".interactiveDismissDisabled(viewModel.isBusy)"))
+        #expect(view.contains(".interactiveDismissDisabled(viewModel.isPerformingAction)"))
     }
 
     @Test("helper failures have a confirmed recovery path without changing the other steps")
@@ -59,6 +59,7 @@ struct WelcomeViewReadabilityTests {
         let app = try readProjectFile("Rockxy/RockxyApp.swift")
 
         #expect(app.contains("onEnableSystemProxy:"))
+        #expect(app.contains("onClose: { lifecycleState.showWelcome = false }"))
         #expect(app.contains("try await coordinator.enableSystemProxyFromWelcome()"))
         #expect(app.contains("let certInstalled = await CertificateManager.shared.isRootCAInstalled()"))
         #expect(app.contains("let helperOK = HelperManager.shared.status == .installedCompatible"))
@@ -73,6 +74,9 @@ struct WelcomeViewReadabilityTests {
 
         #expect(view.contains("Toggle(isOn: $showWelcomeOnLaunch)"))
         #expect(app.contains("if showWelcomeOnLaunch {\n                    lifecycleState.showWelcome = true"))
+        let welcomePresentation = try #require(app.range(of: "if showWelcomeOnLaunch {\n                    lifecycleState.showWelcome = true"))
+        let setupChecks = try #require(app.range(of: "if !onboardingCompletedOnce {"))
+        #expect(welcomePresentation.lowerBound < setupChecks.lowerBound)
         #expect(!app.contains("if !onboardingCompletedOnce {\n                    lifecycleState.showWelcome = true"))
         // The sheet stays reachable from the Help menu once the user opts out.
         #expect(app.contains("Button(String(localized: \"Getting Started…\", bundle: RockxyLocalization.bundle))"))
@@ -85,9 +89,10 @@ struct WelcomeViewReadabilityTests {
         let end = try #require(view.range(of: "if viewModel.canGetStarted", range: start.upperBound ..< view.endIndex))
         let closeAction = String(view[start.lowerBound ..< end.lowerBound])
 
+        #expect(closeAction.contains("onClose()"))
         #expect(closeAction.contains("dismiss()"))
         #expect(closeAction.contains(".keyboardShortcut(.cancelAction)"))
-        #expect(closeAction.contains(".disabled(viewModel.isBusy)"))
+        #expect(closeAction.contains(".disabled(viewModel.isPerformingAction)"))
         #expect(!closeAction.contains("onboardingCompletedOnce ="))
         #expect(!closeAction.contains("finish("))
         #expect(!closeAction.contains("onComplete"))

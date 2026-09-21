@@ -9446,12 +9446,22 @@
         }
       }
     },
-    "Copy this JSON into a compatible client's MCP configuration.": {
+    "The MCP bridge is inside Rockxy.app on this Mac.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "将此 JSON 复制到兼容客户端的 MCP 配置中。"
+            "value": "MCP 桥接工具位于这台 Mac 上的 Rockxy.app 内。"
+          }
+        }
+      }
+    },
+    "Copy creates client-ready JSON with this Mac's absolute app path, which may include your account name.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制操作会生成可供客户端使用的 JSON，其中包含这台 Mac 上应用的绝对路径，可能含有你的账户名称。"
           }
         }
       }
@@ -40293,12 +40303,12 @@
         }
       }
     },
-    "Copies the bundled Rockxy MCP bridge configuration.": {
+    "Copies JSON with this Mac's absolute Rockxy app path.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "复制随 Rockxy 捆绑提供的 MCP 桥接配置。"
+            "value": "复制包含这台 Mac 上 Rockxy 应用绝对路径的 JSON。"
           }
         }
       }
