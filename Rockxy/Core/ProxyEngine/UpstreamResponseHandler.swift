@@ -248,6 +248,9 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
 
             if !shouldBreakOnResponse, !deferRelayForScript {
                 relayResponseHead(modifiedHead)
+                if Self.isStreamingResponse(modifiedHead.headers) {
+                    publishLiveStream(head: modifiedHead)
+                }
             }
 
         case let .body(buffer):
@@ -440,6 +443,8 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
     private var pendingResponseBreakpointTask: Task<Void, Never>?
     private var downloadReadyAtNanos: UInt64?
     private var downloadTailFuture: EventLoopFuture<Void>?
+    /// The row published when a streaming response's head arrived, completed in place at `.end`.
+    private var liveStreamTransaction: HTTPTransaction?
 
     /// True while we are buffering the response before relaying, because a
     /// matching response-side script is expected to mutate it. Flipped to false
@@ -798,6 +803,50 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
 
     // MARK: - Transaction Assembly
 
+    /// Server-sent events and newline-delimited JSON stay open for as long as the server keeps
+    /// producing — an LLM completion commonly streams for 30 s or more. Only these content
+    /// types get a live row, so ordinary responses keep their single delivery.
+    nonisolated static func isStreamingResponse(_ headers: HTTPHeaders) -> Bool {
+        guard let contentType = headers.first(name: "Content-Type")?.lowercased() else {
+            return false
+        }
+        let mediaType = contentType.split(separator: ";", maxSplits: 1).first?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        return [
+            "text/event-stream",
+            "application/x-ndjson",
+            "application/ndjson",
+            "application/jsonl",
+            "application/x-jsonlines",
+        ].contains(mediaType)
+    }
+
+    /// Delivers a streaming response as an `.active` row the moment its head arrives, so a
+    /// long stream is visible while it runs instead of appearing only once it ends. The same
+    /// transaction is completed in place by `buildAndCompleteTransaction()`.
+    nonisolated private func publishLiveStream(head: HTTPResponseHead) {
+        guard liveStreamTransaction == nil else {
+            return
+        }
+        let headers = head.headers.map { HTTPHeader(name: $0.name, value: $0.value) }
+        let transaction = HTTPTransaction(
+            request: requestData,
+            response: HTTPResponseData(
+                statusCode: Int(head.status.code),
+                statusMessage: head.status.reasonPhrase,
+                headers: headers,
+                body: nil,
+                contentType: ContentTypeDetector.detect(headers: headers, body: nil)
+            ),
+            state: .active,
+            graphQLInfo: graphQLInfo
+        )
+        transaction.sourcePort = sourcePort
+        transaction.clientApp = Self.extractAppFromUserAgent(requestData.headers)
+        liveStreamTransaction = transaction
+        onTransactionComplete(transaction)
+    }
+
     nonisolated private func buildAndCompleteTransaction() {
         let endTime = DispatchTime.now()
 
@@ -838,7 +887,22 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
         transaction.sourcePort = sourcePort
         transaction.clientApp = Self.extractAppFromUserAgent(requestData.headers)
 
-        onTransactionComplete(transaction)
+        guard let live = liveStreamTransaction else {
+            onTransactionComplete(transaction)
+            return
+        }
+        // The live row has been observed by the UI since its head arrived, so its fields are
+        // written on the main actor before the closing delivery updates the existing row.
+        liveStreamTransaction = nil
+        let onTransactionComplete = onTransactionComplete
+        Task { @MainActor in
+            live.response = transaction.response
+            live.timingInfo = transaction.timingInfo
+            live.web3RPCInfo = transaction.web3RPCInfo
+            live.x402Info = transaction.x402Info
+            live.state = .completed
+            onTransactionComplete(live)
+        }
     }
 
     nonisolated private func buildTimingInfo(endTime: DispatchTime) -> TimingInfo {

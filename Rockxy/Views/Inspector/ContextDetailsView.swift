@@ -256,10 +256,14 @@ struct ContextDetailsView: View {
     }
 
     private func overviewSection(_ transaction: HTTPTransaction) -> some View {
-        ContextInspectorFieldTable(
-            title: String(localized: "Details", bundle: RockxyLocalization.bundle),
-            fields: overviewFields(transaction)
-        )
+        // A connection or stream that is still open has no final duration; tick its running
+        // time once a second, as the WebSocket inspector does, and stay paused otherwise.
+        TimelineView(.animation(minimumInterval: 1, paused: !transaction.isRunning)) { context in
+            ContextInspectorFieldTable(
+                title: String(localized: "Details", bundle: RockxyLocalization.bundle),
+                fields: overviewFields(transaction, now: context.date)
+            )
+        }
     }
 
     private func insightSection(_ transaction: HTTPTransaction) -> some View {
@@ -533,7 +537,7 @@ struct ContextDetailsView: View {
         DurationFormatter.format(seconds: duration)
     }
 
-    private func overviewFields(_ transaction: HTTPTransaction) -> [ContextTableField] {
+    private func overviewFields(_ transaction: HTTPTransaction, now: Date) -> [ContextTableField] {
         var fields: [ContextTableField] = [
             ContextTableField(
                 label: String(localized: "Outcome", bundle: RockxyLocalization.bundle),
@@ -555,7 +559,7 @@ struct ContextDetailsView: View {
             ),
             ContextTableField(
                 label: String(localized: "Duration", bundle: RockxyLocalization.bundle),
-                value: durationText(for: transaction)
+                value: durationText(for: transaction, now: now)
             ),
             ContextTableField(
                 label: String(localized: "Transferred", bundle: RockxyLocalization.bundle),
@@ -833,8 +837,8 @@ struct ContextDetailsView: View {
         return "\(contentType.rawValue) · \(size)"
     }
 
-    private func durationText(for transaction: HTTPTransaction) -> String {
-        guard let duration = transaction.displayDuration else {
+    private func durationText(for transaction: HTTPTransaction, now: Date) -> String {
+        guard let duration = transaction.displayDuration(at: now) else {
             return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
         }
         return formatDuration(duration)

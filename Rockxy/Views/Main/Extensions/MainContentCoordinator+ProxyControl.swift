@@ -1127,7 +1127,8 @@ extension MainContentCoordinator {
         if !criteria.statusCodes.isEmpty
             || criteria.sidebarScope != .allTraffic
             || !criteria.activeProtocolFilters.isEmpty
-            || workspace.activeSortDescriptors.contains(where: { ["status", "code", "duration"].contains($0.key ?? "") })
+            || workspace.activeSortDescriptors
+            .contains(where: { ["status", "code", "duration", "responseSize"].contains($0.key ?? "") })
             || workspace.activeFocusSet != nil
         {
             return true

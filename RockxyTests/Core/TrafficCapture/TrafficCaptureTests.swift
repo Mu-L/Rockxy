@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 @testable import Rockxy
 import Testing
 
@@ -202,6 +203,58 @@ struct TrafficSessionManagerTests {
 
         #expect(await manager.flushPendingUpdates().isEmpty)
         #expect(updates.value.isEmpty)
+    }
+
+    @Test("A streaming response is a live row that completes in place")
+    func liveStreamingResponseCompletesInPlace() async {
+        // An LLM completion can stream for 30 s. It is delivered as an `.active` row when its
+        // head arrives and again at `.end`; the second delivery must update, not append.
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let stream = HTTPTransaction(
+            request: TestFixtures.makeRequest(method: "POST", url: "https://api.openai.com/v1/chat/completions"),
+            response: TestFixtures.makeResponse(
+                statusCode: 200,
+                headers: [HTTPHeader(name: "Content-Type", value: "text/event-stream")]
+            ),
+            state: .active
+        )
+        await manager.addTransaction(stream)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [stream.id])
+
+        let liveInspectionKey = stream.inspectionKey
+        await MainActor.run { stream.state = .completed }
+        // Inspectors re-analyse the completed body instead of keeping the live, empty one.
+        #expect(stream.inspectionKey != liveInspectionKey)
+        await manager.addTransaction(stream)
+        #expect(await manager.flushPendingUpdates().isEmpty)
+        #expect(updates.value == [[stream.id]])
+
+        // An ordinary completed response is never tracked as live.
+        let plain = TestFixtures.makeTransaction()
+        await manager.addTransaction(plain)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [plain.id])
+        #expect(updates.value == [[stream.id]])
+    }
+
+    @Test("Only event streams and NDJSON get a live row")
+    func streamingContentTypes() {
+        func headers(_ value: String) -> HTTPHeaders {
+            HTTPHeaders([("Content-Type", value)])
+        }
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("text/event-stream")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("text/event-stream; charset=utf-8")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("application/x-ndjson")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("Application/NDJSON")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(headers("application/json")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(headers("text/plain")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(HTTPHeaders()))
     }
 
     @Test("onBatchReady nil drops batch silently without crash")

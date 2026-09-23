@@ -38,7 +38,7 @@ struct ReplayCoordinatorTests {
         #expect(replayed.request.method == "POST")
         #expect(replayed.request.url == source.request.url)
         #expect(replayed.request.body == source.request.body)
-        #expect(replayed.request.captureContext == context)
+        #expect(replayed.captureContext == context)
         #expect(replayed.response?.statusCode == 200)
         #expect(replayed.response?.body == response.body)
         #expect(replayed.state == .completed)

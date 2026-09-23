@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Showed streaming responses (Server-Sent Events and NDJSON, such as LLM completions) in the request list as Active rows as soon as their headers arrive, completed in place when the stream ends, instead of appearing only after a long stream finished.
 - Added Traffic Insights: an Insights destination at the top of the Focus Navigator that turns the active Traffic Tab into a live report — findings with one-click handoffs, traffic over time by bytes, outcome, or latency, protocol share, outcome/content/method breakdowns, top apps and hosts, slowest requests, largest responses, an All/Visible scope that follows the current filters, trailing time windows, pause/resume, and Markdown export.
 - Added persistent application-scoped HTTPS Decrypt and Tunnel rules, with a unified app/host rule list and observed-host picker.
 - Added local Projects with Project-scoped traffic history, durable Traffic Tab layouts and filters, and configuration-only `.rockxyproject` import and export.
@@ -29,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Fixed an open WebSocket reading "Duration Unavailable" in the Context Dock while its inspector showed a running time; both now show the elapsed time of a connection or stream that is still open, updated once a second.
 - Confirmed late helper proxy restoration after an XPC timeout before leaving capture in a recovery state, so stopping capture does not require a second click when macOS finishes the restore moments later.
 - Made Map Local quick-create, response breakpoints, and Copy as Raw/JSON decode gzip, deflate, and Brotli response bodies so compressed JSON is editable and copyable text instead of an opaque binary payload, with the compressed-only headers dropped from the edited response.
 - Attributed locally served responses (Map Local, block, breakpoint abort) to the same client app as forwarded traffic instead of showing them under Unknown.
@@ -43,7 +45,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Prevented a Modify Headers rule or script header with a space in its name or a line break in its value from aborting the relayed response with an empty reply; such headers are now rejected in the editor and skipped at runtime while the rest of the rule still applies.
 - Kept the paused request's scheme and host in the Breakpoint URL field after editing the request line in the Raw tab, instead of showing a blank authority.
 - Made plain `ws://` upgrades sent through the proxy as absolute-form requests reach the server; the relay no longer adds `Content-Length: 0` to bodyless requests that never declared a length, which made WebSocket servers refuse the handshake.
-- Showed WebSocket sessions in the request list while they are open, with frames rendering live, and marked them Completed/Closed when the socket closes instead of leaving them Active forever.
 - Kept the original `startedDateTime` of imported HAR entries when the archive omits fractional seconds; those sessions previously showed every request at the import time.
 - Rendered listen ports as plain digits in the MCP status, Developer Setup proxy step, and system-proxy override banner instead of locale-grouped numbers such as `9,090`.
 - Made the MCP `export_flow_curl` tool redact sensitive query parameters and body credentials the same way flow details do; previously only header values were masked, so tokens in the URL or JSON body reached the AI client in clear text.
@@ -92,7 +93,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Made Developer Setup scroll its target sidebar to the target you picked, so choosing Install Certificate on Android ▸ Android Device — or the matching iOS and React Native entries — no longer leaves the list parked pages above the selection with no row looking selected.
 - Made every surface report the same size for the same payload. The Context Dock's Transferred and Payload rows, the multi-selection summary, the footer's captured total and throughput, the Compose response viewer, the AI event tooltip, and the Debug Assistant's reviewed-content size each counted in their own units, so a 999,999-byte response read "977 KB" in the request list and "1 MB" in the Context Dock, and a WebSocket's frame bytes disagreed between its own inspector and the dock. An empty body now reads "0 bytes" instead of "Zero KB".
 - Fixed the gRPC inspector printing a long-lived stream's duration as "90000 ms" where the request list and Context Dock said "1m 30s", and the Diff candidate list printing "923ms" instead of "923 ms".
-- Made the Rules window report a failed rule import or export instead of closing the file picker and doing nothing; an oversized or malformed file, or an unwritable export location, now explains itself. Those messages were also English-only and contradicted themselves — a file just over the limit reported "Import file is too large (5 MB). Maximum allowed is 5 MB." — and are now translated and rounded correctly.
 - Fixed the Synopsis tab disagreeing with every other surface about the same exchange. Its duration came from the timing breakdown rather than the duration the rest of the app shows, so a WebSocket read "11 ms" — the upgrade handshake — where the row, the Context Dock, and the WebSocket inspector all said "914 ms", and a replayed request showed no duration at all. Its response size was spelled out by hand, so a body the request list called "3 KB" read "3070 bytes". Its Content-Type row printed Rockxy's internal render category (`text`, `unknown`) under the wire header's own name instead of the header the server actually sent.
 - Fixed the WebSocket frame list printing a binary or undecodable frame's size in raw bytes beside that same frame's formatted size column, so a 1 MB frame read "(1048576 bytes)" next to "1 MB"; the placeholder now uses the shared formatter and is translated.
 - Made wall-clock times follow the viewer's region and 24-Hour Time preference. The request list's Time column and the script console pinned a 24-hour `HH:mm:ss` pattern while the Diff candidate picker formatted the same timestamp for the current locale, so on a US Mac one transaction read "21:19:10" in the list and "9:19:10 PM" in the picker. The WebSocket frame list also rebuilt its date formatter for every visible row.
@@ -110,6 +110,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Made Rockxy's Language setting change the language only, as macOS does for a per-app language: numbers, sizes, times, and dates keep the Mac's region, 24-hour clock, and first weekday, while words inside a format (AM/PM, "5 minutes ago") follow the chosen language. Picking 简体中文 on a Mac set to Vietnam used to switch counts from "1.234" to "1,234" while times and sizes stayed regional.
 - Rebuilt Developer Setup as a compact native macOS workflow with a focused target sidebar, adaptive five-part guide, contextual actions, and an optional readiness inspector that honors the Rockxy font-size preference up to 28 pt.
 - Made Manual and Automatic Setup windows target-aware and resizable: Manual Setup now shows the selected target's own workflow or guide instead of always falling back to the generic terminal flow, and Automatic Setup only opens for shipped terminal runtimes and names the selected target.
 - Made Developer Setup launch outcomes honest — prepared-terminal and browser launches now wait for the launched process and report a nonzero exit as a failure instead of always reporting success.

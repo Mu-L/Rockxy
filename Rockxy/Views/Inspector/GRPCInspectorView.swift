@@ -29,7 +29,7 @@ struct GRPCInspectorView: View {
                 inspectorContent(inspection)
             }
         }
-        .task(id: transaction.id) {
+        .task(id: transaction.inspectionKey) {
             await loadInspection()
         }
     }

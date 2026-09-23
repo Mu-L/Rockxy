@@ -215,7 +215,7 @@ struct MCPSettingsTab: View {
 
                 Text(
                     String(
-                        localized: "Last validated method: \(activity.lastMethod) · \(activity.lastActivityAt.formatted(date: .abbreviated, time: .shortened))",
+                        localized: "Last validated method: \(activity.lastMethod) · \(TimestampFormatter.string(activity.lastActivityAt, date: .abbreviated, time: .shortened))",
                         bundle: RockxyLocalization.bundle
                     )
                 )

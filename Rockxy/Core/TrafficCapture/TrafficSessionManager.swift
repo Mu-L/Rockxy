@@ -49,21 +49,21 @@ actor TrafficSessionManager {
     // MARK: - Transaction Intake
 
     func addTransaction(_ transaction: HTTPTransaction) {
-        if transaction.webSocketConnection != nil {
-            // A proxied WebSocket is delivered when it upgrades and again when it closes.
-            // The second delivery of a known live connection is an in-place update; a
-            // delivery for a connection dismissed by Clear Session is dropped so the closed
-            // socket cannot resurface as a new row.
-            if dismissedLiveTransactionIDs.remove(transaction.id) != nil {
-                return
+        // A proxied WebSocket, and a streaming (SSE/NDJSON) response, is delivered as an
+        // `.active` row when it opens and again when it finishes. The second delivery of a known
+        // live transaction is an in-place update; a delivery for one dismissed by Clear Session
+        // is dropped so the finished connection cannot resurface as a new row.
+        if !dismissedLiveTransactionIDs.isEmpty, dismissedLiveTransactionIDs.remove(transaction.id) != nil {
+            return
+        }
+        if liveTransactionIDs.contains(transaction.id) {
+            if transaction.state != .active {
+                liveTransactionIDs.remove(transaction.id)
             }
-            if liveTransactionIDs.contains(transaction.id) {
-                if transaction.state != .active {
-                    liveTransactionIDs.remove(transaction.id)
-                }
-                onLiveTransactionUpdated?([transaction])
-                return
-            }
+            onLiveTransactionUpdated?([transaction])
+            return
+        }
+        if transaction.state == .active {
             liveTransactionIDs.insert(transaction.id)
         }
         pendingUpdates.append(transaction)

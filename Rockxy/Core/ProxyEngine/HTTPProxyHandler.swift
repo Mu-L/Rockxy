@@ -365,15 +365,29 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler, @u
         }
     }
 
+    /// Resolves the request target to an absolute URL string. A proxied WebSocket client may send
+    /// its absolute-form target with its own scheme (`GET ws://host:port/socket`); the upgrade
+    /// travels over HTTP, so `ws`/`wss` map to `http`/`https`. Treating that target as a path
+    /// glued it onto the Host into an unparseable URL, which fell back to `http://host/` — the
+    /// upgrade then went to the wrong path and port.
+    nonisolated static func requestURLString(uri: String, host: String) -> String {
+        let lowered = uri.lowercased()
+        if lowered.hasPrefix("http://") || lowered.hasPrefix("https://") {
+            return uri
+        }
+        if lowered.hasPrefix("ws://") {
+            return "http://" + uri.dropFirst("ws://".count)
+        }
+        if lowered.hasPrefix("wss://") {
+            return "https://" + uri.dropFirst("wss://".count)
+        }
+        return "http://\(host)\(uri)"
+    }
+
     nonisolated private func buildRequestData(from head: HTTPRequestHead) -> HTTPRequestData {
         let headers = head.headers.map { HTTPHeader(name: $0.name, value: $0.value) }
         let host = head.headers["Host"].first ?? ""
-        let uri = head.uri
-        let url: String = if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
-            uri
-        } else {
-            "http://\(host)\(uri)"
-        }
+        let url = Self.requestURLString(uri: head.uri, host: host)
         let body = requestBody.flatMap { buffer -> Data? in
             guard buffer.readableBytes > 0 else {
                 return nil

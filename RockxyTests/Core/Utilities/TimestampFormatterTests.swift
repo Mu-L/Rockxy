@@ -20,22 +20,39 @@ struct TimestampFormatterTests {
         #expect(twelveHour != twentyFourHour)
         #expect(twelveHour.contains("9"))
         #expect(twentyFourHour.contains("21"))
-        // The shipped formatter follows whatever locale the test host runs under.
-        #expect(TimestampFormatter.timeOfDay(Self.sample) == Self.reference(
-            locale: Locale.current.identifier,
-            template: "jms"
-        ))
+        #expect(TimestampFormatter.timeOfDay(Self.sample, locale: Locale(identifier: "en_US")) == twelveHour)
+        #expect(TimestampFormatter.timeOfDay(Self.sample, locale: Locale(identifier: "en_GB")) == twentyFourHour)
+    }
+
+    @Test("Rockxy's language changes the words in a time, never the region's clock")
+    func pinnedLanguageKeepsTheRegionalClock() {
+        // A Chinese interface on a US Mac keeps the 12-hour clock and says so in Chinese.
+        let chineseOnUSMac = AppLanguagePreference.formattingLocale(
+            languageIdentifier: "zh-Hans",
+            regionalBase: Locale(identifier: "en_US")
+        )
+        let time = TimestampFormatter.timeOfDay(Self.sample, locale: chineseOnUSMac)
+        // A Chinese day-period word proves both halves: a 12-hour clock, spelled in Chinese.
+        #expect(["凌晨", "早上", "上午", "中午", "下午", "晚上"].contains { time.contains($0) })
+        #expect(!time.contains("PM") && !time.contains("AM"))
+
+        // Relative dates follow the same locale instead of the Mac's language.
+        let now = Self.sample.addingTimeInterval(300)
+        let relative = TimestampFormatter.relative(Self.sample, to: now, locale: chineseOnUSMac)
+        #expect(relative.contains("5"))
+        #expect(!relative.contains("minutes"))
     }
 
     @Test("Frame timestamps keep their milliseconds")
     func frameTimestampsKeepMilliseconds() {
         // WebSocket frames arrive milliseconds apart; dropping the sub-second digits would make
         // the frame list unorderable by eye.
-        let formatted = TimestampFormatter.timeOfDayWithMilliseconds(Self.sample)
+        let locale = Locale(identifier: "en_GB")
+        let formatted = TimestampFormatter.timeOfDayWithMilliseconds(Self.sample, locale: locale)
 
-        #expect(formatted == Self.reference(locale: Locale.current.identifier, template: "jmsSSS"))
+        #expect(formatted == Self.reference(locale: "en_GB", template: "jmsSSS"))
         #expect(formatted.contains("123"))
-        #expect(formatted != TimestampFormatter.timeOfDay(Self.sample))
+        #expect(formatted != TimestampFormatter.timeOfDay(Self.sample, locale: locale))
     }
 
     @Test("No view formats a wall-clock time with a fixed pattern")
@@ -53,6 +70,25 @@ struct TimestampFormatterTests {
             offenders.isEmpty,
             "These lines pin a date pattern instead of using TimestampFormatter: \(offenders.sorted())"
         )
+    }
+
+    @Test("Dates and relative times go through TimestampFormatter's locale")
+    func noViewFormatsADateInTheMacLanguage() throws {
+        // `Date.formatted(date:time:)`, `.formatted(.dateTime…)` and a bare
+        // `RelativeDateTimeFormatter` follow the Mac's language, so after the user picks another
+        // language in Rockxy they printed "Sep 23, 2026" inside a Chinese interface.
+        let spellings = [".formatted(date:", ".formatted(.dateTime", "RelativeDateTimeFormatter()"]
+        var offenders: [String] = []
+        for (path, source) in try Self.projectSources() where path != "Rockxy/Core/Utilities/TimestampFormatter.swift" {
+            for line in source.split(separator: "\n") {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                guard !code.hasPrefix("//"), spellings.contains(where: { code.contains($0) }) else {
+                    continue
+                }
+                offenders.append("\(path): \(code)")
+            }
+        }
+        #expect(offenders.isEmpty, "Format these through TimestampFormatter: \(offenders.sorted())")
     }
 
     // MARK: Private

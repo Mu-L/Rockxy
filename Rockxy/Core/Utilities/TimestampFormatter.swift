@@ -16,29 +16,65 @@ enum TimestampFormatter {
     // MARK: Internal
 
     /// Hour, minute, and second in the user's locale and clock preference.
-    static func timeOfDay(_ date: Date) -> String {
-        timeOfDayFormatter.string(from: date)
+    static func timeOfDay(_ date: Date, locale: Locale = RockxyLocalization.locale) -> String {
+        formatter(template: "jms", locale: locale).string(from: date)
     }
 
     /// As `timeOfDay(_:)`, plus milliseconds. WebSocket frames arrive milliseconds apart, so the
     /// frame list needs the sub-second digits to order them by eye.
-    static func timeOfDayWithMilliseconds(_ date: Date) -> String {
-        millisecondFormatter.string(from: date)
+    static func timeOfDayWithMilliseconds(_ date: Date, locale: Locale = RockxyLocalization.locale) -> String {
+        formatter(template: "jmsSSS", locale: locale).string(from: date)
+    }
+
+    /// A date and/or time in one of the standard styles, in Rockxy's formatting locale.
+    /// `Date.formatted(date:time:)` would use the Mac's language even after the user picks
+    /// another one in Rockxy, so a Chinese interface printed "Sep 23, 2026 at 9:13 PM".
+    static func string(
+        _ date: Date,
+        date dateStyle: Date.FormatStyle.DateStyle,
+        time timeStyle: Date.FormatStyle.TimeStyle,
+        locale: Locale = RockxyLocalization.locale
+    ) -> String {
+        date.formatted(Date.FormatStyle(date: dateStyle, time: timeStyle, locale: locale))
+    }
+
+    /// The abbreviated weekday ("Tue").
+    static func weekday(_ date: Date, locale: Locale = RockxyLocalization.locale) -> String {
+        date.formatted(Date.FormatStyle(locale: locale).weekday(.abbreviated))
+    }
+
+    /// How long ago a date was ("5 minutes ago"), relative to `now`.
+    static func relative(
+        _ date: Date,
+        to now: Date = Date(),
+        unitsStyle: RelativeDateTimeFormatter.UnitsStyle = .full,
+        locale: Locale = RockxyLocalization.locale
+    ) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = locale
+        formatter.unitsStyle = unitsStyle
+        return formatter.localizedString(for: date, relativeTo: now)
     }
 
     // MARK: Private
 
-    /// A localized template, not a fixed pattern: `setLocalizedDateFormatFromTemplate` resolves
-    /// the field order and the 12-/24-hour choice from the current locale.
-    private static let timeOfDayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("jms")
-        return formatter
-    }()
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: DateFormatter] = [:]
 
-    private static let millisecondFormatter: DateFormatter = {
+    /// A localized template, not a fixed pattern: `setLocalizedDateFormatFromTemplate` resolves
+    /// the field order and the 12-/24-hour choice from the locale. Cached per template and
+    /// locale so a language change takes effect without rebuilding a formatter per row.
+    private static func formatter(template: String, locale: Locale) -> DateFormatter {
+        let key = template + "|" + locale.identifier
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = cache[key] {
+            return cached
+        }
         let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("jmsSSS")
+        formatter.locale = locale
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        cache[key] = formatter
         return formatter
-    }()
+    }
 }

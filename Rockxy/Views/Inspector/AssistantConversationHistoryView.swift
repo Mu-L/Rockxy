@@ -162,8 +162,8 @@ struct AssistantConversationHistoryView: View {
             return String(localized: "\(Int(interval / 60))m", bundle: RockxyLocalization.bundle)
         }
         if Calendar.current.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .shortened)
+            return TimestampFormatter.string(date, date: .omitted, time: .shortened)
         }
-        return date.formatted(.dateTime.weekday(.abbreviated))
+        return TimestampFormatter.weekday(date)
     }
 }

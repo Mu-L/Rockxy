@@ -136,7 +136,7 @@ nonisolated enum TrafficInsightsReportFormatter {
     }
 
     static func formatBytes(_ bytes: Int64) -> String {
-        byteFormatter.string(fromByteCount: max(0, bytes))
+        SizeFormatter.format(bytes: max(0, bytes))
     }
 
     /// Whole-unit label for a bin width ("1 s", "5 min", "1 hr") so chart subtitles never show
@@ -198,14 +198,6 @@ nonisolated enum TrafficInsightsReportFormatter {
     }
 
     // MARK: Private
-
-    /// Binary units to match the rest of Rockxy, but never the spelled-out "Zero KB" form.
-    private static let byteFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .binary
-        formatter.allowsNonnumericFormatting = false
-        return formatter
-    }()
 
     private static func severityLabel(_ severity: TrafficInsightsFindingSeverity) -> String {
         switch severity {

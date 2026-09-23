@@ -57,6 +57,33 @@ struct DurationFormatterTests {
             .contains(DurationFormatter.format(seconds: stream)))
     }
 
+    @Test("An open connection reports its running time; a closed one its final duration")
+    @MainActor
+    func runningConnectionReportsElapsedTime() {
+        // While a socket was open the Context Dock read "Unavailable", the list "—", and the
+        // WebSocket inspector a running value. Detail surfaces now share the running value.
+        let session = TestFixtures.makeWebSocketTransaction()
+        session.state = .active
+        session.measuredDuration = nil
+        let now = session.timestamp.addingTimeInterval(61)
+
+        #expect(session.isRunning)
+        #expect(session.displayDuration == nil)
+        #expect(session.displayDuration(at: now) == 61)
+
+        session.state = .completed
+        session.measuredDuration = 75
+        #expect(!session.isRunning)
+        #expect(session.displayDuration(at: now) == 75)
+
+        // A finished row with no measurement stays unknown rather than counting up forever.
+        let failed = TestFixtures.makeTransaction()
+        failed.state = .failed
+        failed.timingInfo = nil
+        failed.measuredDuration = nil
+        #expect(failed.displayDuration(at: now) == nil)
+    }
+
     // MARK: Private
 
     private static func formatted(_ seconds: TimeInterval, _ localeID: String = "en_US") -> String {

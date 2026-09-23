@@ -127,6 +127,33 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         return timingInfo?.totalDuration ?? measuredDuration
     }
 
+    /// Identifies what an inspector derived from this transaction. A live row keeps its id but
+    /// gains its body when it completes, so an analysis keyed on the id alone stayed on the
+    /// empty-body snapshot taken while the stream was running.
+    var inspectionKey: String {
+        "\(id.uuidString)|\(state.rawValue)"
+    }
+
+    /// Whether this row is a connection or stream that is still open, so its duration is not
+    /// final yet.
+    var isRunning: Bool {
+        state == .active && displayDuration == nil
+    }
+
+    /// The duration a detail surface shows at `now`: the final value once known, otherwise the
+    /// running time of a connection or stream that is still open. The request list keeps `—` for
+    /// a running row instead — a per-second redraw belongs to the one selected row, not the
+    /// capture hot path.
+    func displayDuration(at now: Date) -> TimeInterval? {
+        if let displayDuration {
+            return displayDuration
+        }
+        guard state == .active else {
+            return nil
+        }
+        return max(0, now.timeIntervalSince(timestamp))
+    }
+
     func applyMatchedRuleMetadata(from rule: ProxyRule) {
         matchedRuleID = rule.id
         matchedRuleName = rule.name

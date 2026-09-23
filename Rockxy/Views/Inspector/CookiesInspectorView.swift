@@ -96,7 +96,7 @@ struct CookiesInspectorView: View {
                     Text(String(localized: "Expires", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .fontWeight(.semibold)
-                    Text(expires.formatted(.dateTime))
+                    Text(TimestampFormatter.string(expires, date: .numeric, time: .shortened))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .textSelection(.enabled)
                 }

@@ -229,7 +229,7 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
 
     var menuTitle: String {
         let status = statusCode.map { "\($0)" } ?? String(localized: "No Response", bundle: RockxyLocalization.bundle)
-        return "[\(method)] \(url) • \(status) • \(Self.relativeFormatter.localizedString(for: timestamp, relativeTo: Date()))"
+        return "[\(method)] \(url) • \(status) • \(TimestampFormatter.relative(timestamp, unitsStyle: .abbreviated))"
     }
 
     var requestFingerprint: String {
@@ -248,14 +248,6 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
             bodyContentType ?? "",
         ].joined(separator: "\u{1E}")
     }
-
-    // MARK: Private
-
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
 }
 
 // MARK: - ComposeResponse

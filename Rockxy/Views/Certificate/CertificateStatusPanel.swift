@@ -294,15 +294,13 @@ struct CertificateStatusPanel: View {
             if snapshot?.hasGeneratedCertificate == true {
                 diagnosticRow(
                     label: String(localized: "Valid From:", bundle: RockxyLocalization.bundle),
-                    value: snapshot?.notValidBefore?
-                        .formatted(date: .abbreviated, time: .omitted) ?? "\u{2014}",
+                    value: snapshot?.notValidBefore.map { TimestampFormatter.string($0, date: .abbreviated, time: .omitted) } ?? "\u{2014}",
                     color: .primary
                 )
 
                 diagnosticRow(
                     label: String(localized: "Valid Until:", bundle: RockxyLocalization.bundle),
-                    value: snapshot?.notValidAfter?
-                        .formatted(date: .abbreviated, time: .omitted) ?? "\u{2014}",
+                    value: snapshot?.notValidAfter.map { TimestampFormatter.string($0, date: .abbreviated, time: .omitted) } ?? "\u{2014}",
                     color: expiryColor
                 )
 

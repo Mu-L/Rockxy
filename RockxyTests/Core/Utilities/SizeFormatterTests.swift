@@ -130,6 +130,9 @@ struct SizeFormatterTests {
         "Rockxy/Views/Import/ImportReviewSheet.swift",
         "Rockxy/Views/Settings/AssistantInstalledModelDetailFormatter.swift",
         "Rockxy/Views/Settings/AssistantRuntimeSetupSheet.swift",
+        // Recommended unified memory for a local model — a RAM amount in the `.memory` style,
+        // not a captured payload.
+        "Rockxy/Views/Settings/AssistantSettingsTab.swift",
         "Rockxy/Views/Updates/SoftwareUpdatePanelView.swift",
     ]
 
@@ -150,7 +153,10 @@ struct SizeFormatterTests {
     /// `ScriptResponseBodyLoader.LoadError` is built for the log only — `ScriptMultiArgBridge`
     /// catches it, writes it to `logger.warning`, and falls through to the inline body. Its exact
     /// cap in bytes is the useful thing to record there, and no user ever reads it.
+    /// `CodeSnippetGenerator` writes a comment into generated source code; an exact byte count is
+    /// what a developer pasting that code needs, and it is never localized.
     private static let interpolatedSizeOwners: Set<String> = [
+        "Rockxy/Core/Utilities/CodeSnippetGenerator.swift",
         "Rockxy/Core/Plugins/ScriptResponseBodyLoader.swift",
         "Rockxy/Views/Inspector/GRPCInspectorView.swift",
     ]

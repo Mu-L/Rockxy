@@ -166,8 +166,13 @@ struct WebSocketInspectorView: View {
                         : String(localized: "Active", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                 }
-                if let duration = connectionDuration(connection) {
-                    summaryRow(String(localized: "Duration", bundle: RockxyLocalization.bundle), value: duration)
+                TimelineView(.animation(minimumInterval: 1, paused: !transaction.isRunning)) { context in
+                    if let duration = transaction.displayDuration(at: context.date) {
+                        summaryRow(
+                            String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                            value: DurationFormatter.format(seconds: duration)
+                        )
+                    }
                 }
             }
             HStack(spacing: 16) {
@@ -405,21 +410,6 @@ struct WebSocketInspectorView: View {
     /// translate, so this stays a plain composition.
     private func frameCountSummary(_ frames: [WebSocketFrameData]) -> String {
         "\(CountFormatter.format(frames.count)) (\(totalSize(frames)))"
-    }
-
-    private func connectionDuration(_ connection: WebSocketConnection) -> String? {
-        let frames = connection.frames
-        guard let first = frames.first else {
-            return nil
-        }
-        // A closed connection reports its measured lifetime; a live one spans first frame → now.
-        let interval: TimeInterval = if transaction.state == .completed, let duration = transaction.measuredDuration {
-            duration
-        } else {
-            (transaction.state == .completed ? frames.last?.timestamp ?? Date() : Date())
-                .timeIntervalSince(first.timestamp)
-        }
-        return DurationFormatter.format(seconds: interval)
     }
 
     private func filteredFrames(_ connection: WebSocketConnection) -> [WebSocketFrameData] {
