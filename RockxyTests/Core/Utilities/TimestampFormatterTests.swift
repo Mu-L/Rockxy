@@ -17,9 +17,13 @@ struct TimestampFormatterTests {
         let twelveHour = Self.reference(locale: "en_US", template: "jms")
         let twentyFourHour = Self.reference(locale: "en_GB", template: "jms")
 
+        // The formatter renders in the Mac's time zone, so derive the expected hour from it
+        // instead of hardcoding the hour one machine happens to see.
+        let hour = Calendar.current.component(.hour, from: Self.sample)
+        let twelveHourClockHour = hour % 12 == 0 ? 12 : hour % 12
         #expect(twelveHour != twentyFourHour)
-        #expect(twelveHour.contains("9"))
-        #expect(twentyFourHour.contains("21"))
+        #expect(twelveHour.contains(String(twelveHourClockHour)))
+        #expect(twentyFourHour.contains(String(format: "%02d", hour)))
         #expect(TimestampFormatter.timeOfDay(Self.sample, locale: Locale(identifier: "en_US")) == twelveHour)
         #expect(TimestampFormatter.timeOfDay(Self.sample, locale: Locale(identifier: "en_GB")) == twentyFourHour)
     }
