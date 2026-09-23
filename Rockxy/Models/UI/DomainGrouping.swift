@@ -127,6 +127,12 @@ struct DomainGroupingIndex {
 /// Process attribution arrives after the transaction batch in many captures. Keeping
 /// reference counts lets Rockxy move those rows out of "Unknown" without rebuilding every
 /// workspace index from the complete live history on each 100 ms capture batch.
+///
+/// Groups are keyed by the displayed client name — the same value the Client column shows
+/// and the sidebar app filter matches on — so a sidebar count always equals the rows that
+/// selecting the app reveals. Process identity resolves asynchronously per connection, so
+/// keying by identity split one application into a name-only group and an identity group
+/// with the same title. The first resolved identity is retained for icons and rule pickers.
 struct AppGroupingIndex {
     // MARK: Internal
 
@@ -137,14 +143,14 @@ struct AppGroupingIndex {
 
     mutating func add(_ transaction: HTTPTransaction, appName: String? = nil) {
         let name = Self.normalizedAppName(appName ?? transaction.clientApp)
-        let key = transaction.clientApplicationIdentity?.identifier ?? "name:\(name)"
+        let key = Self.key(for: name)
         let host = transaction.request.host.trimmingCharacters(in: .whitespacesAndNewlines)
         if entries[key] == nil {
             entries[key] = Entry(name: name)
             insertionOrder.append(key)
         }
         entries[key]?.requestCount += 1
-        if let identity = transaction.clientApplicationIdentity {
+        if entries[key]?.identity == nil, let identity = transaction.clientApplicationIdentity {
             entries[key]?.identity = identity
         }
         if !host.isEmpty {
@@ -154,10 +160,7 @@ struct AppGroupingIndex {
 
     mutating func remove(_ transaction: HTTPTransaction, appName: String?) {
         let name = Self.normalizedAppName(appName)
-        let key = transaction.clientApplicationIdentity?.identifier
-            ?? (entries["name:\(name)"] == nil ? nil : "name:\(name)")
-            ?? insertionOrder.first(where: { entries[$0]?.name == name })
-            ?? "name:\(name)"
+        let key = Self.key(for: name)
         guard var entry = entries[key] else {
             return
         }
@@ -205,6 +208,10 @@ struct AppGroupingIndex {
 
     private var entries: [String: Entry] = [:]
     private var insertionOrder: [String] = []
+
+    private static func key(for name: String) -> String {
+        "name:\(name)"
+    }
 
     private static func normalizedAppName(_ value: String?) -> String {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

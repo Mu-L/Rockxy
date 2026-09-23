@@ -9,6 +9,7 @@ struct BlockListTableView<ContextMenuContent: View>: View {
     // MARK: Internal
 
     let rules: [ProxyRule]
+    let isSearching: Bool
     @Binding var selectedRuleID: UUID?
 
     let onToggle: (UUID) -> Void
@@ -23,10 +24,31 @@ struct BlockListTableView<ContextMenuContent: View>: View {
                 zebraRows
 
                 if rules.isEmpty {
-                    Text(String(localized: "Click \"+\" or ⌘N to add new entry", bundle: RockxyLocalization.bundle))
-                        .font(.system(size: toolMetrics.emptyStateFontSize))
+                    VStack(spacing: 7) {
+                        Image(systemName: isSearching ? "magnifyingglass" : "hand.raised")
+                            .font(.system(size: max(22, toolMetrics.emptyStateFontSize + 8)))
+                            .foregroundStyle(.secondary)
+                        Text(
+                            isSearching
+                                ? String(localized: "No matching rules", bundle: RockxyLocalization.bundle)
+                                : String(localized: "No Block List rules", bundle: RockxyLocalization.bundle)
+                        )
+                        .font(toolMetrics.font(weight: .medium))
+                        Text(
+                            isSearching
+                                ? String(
+                                    localized: "Try a different name, method, or URL pattern.",
+                                    bundle: RockxyLocalization.bundle
+                                )
+                                : String(
+                                    localized: "Click \"+\" or press ⌘N to create a rule.",
+                                    bundle: RockxyLocalization.bundle
+                                )
+                        )
+                        .font(toolMetrics.secondaryFont())
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {

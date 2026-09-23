@@ -1747,65 +1747,6 @@ nonisolated private struct HostCertEntry {
     let privateKey: P256.Signing.PrivateKey
 }
 
-// MARK: - CertificateGenerationError
-
-nonisolated enum CertificateGenerationError: LocalizedError {
-    case invalidDateComputation
-
-    // MARK: Internal
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidDateComputation:
-            "Failed to compute certificate validity dates"
-        }
-    }
-}
-
-// MARK: - CertificateManagerError
-
-nonisolated enum CertificateManagerError: LocalizedError, Equatable {
-    case noRootCA
-    case rootCANotTrusted
-    case trustValidationFailed
-    case trustInstallationInProgress
-    case persistedRootIdentityChanged
-    case persistedRootIdentityDrift
-    case rootRemovalInProgress
-    case rootRemovalIncomplete(String)
-    case helperInstallUnavailable(String)
-    case trustStateUnavailable(String)
-
-    // MARK: Internal
-
-    var errorDescription: String? {
-        switch self {
-        case let .helperInstallUnavailable(detail):
-            "The privileged helper was not used for this installation (\(detail))."
-        case .noRootCA:
-            "Root CA certificate has not been generated"
-        case .rootCANotTrusted:
-            "Root CA certificate is not trusted — install and trust the certificate before HTTPS interception"
-        case .trustValidationFailed:
-            "macOS has not validated the certificate for TLS. Your certificate and key were kept. Recheck the certificate status in Settings."
-        case .trustInstallationInProgress:
-            "A certificate trust installation is already in progress. Wait for it to finish, then try again."
-        case .persistedRootIdentityChanged:
-            "Rockxy's persisted root CA changed while trust was being prepared. Quit other running copies of Rockxy, then try again. No second trust prompt was requested."
-        case .persistedRootIdentityDrift:
-            "Rockxy's active root CA no longer matches its saved certificate and private key. " +
-                "This can happen after another Rockxy copy or a Keychain restore changed certificate storage. " +
-                "Use Install & Trust Certificate to reconcile it before HTTPS interception."
-        case .rootRemovalInProgress:
-            "A certificate removal is already in progress. Wait for it to finish, then try again."
-        case let .trustStateUnavailable(detail):
-            "Rockxy could not read the certificate's Keychain and trust status, so it did not request administrator approval. Check the status again once the keychain is available (\(detail))."
-        case let .rootRemovalIncomplete(detail):
-            "The installed root CA certificate could not be fully removed, so your local certificate and key were kept. Remove it in Keychain Access and try again (\(detail))."
-        }
-    }
-}
-
 // MARK: - TrustEvaluationDecision
 
 /// How `CertificateManager.rootCAStatusSnapshot` should resolve system-trust state.

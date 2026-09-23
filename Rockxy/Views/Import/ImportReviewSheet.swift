@@ -384,13 +384,10 @@ struct ImportReviewSheet: View {
     }
 
     private func dateRangeText(_ start: Date, _ end: Date?) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        formatter.timeStyle = .medium
-        let startStr = formatter.string(from: start)
+        let startStr = TimestampFormatter.string(start, date: .numeric, time: .standard)
         guard let end else {
             return startStr
         }
-        return "\(startStr) — \(formatter.string(from: end))"
+        return "\(startStr) — \(TimestampFormatter.string(end, date: .numeric, time: .standard))"
     }
 }

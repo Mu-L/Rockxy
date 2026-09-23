@@ -80,9 +80,11 @@ struct FocusSetEditorSheet: View {
                 bundle: RockxyLocalization.bundle
             )
         }
-        return matchCount == 1
-            ? String(localized: "1 matching request", bundle: RockxyLocalization.bundle)
-            : String(localized: "\(matchCount) matching requests", bundle: RockxyLocalization.bundle)
+        return String(AttributedString(
+            localized: "^[\(matchCount) matching request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     private var sheetHeader: some View {

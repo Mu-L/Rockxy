@@ -32,7 +32,7 @@ enum TrafficInsightsFormatting {
     }
 
     static func clockTime(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .standard)
+        TimestampFormatter.string(date, date: .omitted, time: .standard)
     }
 
     static func isIPAddressLike(_ host: String) -> Bool {

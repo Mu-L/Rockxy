@@ -1,6 +1,6 @@
 import Foundation
 
-/// Parses search-bar tokens such as `is:ai` and `rpc:eth_call` into metadata predicates.
+/// Parses search-bar tokens such as `is:ai`, `model:gpt-4o`, and `rpc:eth_call` into metadata predicates.
 /// Unrecognized text remains available for the normal selected-field substring search.
 struct SmartTrafficFilter: Equatable {
     enum Predicate: Equatable {
@@ -11,6 +11,7 @@ struct SmartTrafficFilter: Equatable {
         case rpcError(Bool)
         case rpcMethod(String)
         case provider(String)
+        case model(String)
     }
 
     let predicates: [Predicate]
@@ -60,6 +61,9 @@ struct SmartTrafficFilter: Equatable {
                 providerValues(in: transaction).contains {
                     $0.localizedCaseInsensitiveContains(provider)
                 }
+            case let .model(model):
+                AITrafficDetector.requestedModel(transaction: transaction)?
+                    .localizedCaseInsensitiveContains(model) ?? false
             }
         }
     }
@@ -103,6 +107,8 @@ struct SmartTrafficFilter: Equatable {
             return .rpcMethod(value)
         case "provider":
             return .provider(value)
+        case "model":
+            return .model(value)
         default:
             return nil
         }

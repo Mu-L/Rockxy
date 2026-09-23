@@ -159,14 +159,19 @@ struct AddSSLAppDomainSheet: View {
         let newCount = newDomainsForSelection.count
         var parts = [String(localized: "\(newCount) new", bundle: RockxyLocalization.bundle)]
         if duplicateCount > 0 {
-            parts.append(String(localized: "\(duplicateCount) already exists", bundle: RockxyLocalization.bundle))
+            parts.append(String(AttributedString(
+                localized: "^[\(duplicateCount) duplicate](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
         }
         if overlapCount > 0 {
             parts.append(
-                String(
-                    localized: "\(overlapCount) overlaps; Tunnel Without Decryption takes priority",
-                    bundle: RockxyLocalization.bundle
-                )
+                String(AttributedString(
+                    localized: "^[\(overlapCount) overlap](inflect: true); Tunnel Without Decryption takes priority",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             )
         }
         return parts.joined(separator: " · ")
@@ -360,7 +365,7 @@ struct AddSSLAppDomainSheet: View {
             Text(title)
                 .font(toolMetrics.secondaryFont(weight: .semibold))
             Spacer()
-            Text("\(count)")
+            Text(CountFormatter.format(count))
                 .font(toolMetrics.metadataFont())
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 6)

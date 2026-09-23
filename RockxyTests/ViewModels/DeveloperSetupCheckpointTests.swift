@@ -338,6 +338,21 @@ struct DeveloperSetupViewModelRoutingTests {
         #expect(viewModel.selectedTab == .setup)
     }
 
+    @Test("Refreshing a manual-only target never reports the local probe as unavailable")
+    func refreshOnManualOnlyTargetKeepsManualValidationIssue() async {
+        let viewModel = DeveloperSetupViewModel(coordinator: MainContentCoordinator())
+
+        await viewModel.selectTarget(.iosSimulator)
+        #expect(viewModel.supportsValidation == false)
+
+        await viewModel.refreshSnapshot()
+        await viewModel.refreshSnapshot()
+
+        #expect(viewModel.activeIssue != .localProbeUnavailable)
+        #expect(viewModel.activeIssue == .manualValidationOnly)
+        #expect(viewModel.snapshot.verificationState == .idle)
+    }
+
     @Test("Serialized target switches land on the final target")
     func serializedTargetSwitchLandsOnFinalTarget() async {
         let viewModel = DeveloperSetupViewModel(coordinator: MainContentCoordinator())

@@ -69,10 +69,11 @@ extension MainContentCoordinator {
 
         activeToast = ToastMessage(
             style: .success,
-            text: String(
-                localized: "Published \(transactions.count) request\(transactions.count == 1 ? "" : "s") to Gist",
-                bundle: RockxyLocalization.bundle
-            )
+            text: String(AttributedString(
+                localized: "Published ^[\(transactions.count) request](inflect: true) to Gist",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         )
         gistPublishContext = nil
         return result

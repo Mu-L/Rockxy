@@ -12,7 +12,7 @@ struct LogStreamView: View {
             ContentUnavailableView(
                 "No Logs",
                 systemImage: "doc.text",
-                description: Text("Enable log capture to see application logs")
+                description: Text(String(localized: "Enable log capture to see application logs", bundle: RockxyLocalization.bundle))
             )
         } else {
             List(coordinator.logEntries) { entry in

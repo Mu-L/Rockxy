@@ -153,7 +153,7 @@ struct ToolWindowReadabilityTests {
 
     @Test("Assistant dock follows Appearance typography and keeps protocol summaries monospaced")
     func assistantDockUsesDisplayMetrics() throws {
-        let source = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let source = try readProjectFile("Rockxy/Views/Inspector/AIAssistantDockView.swift")
 
         #expect(source.contains("@Environment(\\.appUIDisplayMetrics)"))
         // UI/prose uses explicit proportional .system(size:) roles derived from Appearance metrics,
@@ -173,7 +173,8 @@ struct ToolWindowReadabilityTests {
 
     @Test("Assistant dock uses a compact native hierarchy with progressive disclosure")
     func assistantDockKeepsConversationChromeCompact() throws {
-        let source = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let source = try readProjectFile("Rockxy/Views/Inspector/AIAssistantDockView.swift")
+            + readProjectFile("Rockxy/Views/Inspector/AssistantConversationHistoryView.swift")
         let components = try readProjectFile("Rockxy/Views/Inspector/AssistantConversationComponents.swift")
 
         #expect(source.contains("ContentUnavailableView"))

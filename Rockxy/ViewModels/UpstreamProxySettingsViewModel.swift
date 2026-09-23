@@ -329,7 +329,9 @@ private extension UpstreamProxyTestResult {
             ?? negotiatedType?.displayName
             ?? String(localized: "Direct", bundle: RockxyLocalization.bundle)
         return String(
-            localized: "Connected to \(targetHost):\(targetPort) through \(typeName) in \(milliseconds) ms.",
+            // The port is an identifier: `%lld` would group 8443 into "8,443". The elapsed
+            // milliseconds stay a quantity and keep their separators.
+            localized: "Connected to \(targetHost):\(String(targetPort)) through \(typeName) in \(milliseconds) ms.",
             bundle: RockxyLocalization.bundle
         )
     }

@@ -469,6 +469,39 @@ struct FilteringTests {
         #expect(coordinator.filteredTransactions.map(\.id) == [ai.id])
     }
 
+    @Test("Smart model search matches the requested model in the request body")
+    func smartSearchAIModel() {
+        let coordinator = MainContentCoordinator()
+        let gpt = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://api.openai.com/v1/chat/completions"
+        )
+        gpt.request.body = Data(#"{"model":"gpt-4o-mini","messages":[]}"#.utf8)
+        let claude = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://api.anthropic.com/v1/messages"
+        )
+        claude.request.body = Data(#"{"model":"claude-sonnet-4-5","messages":[]}"#.utf8)
+        let gemini = TestFixtures.makeTransaction(
+            method: "POST",
+            url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        )
+        let ordinary = TestFixtures.makeTransaction(url: "https://api.example.com/models/gpt-4o")
+        coordinator.transactions = [gpt, claude, gemini, ordinary]
+
+        coordinator.filterCriteria.searchText = "model:gpt-4o"
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.filteredTransactions.map(\.id) == [gpt.id])
+
+        coordinator.filterCriteria.searchText = "model:gemini"
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.filteredTransactions.map(\.id) == [gemini.id])
+
+        coordinator.filterCriteria.searchText = "provider:anthropic model:sonnet"
+        coordinator.recomputeFilteredTransactions()
+        #expect(coordinator.filteredTransactions.map(\.id) == [claude.id])
+    }
+
     // MARK: - New Field Cases
 
     @Test("fieldValue for statusCode returns status string")
@@ -557,6 +590,40 @@ struct FilteringTests {
         coordinator.recomputeFilteredTransactions()
         #expect(coordinator.filteredTransactions.count == 1)
         #expect(coordinator.filteredTransactions[0].id == match.id)
+    }
+
+    // MARK: - Selection Across Filters
+
+    @Test("Filtering out the primary row promotes a surviving selected row")
+    func filterPromotesSurvivingSelectedRow() {
+        let first = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/a")
+        let kept = TestFixtures.makeTransaction(method: "POST", url: "https://api.example.com/b")
+        let last = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/c")
+        let coordinator = makeCoordinator(transactions: [first, kept, last])
+        coordinator.selectTransactions([first.id, kept.id, last.id], primaryID: first.id)
+        #expect(coordinator.selectedTransaction?.id == first.id)
+
+        coordinator.filterCriteria.searchField = .method
+        coordinator.filterCriteria.searchText = "POST"
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.selectedTransactionIDs == [kept.id])
+        #expect(coordinator.selectedTransaction?.id == kept.id)
+    }
+
+    @Test("Filtering out every selected row clears the primary row")
+    func filterClearsPrimaryWhenNothingSurvives() {
+        let first = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/a")
+        let other = TestFixtures.makeTransaction(method: "POST", url: "https://api.example.com/b")
+        let coordinator = makeCoordinator(transactions: [first, other])
+        coordinator.selectTransactions([first.id], primaryID: first.id)
+
+        coordinator.filterCriteria.searchField = .method
+        coordinator.filterCriteria.searchText = "POST"
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.selectedTransactionIDs.isEmpty)
+        #expect(coordinator.selectedTransaction == nil)
     }
 
     // MARK: - Append Fast Path

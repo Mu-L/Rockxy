@@ -266,6 +266,13 @@ extension MainContentCoordinator {
             Self.logger.info("Exported body to \(url.path())")
         } catch {
             Self.logger.error("Failed to export body: \(error.localizedDescription)")
+            showExportError(
+                title: String(localized: "Export Failed", bundle: RockxyLocalization.bundle),
+                message: String(
+                    localized: "Could not save the body.\n\n\(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
         }
     }
 

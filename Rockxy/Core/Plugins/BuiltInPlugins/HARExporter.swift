@@ -79,7 +79,7 @@ private struct HAREntry {
         let startedDateTime = ISO8601DateFormatter.harFormatter.string(
             from: transaction.timestamp
         )
-        let timeMs = (transaction.timingInfo?.totalDuration ?? 0) * 1_000.0
+        let timeMs = (transaction.timingInfo?.totalDuration ?? transaction.measuredDuration ?? 0) * 1_000.0
 
         var dict: [String: Any] = [
             "startedDateTime": startedDateTime,
@@ -116,7 +116,7 @@ private struct HAREntry {
             "queryString": queryItems.map { ["name": $0.name, "value": $0.value ?? ""] },
             "headersSize": headersSize,
             "bodySize": req.body?.count ?? 0,
-            "postData": postDataDictionary(body: req.body, contentType: req.contentType)
+            "postData": postDataDictionary(body: req.body, headers: req.headers, contentType: req.contentType)
         ]
     }
 
@@ -128,7 +128,7 @@ private struct HAREntry {
                 "httpVersion": "HTTP/1.1",
                 "cookies": [[String: Any]](),
                 "headers": [[String: Any]](),
-                "content": contentDictionary(body: nil, contentType: nil),
+                "content": contentDictionary(body: nil, headers: [], contentType: nil),
                 "redirectURL": "",
                 "headersSize": -1,
                 "bodySize": -1
@@ -148,7 +148,7 @@ private struct HAREntry {
             "httpVersion": "HTTP/1.1",
             "cookies": resp.setCookies.map { ["name": $0.name, "value": $0.value] },
             "headers": resp.headers.map { headerToDict($0) },
-            "content": contentDictionary(body: decodedBody, contentType: resp.contentType),
+            "content": contentDictionary(body: decodedBody, headers: resp.headers, contentType: resp.contentType),
             "redirectURL": redirectURL(from: resp),
             "headersSize": headersSize,
             "bodySize": resp.body?.count ?? -1
@@ -157,12 +157,14 @@ private struct HAREntry {
 
     private func timingsDictionary() -> [String: Any] {
         guard let timing = transaction.timingInfo else {
+            // Rows without a breakdown (replays, restored sessions) still carry a wall-clock
+            // duration; HAR readers expect `time` to equal the sum of the phases.
             return [
                 "dns": -1,
                 "connect": -1,
                 "ssl": -1,
                 "send": 0,
-                "wait": 0,
+                "wait": (transaction.measuredDuration ?? 0) * 1_000.0,
                 "receive": 0
             ]
         }
@@ -177,21 +179,49 @@ private struct HAREntry {
         ]
     }
 
+    /// HAR `mimeType` is the MIME type the wire carried, so readers such as Chrome DevTools,
+    /// Charles, and Proxyman can pick a renderer. The captured `Content-Type` header is the
+    /// source of truth; the normalized category is only a fallback for rows that lost headers.
+    private func mimeType(headers: [HTTPHeader], contentType: ContentType?, fallback: String) -> String {
+        if let header = headers.first(where: { $0.name.caseInsensitiveCompare("Content-Type") == .orderedSame }) {
+            let value = header.value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.isEmpty {
+                return value
+            }
+        }
+        switch contentType {
+        case .json: return "application/json"
+        case .xml: return "application/xml"
+        case .html: return "text/html"
+        case .form: return "application/x-www-form-urlencoded"
+        case .multipartForm: return "multipart/form-data"
+        case .protobuf: return "application/protobuf"
+        case .text: return "text/plain"
+        case .image, .binary, .unknown, .none: return fallback
+        }
+    }
+
     /// HAR spec requires binary content to be base64-encoded with an `encoding` field,
-    /// while text content is stored as plain UTF-8 strings.
-    private func contentDictionary(body: Data?, contentType: ContentType?) -> [String: Any] {
-        let mimeType = contentType?.rawValue ?? "application/octet-stream"
+    /// while text content is stored as plain UTF-8 strings. Streamed AI responses
+    /// (`text/event-stream`, `application/x-ndjson`) and other UTF-8 payloads without a
+    /// textual category stay readable instead of being base64-wrapped.
+    private func contentDictionary(body: Data?, headers: [HTTPHeader], contentType: ContentType?) -> [String: Any] {
+        let mimeType = mimeType(headers: headers, contentType: contentType, fallback: "application/octet-stream")
         let size = body?.count ?? 0
-        let isText = contentType.map { [.json, .xml, .html, .text, .form].contains($0) } ?? false
 
         var dict: [String: Any] = [
             "size": size,
             "mimeType": mimeType
         ]
 
-        if let body, isText {
-            dict["text"] = String(data: body, encoding: .utf8) ?? ""
-        } else if let body {
+        guard let body else {
+            return dict
+        }
+        if Self.isTextual(mimeType: mimeType, contentType: contentType),
+           let text = String(data: body, encoding: .utf8)
+        {
+            dict["text"] = text
+        } else {
             dict["text"] = body.base64EncodedString()
             dict["encoding"] = "base64"
         }
@@ -199,13 +229,37 @@ private struct HAREntry {
         return dict
     }
 
-    private func postDataDictionary(body: Data?, contentType: ContentType?) -> [String: Any] {
-        let mimeType = contentType?.rawValue ?? ""
+    private func postDataDictionary(body: Data?, headers: [HTTPHeader], contentType: ContentType?) -> [String: Any] {
+        let mimeType = mimeType(headers: headers, contentType: contentType, fallback: "")
         guard let body else {
             return ["mimeType": mimeType, "text": ""]
         }
         let text = String(data: body, encoding: .utf8) ?? body.base64EncodedString()
         return ["mimeType": mimeType, "text": text]
+    }
+
+    private static func isTextual(mimeType: String, contentType: ContentType?) -> Bool {
+        if let contentType, [.json, .xml, .html, .text, .form].contains(contentType) {
+            return true
+        }
+        let mediaType = mimeType.split(separator: ";", maxSplits: 1).first
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() } ?? ""
+        if mediaType.hasPrefix("text/") {
+            return true
+        }
+        let textualApplicationTypes: Set<String> = [
+            "application/json",
+            "application/x-ndjson",
+            "application/jsonlines",
+            "application/javascript",
+            "application/x-javascript",
+            "application/xml",
+            "application/x-www-form-urlencoded",
+            "application/graphql",
+        ]
+        return textualApplicationTypes.contains(mediaType)
+            || mediaType.hasSuffix("+json")
+            || mediaType.hasSuffix("+xml")
     }
 
     private func headerToDict(_ header: HTTPHeader) -> [String: String] {

@@ -218,7 +218,7 @@ struct AddFavoriteView: View {
                 Text(label)
                     .font(.system(size: metrics.sidebarNavigationFontSize, weight: .medium))
                 Spacer()
-                Text("\(count)")
+                Text(CountFormatter.format(count))
                     .font(.system(size: metrics.sidebarSecondaryFontSize).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -273,7 +273,7 @@ struct AddFavoriteView: View {
                     .lineLimit(1)
                 Spacer()
                 if node.requestCount > 0 {
-                    Text("\(node.requestCount)")
+                    Text(CountFormatter.format(node.requestCount))
                         .font(.system(size: metrics.sidebarSecondaryFontSize).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }

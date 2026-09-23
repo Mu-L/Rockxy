@@ -40,7 +40,13 @@ extension MainContentCoordinator {
         let visibleIDs = Set(workspace.filteredTransactions.map(\.id))
         workspace.selectedTransactionIDs.formIntersection(visibleIDs)
         if let selected = workspace.selectedTransaction, !visibleIDs.contains(selected.id) {
-            workspace.selectedTransaction = nil
+            // The primary row was filtered out. Promote the top-most surviving selected row,
+            // matching `selectTransactions(_:primaryID:)`, so the inspector never reads
+            // "No Selection" beside a table and footer that still show a selected row.
+            let survivingPrimary = rows.first { workspace.selectedTransactionIDs.contains($0.id) }
+            workspace.selectedTransaction = survivingPrimary.flatMap {
+                workspace.trafficSelectionIndex[$0.id]?.transaction
+            }
         }
         // A full derivation replaces the entire row set, so any in-flight append chain is
         // void: clear both the append-only signal and its provenance token before bumping the

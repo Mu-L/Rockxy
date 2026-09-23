@@ -202,10 +202,11 @@ extension MainContentCoordinator {
 
             activeToast = ToastMessage(
                 style: .success,
-                text: String(
-                    localized: "Imported \(importedTransactions.count) transactions from \(fileName)",
-                    bundle: RockxyLocalization.bundle
-                )
+                text: String(AttributedString(
+                    localized: "Imported ^[\(importedTransactions.count) transaction](inflect: true) from \(fileName)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             )
 
             Self.logger.info("Imported HAR from \(fileName): \(importedTransactions.count) transactions")
@@ -269,10 +270,11 @@ extension MainContentCoordinator {
 
             activeToast = ToastMessage(
                 style: .success,
-                text: String(
-                    localized: "Opened session with \(session.transactions.count) transactions",
-                    bundle: RockxyLocalization.bundle
-                )
+                text: String(AttributedString(
+                    localized: "Opened session with ^[\(session.transactions.count) transaction](inflect: true)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             )
 
             Self.logger.info("Opened session from \(fileName): \(session.transactions.count) transactions")

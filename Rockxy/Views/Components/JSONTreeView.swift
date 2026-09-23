@@ -89,8 +89,11 @@ struct JSONTreeView: View {
         guard !trimmed.isEmpty else {
             return ""
         }
-        let suffix = queryResult.isTruncated ? "+" : ""
-        return "\(queryResult.matches.count)\(suffix) selected"
+        let count = queryResult.matches.count
+        guard queryResult.isTruncated else {
+            return String(localized: "\(count) selected", bundle: RockxyLocalization.bundle)
+        }
+        return String(localized: "\(count)+ selected", bundle: RockxyLocalization.bundle)
     }
 
     @ViewBuilder private var content: some View {
@@ -456,7 +459,13 @@ private struct JSONTreeNodeView: View {
                     .font(.system(size: metrics.fontSize, design: .monospaced))
                     .foregroundStyle(Theme.JSON.bracket)
                 if !effectiveExpanded {
-                    Text(" // \(count) items")
+                    Text(String(
+                        AttributedString(
+                            localized: " // ^[\(count) item](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters
+                    ))
                         .font(.system(size: metrics.secondaryFontSize))
                         .foregroundStyle(.tertiary)
                 }

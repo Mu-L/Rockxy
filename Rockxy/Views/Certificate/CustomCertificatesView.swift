@@ -522,7 +522,7 @@ struct CustomCertificatesView: View {
     }
 
     nonisolated private static func format(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .shortened)
+        TimestampFormatter.string(date, date: .abbreviated, time: .shortened)
     }
 
     private func confirmDeletion() {

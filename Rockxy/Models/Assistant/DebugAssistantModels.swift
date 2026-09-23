@@ -257,15 +257,17 @@ struct DebugAssistantConversationContext: Equatable {
 
     var summary: String {
         if requestedSelectionCount == selectedTransactionIDs.count {
-            return String(
-                localized: "\(selectedTransactionIDs.count) selected request(s)",
-                bundle: RockxyLocalization.bundle
-            )
+            return String(AttributedString(
+                localized: "^[\(selectedTransactionIDs.count) selected request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
-        return String(
-            localized: "\(selectedTransactionIDs.count) of \(requestedSelectionCount) selected request(s)",
-            bundle: RockxyLocalization.bundle
-        )
+        return String(AttributedString(
+            localized: "\(selectedTransactionIDs.count) of ^[\(requestedSelectionCount) selected request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     func matches(

@@ -1,4 +1,5 @@
 import Foundation
+import NIOHTTP1
 @testable import Rockxy
 import Testing
 
@@ -143,6 +144,119 @@ struct TrafficSessionManagerTests {
         #expect(flushed[0].id == transaction.id)
     }
 
+    @Test("A live WebSocket is appended once and its close is routed as an in-place update")
+    func liveWebSocketCloseIsRoutedAsUpdate() async {
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: WebSocketConnection(upgradeRequest: request)
+        )
+
+        await manager.addTransaction(transaction)
+        let opened = await manager.flushPendingUpdates()
+        #expect(opened.map(\.id) == [transaction.id])
+        #expect(updates.value.isEmpty)
+
+        await MainActor.run { transaction.state = .completed }
+        await manager.addTransaction(transaction)
+        let afterClose = await manager.flushPendingUpdates()
+        #expect(afterClose.isEmpty)
+        #expect(updates.value == [[transaction.id]])
+
+        // A re-delivery after the update path has retired the connection appends nothing new
+        // and updates again, so a duplicate close can never create a second row.
+        await manager.addTransaction(transaction)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [transaction.id])
+    }
+
+    @Test("Clear Session drops the close delivery of a WebSocket it already dismissed")
+    func clearedLiveWebSocketDoesNotResurface() async {
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let transaction = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: WebSocketConnection(upgradeRequest: request)
+        )
+        await manager.addTransaction(transaction)
+        _ = await manager.flushPendingUpdates()
+        _ = await manager.beginNewSession()
+
+        await MainActor.run { transaction.state = .completed }
+        await manager.addTransaction(transaction)
+
+        #expect(await manager.flushPendingUpdates().isEmpty)
+        #expect(updates.value.isEmpty)
+    }
+
+    @Test("A streaming response is a live row that completes in place")
+    func liveStreamingResponseCompletesInPlace() async {
+        // An LLM completion can stream for 30 s. It is delivered as an `.active` row when its
+        // head arrives and again at `.end`; the second delivery must update, not append.
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let stream = HTTPTransaction(
+            request: TestFixtures.makeRequest(method: "POST", url: "https://api.openai.com/v1/chat/completions"),
+            response: TestFixtures.makeResponse(
+                statusCode: 200,
+                headers: [HTTPHeader(name: "Content-Type", value: "text/event-stream")]
+            ),
+            state: .active
+        )
+        await manager.addTransaction(stream)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [stream.id])
+
+        let liveInspectionKey = stream.inspectionKey
+        await MainActor.run { stream.state = .completed }
+        // Inspectors re-analyse the completed body instead of keeping the live, empty one.
+        #expect(stream.inspectionKey != liveInspectionKey)
+        await manager.addTransaction(stream)
+        #expect(await manager.flushPendingUpdates().isEmpty)
+        #expect(updates.value == [[stream.id]])
+
+        // An ordinary completed response is never tracked as live.
+        let plain = TestFixtures.makeTransaction()
+        await manager.addTransaction(plain)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [plain.id])
+        #expect(updates.value == [[stream.id]])
+    }
+
+    @Test("Only event streams and NDJSON get a live row")
+    func streamingContentTypes() {
+        func headers(_ value: String) -> HTTPHeaders {
+            HTTPHeaders([("Content-Type", value)])
+        }
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("text/event-stream")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("text/event-stream; charset=utf-8")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("application/x-ndjson")))
+        #expect(UpstreamResponseHandler.isStreamingResponse(headers("Application/NDJSON")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(headers("application/json")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(headers("text/plain")))
+        #expect(!UpstreamResponseHandler.isStreamingResponse(HTTPHeaders()))
+    }
+
     @Test("onBatchReady nil drops batch silently without crash")
     func nilCallbackDoesNotCrash() async {
         let manager = TrafficSessionManager()
@@ -182,4 +296,27 @@ struct TrafficSessionManagerTests {
         await manager.stopBatchTimer()
         #expect(delivered == true)
     }
+}
+
+// MARK: - UpdateRecorder
+
+private final class UpdateRecorder: @unchecked Sendable {
+    // MARK: Internal
+
+    var value: [[UUID]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
+    }
+
+    func record(_ ids: [UUID]) {
+        lock.lock()
+        recorded.append(ids)
+        lock.unlock()
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var recorded: [[UUID]] = []
 }

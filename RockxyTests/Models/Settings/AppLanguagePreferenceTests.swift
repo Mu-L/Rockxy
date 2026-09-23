@@ -131,13 +131,36 @@ struct AppLanguagePreferenceTests {
 
         // System Default must not collapse the environment locale onto a
         // region-less language locale; regional formatting follows the Mac.
-        #expect(controller.locale == Locale.current)
+        #expect(controller.locale.identifier == Locale.current.identifier)
 
+        // An explicit choice changes the language and keeps the Mac's region formats.
         #expect(controller.select(optionID: "en"))
-        #expect(controller.locale == Locale(identifier: "en"))
+        #expect(controller.locale.language.languageCode == .english)
+        #expect(controller.locale.region == Locale.current.region)
+        #expect(controller.locale.decimalSeparator == Locale.current.decimalSeparator)
+        #expect(controller.locale.hourCycle == Locale.current.hourCycle)
 
         #expect(controller.select(optionID: AppLanguageOption.systemID))
-        #expect(controller.locale == Locale.current)
+        #expect(controller.locale.identifier == Locale.current.identifier)
+    }
+
+    @Test("An explicit language keeps the region's number, clock, and week formats")
+    func explicitLanguageKeepsRegionalFormats() {
+        let germany = Locale(identifier: "de_DE")
+        let chinese = AppLanguagePreference.formattingLocale(languageIdentifier: "zh-Hans", regionalBase: germany)
+        #expect(chinese.language.languageCode == .chinese)
+        #expect(chinese.decimalSeparator == ",")
+        #expect(chinese.groupingSeparator == ".")
+        #expect(chinese.hourCycle == germany.hourCycle)
+        #expect(chinese.firstDayOfWeek == .monday)
+        #expect(12_345.formatted(.number.locale(chinese)) == "12.345")
+
+        let unitedStates = Locale(identifier: "en_US")
+        let vietnamese = AppLanguagePreference.formattingLocale(languageIdentifier: "vi", regionalBase: unitedStates)
+        #expect(vietnamese.language.languageCode == .vietnamese)
+        #expect(vietnamese.decimalSeparator == ".")
+        #expect(vietnamese.hourCycle == unitedStates.hourCycle)
+        #expect(vietnamese.firstDayOfWeek == .sunday)
     }
 
     @MainActor
@@ -160,6 +183,6 @@ struct AppLanguagePreferenceTests {
 
         #expect(controller.select(optionID: AppLanguageOption.systemID))
         #expect(String(localized: "General", bundle: controller.localizedBundle) == "General")
-        #expect(controller.locale == Locale.current)
+        #expect(controller.locale.identifier == Locale.current.identifier)
     }
 }

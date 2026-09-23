@@ -41,7 +41,7 @@ enum BabylonCaptureMapper {
             let body = package.responseBodyData.isEmpty ? nil : package.responseBodyData
             return HTTPResponseData(
                 statusCode: response.statusCode,
-                statusMessage: HTTPURLResponse.localizedString(forStatusCode: response.statusCode),
+                statusMessage: HTTPReasonPhrase.standard(for: response.statusCode),
                 headers: responseHeaders,
                 body: body,
                 contentType: ContentTypeDetector.detect(headers: responseHeaders, body: body)

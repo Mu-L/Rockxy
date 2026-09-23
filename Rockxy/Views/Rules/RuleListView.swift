@@ -34,6 +34,23 @@ struct RuleListView: View {
             bottomBar
         }
         .font(toolMetrics.font())
+        .alert(
+            operationAlertTitle,
+            isPresented: Binding(
+                get: { operationError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        operationError = nil
+                    }
+                }
+            )
+        ) {
+            Button(String(localized: "OK", bundle: RockxyLocalization.bundle)) { operationError = nil }
+        } message: {
+            if let operationError {
+                Text(operationError)
+            }
+        }
         .sheet(isPresented: $showAddSheet) {
             RuleEditSheet { newRule in
                 coordinator.addRule(newRule)
@@ -51,6 +68,8 @@ struct RuleListView: View {
     @State private var editingRule: ProxyRule?
     @State private var searchText = ""
     @State private var filterAction: RuleActionType?
+    @State private var operationError: String?
+    @State private var operationAlertTitle = String(localized: "Import Failed", bundle: RockxyLocalization.bundle)
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 
     private var rules: [ProxyRule] {
@@ -187,7 +206,11 @@ struct RuleListView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 8) {
-            Text(String(localized: "\(filteredRules.count) rules", bundle: RockxyLocalization.bundle))
+            Text(String(AttributedString(
+                localized: "^[\(filteredRules.count) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
 
@@ -303,6 +326,10 @@ struct RuleListView: View {
             }
             Self.logger.info("Imported \(imported.count) rules from \(url.lastPathComponent)")
         } catch {
+            // Without this the picker just closed: an oversized or malformed rules file failed
+            // only into the log, so the window looked like nothing had been asked of it.
+            operationAlertTitle = String(localized: "Import Failed", bundle: RockxyLocalization.bundle)
+            operationError = error.localizedDescription
             Self.logger.error("Failed to import rules: \(error.localizedDescription)")
         }
     }
@@ -321,6 +348,8 @@ struct RuleListView: View {
             try RuleStore().exportRules(to: url)
             Self.logger.info("Exported rules to \(url.lastPathComponent)")
         } catch {
+            operationAlertTitle = String(localized: "Export Failed", bundle: RockxyLocalization.bundle)
+            operationError = error.localizedDescription
             Self.logger.error("Failed to export rules: \(error.localizedDescription)")
         }
     }
@@ -436,9 +465,9 @@ private struct RuleEditSheet: View {
                 }
 
                 Section(String(localized: "Match Condition", bundle: RockxyLocalization.bundle)) {
-                    TextField("URL Pattern (regex)", text: $urlPattern)
+                    TextField(String(localized: "URL Pattern (regex)", bundle: RockxyLocalization.bundle), text: $urlPattern)
                         .font(toolMetrics.font(monospaced: true))
-                    TextField("HTTP Method", text: $method)
+                    TextField(String(localized: "HTTP Method", bundle: RockxyLocalization.bundle), text: $method)
                         .textCase(.uppercase)
                 }
 

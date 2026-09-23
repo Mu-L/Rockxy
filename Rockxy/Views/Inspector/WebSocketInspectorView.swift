@@ -166,18 +166,23 @@ struct WebSocketInspectorView: View {
                         : String(localized: "Active", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                 }
-                if let duration = connectionDuration(connection) {
-                    summaryRow(String(localized: "Duration", bundle: RockxyLocalization.bundle), value: duration)
+                TimelineView(.animation(minimumInterval: 1, paused: !transaction.isRunning)) { context in
+                    if let duration = transaction.displayDuration(at: context.date) {
+                        summaryRow(
+                            String(localized: "Duration", bundle: RockxyLocalization.bundle),
+                            value: DurationFormatter.format(seconds: duration)
+                        )
+                    }
                 }
             }
             HStack(spacing: 16) {
                 summaryRow(
                     String(localized: "Sent", bundle: RockxyLocalization.bundle),
-                    value: "\(connection.sentFrames.count) (\(totalSize(connection.sentFrames)))"
+                    value: frameCountSummary(connection.sentFrames)
                 )
                 summaryRow(
                     String(localized: "Received", bundle: RockxyLocalization.bundle),
-                    value: "\(connection.receivedFrames.count) (\(totalSize(connection.receivedFrames)))"
+                    value: frameCountSummary(connection.receivedFrames)
                 )
             }
             if connection.isCaptureLimitReached {
@@ -220,10 +225,10 @@ struct WebSocketInspectorView: View {
         Picker(selection: $directionFilterValue) {
             Text(String(localized: "All (\(connection.frameCount))", bundle: RockxyLocalization.bundle))
                 .tag(FrameDirection?.none)
-            Text("↑ \(String(localized: "Sent", bundle: RockxyLocalization.bundle)) (\(connection.sentFrames.count))")
+            Text("↑ \(String(localized: "Sent", bundle: RockxyLocalization.bundle)) (\(CountFormatter.format(connection.sentFrames.count)))")
                 .tag(Optional(FrameDirection.sent))
             Text(
-                "↓ \(String(localized: "Received", bundle: RockxyLocalization.bundle)) (\(connection.receivedFrames.count))"
+                "↓ \(String(localized: "Received", bundle: RockxyLocalization.bundle)) (\(CountFormatter.format(connection.receivedFrames.count)))"
             )
             .tag(Optional(FrameDirection.received))
         } label: {
@@ -400,20 +405,11 @@ struct WebSocketInspectorView: View {
         SizeFormatter.format(bytes: frames.reduce(0) { $0 + $1.payload.count })
     }
 
-    private func connectionDuration(_ connection: WebSocketConnection) -> String? {
-        let frames = connection.frames
-        guard let first = frames.first else {
-            return nil
-        }
-        let end = frames.last?.timestamp ?? Date()
-        let interval = end.timeIntervalSince(first.timestamp)
-        if interval < 60 {
-            return String(format: "%.0fs", interval)
-        } else if interval < 3_600 {
-            return String(format: "%.0fm %.0fs", interval / 60, interval.truncatingRemainder(dividingBy: 60))
-        } else {
-            return String(format: "%.0fh %.0fm", interval / 3_600, (interval / 60).truncatingRemainder(dividingBy: 60))
-        }
+    /// "1,204 (2.3 MB)" — the frame count beside its own payload total. Both halves go through a
+    /// shared formatter so the pair reads in one locale; the parentheses carry no wording to
+    /// translate, so this stays a plain composition.
+    private func frameCountSummary(_ frames: [WebSocketFrameData]) -> String {
+        "\(CountFormatter.format(frames.count)) (\(totalSize(frames)))"
     }
 
     private func filteredFrames(_ connection: WebSocketConnection) -> [WebSocketFrameData] {
@@ -434,19 +430,26 @@ struct WebSocketInspectorView: View {
         }
     }
 
+    /// Stands in for a frame whose bytes cannot be shown as text. It sits in the same row as the
+    /// frame's own size column, so it has to be the shared formatter's spelling — building the
+    /// count by hand printed "(1048576 bytes)" beside that column's "1 MB".
+    private static func sizePlaceholder(for frame: WebSocketFrameData) -> String {
+        "(\(SizeFormatter.format(bytes: frame.payload.count)))"
+    }
+
     private func payloadPreview(_ frame: WebSocketFrameData) -> String {
         switch frame.opcode {
         case .text:
             let previewBytes = frame.payload.prefix(Self.maxPayloadPreviewBytes)
             guard let text = String(data: previewBytes, encoding: .utf8) else {
-                return "(\(frame.payload.count) bytes)"
+                return Self.sizePlaceholder(for: frame)
             }
             if text.count > 80 {
                 return String(text.prefix(80))
             }
             return text
         case .binary:
-            return "(\(frame.payload.count) bytes)"
+            return Self.sizePlaceholder(for: frame)
         case .connectionClose:
             if frame.payload.count >= 2 {
                 let code = UInt16(frame.payload[0]) << 8 | UInt16(frame.payload[1])
@@ -466,9 +469,7 @@ struct WebSocketInspectorView: View {
     }
 
     private func formatTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: date)
+        TimestampFormatter.timeOfDayWithMilliseconds(date)
     }
 }
 

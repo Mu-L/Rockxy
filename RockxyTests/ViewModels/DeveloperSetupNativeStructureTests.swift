@@ -95,6 +95,20 @@ struct DeveloperSetupNativeStructureTests {
         #expect(source.contains("isPinned(target) || selection == target.id"))
     }
 
+    @Test("A routed or searched target is scrolled into view instead of leaving the sidebar blank")
+    func sourceListRevealsTheSelectedTarget() throws {
+        let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupSourceList.swift")
+
+        // The Certificate and Setup menus select targets that sit far below the visible rows
+        // (iOS Device, Android Device). Without this the sidebar keeps showing the top of the
+        // list with no row selected, so the guide on screen belongs to an invisible target.
+        #expect(source.contains("ScrollViewReader"))
+        #expect(source.contains("proxy.scrollTo(selection, anchor: nil)"))
+        #expect(source.contains(".onChange(of: selection)"))
+        // scrollTo matches by .id(), not the selection .tag().
+        #expect(source.contains(".id(target.id)"))
+    }
+
     @Test("Inspector is a compact readiness panel without setup modes or duplicate actions")
     func inspectorIsCompactReadinessPanel() throws {
         let source = try readFeatureFile("Rockxy/Views/DeveloperSetup/DeveloperSetupInspector.swift")

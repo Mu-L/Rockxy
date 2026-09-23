@@ -132,10 +132,11 @@ extension MainContentCoordinator {
             localized: "Import \(portable.name) as a New Project?",
             bundle: RockxyLocalization.bundle
         )
-        alert.informativeText = String(
-            localized: "\(fileName) contains \(portable.tabs.count) traffic tab(s), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced.",
-            bundle: RockxyLocalization.bundle
-        )
+        alert.informativeText = String(AttributedString(
+            localized: "\(fileName) contains ^[\(portable.tabs.count) traffic tab](inflect: true), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced.",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
         alert.alertStyle = .informational
         alert.addButton(withTitle: String(localized: "Import", bundle: RockxyLocalization.bundle))
         alert.addButton(withTitle: String(localized: "Cancel", bundle: RockxyLocalization.bundle))

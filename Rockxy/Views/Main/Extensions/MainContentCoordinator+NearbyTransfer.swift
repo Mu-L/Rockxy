@@ -131,7 +131,7 @@ extension MainContentCoordinator {
         let body = bodyData(message.body)
         return HTTPResponseData(
             statusCode: statusCode,
-            statusMessage: HTTPURLResponse.localizedString(forStatusCode: statusCode),
+            statusMessage: HTTPReasonPhrase.standard(for: statusCode),
             headers: headers,
             body: body,
             contentType: ContentTypeDetector.detect(headers: headers, body: body)

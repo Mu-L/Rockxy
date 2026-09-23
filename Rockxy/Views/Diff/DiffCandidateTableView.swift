@@ -105,7 +105,10 @@ struct DiffCandidateTableView: View {
             }
             .width(clientColumnWidth)
 
-            TableColumn(String(localized: "Compact HTTP status code", bundle: RockxyLocalization.bundle)) { transaction in
+            TableColumn(String(
+                localized: "Compact HTTP status code",
+                bundle: RockxyLocalization.bundle
+            )) { transaction in
                 if let statusCode = transaction.response?.statusCode {
                     DiffStatusCodeBadge(statusCode: statusCode)
                 } else {
@@ -127,7 +130,7 @@ struct DiffCandidateTableView: View {
             .width(timeColumnWidth)
 
             TableColumn(String(localized: "Duration", bundle: RockxyLocalization.bundle)) { transaction in
-                Text(formatDuration(transaction.timingInfo?.totalDuration ?? transaction.measuredDuration))
+                Text(formatDuration(transaction.displayDuration))
                     .font(toolMetrics.secondaryFont(monospaced: true))
                     .foregroundStyle(.secondary)
             }
@@ -191,14 +194,14 @@ struct DiffCandidateTableView: View {
     }
 
     private func formatTime(_ date: Date) -> String {
-        date.formatted(.dateTime.hour().minute().second())
+        TimestampFormatter.timeOfDay(date)
     }
 
     private func formatDuration(_ seconds: TimeInterval?) -> String {
         guard let seconds else {
             return "—"
         }
-        return String(format: "%.0fms", seconds * 1_000)
+        return DurationFormatter.format(seconds: seconds)
     }
 }
 

@@ -373,12 +373,17 @@ struct ModifyHeaderWindowView: View {
 
     private var footerHint: String {
         let countText = if viewModel.searchText.isEmpty {
-            "\(viewModel.headerRules.count) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
+            String(AttributedString(
+                localized: "^[\(viewModel.headerRules.count) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         } else {
-            String(
-                localized: "\(viewModel.modifyHeaderRules.count) of \(viewModel.headerRules.count) rules",
-                bundle: RockxyLocalization.bundle
-            )
+            String(AttributedString(
+                localized: "\(viewModel.modifyHeaderRules.count) of ^[\(viewModel.headerRules.count) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
         let reorderHint = viewModel.isReorderable
             ? String(localized: "Drag rows to reorder", bundle: RockxyLocalization.bundle)
@@ -575,10 +580,11 @@ struct ModifyHeaderWindowView: View {
             .rockxyChipStyle(tint: .green, isActive: viewModel.isToolEnabled)
             .accessibilityLabel(
                 viewModel.isToolEnabled
-                    ? String(
-                        localized: "\(viewModel.activeRuleCount) active Modify Header rules",
-                        bundle: RockxyLocalization.bundle
-                    )
+                    ? String(AttributedString(
+                        localized: "^[\(viewModel.activeRuleCount) active Modify Header rule](inflect: true)",
+                        bundle: RockxyLocalization.bundle,
+                        locale: RockxyLocalization.locale
+                    ).characters)
                     : String(localized: "Modify Headers is off", bundle: RockxyLocalization.bundle)
             )
         }

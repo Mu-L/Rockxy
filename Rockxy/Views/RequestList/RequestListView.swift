@@ -15,7 +15,7 @@ struct RequestListView: View {
     var body: some View {
         VStack(spacing: 0) {
             UtilitySegmentedHeader(width: 320) {
-                Picker("View", selection: Binding(
+                Picker(String(localized: "View", bundle: RockxyLocalization.bundle), selection: Binding(
                     get: { coordinator.activeMainTab },
                     set: { coordinator.activeMainTab = $0 }
                 )) {

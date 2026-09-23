@@ -227,14 +227,18 @@ struct Web3RPCInspectorView: View {
         if let batch {
             section(
                 String(localized: "Batch Calls", bundle: RockxyLocalization.bundle),
-                badgeText: String(localized: "\(batch.web3RequestCount) calls", bundle: RockxyLocalization.bundle)
+                badgeText: String(AttributedString(
+                    localized: "^[\(batch.web3RequestCount) call](inflect: true)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             ) {
                 VStack(spacing: 0) {
                     batchHeaderRow
                     Divider()
                     batchMetricRow(
                         String(localized: "Requests", bundle: RockxyLocalization.bundle),
-                        value: "\(batch.requestCount)",
+                        value: CountFormatter.format(batch.requestCount),
                         detail: String(
                             localized: "\(batch.web3RequestCount) Web3 methods",
                             bundle: RockxyLocalization.bundle
@@ -250,7 +254,11 @@ struct Web3RPCInspectorView: View {
                         detail: batch.errorCount == 0 ? String(
                             localized: "No RPC errors",
                             bundle: RockxyLocalization.bundle
-                        ) : String(localized: "\(batch.errorCount) RPC errors", bundle: RockxyLocalization.bundle)
+                        ) : String(AttributedString(
+                            localized: "^[\(batch.errorCount) RPC error](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters)
                     )
                     if !batch.methods.isEmpty {
                         Divider()
@@ -435,7 +443,11 @@ struct Web3RPCInspectorView: View {
                 bundle: RockxyLocalization.bundle
             ) : first
         }
-        return String(localized: "\(batch.web3RequestCount) calls", bundle: RockxyLocalization.bundle)
+        return String(AttributedString(
+            localized: "^[\(batch.web3RequestCount) call](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     private func payloadSummary(_ info: Web3RPCInfo) -> String {

@@ -68,7 +68,11 @@ struct BypassProxyListView: View {
             titleVisibility: .visible
         ) {
             Button(
-                String(localized: "Remove \(pendingRemovalIDs.count) Entries", bundle: RockxyLocalization.bundle),
+                String(AttributedString(
+                    localized: "Remove ^[\(pendingRemovalIDs.count) Entry](inflect: true)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters),
                 role: .destructive
             ) {
                 removeDomains(pendingRemovalIDs)
@@ -163,10 +167,11 @@ struct BypassProxyListView: View {
     }
 
     private var ruleCountText: String {
-        let count = manager.domains.count
-        return count == 1
-            ? String(localized: "1 host pattern", bundle: RockxyLocalization.bundle)
-            : String(localized: "\(count) host patterns", bundle: RockxyLocalization.bundle)
+        String(AttributedString(
+            localized: "^[\(manager.domains.count) host pattern](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     private var activeStatusText: String {

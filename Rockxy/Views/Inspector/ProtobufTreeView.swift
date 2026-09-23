@@ -121,9 +121,17 @@ private struct ProtobufFieldRow: View {
         case let .string(value):
             "\"\(value)\""
         case let .bytes(data):
-            String(localized: "raw bytes · \(data.count) bytes", bundle: RockxyLocalization.bundle)
+            String(AttributedString(
+                localized: "raw bytes · ^[\(data.count) byte](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         case let .message(tree):
-            String(localized: "nested message · \(tree.fields.count) fields", bundle: RockxyLocalization.bundle)
+            String(AttributedString(
+                localized: "nested message · ^[\(tree.fields.count) field](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
     }
 }

@@ -94,6 +94,9 @@ struct PreviewTabContentView: View {
         }
     }
 
+    /// A cache identity for the rendered preview, never shown to anyone. The byte counts stay
+    /// raw on purpose: grouping separators would make the key locale-dependent, so the same
+    /// snapshot would miss its own cache entry after a language change.
     private func renderID(snapshot: InspectorTransactionSnapshot) -> String {
         let bodyCounts = if tab.panel == .request {
             "\(snapshot.request.body?.count ?? 0)"

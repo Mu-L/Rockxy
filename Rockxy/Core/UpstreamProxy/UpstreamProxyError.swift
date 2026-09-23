@@ -43,7 +43,7 @@ enum UpstreamProxyError: LocalizedError, Equatable {
             )
         case let .unsupportedSOCKS5AuthMethod(method):
             String(
-                localized: "SOCKS5 proxy selected unsupported authentication method \(method).",
+                localized: "SOCKS5 proxy selected unsupported authentication method \(Int(method)).",
                 bundle: RockxyLocalization.bundle
             )
         case let .socks5Reply(reply):

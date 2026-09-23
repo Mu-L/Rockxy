@@ -37,14 +37,14 @@ struct ScriptEditorWindowReadabilityTests {
 
         // User-directed Test URL / Test Match; invalid regex is surfaced honestly.
         #expect(source.contains("String(localized: \"Test URL\", bundle: RockxyLocalization.bundle)"))
-        #expect(source.contains("Text(\"Test Match\")"))
+        #expect(source.contains("Text(String(localized: \"Test Match\", bundle: RockxyLocalization.bundle))"))
         #expect(source.contains("viewModel.runRuleTest()"))
         #expect(!source.contains("Test your Rule"))
 
         // Run request/response/mock controls, with mock normalization routed through the VM.
-        #expect(source.contains("Text(\"Request\")"))
-        #expect(source.contains("Text(\"Response\")"))
-        #expect(source.contains("Text(\"Mock API\")"))
+        #expect(source.contains("Text(String(localized: \"Request\", bundle: RockxyLocalization.bundle))"))
+        #expect(source.contains("Text(String(localized: \"Response\", bundle: RockxyLocalization.bundle))"))
+        #expect(source.contains("Text(String(localized: \"Mock API\", bundle: RockxyLocalization.bundle))"))
         #expect(source.contains("viewModel.setRunAsMock($0)"))
         #expect(source.contains("viewModel.setRunOnRequest($0)"))
 

@@ -24,12 +24,18 @@ enum ScriptRuntimeError: Error, LocalizedError {
 
     // MARK: Internal
 
+    /// Shown as the plugin's status and last error in the scripting surfaces, so the
+    /// templates are localized; the plugin ID and the script's own message stay verbatim.
     var errorDescription: String? {
         switch self {
-        case let .pluginNotLoaded(id): "Plugin not loaded: \(id)"
-        case let .scriptLoadFailed(reason): "Script load failed: \(reason)"
-        case .executionTimeout: "Plugin script execution timed out"
-        case let .jsException(message): "JS exception: \(message)"
+        case let .pluginNotLoaded(id):
+            String(localized: "Plugin not loaded: \(id)", bundle: RockxyLocalization.bundle)
+        case let .scriptLoadFailed(reason):
+            String(localized: "Script load failed: \(reason)", bundle: RockxyLocalization.bundle)
+        case .executionTimeout:
+            String(localized: "Plugin script execution timed out", bundle: RockxyLocalization.bundle)
+        case let .jsException(message):
+            String(localized: "JS exception: \(message)", bundle: RockxyLocalization.bundle)
         }
     }
 }
@@ -53,7 +59,9 @@ actor ScriptRuntime {
 
     func loadPlugin(_ info: PluginInfo) throws {
         guard let scriptEntry = info.manifest.entryPoints["script"] else {
-            throw ScriptRuntimeError.scriptLoadFailed("No script entry point defined")
+            throw ScriptRuntimeError.scriptLoadFailed(
+                String(localized: "No script entry point defined", bundle: RockxyLocalization.bundle)
+            )
         }
 
         let scriptURL = info.bundlePath.appendingPathComponent(scriptEntry)
@@ -61,7 +69,12 @@ actor ScriptRuntime {
         do {
             source = try String(contentsOf: scriptURL, encoding: .utf8)
         } catch {
-            throw ScriptRuntimeError.scriptLoadFailed("Cannot read \(scriptURL.path): \(error.localizedDescription)")
+            throw ScriptRuntimeError.scriptLoadFailed(
+                String(
+                    localized: "Cannot read \(scriptURL.path): \(error.localizedDescription)",
+                    bundle: RockxyLocalization.bundle
+                )
+            )
         }
 
         let queue = DispatchQueue(
@@ -69,7 +82,9 @@ actor ScriptRuntime {
             qos: .userInitiated
         )
         guard let context = JSContext() else {
-            throw ScriptRuntimeError.scriptLoadFailed("Failed to create JSContext")
+            throw ScriptRuntimeError.scriptLoadFailed(
+                String(localized: "Failed to create JSContext", bundle: RockxyLocalization.bundle)
+            )
         }
 
         let pluginID = info.id

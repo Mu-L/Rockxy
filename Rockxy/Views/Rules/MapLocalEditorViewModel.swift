@@ -805,7 +805,7 @@ enum MapLocalHTTPMessage {
 
     static func message(statusCode: Int, headers: [HTTPHeader], body: String) -> String {
         let status = HTTPResponseStatusLookup.reasonPhrase(for: statusCode)
-            ?? HTTPURLResponse.localizedString(forStatusCode: statusCode).localizedCapitalized
+            ?? HTTPReasonPhrase.standard(for: statusCode)
         let headerText = headers
             .map { "\($0.name): \($0.value)" }
             .joined(separator: "\n")

@@ -191,9 +191,11 @@ struct ProtobufSchemaListWindowView: View {
 
             TableColumn(String(localized: "Referenced By", bundle: RockxyLocalization.bundle)) { schema in
                 let count = mappingStore.referenceCount(forSchema: schema.id)
-                Text(count == 1
-                    ? String(localized: "1 definition", bundle: RockxyLocalization.bundle)
-                    : String(localized: "\(count) definitions", bundle: RockxyLocalization.bundle))
+                Text(String(AttributedString(
+                    localized: "^[\(count) definition](inflect: true)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters))
                     .foregroundStyle(count == 0 ? .secondary : .primary)
             }
             .width(min: 130, ideal: 160)

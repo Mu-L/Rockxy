@@ -295,6 +295,7 @@ struct BlockListWindowView: View {
             Divider()
             BlockListTableView(
                 rules: viewModel.filteredBlockRules,
+                isSearching: !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                 selectedRuleID: $viewModel.selectedRuleID,
                 onToggle: { viewModel.toggleRule(id: $0) },
                 onEdit: openEditorForRule,
@@ -403,11 +404,16 @@ struct BlockListWindowView: View {
 
     private var footerHint: String {
         let countText = viewModel.searchText.isEmpty
-            ? "\(viewModel.ruleCount) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
-            : String(
-                localized: "\(viewModel.filteredBlockRules.count) of \(viewModel.ruleCount) rules",
-                bundle: RockxyLocalization.bundle
-            )
+            ? String(AttributedString(
+                localized: "^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "\(viewModel.filteredBlockRules.count) of ^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 

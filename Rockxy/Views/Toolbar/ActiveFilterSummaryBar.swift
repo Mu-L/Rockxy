@@ -37,10 +37,11 @@ struct ActiveFilterSummaryBar: View {
 
                     if !coordinator.activeWorkspace.mutedTrafficSources.isEmpty {
                         FilterChip(
-                            label: String(
-                                localized: "\(coordinator.activeWorkspace.mutedTrafficSources.count) muted sources",
-                                bundle: RockxyLocalization.bundle
-                            ),
+                            label: String(AttributedString(
+                                localized: "^[\(coordinator.activeWorkspace.mutedTrafficSources.count) muted source](inflect: true)",
+                                bundle: RockxyLocalization.bundle,
+                                locale: RockxyLocalization.locale
+                            ).characters),
                             onRemove: coordinator.unmuteAllTrafficSources
                         )
                     }

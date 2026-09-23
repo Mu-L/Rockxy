@@ -95,6 +95,8 @@ enum CodeSnippetGenerator {
         case let .text(text):
             lines.append("request.httpBody = Data(\(swiftQuoted(text)).utf8)")
         case let .binary(byteCount):
+            // Generated source code, not UI: the exact byte count is what a developer pasting
+            // this needs, so it is deliberately not grouped, scaled, or localized.
             lines.append("// Binary body omitted (\(byteCount) bytes). Load it from a file:")
             lines.append("// request.httpBody = try Data(contentsOf: URL(fileURLWithPath: \"body.bin\"))")
         case nil:

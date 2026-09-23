@@ -1007,10 +1007,10 @@ struct AssistantSettingsTab: View {
     private func modelPickerTitle(_ model: AssistantModel) -> String {
         var details: [String] = []
         if let limit = model.inputTokenLimit {
-            details.append(String(localized: "\(limit.formatted()) input", bundle: RockxyLocalization.bundle))
+            details.append(String(localized: "\(CountFormatter.format(limit)) input", bundle: RockxyLocalization.bundle))
         }
         if let limit = model.outputTokenLimit {
-            details.append(String(localized: "\(limit.formatted()) output", bundle: RockxyLocalization.bundle))
+            details.append(String(localized: "\(CountFormatter.format(limit)) output", bundle: RockxyLocalization.bundle))
         }
         return details.isEmpty ? model.displayName : "\(model.displayName) · \(details.joined(separator: " / "))"
     }

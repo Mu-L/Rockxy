@@ -215,7 +215,9 @@ struct NetworkConditionsWindowViewModelTests {
         #expect(profile.name == "3G")
         #expect(profile.downloadBandwidth == "< 780 kbps")
         #expect(profile.uploadBandwidth == "< 330 kbps")
-        #expect(profile.packetLoss == "0.0%")
+        // The percent sign is placed by the locale (`de_DE` writes "0,0 %"), so this pins the
+        // shared formatter rather than one machine's spelling.
+        #expect(profile.packetLoss == DecimalFormatter.percent(0, fractionDigits: 1))
         #expect(profile.systemImage == "antenna.radiowaves.left.and.right")
         #expect(viewModel.statusLabel(for: activeRule).0 == "Enabled")
         #expect(viewModel.statusLabel(for: inactiveRule).0 == "Inactive")

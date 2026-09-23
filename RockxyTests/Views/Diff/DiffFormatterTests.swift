@@ -94,7 +94,8 @@ struct DiffFormatterTests {
 
         let sections = DiffFormatter.format(transaction: transaction, target: .timing)
 
-        #expect(sections[0].1.contains("125.0ms"))
+        // The decimal separator follows Rockxy's formatting locale ("125,0ms" on a Vietnam Mac).
+        #expect(sections[0].1.contains("\(DecimalFormatter.format(125, fractionDigits: 1))ms"))
         #expect(sections[0].1.contains("Detailed phase timing unavailable"))
     }
 

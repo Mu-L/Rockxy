@@ -123,7 +123,7 @@ struct PluginsSettingsTab: View {
                 systemImage: "puzzlepiece.extension"
             )
         } description: {
-            Text("Select a plugin from the list to view its details and configuration.")
+            Text(String(localized: "Select a plugin from the list to view its details and configuration.", bundle: RockxyLocalization.bundle))
         }
     }
 
@@ -146,7 +146,11 @@ struct PluginsSettingsTab: View {
 
             Spacer()
 
-            Text(String(localized: "\(viewModel.plugins.count) plugins", bundle: RockxyLocalization.bundle))
+            Text(String(AttributedString(
+                localized: "^[\(viewModel.plugins.count) plugin](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
                 .font(settingsMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }

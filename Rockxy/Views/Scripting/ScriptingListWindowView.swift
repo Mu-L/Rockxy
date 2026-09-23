@@ -168,13 +168,18 @@ struct ScriptingListWindowView: View {
     }
 
     private var footerHint: String {
-        let count = isSearching
-            ? "\(visibleScriptCount) of \(viewModel.plugins.count)"
-            : "\(viewModel.plugins.count)"
-        return String(
-            localized: "\(count) scripts  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder",
-            bundle: RockxyLocalization.bundle
-        )
+        let total = viewModel.plugins.count
+        return isSearching
+            ? String(AttributedString(
+                localized: "\(visibleScriptCount) of ^[\(total) script](inflect: true)  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "^[\(total) script](inflect: true)  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
     }
 
     private var statusText: String {

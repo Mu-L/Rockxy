@@ -31,10 +31,26 @@ struct RuleStore {
         var errorDescription: String? {
             switch self {
             case let .importFileTooLarge(size):
-                "Import file is too large (\(size / 1_024 / 1_024) MB). Maximum allowed is 5 MB."
+                Self.tooLargeMessage(size: size)
             case let .invalidRegexInImport(pattern, reason):
-                "Invalid regex pattern '\(pattern)': \(reason)"
+                String(
+                    localized: "Invalid regex pattern '\(pattern)': \(reason)",
+                    bundle: RockxyLocalization.bundle
+                )
             }
+        }
+
+        // MARK: Private
+
+        private static func tooLargeMessage(size: UInt64) -> String {
+            // Integer-dividing the byte count printed "too large (5 MB). Maximum allowed is 5 MB."
+            // for anything just over the limit; the shared formatter rounds instead.
+            let actual = SizeFormatter.format(bytes: Int(clamping: size))
+            let limit = SizeFormatter.format(bytes: Int(RuleStore.maxImportSize))
+            return String(
+                localized: "Import file is too large (\(actual)). Maximum allowed is \(limit).",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 

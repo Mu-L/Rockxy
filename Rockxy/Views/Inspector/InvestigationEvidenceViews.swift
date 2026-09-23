@@ -334,10 +334,11 @@ struct InvestigationReportView: View {
         if let modelResult = message.modelResult {
             modelAttributionLabel(modelResult, requestCount: result.scopeTransactionIDs.count)
         } else {
-            let text = String(
-                localized: "Local analysis · \(result.scopeTransactionIDs.count) requests",
-                bundle: RockxyLocalization.bundle
-            )
+            let text = String(AttributedString(
+                localized: "Local analysis · ^[\(result.scopeTransactionIDs.count) request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
             Text(text)
                 .font(.system(size: metrics.metadataFontSize))
                 .foregroundStyle(.secondary)
@@ -355,10 +356,11 @@ struct InvestigationReportView: View {
     )
         -> some View
     {
-        let summary = String(
-            localized: "\(modelResult.provider.title) · \(modelResult.model) · \(requestCount) requests",
-            bundle: RockxyLocalization.bundle
-        )
+        let summary = String(AttributedString(
+            localized: "\(modelResult.provider.title) · \(modelResult.model) · ^[\(requestCount) request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
         return Menu {
             Button(modelResult.endpointHost) {}
                 .disabled(true)

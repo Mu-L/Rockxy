@@ -128,9 +128,11 @@ struct NoiseControlManagerSheet: View {
     }
 
     private var mutedSourceCountLabel: String {
-        allSources.count == 1
-            ? String(localized: "1 muted source", bundle: RockxyLocalization.bundle)
-            : String(localized: "\(allSources.count) muted sources", bundle: RockxyLocalization.bundle)
+        String(AttributedString(
+            localized: "^[\(allSources.count) muted source](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     private var sheetHeader: some View {
@@ -281,7 +283,7 @@ struct NoiseControlManagerSheet: View {
             .width(min: 130, ideal: 150)
 
             TableColumn(String(localized: "Matches", bundle: RockxyLocalization.bundle)) { source in
-                Text("\(coordinator.mutedTransactionCount(for: source))")
+                Text(CountFormatter.format(coordinator.mutedTransactionCount(for: source)))
                     .font(toolMetrics.font(monospaced: true))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)

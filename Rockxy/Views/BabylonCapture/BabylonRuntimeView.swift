@@ -212,8 +212,16 @@ struct BabylonRuntimeView: View {
         let total = store.events.count
         let shown = filteredEvents.count
         let base = filter.isActive
-            ? String(localized: "\(shown) of \(total) events", bundle: RockxyLocalization.bundle)
-            : String(localized: "\(total) events", bundle: RockxyLocalization.bundle)
+            ? String(AttributedString(
+                localized: "\(shown) of ^[\(total) event](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "^[\(total) event](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         guard store.evictedEventCount > 0 else {
             return base
         }

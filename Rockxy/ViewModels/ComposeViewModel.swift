@@ -42,7 +42,7 @@ enum ComposeResponseError: LocalizedError, Equatable {
         case let .bodyTooLarge(limitBytes):
             let limitMB = Double(limitBytes) / (1_024 * 1_024)
             return String(
-                localized: "The response body exceeded the \(String(format: "%.0f", limitMB)) MB Compose limit.",
+                localized: "The response body exceeded the \(DecimalFormatter.format(limitMB, fractionDigits: 0)) MB Compose limit.",
                 bundle: RockxyLocalization.bundle
             )
         }
@@ -229,7 +229,7 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
 
     var menuTitle: String {
         let status = statusCode.map { "\($0)" } ?? String(localized: "No Response", bundle: RockxyLocalization.bundle)
-        return "[\(method)] \(url) • \(status) • \(Self.relativeFormatter.localizedString(for: timestamp, relativeTo: Date()))"
+        return "[\(method)] \(url) • \(status) • \(TimestampFormatter.relative(timestamp, unitsStyle: .abbreviated))"
     }
 
     var requestFingerprint: String {
@@ -248,14 +248,6 @@ struct ComposeHistoryEntry: Codable, Equatable, Identifiable, Sendable {
             bodyContentType ?? "",
         ].joined(separator: "\u{1E}")
     }
-
-    // MARK: Private
-
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
 }
 
 // MARK: - ComposeResponse
@@ -274,7 +266,11 @@ struct ComposeResponse {
         if let text = bodyText {
             return text
         }
-        return String(localized: "(binary data, \(bodyData.count) bytes)", bundle: RockxyLocalization.bundle)
+        return String(AttributedString(
+            localized: "(binary data, ^[\(bodyData.count) byte](inflect: true))",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     var bodySize: Int {
@@ -501,7 +497,7 @@ final class ComposeViewModel {
 
             let response = ComposeResponse(
                 statusCode: httpResponse.statusCode,
-                statusMessage: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
+                statusMessage: HTTPReasonPhrase.standard(for: httpResponse.statusCode),
                 headers: responseHeaders,
                 bodyData: data,
                 bodyText: bodyText,
@@ -773,7 +769,7 @@ final class ComposeViewModel {
             }?.value)
             let response = ComposeResponse(
                 statusCode: statusCode,
-                statusMessage: HTTPURLResponse.localizedString(forStatusCode: statusCode),
+                statusMessage: HTTPReasonPhrase.standard(for: statusCode),
                 headers: (entry.responseHeaders ?? []).map { ($0.name, $0.value) },
                 bodyData: Data(responseBody.utf8),
                 bodyText: responseBody,

@@ -27,42 +27,93 @@ enum HelperConnectionError: LocalizedError {
 
     // MARK: Internal
 
+    /// Every case reaches the viewer: Settings ▸ Advanced ▸ Privileged Helper Tool renders the
+    /// last one in its "Last Error" panel, and the Welcome window repeats it after a failed
+    /// repair. Several of them tell the reader what to do next, so they are localized.
     var errorDescription: String? {
         switch self {
         case .connectionFailed:
-            "Failed to establish XPC connection to helper tool"
+            String(
+                localized: "Failed to establish XPC connection to helper tool",
+                bundle: RockxyLocalization.bundle
+            )
         case let .proxyOverrideFailed(reason):
-            "Helper failed to override system proxy: \(reason)"
+            String(
+                localized: "Helper failed to override system proxy: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case let .proxyRestoreFailed(reason):
-            "Helper failed to restore system proxy: \(reason)"
+            String(
+                localized: "Helper failed to restore system proxy: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case .uninstallFailed:
-            "Helper failed to prepare for uninstall"
+            String(localized: "Helper failed to prepare for uninstall", bundle: RockxyLocalization.bundle)
         case .xpcTimeout:
-            "XPC call timed out — helper tool may not be responding"
+            String(
+                localized: "XPC call timed out — helper tool may not be responding",
+                bundle: RockxyLocalization.bundle
+            )
         case let .certInstallFailed(reason):
-            "Helper failed to install root certificate: \(reason)"
+            String(
+                localized: "Helper failed to install root certificate: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case .certInstallUnsupported:
-            "The installed Rockxy helper installs certificates destructively, so it was not used. Update it in Settings > Advanced > Proxy Helper Tool."
+            String(
+                localized: "The installed Rockxy helper installs certificates destructively, so it was not used. Update it in Settings > Advanced > Proxy Helper Tool.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .certRemoveFailed(reason):
-            "Helper failed to remove root certificate: \(reason)"
+            String(
+                localized: "Helper failed to remove root certificate: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case .certRemovalUnsupported:
-            "The installed Rockxy helper does not support safe certificate removal. Update the helper in Settings > Advanced > Proxy Helper Tool, then try again."
+            String(
+                localized: "The installed Rockxy helper does not support safe certificate removal. Update the helper in Settings > Advanced > Proxy Helper Tool, then try again.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .bypassDomainsFailed(reason):
-            "Helper failed to set bypass domains: \(reason)"
+            String(
+                localized: "Helper failed to set bypass domains: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case .executableRefreshUnsupported:
-            "The installed helper does not support approval-preserving executable refresh"
+            String(
+                localized: "The installed helper does not support approval-preserving executable refresh",
+                bundle: RockxyLocalization.bundle
+            )
         case .executableRefreshDeferred:
-            "The helper is busy with proxy or certificate work; executable refresh was deferred"
+            String(
+                localized: "The helper is busy with proxy or certificate work; executable refresh was deferred",
+                bundle: RockxyLocalization.bundle
+            )
         case .executableIdentityUnsupported:
-            "The installed helper cannot describe the executable it is running"
+            String(
+                localized: "The installed helper cannot describe the executable it is running",
+                bundle: RockxyLocalization.bundle
+            )
         case .executableIdentityUnreadable:
-            "The helper answered with an executable identity Rockxy cannot compare"
+            String(
+                localized: "The helper answered with an executable identity Rockxy cannot compare",
+                bundle: RockxyLocalization.bundle
+            )
         case .applicationMustReopen:
-            "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again."
+            String(
+                localized: "Rockxy was updated or replaced while it was open. Quit and reopen Rockxy, then check the helper again.",
+                bundle: RockxyLocalization.bundle
+            )
         case .appSignatureInvalid:
-            "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again."
+            String(
+                localized: "Rockxy could not verify this app copy. Install a fresh copy of Rockxy, then check the helper again.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .signingIdentityMismatch(app, helper):
-            "This app is signed by \"\(app)\" but the installed helper was signed by \"\(helper)\""
+            String(
+                localized: "This app is signed by \"\(app)\" but the installed helper was signed by \"\(helper)\"",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

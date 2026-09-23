@@ -399,11 +399,11 @@ extension MainContentCoordinator {
             style: .success,
             text: alreadyEnabled ?
                 String(
-                    localized: "SSL Proxying is already enabled for \(domain). Make the request again to inspect it.",
+                    localized: "HTTPS Decryption is already enabled for \(domain). Make the request again to inspect it.",
                     bundle: RockxyLocalization.bundle
                 ) :
                 String(
-                    localized: "Enabled SSL Proxying for \(domain). Make the request again to inspect it.",
+                    localized: "Enabled HTTPS Decryption for \(domain). Make the request again to inspect it.",
                     bundle: RockxyLocalization.bundle
                 )
         )
@@ -442,7 +442,7 @@ extension MainContentCoordinator {
         activeToast = ToastMessage(
             style: .success,
             text: String(
-                localized: "Disabled SSL Proxying for \(domain). Requests to it will stay tunneled.",
+                localized: "Disabled HTTPS Decryption for \(domain). Requests to it will stay tunneled.",
                 bundle: RockxyLocalization.bundle
             )
         )

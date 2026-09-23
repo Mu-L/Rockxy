@@ -26,10 +26,38 @@ nonisolated enum WebSocketDetector {
     }
 }
 
+// MARK: - WebSocketHandshakeRecord
+
+/// The upstream `101 Switching Protocols` evidence captured before the pipelines are
+/// swapped to frame relay, so the live WebSocket row can show handshake headers and timing.
+struct WebSocketHandshakeRecord: Sendable {
+    let responseHead: HTTPResponseHead?
+    let timingInfo: TimingInfo?
+    let sourcePort: UInt16?
+
+    func makeResponseData() -> HTTPResponseData? {
+        guard let responseHead else {
+            return nil
+        }
+        return HTTPResponseData(
+            statusCode: Int(responseHead.status.code),
+            statusMessage: responseHead.status.reasonPhrase,
+            headers: responseHead.headers.map { HTTPHeader(name: $0.name, value: $0.value) },
+            body: nil,
+            contentType: .unknown
+        )
+    }
+}
+
 // MARK: - WebSocketLifecycle
 
 /// Delivers the terminal transaction and upstream-channel release exactly once even though
 /// either half of a proxied WebSocket may observe channel inactivity first.
+///
+/// A proxied WebSocket is delivered twice through the same intake callback: once as an
+/// `.active` row when the upgrade completes, and once more when the socket closes with the
+/// state flipped to `.completed`. The traffic session manager treats the second delivery of
+/// a live transaction as an in-place update, never as a new row.
 final class WebSocketLifecycle: @unchecked Sendable {
     // MARK: Lifecycle
 
@@ -43,18 +71,31 @@ final class WebSocketLifecycle: @unchecked Sendable {
 
     // MARK: Internal
 
+    /// Publishes the upgraded connection as a live row before any frame is relayed.
+    func open(_ transaction: HTTPTransaction) {
+        lock.lock()
+        let alreadyOpened = isOpened || isComplete
+        isOpened = true
+        lock.unlock()
+        guard !alreadyOpened else {
+            return
+        }
+        onTransactionComplete(transaction)
+    }
+
     func complete(_ transaction: HTTPTransaction) {
         guard claimTerminalState() else {
             return
         }
-        // The session was delivered as `.active` when the upgrade completed and has been
-        // observed by the UI since, so its terminal state is written on the main actor
-        // before the closing delivery updates the existing row.
+        let closedAt = Date()
+        let onTransactionComplete = onTransactionComplete
+        // Transaction fields are only mutated on the main actor once a row is visible.
         Task { @MainActor in
             transaction.state = .completed
+            transaction.measuredDuration = closedAt.timeIntervalSince(transaction.timestamp)
             transaction.webSocketFrameVersion += 1
+            onTransactionComplete(transaction)
         }
-        onTransactionComplete(transaction)
         onChannelClosed()
     }
 
@@ -70,6 +111,7 @@ final class WebSocketLifecycle: @unchecked Sendable {
     private let lock = NSLock()
     private let onTransactionComplete: @Sendable (HTTPTransaction) -> Void
     private let onChannelClosed: @Sendable () -> Void
+    private var isOpened = false
     private var isComplete = false
 
     private func claimTerminalState() -> Bool {
@@ -232,6 +274,7 @@ nonisolated enum WebSocketPipelineConfigurator {
         clientChannel: Channel,
         serverChannel: Channel,
         requestData: HTTPRequestData,
+        handshake: WebSocketHandshakeRecord? = nil,
         onTransactionComplete: @escaping @Sendable (HTTPTransaction) -> Void,
         lifecycle: WebSocketLifecycle? = nil
     )
@@ -240,9 +283,13 @@ nonisolated enum WebSocketPipelineConfigurator {
         let wsConnection = WebSocketConnection(upgradeRequest: requestData)
         let transaction = HTTPTransaction(
             request: requestData,
+            response: handshake?.makeResponseData(),
             state: .active,
+            timingInfo: handshake?.timingInfo,
             webSocketConnection: wsConnection
         )
+        transaction.sourcePort = handshake?.sourcePort
+        transaction.clientApp = UpstreamResponseHandler.extractAppFromUserAgent(requestData.headers)
         let lifecycle = lifecycle ?? WebSocketLifecycle(onTransactionComplete: onTransactionComplete)
 
         let clientHandler = WebSocketFrameHandler(
@@ -275,9 +322,7 @@ nonisolated enum WebSocketPipelineConfigurator {
         // Complete the combined transition on the client loop so callers can safely
         // chain this future from the flushed 101 response promise.
         return clientFuture.and(serverFuture.hop(to: clientChannel.eventLoop)).map { _ in
-            // Deliver the open session now so the row appears while it is live and frames
-            // render as they arrive; the closing delivery later updates the same row.
-            onTransactionComplete(transaction)
+            lifecycle.open(transaction)
         }
     }
 }

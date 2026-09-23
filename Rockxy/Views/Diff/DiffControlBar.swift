@@ -63,7 +63,7 @@ struct DiffControlBar: View {
                     .foregroundStyle(.secondary)
             }
             if result.addedCount > 0 {
-                Label("+\(result.addedCount)", systemImage: "plus.circle")
+                Label("+\(CountFormatter.format(result.addedCount))", systemImage: "plus.circle")
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(Theme.Highlight.green)
                     .accessibilityLabel(String(
@@ -72,7 +72,7 @@ struct DiffControlBar: View {
                     ))
             }
             if result.removedCount > 0 {
-                Label("-\(result.removedCount)", systemImage: "minus.circle")
+                Label("-\(CountFormatter.format(result.removedCount))", systemImage: "minus.circle")
                     .font(toolMetrics.secondaryFont())
                     .foregroundStyle(Theme.Highlight.red)
                     .accessibilityLabel(String(
@@ -80,7 +80,13 @@ struct DiffControlBar: View {
                         bundle: RockxyLocalization.bundle
                     ))
             }
-            Text("^[\(result.differenceCount) line change](inflect: true)")
+            Text(String(
+                AttributedString(
+                    localized: "^[\(result.differenceCount) line change](inflect: true)",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters
+            ))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
         }

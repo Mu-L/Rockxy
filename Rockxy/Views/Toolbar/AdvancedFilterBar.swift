@@ -50,13 +50,13 @@ struct AdvancedFilterBar: View {
 
     private var shortcutsHint: some View {
         HStack(spacing: 12) {
-            Text("Show: ⌘F")
-            Text("New: ⌘N")
-            Text("Remove: ⌥⌘N")
-            Text("Up: ⌘↑")
-            Text("Down: ⌘↓")
-            Text("On/Off: ⌘B")
-            Text("Hide: ESC")
+            Text(String(localized: "Show: ⌘F", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "New: ⌘N", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "Remove: ⌥⌘N", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "Up: ⌘↑", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "Down: ⌘↓", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "On/Off: ⌘B", bundle: RockxyLocalization.bundle))
+            Text(String(localized: "Hide: ESC", bundle: RockxyLocalization.bundle))
         }
         .font(.system(size: max(10.5, metrics.secondaryFontSize - 0.5)))
         .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
@@ -114,7 +114,7 @@ struct AdvancedFilterBar: View {
                 .frame(width: Self.enableToggleWidth, alignment: .center)
 
             if isFirst {
-                Text("Where")
+                Text(String(localized: "Where", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: Self.connectorWidth, alignment: .leading)

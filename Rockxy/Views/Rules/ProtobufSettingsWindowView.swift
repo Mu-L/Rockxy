@@ -95,10 +95,11 @@ struct ProtobufSettingsWindowView: View {
     @State private var editorSession: ProtobufRuleEditorSession?
 
     private var footerHint: String {
-        let count = mappingStore.rules.count
-        let countText = count == 1
-            ? String(localized: "1 definition", bundle: RockxyLocalization.bundle)
-            : String(localized: "\(count) definitions", bundle: RockxyLocalization.bundle)
+        let countText = String(AttributedString(
+            localized: "^[\(mappingStore.rules.count) definition](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
         return "\(countText) · ⌘N \(String(localized: "New", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 
