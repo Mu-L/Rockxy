@@ -84,13 +84,25 @@ final class WebSocketLifecycle: @unchecked Sendable {
     }
 
     func complete(_ transaction: HTTPTransaction) {
-        guard claimTerminalState() else {
+        // Claim and read the open flag in one critical section: `open(_:)` checks `isComplete`
+        // under the same lock, so it either delivered before this point or never will.
+        lock.lock()
+        let claimed = !isComplete
+        isComplete = true
+        let wasOpened = isOpened
+        lock.unlock()
+        guard claimed else {
             return
         }
         let closedAt = Date()
         let onTransactionComplete = onTransactionComplete
         // Transaction fields are only mutated on the main actor once a row is visible.
         Task { @MainActor in
+            // A socket that closed before its upgrade finished was never delivered as a live
+            // row, so this single delivery is an ordinary completed row.
+            if !wasOpened {
+                transaction.deliversLiveRow = false
+            }
             transaction.state = .completed
             transaction.measuredDuration = closedAt.timeIntervalSince(transaction.timestamp)
             transaction.webSocketFrameVersion += 1
