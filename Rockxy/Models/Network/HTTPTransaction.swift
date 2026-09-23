@@ -36,6 +36,7 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         self.graphQLInfo = graphQLInfo
         self.web3RPCInfo = web3RPCInfo
         self.x402Info = x402Info
+        deliversLiveRow = state == .active
         captureContext = request.captureContext
     }
 
@@ -64,6 +65,11 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     /// Changes whenever request or response evidence used by cached list signals changes.
     @ObservationIgnored private(set) var signalEvidenceRevision: UInt64 = 0
     var state: TransactionState
+    /// Whether this transaction reaches the session twice — as an `.active` row when it opens
+    /// and again when it finishes. Fixed at creation because the two deliveries travel through
+    /// independent tasks: by the time the opening one is taken in, `state` may already read
+    /// `.completed`, so routing on the live `state` could append the same transaction twice.
+    @ObservationIgnored var deliversLiveRow: Bool
     var timingInfo: TimingInfo?
     var measuredDuration: TimeInterval?
     var webSocketConnection: WebSocketConnection?

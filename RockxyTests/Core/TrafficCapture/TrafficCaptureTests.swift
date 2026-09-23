@@ -243,6 +243,65 @@ struct TrafficSessionManagerTests {
         #expect(updates.value == [[stream.id]])
     }
 
+    @Test("A live row's close delivery arriving before its open delivery still yields one row")
+    func reorderedLiveDeliveriesYieldOneRow() async {
+        // The open and close deliveries travel through independent tasks. A short stream can
+        // finish, and flip `state` to `.completed`, before the opening delivery is taken in.
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let stream = HTTPTransaction(
+            request: TestFixtures.makeRequest(method: "POST", url: "https://api.openai.com/v1/chat/completions"),
+            response: TestFixtures.makeResponse(
+                statusCode: 200,
+                headers: [HTTPHeader(name: "Content-Type", value: "text/event-stream")]
+            ),
+            state: .active
+        )
+        await MainActor.run { stream.state = .completed }
+
+        // Both deliveries now read `.completed`; only the first one adds a row.
+        await manager.addTransaction(stream)
+        await manager.addTransaction(stream)
+
+        #expect(await manager.flushPendingUpdates().map(\.id) == [stream.id])
+        #expect(updates.value == [[stream.id]])
+    }
+
+    @Test("Paused recording still finishes a live row but adds no new rows")
+    func pausedRecordingFinishesLiveRows() async {
+        let manager = TrafficSessionManager()
+        let updates = UpdateRecorder()
+        await manager.setOnBatchReady { _, _ in }
+        await manager.setOnLiveTransactionUpdated { transactions in
+            updates.record(transactions.map(\.id))
+        }
+        await manager.setMaxBufferSize(50_000)
+
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let socket = HTTPTransaction(
+            request: request,
+            state: .active,
+            webSocketConnection: WebSocketConnection(upgradeRequest: request)
+        )
+        await manager.addTransaction(socket)
+        #expect(await manager.flushPendingUpdates().map(\.id) == [socket.id])
+
+        // Recording is paused while the socket is open, then it closes.
+        await MainActor.run { socket.state = .completed }
+        await manager.addTransaction(socket, acceptsNewRows: false)
+        #expect(updates.value == [[socket.id]])
+
+        // New traffic during the pause is still dropped.
+        await manager.addTransaction(TestFixtures.makeTransaction(), acceptsNewRows: false)
+        #expect(await manager.flushPendingUpdates().isEmpty)
+    }
+
     @Test("Only event streams and NDJSON get a live row")
     func streamingContentTypes() {
         func headers(_ value: String) -> HTTPHeaders {

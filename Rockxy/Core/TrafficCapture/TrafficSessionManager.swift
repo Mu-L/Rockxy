@@ -48,22 +48,28 @@ actor TrafficSessionManager {
 
     // MARK: - Transaction Intake
 
-    func addTransaction(_ transaction: HTTPTransaction) {
-        // A proxied WebSocket, and a streaming (SSE/NDJSON) response, is delivered as an
-        // `.active` row when it opens and again when it finishes. The second delivery of a known
-        // live transaction is an in-place update; a delivery for one dismissed by Clear Session
-        // is dropped so the finished connection cannot resurface as a new row.
+    /// Takes in one delivered transaction.
+    ///
+    /// - Parameter acceptsNewRows: `false` while recording is paused. A paused capture still
+    ///   finishes rows it already shows — otherwise a stream or WebSocket that closes during the
+    ///   pause would stay `Active` in the list — but it never adds a new one.
+    func addTransaction(_ transaction: HTTPTransaction, acceptsNewRows: Bool = true) {
+        // A proxied WebSocket, and a streaming (SSE/NDJSON) response, is delivered once when it
+        // opens and once when it finishes, through independent tasks that can arrive in either
+        // order. Whichever delivery comes first adds the row; the other one is an in-place
+        // update. A delivery for a row dismissed by Clear Session is dropped so the finished
+        // connection cannot resurface as a new row.
         if !dismissedLiveTransactionIDs.isEmpty, dismissedLiveTransactionIDs.remove(transaction.id) != nil {
             return
         }
-        if liveTransactionIDs.contains(transaction.id) {
-            if transaction.state != .active {
-                liveTransactionIDs.remove(transaction.id)
-            }
+        if liveTransactionIDs.remove(transaction.id) != nil {
             onLiveTransactionUpdated?([transaction])
             return
         }
-        if transaction.state == .active {
+        guard acceptsNewRows else {
+            return
+        }
+        if transaction.deliversLiveRow {
             liveTransactionIDs.insert(transaction.id)
         }
         pendingUpdates.append(transaction)

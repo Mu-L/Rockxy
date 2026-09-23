@@ -62,10 +62,12 @@ enum TimestampFormatter {
     nonisolated(unsafe) private static var cache: [String: DateFormatter] = [:]
 
     /// A localized template, not a fixed pattern: `setLocalizedDateFormatFromTemplate` resolves
-    /// the field order and the 12-/24-hour choice from the locale. Cached per template and
-    /// locale so a language change takes effect without rebuilding a formatter per row.
+    /// the field order and the 12-/24-hour choice from the locale. Cached per template, locale,
+    /// and hour cycle so a language change takes effect without rebuilding a formatter per row.
+    /// The pattern is resolved once per formatter, and the Mac's live locale keeps its
+    /// identifier when the 24-Hour Time setting flips, so the hour cycle is part of the key.
     private static func formatter(template: String, locale: Locale) -> DateFormatter {
-        let key = template + "|" + locale.identifier
+        let key = "\(template)|\(locale.identifier)|\(locale.hourCycle)"
         lock.lock()
         defer { lock.unlock() }
         if let cached = cache[key] {

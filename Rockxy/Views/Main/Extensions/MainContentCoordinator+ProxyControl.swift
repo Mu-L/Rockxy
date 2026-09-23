@@ -867,10 +867,10 @@ extension MainContentCoordinator {
                     if captureProbeTracker.consumeIfExpected(transaction) {
                         return
                     }
-                    guard captureRecordingGate.allowsCapture() else {
-                        return
-                    }
-                    await manager.addTransaction(transaction)
+                    await manager.addTransaction(
+                        transaction,
+                        acceptsNewRows: captureRecordingGate.allowsCapture()
+                    )
                 }
             },
             onBreakpointHit: { @Sendable data in

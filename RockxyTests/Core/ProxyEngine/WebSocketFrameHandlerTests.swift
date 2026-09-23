@@ -56,6 +56,27 @@ struct WebSocketFrameHandlerTests {
         #expect(states.value == [.active, .completed])
     }
 
+    @Test("A socket that closes before it opens is delivered once as an ordinary row")
+    func lifecycleCloseBeforeOpenIsNotLive() async {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let transaction = HTTPTransaction(request: request, state: .active)
+        #expect(transaction.deliversLiveRow)
+        let completions = WebSocketEventCount()
+        let lifecycle = WebSocketLifecycle(
+            onTransactionComplete: { _ in completions.record() },
+            onChannelClosed: {}
+        )
+
+        lifecycle.complete(transaction)
+        lifecycle.open(transaction)
+        await Task.yield()
+        await MainActor.run {}
+
+        #expect(completions.value == 1)
+        // No second delivery will follow, so the session must not wait for one.
+        #expect(!transaction.deliversLiveRow)
+    }
+
     @Test("Upgrade records the 101 handshake and publishes the live row")
     func upgradeRecordsHandshakeAndPublishesLiveRow() throws {
         let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
