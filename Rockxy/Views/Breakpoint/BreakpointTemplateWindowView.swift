@@ -184,7 +184,11 @@ struct BreakpointTemplateWindowView: View {
         HStack(spacing: toolMetrics.controlSpacing) {
             compactAddRemoveControl
 
-            Text(String(localized: "\(filteredTemplates.count) templates", bundle: RockxyLocalization.bundle))
+            Text(String(AttributedString(
+                localized: "^[\(filteredTemplates.count) template](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -11,6 +11,7 @@ actor TrafficSessionManager {
 
     var onBatchReady: (@Sendable ([HTTPTransaction], _ generation: UInt) -> Void)?
     var onClientAppEnriched: (@Sendable ([HTTPTransaction]) -> Void)?
+    var onLiveTransactionUpdated: (@Sendable ([HTTPTransaction]) -> Void)?
     var onBeginNewSession: (@Sendable (_ generation: UInt) async -> Void)?
 
     var currentGeneration: UInt {
@@ -25,6 +26,12 @@ actor TrafficSessionManager {
 
     func setOnClientAppEnriched(_ callback: @escaping @Sendable ([HTTPTransaction]) -> Void) {
         onClientAppEnriched = callback
+    }
+
+    /// Receives long-lived transactions (WebSocket connections) that were already delivered as
+    /// live rows and have since changed state, so the UI refreshes them in place.
+    func setOnLiveTransactionUpdated(_ callback: @escaping @Sendable ([HTTPTransaction]) -> Void) {
+        onLiveTransactionUpdated = callback
     }
 
     func setOnBeginNewSession(_ callback: (@Sendable (_ generation: UInt) async -> Void)?) {
@@ -42,6 +49,23 @@ actor TrafficSessionManager {
     // MARK: - Transaction Intake
 
     func addTransaction(_ transaction: HTTPTransaction) {
+        if transaction.webSocketConnection != nil {
+            // A proxied WebSocket is delivered when it upgrades and again when it closes.
+            // The second delivery of a known live connection is an in-place update; a
+            // delivery for a connection dismissed by Clear Session is dropped so the closed
+            // socket cannot resurface as a new row.
+            if dismissedLiveTransactionIDs.remove(transaction.id) != nil {
+                return
+            }
+            if liveTransactionIDs.contains(transaction.id) {
+                if transaction.state != .active {
+                    liveTransactionIDs.remove(transaction.id)
+                }
+                onLiveTransactionUpdated?([transaction])
+                return
+            }
+            liveTransactionIDs.insert(transaction.id)
+        }
         pendingUpdates.append(transaction)
 
         if pendingUpdates.count >= batchSize {
@@ -82,6 +106,7 @@ actor TrafficSessionManager {
     /// local state cleared (e.g. tests) and does not rely on the rollover callback.
     func resetBufferState() {
         pendingUpdates.removeAll()
+        dismissLiveTransactions()
         totalBuffered = 0
         generation &+= 1
     }
@@ -102,6 +127,7 @@ actor TrafficSessionManager {
     func beginNewSessionPreservingPending() async -> (generation: UInt, pending: [HTTPTransaction]) {
         let pending = pendingUpdates
         pendingUpdates.removeAll()
+        dismissLiveTransactions()
         totalBuffered = 0
         generation &+= 1
         if let onBeginNewSession {
@@ -128,6 +154,10 @@ actor TrafficSessionManager {
     )
 
     private var pendingUpdates: [HTTPTransaction] = []
+    /// Live (still open) connections already delivered as rows, keyed for update routing.
+    private var liveTransactionIDs: Set<UUID> = []
+    /// Live connections whose rows were cleared; their close delivery must not resurface them.
+    private var dismissedLiveTransactionIDs: Set<UUID> = []
     private let batchSize = 50
     private let batchInterval: TimeInterval = 0.1
     private var maxBufferSize: Int = 50_000
@@ -172,6 +202,14 @@ actor TrafficSessionManager {
             if !enrichedTransactions.isEmpty {
                 enrichCallback?(enrichedTransactions)
             }
+        }
+    }
+
+    private func dismissLiveTransactions() {
+        dismissedLiveTransactionIDs.formUnion(liveTransactionIDs)
+        liveTransactionIDs.removeAll()
+        if dismissedLiveTransactionIDs.count > 4_096 {
+            dismissedLiveTransactionIDs.removeAll()
         }
     }
 

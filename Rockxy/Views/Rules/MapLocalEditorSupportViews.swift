@@ -141,7 +141,7 @@ struct MapLocalHTTPSPrerequisiteNotice: View {
                     ? String(localized: "HTTPS interception is ready for \(host).", bundle: RockxyLocalization.bundle)
                     :
                     String(
-                        localized: "HTTPS Map Local needs SSL Proxying for \(host) before this rule can see the request.",
+                        localized: "HTTPS Map Local needs HTTPS Decryption for \(host) before this rule can see the request.",
                         bundle: RockxyLocalization.bundle
                     )
             )

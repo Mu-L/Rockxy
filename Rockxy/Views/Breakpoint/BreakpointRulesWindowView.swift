@@ -438,10 +438,18 @@ struct BreakpointRulesWindowView: View {
 
     private var footerHint: String {
         let count = isSearching
-            ? "\(viewModel.filteredBreakpointRules.count) of \(viewModel.ruleCount)"
-            : "\(viewModel.ruleCount)"
+            ? String(AttributedString(
+                localized: "\(viewModel.filteredBreakpointRules.count) of ^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         return String(
-            localized: "\(count) rules  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete",
+            localized: "\(count)  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete",
             bundle: RockxyLocalization.bundle
         )
     }

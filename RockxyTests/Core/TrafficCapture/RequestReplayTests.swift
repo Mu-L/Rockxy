@@ -82,6 +82,19 @@ struct RequestReplayTests {
         #expect(built.value(forHTTPHeaderField: "Authorization") == "Bearer keep")
     }
 
+    @Test("self-issued responses use standard HTTP reason phrases, not CFNetwork wording")
+    func standardReasonPhrases() {
+        // `HTTPURLResponse.localizedString(forStatusCode:)` returns "no error" for 200,
+        // which reads wrong beside proxy-captured rows that show the wire reason phrase.
+        #expect(HTTPReasonPhrase.standard(for: 200) == "OK")
+        #expect(HTTPReasonPhrase.standard(for: 101) == "Switching Protocols")
+        #expect(HTTPReasonPhrase.standard(for: 204) == "No Content")
+        #expect(HTTPReasonPhrase.standard(for: 429) == "Too Many Requests")
+        #expect(HTTPReasonPhrase.standard(for: 503) == "Service Unavailable")
+        #expect(!HTTPReasonPhrase.standard(for: 200).isEmpty)
+        #expect(!HTTPReasonPhrase.standard(for: 599).isEmpty)
+    }
+
     @Test("fast replay rejects CONNECT tunnels and WebSocket sessions")
     func unsupportedTransportsRejected() {
         let http = TestFixtures.makeTransaction(method: "GET")

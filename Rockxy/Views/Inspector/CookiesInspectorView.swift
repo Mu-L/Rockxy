@@ -11,20 +11,20 @@ struct CookiesInspectorView: View {
     var body: some View {
         ScrollView {
             if transaction.request.cookies.isEmpty, responseCookies.isEmpty {
-                Text("No cookies")
+                Text(String(localized: "No cookies", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize))
                     .foregroundStyle(.secondary)
                     .padding()
             } else {
                 VStack(alignment: .leading, spacing: 16) {
                     if !transaction.request.cookies.isEmpty {
-                        Section("Request Cookies") {
+                        Section(String(localized: "Request Cookies", bundle: RockxyLocalization.bundle)) {
                             cookieTable(cookies: transaction.request.cookies)
                         }
                     }
 
                     if !responseCookies.isEmpty {
-                        Section("Response Cookies") {
+                        Section(String(localized: "Response Cookies", bundle: RockxyLocalization.bundle)) {
                             cookieTable(cookies: responseCookies)
                         }
                     }
@@ -46,28 +46,28 @@ struct CookiesInspectorView: View {
             GridItem(.flexible(), alignment: .topLeading),
         ], spacing: 4) {
             ForEach(Array(cookies.enumerated()), id: \.offset) { _, cookie in
-                Text("Name")
+                Text(String(localized: "Name", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .fontWeight(.semibold)
                 HighlightedInspectorText(text: cookie.name, highlightContext: highlightContext)
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .textSelection(.enabled)
 
-                Text("Value")
+                Text(String(localized: "Value", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .fontWeight(.semibold)
                 HighlightedInspectorText(text: cookie.value, highlightContext: highlightContext)
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .textSelection(.enabled)
 
-                Text("Domain")
+                Text(String(localized: "Domain", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .fontWeight(.semibold)
                 HighlightedInspectorText(text: cookie.domain, highlightContext: highlightContext)
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .textSelection(.enabled)
 
-                Text("Path")
+                Text(String(localized: "Path", bundle: RockxyLocalization.bundle))
                     .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                     .fontWeight(.semibold)
                 HighlightedInspectorText(text: cookie.path, highlightContext: highlightContext)
@@ -75,10 +75,10 @@ struct CookiesInspectorView: View {
                     .textSelection(.enabled)
 
                 if cookie.isSecure {
-                    Text("Secure")
+                    Text(String(localized: "Secure", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .fontWeight(.semibold)
-                    Text("Yes")
+                    Text(String(localized: "Yes", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .textSelection(.enabled)
                 }
@@ -87,13 +87,13 @@ struct CookiesInspectorView: View {
                     Text("HttpOnly")
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .fontWeight(.semibold)
-                    Text("Yes")
+                    Text(String(localized: "Yes", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .textSelection(.enabled)
                 }
 
                 if let expires = cookie.expiresDate {
-                    Text("Expires")
+                    Text(String(localized: "Expires", bundle: RockxyLocalization.bundle))
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                         .fontWeight(.semibold)
                     Text(expires.formatted(.dateTime))

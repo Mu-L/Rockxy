@@ -7,7 +7,7 @@ enum AssistantInstalledModelDetailFormatter {
             parts.append(ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file))
         }
         if let contextWindow = model.inputTokenLimit {
-            parts.append(String(localized: "\(contextWindow.formatted()) context", bundle: RockxyLocalization.bundle))
+            parts.append(String(localized: "\(CountFormatter.format(contextWindow)) context", bundle: RockxyLocalization.bundle))
         }
         if model.capabilities.contains(.tools) {
             parts.append(String(localized: "Tool-ready model", bundle: RockxyLocalization.bundle))

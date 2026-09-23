@@ -235,10 +235,11 @@ struct MapLocalEditorWindowView: View {
                     delayMenu
                     if viewModel.delayPreset == .custom {
                         Stepper(
-                            String(
-                                localized: "\(viewModel.customDelaySeconds) seconds",
-                                bundle: RockxyLocalization.bundle
-                            ),
+                            String(AttributedString(
+                                localized: "^[\(viewModel.customDelaySeconds) second](inflect: true)",
+                                bundle: RockxyLocalization.bundle,
+                                locale: RockxyLocalization.locale
+                            ).characters),
                             value: $viewModel.customDelaySeconds,
                             in: 0 ... 300
                         )

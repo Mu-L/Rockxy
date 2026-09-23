@@ -116,6 +116,17 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         return !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Duration shown in list rows and summaries. A WebSocket row reports the connection
+    /// lifetime measured at close (its `timingInfo` only covers the upgrade handshake); every
+    /// other transaction reports the timing breakdown total, falling back to the wall-clock
+    /// measurement.
+    var displayDuration: TimeInterval? {
+        if webSocketConnection != nil {
+            return measuredDuration
+        }
+        return timingInfo?.totalDuration ?? measuredDuration
+    }
+
     func applyMatchedRuleMetadata(from rule: ProxyRule) {
         matchedRuleID = rule.id
         matchedRuleName = rule.name

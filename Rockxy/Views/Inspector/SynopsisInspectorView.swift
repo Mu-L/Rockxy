@@ -17,7 +17,10 @@ struct SynopsisInspectorView: View {
                 )
                 synopsisRow(String(localized: "Host", bundle: RockxyLocalization.bundle), transaction.request.host)
                 synopsisRow(String(localized: "Path", bundle: RockxyLocalization.bundle), transaction.request.path)
-                synopsisRow("HTTP Version", transaction.request.httpVersion)
+                synopsisRow(
+                    String(localized: "HTTP Version", bundle: RockxyLocalization.bundle),
+                    transaction.request.httpVersion
+                )
 
                 if let matchedRuleName = transaction.matchedRuleName {
                     Divider()
@@ -36,22 +39,22 @@ struct SynopsisInspectorView: View {
                         String(localized: "Status", bundle: RockxyLocalization.bundle),
                         "\(response.statusCode) \(response.statusMessage)"
                     )
-                    if let contentType = response.contentType {
-                        synopsisRow("Content-Type", contentType.rawValue)
+                    if let contentType = Self.contentTypeHeaderValue(in: response.headers) {
+                        synopsisRow("Content-Type", contentType)
                     }
                     if let body = response.body {
                         synopsisRow(
                             String(localized: "Response Size", bundle: RockxyLocalization.bundle),
-                            "\(body.count) bytes"
+                            SizeFormatter.format(bytes: body.count)
                         )
                     }
                 }
 
-                if let timing = transaction.timingInfo {
+                if let duration = transaction.displayDuration {
                     Divider()
                     synopsisRow(
                         String(localized: "Duration", bundle: RockxyLocalization.bundle),
-                        DurationFormatter.format(seconds: timing.totalDuration)
+                        DurationFormatter.format(seconds: duration)
                     )
                 }
 
@@ -77,5 +80,13 @@ struct SynopsisInspectorView: View {
                 .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
                 .textSelection(.enabled)
         }
+    }
+
+    /// The `Content-Type` header exactly as the peer sent it. The row is labelled with the wire
+    /// header name, so it must show the wire value — `ContentType` is Rockxy's normalized render
+    /// bucket (`text` for `text/event-stream`, `unknown` for a message with no such header) and
+    /// reading it here reported a category the response never carried.
+    private static func contentTypeHeaderValue(in headers: [HTTPHeader]) -> String? {
+        headers.first { $0.name.lowercased() == "content-type" }?.value
     }
 }

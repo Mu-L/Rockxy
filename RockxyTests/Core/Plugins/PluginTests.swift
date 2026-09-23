@@ -248,7 +248,48 @@ struct PluginTests {
         let postData = try #require(requestDict["postData"] as? [String: Any])
 
         #expect(postData["text"] as? String == "{\"name\":\"test\"}")
-        #expect(postData["mimeType"] as? String == "json")
+        #expect(postData["mimeType"] as? String == "application/json")
+    }
+
+    @Test("HARExporter keeps streamed AI bodies as text with the wire MIME type")
+    func harExporterStreamedBodiesStayTextual() throws {
+        let exporter = HARExporter()
+        let sse = TestFixtures.makeTransaction(method: "POST", url: "https://api.openai.com/v1/chat/completions")
+        sse.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            headers: [HTTPHeader(name: "Content-Type", value: "text/event-stream; charset=utf-8")],
+            body: Data("data: {\"choices\":[]}\n\ndata: [DONE]\n\n".utf8)
+        )
+        sse.response?.contentType = .text
+        sse.measuredDuration = 1.5
+        let ndjson = TestFixtures.makeTransaction(method: "POST", url: "http://localhost:11434/api/chat")
+        ndjson.response = TestFixtures.makeResponse(
+            statusCode: 200,
+            headers: [HTTPHeader(name: "Content-Type", value: "application/x-ndjson")],
+            body: Data("{\"done\":false}\n{\"done\":true}\n".utf8)
+        )
+        ndjson.response?.contentType = .unknown
+
+        let data = try exporter.export(transactions: [sse, ndjson])
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let log = try #require(json["log"] as? [String: Any])
+        let entries = try #require(log["entries"] as? [[String: Any]])
+        #expect(entries.count == 2)
+
+        let sseResponse = try #require(entries[0]["response"] as? [String: Any])
+        let sseContent = try #require(sseResponse["content"] as? [String: Any])
+        #expect(sseContent["mimeType"] as? String == "text/event-stream; charset=utf-8")
+        #expect(sseContent["encoding"] == nil)
+        #expect(sseContent["text"] as? String == "data: {\"choices\":[]}\n\ndata: [DONE]\n\n")
+        #expect(entries[0]["time"] as? Double == 1_500)
+        let sseTimings = try #require(entries[0]["timings"] as? [String: Any])
+        #expect(sseTimings["wait"] as? Double == 1_500)
+
+        let ndjsonResponse = try #require(entries[1]["response"] as? [String: Any])
+        let ndjsonContent = try #require(ndjsonResponse["content"] as? [String: Any])
+        #expect(ndjsonContent["mimeType"] as? String == "application/x-ndjson")
+        #expect(ndjsonContent["encoding"] == nil)
+        #expect(ndjsonContent["text"] as? String == "{\"done\":false}\n{\"done\":true}\n")
     }
 
     @Test("HARExporter single transaction produces valid HAR structure")

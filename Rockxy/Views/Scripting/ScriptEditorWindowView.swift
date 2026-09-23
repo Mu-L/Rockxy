@@ -224,7 +224,7 @@ struct ScriptEditorWindowView: View {
                     runOptionToggles
                 }
             }
-            Text("A Mock API script runs on Request and replaces the response.")
+            Text(String(localized: "A Mock API script runs on Request and replaces the response.", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -232,7 +232,7 @@ struct ScriptEditorWindowView: View {
     }
 
     private var runOptionsLabel: some View {
-        Text("Run script on:")
+        Text(String(localized: "Run script on:", bundle: RockxyLocalization.bundle))
             .font(toolMetrics.font(weight: .medium))
             .fixedSize()
     }
@@ -242,14 +242,14 @@ struct ScriptEditorWindowView: View {
             Toggle(isOn: Binding(
                 get: { viewModel.runOnRequest },
                 set: { viewModel.setRunOnRequest($0) }
-            )) { Text("Request") }
+            )) { Text(String(localized: "Request", bundle: RockxyLocalization.bundle)) }
                 .toggleStyle(.checkbox)
-            Toggle(isOn: $viewModel.runOnResponse) { Text("Response") }
+            Toggle(isOn: $viewModel.runOnResponse) { Text(String(localized: "Response", bundle: RockxyLocalization.bundle)) }
                 .toggleStyle(.checkbox)
             Toggle(isOn: Binding(
                 get: { viewModel.runAsMock },
                 set: { viewModel.setRunAsMock($0) }
-            )) { Text("Mock API") }
+            )) { Text(String(localized: "Mock API", bundle: RockxyLocalization.bundle)) }
                 .toggleStyle(.checkbox)
         }
         .fixedSize()
@@ -472,7 +472,7 @@ struct ScriptEditorWindowView: View {
             patternModeMenu
             if viewModel.patternMode == .wildcard {
                 Toggle(isOn: $viewModel.includeSubpaths) {
-                    Text("Include subpaths")
+                    Text(String(localized: "Include subpaths", bundle: RockxyLocalization.bundle))
                 }
                 .toggleStyle(.checkbox)
             }
@@ -506,7 +506,7 @@ struct ScriptEditorWindowView: View {
         let button = Button {
             viewModel.runRuleTest()
         } label: {
-            Text("Test Match")
+            Text(String(localized: "Test Match", bundle: RockxyLocalization.bundle))
                 .font(toolMetrics.font(weight: .medium))
                 .frame(minHeight: toolMetrics.formControlHeight)
         }

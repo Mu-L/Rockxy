@@ -279,6 +279,8 @@ final class MainContentCoordinator {
     var clearingProjectID: UUID?
     var clearingTargetGeneration: UInt?
     var deferredSessionBatches: [DeferredBatch] = []
+    /// Replay rows the user asked for, selected as soon as their batch lands in the list.
+    @ObservationIgnored var pendingReplaySelectionIDs: Set<UUID> = []
     var proxyError: String?
     var isSystemProxyConfigured = false
     @ObservationIgnored var captureHealthTask: Task<Void, Never>?
@@ -849,7 +851,9 @@ struct AppInfo: Identifiable {
     var requestCount: Int
     var identity: ClientApplicationIdentity?
 
+    /// Sidebar app rows are keyed by the displayed client label: the app filter matches
+    /// `clientApp` by name, and one process can carry several labels (SDK user agents).
     var id: String {
-        identity?.identifier ?? name
+        name
     }
 }

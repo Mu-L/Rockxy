@@ -15,29 +15,34 @@ struct DeveloperSetupSourceList: View {
     let onTogglePinned: (SetupTarget) -> Void
 
     var body: some View {
-        List(selection: $selection) {
-            if sections.isEmpty {
-                emptySearchState
-            } else {
-                ForEach(sections) { section in
-                    Section(section.category.title) {
-                        if section.targets.isEmpty {
-                            Text(emptySectionTitle(for: section.category))
-                                .font(setupMetrics.secondaryFont())
-                                .foregroundStyle(.tertiary)
-                        } else {
-                            ForEach(section.targets, id: \.id) { target in
-                                row(for: target)
-                                    .tag(target.id)
+        ScrollViewReader { proxy in
+            List(selection: $selection) {
+                if sections.isEmpty {
+                    emptySearchState
+                } else {
+                    ForEach(sections) { section in
+                        Section(section.category.title) {
+                            if section.targets.isEmpty {
+                                Text(emptySectionTitle(for: section.category))
+                                    .font(setupMetrics.secondaryFont())
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                ForEach(section.targets, id: \.id) { target in
+                                    row(for: target)
+                                        .tag(target.id)
+                                        .id(target.id)
+                                }
                             }
                         }
                     }
                 }
             }
+            .listStyle(.sidebar)
+            .font(setupMetrics.font())
+            .accessibilityLabel(String(localized: "Developer setup targets", bundle: RockxyLocalization.bundle))
+            .onAppear { revealSelection(using: proxy) }
+            .onChange(of: selection) { _, _ in revealSelection(using: proxy) }
         }
-        .listStyle(.sidebar)
-        .font(setupMetrics.font())
-        .accessibilityLabel(String(localized: "Developer setup targets", bundle: RockxyLocalization.bundle))
     }
 
     // MARK: Private
@@ -106,6 +111,19 @@ struct DeveloperSetupSourceList: View {
             Button(pinActionTitle(for: target)) {
                 onTogglePinned(target)
             }
+        }
+    }
+
+    /// A target chosen by the Certificate/Setup menus, a route, or search can sit far below the
+    /// visible rows, leaving the sidebar showing no selection at all. Scroll the minimum amount
+    /// that brings the selected row into view; `anchor: nil` leaves an already-visible row alone.
+    /// Deferred by one run-loop turn so the scroll never runs inside the split view's layout pass.
+    private func revealSelection(using proxy: ScrollViewProxy) {
+        guard let selection else {
+            return
+        }
+        DispatchQueue.main.async {
+            proxy.scrollTo(selection, anchor: nil)
         }
     }
 

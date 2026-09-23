@@ -185,7 +185,7 @@ struct MCPSettingsTab: View {
         case let .running(port):
             Label {
                 if let port {
-                    Text(String(localized: "Running on port \(port)", bundle: RockxyLocalization.bundle))
+                    Text(String(localized: "Running on port \(String(port))", bundle: RockxyLocalization.bundle))
                 } else {
                     Text(String(localized: "Running", bundle: RockxyLocalization.bundle))
                 }

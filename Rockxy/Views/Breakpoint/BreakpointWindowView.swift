@@ -70,10 +70,11 @@ struct BreakpointWindowView: View {
             Button(String(localized: "Cancel", bundle: RockxyLocalization.bundle), role: .cancel) {}
         } message: {
             Text(
-                String(
-                    localized: "\(manager.pausedItems.count) paused items will receive a 503 Service Unavailable response.",
-                    bundle: RockxyLocalization.bundle
-                )
+                String(AttributedString(
+                    localized: "^[\(manager.pausedItems.count) paused item](inflect: true) will receive a 503 Service Unavailable response.",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             )
         }
     }
@@ -102,11 +103,11 @@ struct BreakpointWindowView: View {
     }
 
     private var queueSummary: String {
-        let count = manager.pausedItems.count
-        if count == 1 {
-            return String(localized: "1 item waiting", bundle: RockxyLocalization.bundle)
-        }
-        return String(localized: "\(count) items waiting", bundle: RockxyLocalization.bundle)
+        String(AttributedString(
+            localized: "^[\(manager.pausedItems.count) item](inflect: true) waiting",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     private var hasSelection: Bool {

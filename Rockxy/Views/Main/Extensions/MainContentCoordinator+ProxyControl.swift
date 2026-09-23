@@ -894,6 +894,14 @@ extension MainContentCoordinator {
                 self.handleClientAppEnrichment(enrichedTransactions)
             }
         }
+        await sessionManager.setOnLiveTransactionUpdated { [weak self] updatedTransactions in
+            guard let self else {
+                return
+            }
+            Task { @MainActor in
+                self.handleLiveTransactionUpdate(updatedTransactions)
+            }
+        }
         let effectiveBufferSize = min(settings.maxBufferSize, policy.maxLiveHistoryEntries)
         liveHistoryLimit = max(1, effectiveBufferSize)
         await sessionManager.setMaxBufferSize(effectiveBufferSize)
@@ -1027,6 +1035,7 @@ extension MainContentCoordinator {
                 errorCount += projectBatch.count { ($0.response?.statusCode ?? 0) >= 400 }
             }
             followLatestVisibleTransaction(from: projectBatch)
+            selectPendingReplayTransaction(from: projectBatch)
             headerColumnStore.updateDiscoveredHeaders(fromBatch: projectBatch)
         }
     }
@@ -1051,31 +1060,82 @@ extension MainContentCoordinator {
             if workspaceUsesClientDependentOrderingOrFiltering(workspace) {
                 recomputeFilteredTransactions(for: workspace)
             } else {
-                var didUpdateRows = false
-                for (id, transaction) in enrichedByID {
-                    guard let entry = workspace.trafficSelectionIndex[id],
-                          workspace.filteredRows.indices.contains(entry.rowIndex),
-                          workspace.filteredRows[entry.rowIndex].id == id else {
-                        continue
-                    }
-                    workspace.filteredRows[entry.rowIndex] = RequestListRow(
-                        from: transaction,
-                        sslState: sslState(for: transaction)
-                    )
-                    didUpdateRows = true
-                }
-                guard didUpdateRows else {
-                    continue
-                }
-                // In-place enrichment rewrites existing rows without a full derive, so it must
-                // invalidate the append provenance itself — otherwise a later coalesced append
-                // could insert against a prefix this enrichment already mutated.
-                workspace.lastDeriveWasAppendOnly = false
-                workspace.appendChainOriginToken = nil
-                workspace.refreshToken += 1
+                rewriteVisibleRowsInPlace(from: enrichedByID, in: workspace)
             }
         }
         TrafficDomainSnapshot.shared.update(appNodes: appNodes, domainTree: domainTree)
+    }
+
+    /// Refreshes rows for long-lived transactions (WebSocket connections) whose state, response,
+    /// or duration changed after they were already delivered as live rows. The transaction
+    /// objects are shared, so only the derived row snapshots and state-dependent views need work.
+    func handleLiveTransactionUpdate(_ updatedTransactions: [HTTPTransaction]) {
+        let activeIDs = Set(transactions.map(\.id))
+        let updatedTransactions = updatedTransactions.filter { activeIDs.contains($0.id) }
+        guard !updatedTransactions.isEmpty else {
+            return
+        }
+
+        let updatedByID = Dictionary(
+            updatedTransactions.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        for workspace in workspaceStore.workspaces {
+            if workspaceUsesStateDependentOrderingOrFiltering(workspace) {
+                recomputeFilteredTransactions(for: workspace)
+            } else {
+                rewriteVisibleRowsInPlace(from: updatedByID, in: workspace)
+            }
+        }
+        recomputeErrorCount()
+    }
+
+    /// Rewrites the `RequestListRow` snapshots of already-visible rows without a full derive.
+    private func rewriteVisibleRowsInPlace(
+        from transactionsByID: [UUID: HTTPTransaction],
+        in workspace: WorkspaceState
+    ) {
+        var didUpdateRows = false
+        for (id, transaction) in transactionsByID {
+            guard let entry = workspace.trafficSelectionIndex[id],
+                  workspace.filteredRows.indices.contains(entry.rowIndex),
+                  workspace.filteredRows[entry.rowIndex].id == id else {
+                continue
+            }
+            workspace.filteredRows[entry.rowIndex] = RequestListRow(
+                from: transaction,
+                sslState: sslState(for: transaction)
+            )
+            didUpdateRows = true
+        }
+        guard didUpdateRows else {
+            return
+        }
+        // In-place rewrites change existing rows without a full derive, so they must
+        // invalidate the append provenance themselves — otherwise a later coalesced append
+        // could insert against a prefix this update already mutated.
+        workspace.lastDeriveWasAppendOnly = false
+        workspace.appendChainOriginToken = nil
+        workspace.refreshToken += 1
+    }
+
+    private func workspaceUsesStateDependentOrderingOrFiltering(_ workspace: WorkspaceState) -> Bool {
+        let criteria = workspace.filterCriteria
+        if criteria.isSearchEnabled, !criteria.searchText.isEmpty {
+            return true
+        }
+        if !criteria.statusCodes.isEmpty
+            || criteria.sidebarScope != .allTraffic
+            || !criteria.activeProtocolFilters.isEmpty
+            || workspace.activeSortDescriptors.contains(where: { ["status", "code", "duration"].contains($0.key ?? "") })
+            || workspace.activeFocusSet != nil
+        {
+            return true
+        }
+        return !FilterRuleEvaluator.activeRules(
+            in: workspace.filterRules,
+            isFilterBarVisible: workspace.isFilterBarVisible
+        ).isEmpty
     }
 
     private func updateAppGroupingForEnrichedTransactions(

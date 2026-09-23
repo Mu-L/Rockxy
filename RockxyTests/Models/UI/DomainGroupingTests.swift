@@ -119,30 +119,58 @@ struct DomainGroupingTests {
 
         let node = try #require(index.makeNodes().first)
         #expect(node.identity == request.clientApplicationIdentity)
-        #expect(node.id == "com.google.Chrome")
+        #expect(node.id == "Google Chrome")
     }
 
-    @Test("App grouping removes a name-only transaction from its own colliding group")
-    func appGroupingRemovesNameOnlyCollision() throws {
+    @Test("App grouping merges late-attributed rows into the group the Client column names")
+    func appGroupingMergesIdentityAndNameOnlyRowsByDisplayedName() throws {
         var index = AppGroupingIndex()
         let identified = transaction("https://identified.example.com/one", sequence: 0)
-        identified.clientApp = "Shared Name"
-        identified.clientApplicationIdentity = .bundle(
-            identifier: "com.example.Identified",
-            displayName: "Shared Name"
+        identified.clientApp = "openai-python"
+        identified.clientApplicationIdentity = .executable(
+            normalizedPath: "/usr/bin/python3",
+            displayName: "python3"
         )
         let nameOnly = transaction("https://name-only.example.com/two", sequence: 1)
-        nameOnly.clientApp = "Shared Name"
+        nameOnly.clientApp = "openai-python"
 
-        index.add(identified)
         index.add(nameOnly)
-        index.remove(nameOnly, appName: "Shared Name")
+        index.add(identified)
 
         let node = try #require(index.makeNodes().first)
         #expect(index.makeNodes().count == 1)
-        #expect(node.id == "com.example.Identified")
-        #expect(node.requestCount == 1)
-        #expect(node.domains == ["identified.example.com"])
+        #expect(node.name == "openai-python")
+        #expect(node.requestCount == 2)
+        #expect(node.identity == identified.clientApplicationIdentity)
+        #expect(node.domains == ["identified.example.com", "name-only.example.com"])
+
+        index.remove(nameOnly, appName: "openai-python")
+        let remaining = try #require(index.makeNodes().first)
+        #expect(remaining.requestCount == 1)
+        #expect(remaining.domains == ["identified.example.com"])
+    }
+
+    @Test("App grouping keeps one process with several client labels as separate sidebar apps")
+    func appGroupingSeparatesClientLabelsSharingOneProcess() throws {
+        var index = AppGroupingIndex()
+        let identity = ClientApplicationIdentity.executable(
+            normalizedPath: "/usr/bin/python3",
+            displayName: "python3"
+        )
+        let openAI = transaction("https://api.openai.com/v1/chat/completions", sequence: 0)
+        openAI.clientApp = "openai-python"
+        openAI.clientApplicationIdentity = identity
+        let anthropic = transaction("https://api.anthropic.com/v1/messages", sequence: 1)
+        anthropic.clientApp = "anthropic-python"
+        anthropic.clientApplicationIdentity = identity
+
+        index.add(openAI)
+        index.add(anthropic)
+
+        let nodes = index.makeNodes()
+        #expect(nodes.map(\.name) == ["openai-python", "anthropic-python"])
+        #expect(nodes.map(\.requestCount) == [1, 1])
+        #expect(nodes.allSatisfy { $0.identity == identity })
     }
 
     // MARK: Private

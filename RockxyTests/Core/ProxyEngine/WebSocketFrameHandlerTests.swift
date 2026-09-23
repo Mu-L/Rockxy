@@ -10,7 +10,7 @@ import Testing
 
 struct WebSocketFrameHandlerTests {
     @Test("WebSocket lifecycle completes and releases exactly once")
-    func lifecycleIsIdempotent() {
+    func lifecycleIsIdempotent() async {
         let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
         let transaction = HTTPTransaction(request: request, state: .active)
         let completions = WebSocketEventCount()
@@ -23,9 +23,81 @@ struct WebSocketFrameHandlerTests {
         lifecycle.complete(transaction)
         lifecycle.complete(transaction)
         lifecycle.failSetup()
+        await Task.yield()
+        await MainActor.run {}
 
         #expect(completions.value == 1)
         #expect(releases.value == 1)
+        #expect(transaction.state == .completed)
+        #expect(transaction.measuredDuration != nil)
+    }
+
+    @Test("WebSocket lifecycle publishes the live row once at open and marks it closed on completion")
+    func lifecyclePublishesOpenThenClosed() async {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let transaction = HTTPTransaction(request: request, state: .active)
+        let states = WebSocketStateRecorder()
+        let lifecycle = WebSocketLifecycle(
+            onTransactionComplete: { states.record($0.state) },
+            onChannelClosed: {}
+        )
+
+        lifecycle.open(transaction)
+        lifecycle.open(transaction)
+        #expect(states.value == [.active])
+
+        lifecycle.complete(transaction)
+        await Task.yield()
+        await MainActor.run {}
+
+        #expect(states.value == [.active, .completed])
+        // A late open after completion must not resurrect an active row.
+        lifecycle.open(transaction)
+        #expect(states.value == [.active, .completed])
+    }
+
+    @Test("Upgrade records the 101 handshake and publishes the live row")
+    func upgradeRecordsHandshakeAndPublishesLiveRow() throws {
+        let request = TestFixtures.makeRequest(url: "ws://127.0.0.1/socket")
+        let eventLoop = EmbeddedEventLoop()
+        let client = EmbeddedChannel(loop: eventLoop)
+        let server = EmbeddedChannel(loop: eventLoop)
+        let published = WebSocketTransactionRecorder()
+        var head = HTTPResponseHead(version: .http1_1, status: .switchingProtocols)
+        head.headers.add(name: "Upgrade", value: "websocket")
+        head.headers.add(name: "Sec-WebSocket-Accept", value: "fixture")
+
+        let future = WebSocketPipelineConfigurator.upgradeToWebSocket(
+            clientChannel: client,
+            serverChannel: server,
+            requestData: request,
+            handshake: WebSocketHandshakeRecord(
+                responseHead: head,
+                timingInfo: TimingInfo(
+                    dnsLookup: 0,
+                    tcpConnection: 0.001,
+                    tlsHandshake: 0,
+                    timeToFirstByte: 0.002,
+                    contentTransfer: 0
+                ),
+                sourcePort: 4_242
+            ),
+            onTransactionComplete: { published.record($0) }
+        )
+        eventLoop.run()
+        try future.wait()
+
+        let transaction = try #require(published.value.first)
+        #expect(published.value.count == 1)
+        #expect(transaction.state == .active)
+        #expect(transaction.webSocketConnection != nil)
+        #expect(transaction.response?.statusCode == 101)
+        #expect(transaction.response?.headers.contains { $0.name == "Sec-WebSocket-Accept" } == true)
+        #expect(transaction.sourcePort == 4_242)
+        #expect(transaction.displayDuration == nil)
+
+        _ = try? client.finish(acceptAlreadyClosed: true)
+        _ = try? server.finish(acceptAlreadyClosed: true)
     }
 
     @Test("HTTP-to-WebSocket transition removes codecs and relays the first frame")
@@ -290,4 +362,50 @@ private final class WebSocketEventCount: @unchecked Sendable {
 
     private let lock = NSLock()
     private var count = 0
+}
+
+// MARK: - WebSocketStateRecorder
+
+private final class WebSocketStateRecorder: @unchecked Sendable {
+    // MARK: Internal
+
+    var value: [TransactionState] {
+        lock.lock()
+        defer { lock.unlock() }
+        return states
+    }
+
+    func record(_ state: TransactionState) {
+        lock.lock()
+        states.append(state)
+        lock.unlock()
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var states: [TransactionState] = []
+}
+
+// MARK: - WebSocketTransactionRecorder
+
+private final class WebSocketTransactionRecorder: @unchecked Sendable {
+    // MARK: Internal
+
+    var value: [HTTPTransaction] {
+        lock.lock()
+        defer { lock.unlock() }
+        return transactions
+    }
+
+    func record(_ transaction: HTTPTransaction) {
+        lock.lock()
+        transactions.append(transaction)
+        lock.unlock()
+    }
+
+    // MARK: Private
+
+    private let lock = NSLock()
+    private var transactions: [HTTPTransaction] = []
 }

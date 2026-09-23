@@ -159,7 +159,10 @@ struct PluginDetailView: View {
                         Task { await viewModel.uninstallPlugin(id: plugin.id) }
                     }
                 } message: {
-                    Text("Are you sure you want to uninstall \(plugin.manifest.name)?")
+                    Text(String(
+                        localized: "Are you sure you want to uninstall \(plugin.manifest.name)?",
+                        bundle: RockxyLocalization.bundle
+                    ))
                 }
             }
         }
@@ -167,7 +170,7 @@ struct PluginDetailView: View {
 
     private func configurationSection(_ configuration: [String: PluginConfigField]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Configuration")
+            Text(String(localized: "Configuration", bundle: RockxyLocalization.bundle))
                 .font(settingsMetrics.font(weight: .semibold))
 
             ForEach(configuration.sorted(by: { $0.key < $1.key }), id: \.key) { key, field in

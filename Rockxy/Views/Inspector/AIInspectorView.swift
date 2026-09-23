@@ -49,11 +49,22 @@ struct AIInspectorView: View {
 
     // MARK: Private
 
+    private static let truncatedFinishReasons: Set<String> = [
+        "length",
+        "max_tokens",
+        "max_output_tokens",
+        "incomplete (max_output_tokens)",
+    ]
+
     @State private var inspection: AIInspection?
     @State private var selectedEventID: String?
     @State private var filter: AIInspectorEventFilter = .all
     @State private var isLoading = true
     @Environment(\.appUIDisplayMetrics) private var metrics
+
+    private var unavailableLabel: String {
+        String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+    }
 
     private var selectedEvent: AIEventSummary? {
         guard let inspection else {
@@ -80,11 +91,20 @@ struct AIInspectorView: View {
     @ViewBuilder private var selectedEventSection: some View {
         if let selectedEvent {
             VStack(alignment: .leading, spacing: 8) {
-                sectionHeader(String(localized: "Selected Event", bundle: RockxyLocalization.bundle))
+                HStack(spacing: 6) {
+                    sectionHeader(String(localized: "Selected Event", bundle: RockxyLocalization.bundle))
+                    Text(selectedEvent.offsetLabel)
+                        .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Text(SizeFormatter.format(bytes: selectedEvent.byteCount))
+                        .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
                 Text(selectedEvent.detail)
                     .font(.system(size: metrics.metadataFontSize, design: .monospaced))
                     .textSelection(.enabled)
-                    .lineLimit(8)
+                    .lineLimit(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(8)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
@@ -92,34 +112,49 @@ struct AIInspectorView: View {
         }
     }
 
+    // MARK: Summary
+
     private func summaryStrip(_ inspection: AIInspection) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 badge(inspection.kind.displayName, color: inspection.kind == .session ? .teal : .accentColor)
                 if inspection.kind == .session {
                     badge(String(localized: "TLS only", bundle: RockxyLocalization.bundle), color: .orange)
                 } else if inspection.isStreaming {
-                    badge(String(localized: "Stream", bundle: RockxyLocalization.bundle), color: .blue)
+                    badge(streamBadgeLabel(inspection), color: .blue)
                 }
-                if !inspection.toolCalls.isEmpty {
+                if !inspection.invokedToolCalls.isEmpty {
                     badge(String(localized: "Tool", bundle: RockxyLocalization.bundle), color: .orange)
+                }
+                if let status = inspection.httpStatusCode, status >= 400 {
+                    badge("HTTP \(String(status))", color: .red)
                 }
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 18) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 170, maximum: 320), alignment: .leading)],
+                alignment: .leading,
+                spacing: 4
+            ) {
                 summaryItem(
                     String(localized: "Provider", bundle: RockxyLocalization.bundle),
                     value: inspection.provider.displayName
                 )
                 summaryItem(
                     String(localized: "Model", bundle: RockxyLocalization.bundle),
-                    value: inspection.model ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+                    value: inspection.model ?? unavailableLabel
                 )
+                if let servedModel = inspection.servedModel {
+                    summaryItem(String(localized: "Served", bundle: RockxyLocalization.bundle), value: servedModel)
+                }
                 summaryItem(
                     String(localized: "Finish", bundle: RockxyLocalization.bundle),
                     value: finishLabel(for: inspection)
                 )
+                if let requestID = inspection.requestID {
+                    summaryItem(String(localized: "Request ID", bundle: RockxyLocalization.bundle), value: requestID)
+                }
                 summaryItem(
                     String(localized: "Evidence", bundle: RockxyLocalization.bundle),
                     value: evidenceLabel(for: inspection)
@@ -129,13 +164,29 @@ struct AIInspectorView: View {
             Text(unavailableSummary(for: inspection))
                 .font(.system(size: metrics.metadataFontSize))
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5))
+    }
+
+    private func summaryItem(_ label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(label)
+                .font(.system(size: metrics.secondaryFontSize))
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            Text(value)
+                .font(.system(size: metrics.secondaryFontSize, weight: .medium, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                .help(value)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func sessionPane(_ inspection: AIInspection) -> some View {
@@ -176,7 +227,7 @@ struct AIInspectorView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         sectionHeader(String(localized: "Suggested Check", bundle: RockxyLocalization.bundle))
                         Text(String(
-                            localized: "Open SSL Proxying for this host or capture SDK traffic with HTTPS_PROXY when debugging local apps.",
+                            localized: "Enable HTTPS Decryption for this host, or capture SDK traffic with HTTPS_PROXY when debugging local apps.",
                             bundle: RockxyLocalization.bundle
                         ))
                         .font(.system(size: metrics.metadataFontSize))
@@ -190,18 +241,7 @@ struct AIInspectorView: View {
         }
     }
 
-    private func summaryItem(_ label: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
-                .font(.system(size: metrics.secondaryFontSize))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: metrics.secondaryFontSize, weight: .medium, design: .monospaced))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-        }
-    }
+    // MARK: Event list
 
     private func eventList(_ inspection: AIInspection) -> some View {
         VStack(spacing: 0) {
@@ -241,24 +281,36 @@ struct AIInspectorView: View {
 
     private func eventRow(_ event: AIEventSummary) -> some View {
         HStack(spacing: 6) {
-            severityDot(event.severity)
+            severityDot(event)
             Text(event.title)
-                .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                .font(.system(size: metrics.metadataFontSize, weight: .medium, design: .monospaced))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .layoutPriority(1)
+            if let preview = eventPreview(event) {
+                Text(preview)
+                    .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
             Spacer(minLength: 8)
             Text(event.offsetLabel)
                 .font(.system(size: metrics.metadataFontSize, design: .monospaced))
                 .foregroundStyle(event.severity == .error ? .red : .secondary)
                 .lineLimit(1)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(for: event))
     }
 
-    private func severityDot(_ severity: AIEventSeverity) -> some View {
+    private func severityDot(_ event: AIEventSummary) -> some View {
         Circle()
-            .fill(severity == .error ? Color.red : Color.accentColor)
+            .fill(eventColor(event))
             .frame(width: 7, height: 7)
     }
+
+    // MARK: Detail pane
 
     private func detailPane(_ inspection: AIInspection) -> some View {
         ScrollView {
@@ -266,6 +318,7 @@ struct AIInspectorView: View {
                 debugFocusSection(inspection)
                 timingSection(inspection)
                 usageSection(inspection)
+                assembledOutputSection(inspection)
                 toolChainSection(inspection)
                 retrievalSection(inspection)
                 warningSection(inspection)
@@ -299,41 +352,53 @@ struct AIInspectorView: View {
     private func timingSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(String(localized: "Timing and Stream", bundle: RockxyLocalization.bundle))
-            HStack(spacing: 14) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 120, maximum: 220), alignment: .leading)],
+                alignment: .leading,
+                spacing: 4
+            ) {
                 metadataPair(
                     String(localized: "Duration", bundle: RockxyLocalization.bundle),
                     value: durationLabel(inspection.duration)
                 )
                 metadataPair(
                     String(localized: "Streaming", bundle: RockxyLocalization.bundle),
-                    value: inspection
-                        .isStreaming ? String(localized: "Yes", bundle: RockxyLocalization.bundle) : String(
-                            localized: "No",
-                            bundle: RockxyLocalization.bundle
-                        )
+                    value: streamingLabel(inspection)
                 )
                 metadataPair(
                     String(localized: "Events", bundle: RockxyLocalization.bundle),
-                    value: "\(inspection.events.count)"
+                    value: CountFormatter.format(inspection.events.count)
                 )
             }
-            streamBars(inspection.events)
-            Text(String(
-                localized: "SSE cadence is shown from captured events. Token boundaries stay unavailable unless the provider exposes them.",
-                bundle: RockxyLocalization.bundle
-            ))
-            .font(.system(size: metrics.metadataFontSize))
-            .foregroundStyle(.secondary)
+            if inspection.isStreaming,
+               inspection.events.contains(where: { $0.category == .stream || $0.category == .tool })
+            {
+                streamBars(inspection.events)
+                Text(String(
+                    localized: "Bars show each captured event's payload size in stream order. Per-event arrival timing is not recorded.",
+                    bundle: RockxyLocalization.bundle
+                ))
+                .font(.system(size: metrics.metadataFontSize))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     private func streamBars(_ events: [AIEventSummary]) -> some View {
-        HStack(alignment: .bottom, spacing: 5) {
-            ForEach(Array(events.prefix(18).enumerated()), id: \.element.id) { index, event in
+        let shown = Array(events.prefix(48))
+        let largest = max(shown.map(\.byteCount).max() ?? 1, 1)
+        return HStack(alignment: .bottom, spacing: 3) {
+            ForEach(shown) { event in
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(event.category == .tool ? Color.orange : Color.accentColor)
-                    .frame(width: 8, height: CGFloat(10 + ((index * 7) % 24)))
-                    .help(event.title)
+                    .fill(eventColor(event))
+                    .frame(width: 6, height: max(3, 34 * CGFloat(event.byteCount) / CGFloat(largest)))
+                    .help("\(event.offsetLabel) \(event.title) · \(SizeFormatter.format(bytes: event.byteCount))")
+            }
+            if events.count > shown.count {
+                Text("+\(CountFormatter.format(events.count - shown.count))")
+                    .font(.system(size: metrics.badgeFontSize, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 8)
@@ -341,13 +406,23 @@ struct AIInspectorView: View {
         .frame(height: 48, alignment: .bottomLeading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(AttributedString(
+            localized: "Stream event sizes, ^[\(events.count) event](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters))
     }
 
     private func usageSection(_ inspection: AIInspection) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader(String(localized: "Usage", bundle: RockxyLocalization.bundle))
             if let usage = inspection.usage {
-                HStack(spacing: 16) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 96, maximum: 180), alignment: .leading)],
+                    alignment: .leading,
+                    spacing: 4
+                ) {
                     metadataPair(
                         String(localized: "Input", bundle: RockxyLocalization.bundle),
                         value: tokenLabel(usage.inputTokens)
@@ -360,12 +435,19 @@ struct AIInspectorView: View {
                         String(localized: "Output", bundle: RockxyLocalization.bundle),
                         value: tokenLabel(usage.outputTokens)
                     )
+                    if let reasoning = usage.reasoningTokens {
+                        metadataPair(
+                            String(localized: "Reasoning", bundle: RockxyLocalization.bundle),
+                            value: CountFormatter.format(reasoning)
+                        )
+                    }
                     metadataPair(
                         String(localized: "Total", bundle: RockxyLocalization.bundle),
-                        value: "\(usage.totalTokens)"
+                        value: CountFormatter.format(usage.totalTokens)
                     )
                 }
                 tokenBar(usage)
+                tokenLegend(usage)
             } else {
                 unavailableText(String(
                     localized: "Usage fields were not present in the captured provider response.",
@@ -375,18 +457,20 @@ struct AIInspectorView: View {
         }
     }
 
+    /// Cached tokens are a subset of input tokens, so the bar splits input into its
+    /// uncached and cached parts before appending output.
     private func tokenBar(_ usage: AIUsage) -> some View {
         GeometryReader { proxy in
             let input = CGFloat(usage.inputTokens ?? 0)
-            let cached = CGFloat(usage.cachedTokens ?? 0)
+            let cached = min(CGFloat(usage.cachedTokens ?? 0), input)
             let output = CGFloat(usage.outputTokens ?? 0)
-            let total = max(CGFloat(usage.totalTokens), 1)
+            let total = max(CGFloat(usage.totalTokens), input + output, 1)
             let width = proxy.size.width
 
             HStack(spacing: 0) {
                 Rectangle()
                     .fill(Color.purple)
-                    .frame(width: width * input / total)
+                    .frame(width: width * (input - cached) / total)
                 Rectangle()
                     .fill(Color.blue.opacity(0.65))
                     .frame(width: width * cached / total)
@@ -399,6 +483,59 @@ struct AIInspectorView: View {
             .clipShape(RoundedRectangle(cornerRadius: 3))
         }
         .frame(height: 10)
+        .accessibilityHidden(true)
+    }
+
+    private func tokenLegend(_ usage: AIUsage) -> some View {
+        HStack(spacing: 12) {
+            legendSwatch(.purple, String(localized: "Input", bundle: RockxyLocalization.bundle))
+            if (usage.cachedTokens ?? 0) > 0 {
+                legendSwatch(.blue.opacity(0.65), String(localized: "Cached", bundle: RockxyLocalization.bundle))
+            }
+            legendSwatch(.green, String(localized: "Output", bundle: RockxyLocalization.bundle))
+        }
+        .font(.system(size: metrics.badgeFontSize))
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+    }
+
+    private func legendSwatch(_ color: Color, _ label: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
+        }
+    }
+
+    @ViewBuilder
+    private func assembledOutputSection(_ inspection: AIInspection) -> some View {
+        if let output = inspection.assembledOutput {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    sectionHeader(String(localized: "Assembled Output", bundle: RockxyLocalization.bundle))
+                    Spacer(minLength: 0)
+                    Text(String(AttributedString(
+                        localized: "^[\(output.count) character](inflect: true)",
+                        bundle: RockxyLocalization.bundle,
+                        locale: RockxyLocalization.locale
+                    ).characters))
+                        .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Text(output)
+                    .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+                Text(assembledOutputCaption(inspection))
+                    .font(.system(size: metrics.metadataFontSize))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private func toolChainSection(_ inspection: AIInspection) -> some View {
@@ -406,23 +543,33 @@ struct AIInspectorView: View {
             sectionHeader(String(localized: "Tool Chain", bundle: RockxyLocalization.bundle))
             if inspection.toolCalls.isEmpty {
                 unavailableText(String(
-                    localized: "No tool-call payloads were visible in the captured traffic.",
+                    localized: "No tool declarations or tool-call payloads were visible in the captured traffic.",
                     bundle: RockxyLocalization.bundle
                 ))
             } else {
                 ForEach(Array(inspection.toolCalls.enumerated()), id: \.offset) { index, tool in
-                    HStack(spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(.system(size: metrics.metadataFontSize, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18, alignment: .trailing)
-                        Text(tool.name)
-                            .font(.system(size: metrics.metadataFontSize, weight: .medium, design: .monospaced))
-                        Spacer()
-                        Text(tool.state.displayName)
-                            .font(.system(size: metrics.metadataFontSize))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 10) {
+                            Text(String(index + 1))
+                                .font(.system(size: metrics.metadataFontSize, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18, alignment: .trailing)
+                            Text(tool.name)
+                                .font(.system(size: metrics.metadataFontSize, weight: .medium, design: .monospaced))
+                                .textSelection(.enabled)
+                            Spacer()
+                            badge(toolStateLabel(tool.state), color: toolStateColor(tool.state))
+                        }
+                        if let arguments = tool.argumentsPreview, !arguments.isEmpty {
+                            Text(arguments)
+                                .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                                .textSelection(.enabled)
+                                .padding(.leading, 28)
+                        }
                     }
+                    .accessibilityElement(children: .combine)
                     Divider()
                 }
             }
@@ -465,12 +612,11 @@ struct AIInspectorView: View {
                 ))
             } else {
                 ForEach(Array(inspection.warnings.enumerated()), id: \.offset) { _, warning in
-                    Label(
-                        warning.message,
-                        systemImage: warning.severity == .error ? "exclamationmark.triangle" : "lock.shield"
-                    )
-                    .font(.system(size: metrics.metadataFontSize, weight: .medium))
-                    .foregroundStyle(warning.severity == .error ? .red : .orange)
+                    Label(warning.message, systemImage: warningSymbol(warning.severity))
+                        .font(.system(size: metrics.metadataFontSize, weight: .medium))
+                        .foregroundStyle(warningColor(warning.severity))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
                 }
             }
         }
@@ -513,23 +659,28 @@ struct AIInspectorView: View {
             Text(title)
                 .font(.system(size: metrics.secondaryFontSize, weight: .semibold))
         }
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func metadataPair(_ label: String, value: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(label)
                 .foregroundStyle(.secondary)
+                .fixedSize()
             Text(value)
                 .fontWeight(.medium)
                 .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .font(.system(size: metrics.metadataFontSize, design: .monospaced))
+        .accessibilityElement(children: .combine)
     }
 
     private func badge(_ text: String, color: Color) -> some View {
         Text(text)
             .font(.system(size: metrics.badgeFontSize, weight: .semibold))
             .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(color.opacity(0.12), in: Capsule())
@@ -540,6 +691,62 @@ struct AIInspectorView: View {
         Text(text)
             .font(.system(size: metrics.metadataFontSize))
             .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func eventPreview(_ event: AIEventSummary) -> String? {
+        guard let preview = event.preview?
+            .replacingOccurrences(of: "\n", with: "⏎")
+            .trimmingCharacters(in: .whitespaces),
+            !preview.isEmpty else
+        {
+            return nil
+        }
+        return preview.count > 80 ? String(preview.prefix(80)) + "…" : preview
+    }
+
+    private func accessibilityLabel(for event: AIEventSummary) -> String {
+        var parts = [event.offsetLabel, event.title]
+        if let preview = eventPreview(event) {
+            parts.append(preview)
+        }
+        if event.severity == .error {
+            parts.append(String(localized: "error", bundle: RockxyLocalization.bundle))
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func eventColor(_ event: AIEventSummary) -> Color {
+        if event.severity == .error {
+            return .red
+        }
+        return event.category == .tool ? .orange : .accentColor
+    }
+
+    private func assembledOutputCaption(_ inspection: AIInspection) -> String {
+        if inspection.isStreaming {
+            return String(
+                localized: "Reassembled from captured stream deltas; the client may apply its own post-processing.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        return String(localized: "Text read from the captured response body.", bundle: RockxyLocalization.bundle)
+    }
+
+    private func warningSymbol(_ severity: AIWarningSeverity) -> String {
+        switch severity {
+        case .error: "exclamationmark.triangle"
+        case .retry: "arrow.clockwise"
+        case .redaction: "lock.shield"
+        }
+    }
+
+    private func warningColor(_ severity: AIWarningSeverity) -> Color {
+        switch severity {
+        case .error: .red
+        case .retry: .blue
+        case .redaction: .orange
+        }
     }
 
     private func loadInspection() async {
@@ -569,17 +776,56 @@ struct AIInspectorView: View {
         }
     }
 
+    // MARK: Labels
+
+    private func streamBadgeLabel(_ inspection: AIInspection) -> String {
+        switch inspection.streamTransport {
+        case .sse: String(localized: "SSE stream", bundle: RockxyLocalization.bundle)
+        case .ndjson: String(localized: "NDJSON stream", bundle: RockxyLocalization.bundle)
+        case .none: String(localized: "Stream", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func streamingLabel(_ inspection: AIInspection) -> String {
+        guard inspection.isStreaming else {
+            return String(localized: "No", bundle: RockxyLocalization.bundle)
+        }
+        switch inspection.streamTransport {
+        case .sse: return "SSE"
+        case .ndjson: return "NDJSON"
+        case .none: return String(localized: "Requested", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func toolStateLabel(_ state: AIToolCallState) -> String {
+        switch state {
+        case .declared: String(localized: "declared", bundle: RockxyLocalization.bundle)
+        case .streaming: String(localized: "streaming", bundle: RockxyLocalization.bundle)
+        case .completed: String(localized: "called", bundle: RockxyLocalization.bundle)
+        case .partial: String(localized: "partial", bundle: RockxyLocalization.bundle)
+        }
+    }
+
+    private func toolStateColor(_ state: AIToolCallState) -> Color {
+        switch state {
+        case .declared: .secondary
+        case .streaming,
+             .partial: .blue
+        case .completed: .orange
+        }
+    }
+
     private func aiDebugFocusLabel(_ inspection: AIInspection) -> String {
         if inspection.warnings.contains(where: { $0.severity == .error }) {
             return String(localized: "Provider Error", bundle: RockxyLocalization.bundle)
         }
-        if inspection.isStreaming, !inspection.toolCalls.isEmpty {
+        if inspection.isStreaming, !inspection.invokedToolCalls.isEmpty {
             return String(localized: "Streaming Tool", bundle: RockxyLocalization.bundle)
         }
         if inspection.isStreaming {
             return String(localized: "Streaming", bundle: RockxyLocalization.bundle)
         }
-        if !inspection.toolCalls.isEmpty {
+        if !inspection.invokedToolCalls.isEmpty {
             return String(localized: "Tool Call", bundle: RockxyLocalization.bundle)
         }
         if !inspection.retrieval.isEmpty {
@@ -595,7 +841,7 @@ struct AIInspectorView: View {
         if inspection.warnings.contains(where: { $0.severity == .error }) {
             return .red
         }
-        if !inspection.toolCalls.isEmpty {
+        if !inspection.invokedToolCalls.isEmpty {
             return .orange
         }
         if inspection.isStreaming {
@@ -632,7 +878,13 @@ struct AIInspectorView: View {
                 bundle: RockxyLocalization.bundle
             )
         }
-        if inspection.isStreaming, !inspection.toolCalls.isEmpty {
+        if let finish = inspection.finishReason, Self.truncatedFinishReasons.contains(finish.lowercased()) {
+            return String(
+                localized: "The model stopped at the output limit; raise max tokens or shorten the prompt before comparing outputs.",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        if inspection.isStreaming, !inspection.invokedToolCalls.isEmpty {
             return String(
                 localized: "Filter Tools and verify partial arguments, final tool call state, and stream completion.",
                 bundle: RockxyLocalization.bundle
@@ -644,7 +896,7 @@ struct AIInspectorView: View {
                 bundle: RockxyLocalization.bundle
             )
         }
-        if !inspection.toolCalls.isEmpty {
+        if !inspection.invokedToolCalls.isEmpty {
             return String(
                 localized: "Verify declared tool name, arguments, completion state, and app-side tool result follow-up.",
                 bundle: RockxyLocalization.bundle
@@ -669,31 +921,28 @@ struct AIInspectorView: View {
     }
 
     private func durationLabel(_ duration: TimeInterval?) -> String {
-        duration.map { DurationFormatter.format(seconds: $0) } ?? String(
-            localized: "Unavailable",
-            bundle: RockxyLocalization.bundle
-        )
+        duration.map { DurationFormatter.format(seconds: $0) } ?? unavailableLabel
     }
 
     private func tokenLabel(_ value: Int?) -> String {
-        value.map(String.init) ?? String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        value.map(CountFormatter.format) ?? unavailableLabel
     }
 
     private func scoreLabel(_ score: Double?) -> String {
         guard let score else {
-            return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+            return unavailableLabel
         }
-        return String(format: "%.2f", score)
+        return DecimalFormatter.format(score, fractionDigits: 2)
     }
 
     private func finishLabel(for inspection: AIInspection) -> String {
-        if inspection.events.contains(where: { $0.title.lowercased().contains("completed") }) {
-            return String(localized: "completed", bundle: RockxyLocalization.bundle)
+        if let finishReason = inspection.finishReason {
+            return finishReason
         }
         if let status = inspection.httpStatusCode, status >= 400 {
-            return "HTTP \(status)"
+            return "HTTP \(String(status))"
         }
-        return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
+        return unavailableLabel
     }
 
     private func confidenceLabel(for inspection: AIInspection) -> String {

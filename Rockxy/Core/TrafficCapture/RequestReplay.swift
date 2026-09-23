@@ -53,7 +53,7 @@ enum RequestReplay {
 
         return HTTPResponseData(
             statusCode: httpResponse.statusCode,
-            statusMessage: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
+            statusMessage: HTTPReasonPhrase.standard(for: httpResponse.statusCode),
             headers: headers,
             body: data,
             contentType: ContentType.detect(from: httpResponse.value(forHTTPHeaderField: "Content-Type"))

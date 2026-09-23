@@ -61,7 +61,7 @@ enum ImportSizeError: Error, LocalizedError {
             let actualMB = Double(actual) / (1_024 * 1_024)
             let limitMB = Double(limit) / (1_024 * 1_024)
             return String(
-                localized: "File is too large (\(String(format: "%.1f", actualMB)) MB). Maximum supported size is \(String(format: "%.0f", limitMB)) MB.",
+                localized: "File is too large (\(DecimalFormatter.format(actualMB, fractionDigits: 1)) MB). Maximum supported size is \(DecimalFormatter.format(limitMB, fractionDigits: 0)) MB.",
                 bundle: RockxyLocalization.bundle
             )
         case let .attributeError(error):

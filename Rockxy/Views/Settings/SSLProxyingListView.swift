@@ -211,11 +211,16 @@ struct SSLProxyingListView: View {
 
     private var footerHint: String {
         let countText = isSearching
-            ? String(
-                localized: "\(viewModel.filteredRows.count) of \(viewModel.ruleCount) rules",
-                bundle: RockxyLocalization.bundle
-            )
-            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+            ? String(AttributedString(
+                localized: "\(viewModel.filteredRows.count) of ^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         let breakdown = String(
             localized: "\(viewModel.decryptCount) decrypt · \(viewModel.tunnelCount) tunnel",
             bundle: RockxyLocalization.bundle

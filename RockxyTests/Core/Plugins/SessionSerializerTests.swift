@@ -73,6 +73,24 @@ struct SessionSerializerTests {
         #expect(restored.webSocketConnection?.frames.count == 5)
     }
 
+    @Test("Round-trip preserves the measured lifetime of WebSocket and replay rows")
+    func roundTripMeasuredDuration() throws {
+        let socket = TestFixtures.makeWebSocketTransaction()
+        socket.measuredDuration = 90.2
+        let replay = TestFixtures.makeTransaction(url: "https://api.example.com/replayed")
+        replay.measuredDuration = 1.25
+        let untimed = TestFixtures.makeTransaction(url: "https://api.example.com/untimed")
+        let metadata = SessionSerializer.makeMetadata(transactionCount: 3)
+        let data = try SessionSerializer.serialize(transactions: [socket, replay, untimed], metadata: metadata)
+        let session = try SessionSerializer.deserialize(from: data)
+
+        let restored = session.transactions.map { $0.toLiveModel() }
+        #expect(restored[0].measuredDuration == 90.2)
+        #expect(restored[0].displayDuration == 90.2)
+        #expect(restored[1].measuredDuration == 1.25)
+        #expect(restored[2].measuredDuration == nil)
+    }
+
     @Test("Round-trip preserves WebSocket binary frames")
     func roundTripWebSocketBinary() throws {
         let request = TestFixtures.makeRequest(url: "wss://binary.example.com/ws")

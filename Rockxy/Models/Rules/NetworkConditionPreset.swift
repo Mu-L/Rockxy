@@ -69,7 +69,7 @@ enum NetworkConditionPreset: String, CaseIterable, Codable {
     }
 
     var packetLossLabel: String {
-        String(format: "%.1f%%", packetLossRate)
+        DecimalFormatter.percent(packetLossRate, fractionDigits: 1)
     }
 
     var downloadBytesPerSecond: Int? {

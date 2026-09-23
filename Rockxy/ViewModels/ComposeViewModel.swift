@@ -42,7 +42,7 @@ enum ComposeResponseError: LocalizedError, Equatable {
         case let .bodyTooLarge(limitBytes):
             let limitMB = Double(limitBytes) / (1_024 * 1_024)
             return String(
-                localized: "The response body exceeded the \(String(format: "%.0f", limitMB)) MB Compose limit.",
+                localized: "The response body exceeded the \(DecimalFormatter.format(limitMB, fractionDigits: 0)) MB Compose limit.",
                 bundle: RockxyLocalization.bundle
             )
         }
@@ -274,7 +274,11 @@ struct ComposeResponse {
         if let text = bodyText {
             return text
         }
-        return String(localized: "(binary data, \(bodyData.count) bytes)", bundle: RockxyLocalization.bundle)
+        return String(AttributedString(
+            localized: "(binary data, ^[\(bodyData.count) byte](inflect: true))",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     var bodySize: Int {
@@ -501,7 +505,7 @@ final class ComposeViewModel {
 
             let response = ComposeResponse(
                 statusCode: httpResponse.statusCode,
-                statusMessage: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
+                statusMessage: HTTPReasonPhrase.standard(for: httpResponse.statusCode),
                 headers: responseHeaders,
                 bodyData: data,
                 bodyText: bodyText,
@@ -773,7 +777,7 @@ final class ComposeViewModel {
             }?.value)
             let response = ComposeResponse(
                 statusCode: statusCode,
-                statusMessage: HTTPURLResponse.localizedString(forStatusCode: statusCode),
+                statusMessage: HTTPReasonPhrase.standard(for: statusCode),
                 headers: (entry.responseHeaders ?? []).map { ($0.name, $0.value) },
                 bodyData: Data(responseBody.utf8),
                 bodyText: responseBody,

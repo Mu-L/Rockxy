@@ -20,7 +20,7 @@ struct TimingInspectorView: View {
                     Divider()
 
                     HStack {
-                        Text("Total")
+                        Text(String(localized: "Total", bundle: RockxyLocalization.bundle))
                             .fontWeight(.semibold)
                         Spacer()
                         Text(DurationFormatter.format(seconds: timing.totalDuration))

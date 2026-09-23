@@ -47,10 +47,11 @@ enum AssistantProviderError: LocalizedError, Equatable {
             )
         case let .rateLimited(retryAfterSeconds):
             if let retryAfterSeconds {
-                String(
-                    localized: "The provider rate limit was reached. Try again in \(retryAfterSeconds) seconds.",
-                    bundle: RockxyLocalization.bundle
-                )
+                String(AttributedString(
+                    localized: "The provider rate limit was reached. Try again in ^[\(retryAfterSeconds) second](inflect: true).",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             } else {
                 String(
                     localized: "The provider rate limit was reached. Try again later.",

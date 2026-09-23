@@ -202,10 +202,6 @@ struct SidebarView: View {
         SidebarSearchFilter.domainTree(coordinator.domainTree, query: sidebarFilterText)
     }
 
-    private var focusSets: [FocusSet] {
-        SidebarSearchFilter.focusSets(coordinator.activeWorkspace.focusSets, query: sidebarFilterText)
-    }
-
     private var pinnedTransactions: [HTTPTransaction] {
         SidebarSearchFilter.transactions(coordinator.allPinnedTransactions, query: sidebarFilterText)
     }
@@ -283,7 +279,13 @@ struct SidebarView: View {
         case .browse:
             browseList
         case .focus:
-            focusList
+            FocusSidebarList(
+                coordinator: coordinator,
+                filterText: sidebarFilterText,
+                editingFocusSet: $editingFocusSet,
+                isMutedSourcesPresented: $isMutedSourcesPresented,
+                expandedFocusSetIDs: $expandedFocusSetIDs
+            )
         case .library:
             libraryList
         }
@@ -307,83 +309,6 @@ struct SidebarView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .font(.system(size: metrics.sidebarNavigationFontSize))
-    }
-
-    private var focusList: some View {
-        List {
-            Section {
-                if focusSets.isEmpty {
-                    Label(
-                        SidebarSearchFilter.hasQuery(sidebarFilterText)
-                            ? String(localized: "No Matching Focus Sets", bundle: RockxyLocalization.bundle)
-                            : String(localized: "No Focus Sets", bundle: RockxyLocalization.bundle),
-                        systemImage: "scope"
-                    )
-                    .font(.system(size: metrics.sidebarNavigationFontSize, weight: .medium))
-                    .help(String(localized: "Create a reusable app, domain, or path scope.", bundle: RockxyLocalization.bundle))
-                    .padding(.vertical, 4)
-                } else {
-                    ForEach(focusSets) { focusSet in
-                        FocusSetSidebarRow(
-                            focusSet: focusSet,
-                            isActive: coordinator.activeWorkspace.activeFocusSetID == focusSet.id,
-                            isExpanded: focusSetExpansionBinding(for: focusSet.id),
-                            onApply: { applyFocusSetFromSidebar(focusSet) }
-                        )
-                        .listRowBackground(
-                            coordinator.activeWorkspace.activeFocusSetID == focusSet.id
-                                ? Color.accentColor.opacity(0.09)
-                                : Color.clear
-                        )
-                        .contextMenu {
-                            Button(String(localized: "Apply", bundle: RockxyLocalization.bundle)) {
-                                applyFocusSetFromSidebar(focusSet)
-                            }
-                            Button(expandedFocusSetIDs.contains(focusSet.id)
-                                ? String(localized: "Collapse Rules", bundle: RockxyLocalization.bundle)
-                                : String(localized: "Expand Rules", bundle: RockxyLocalization.bundle))
-                            {
-                                toggleFocusSetExpansion(focusSet.id)
-                            }
-                            Divider()
-                            Button(String(localized: "Edit…", bundle: RockxyLocalization.bundle)) {
-                                editingFocusSet = focusSet
-                            }
-                            Button(String(localized: "Duplicate", bundle: RockxyLocalization.bundle)) {
-                                coordinator.duplicateFocusSet(focusSet)
-                            }
-                            Divider()
-                            Button(String(localized: "Delete", bundle: RockxyLocalization.bundle), role: .destructive) {
-                                coordinator.deleteFocusSet(focusSet)
-                            }
-                        }
-                    }
-                }
-            } header: {
-                sidebarSectionHeader(
-                    title: String(localized: "Focus Sets", bundle: RockxyLocalization.bundle),
-                    actionTitle: nil,
-                    actionSystemImage: "plus",
-                    actionLabel: String(localized: "Create Focus Set", bundle: RockxyLocalization.bundle),
-                    action: { editingFocusSet = coordinator.makeFocusSetFromCurrentScope() }
-                )
-                .padding(.top, 4)
-            }
-
-            Section {
-                EmptyView()
-            } header: {
-                sidebarSectionHeader(
-                    title: String(localized: "Noise Control", bundle: RockxyLocalization.bundle),
-                    actionTitle: nil,
-                    actionSystemImage: "slider.horizontal.3",
-                    actionLabel: String(localized: "Configure Noise Control", bundle: RockxyLocalization.bundle),
-                    action: { isMutedSourcesPresented = true }
-                )
-            }
-        }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
     }
 
     private var libraryList: some View {
@@ -599,36 +524,6 @@ struct SidebarView: View {
         .headerProminence(.increased)
     }
 
-    private func sidebarSectionHeader(
-        title: String,
-        actionTitle: String?,
-        actionSystemImage: String?,
-        actionLabel: String,
-        action: @escaping () -> Void
-    )
-        -> some View
-    {
-        HStack(spacing: 8) {
-            Text(title)
-            Spacer(minLength: 8)
-            Button(action: action) {
-                if let actionSystemImage {
-                    Image(systemName: actionSystemImage)
-                        .frame(width: 18, height: 18)
-                } else if let actionTitle {
-                    Text(actionTitle)
-                        .font(.caption.weight(.medium))
-                }
-            }
-            .rockxyGlassButtonStyle()
-            .controlSize(.small)
-            .foregroundStyle(.secondary)
-            .help(actionLabel)
-            .accessibilityLabel(actionLabel)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private func signalRow(_ signal: TrafficSignal) -> some View {
         let isActive = coordinator.activeWorkspace.activeTrafficSignal == signal
         return Button {
@@ -639,7 +534,7 @@ struct SidebarView: View {
                     .frame(width: 16)
                 Text(signal.title)
                 Spacer(minLength: 8)
-                Text("\(coordinator.trafficSignalCount(signal))")
+                Text(CountFormatter.format(coordinator.trafficSignalCount(signal)))
                     .font(.system(size: metrics.sidebarBadgeFontSize).monospacedDigit())
                     .foregroundStyle(.secondary)
                 if isActive {
@@ -740,11 +635,15 @@ struct SidebarView: View {
                 }
 
                 if node.errorCount > 0 {
-                    Label("\(node.errorCount)", systemImage: "exclamationmark.triangle.fill")
+                    Label(CountFormatter.format(node.errorCount), systemImage: "exclamationmark.triangle.fill")
                         .labelStyle(.titleAndIcon)
                         .font(.system(size: metrics.sidebarBadgeFontSize))
                         .foregroundStyle(.orange)
-                        .help(String(localized: "\(node.errorCount) failed or error responses", bundle: RockxyLocalization.bundle))
+                        .help(String(AttributedString(
+                            localized: "^[\(node.errorCount) failed or error response](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters))
                 }
             }
         } icon: {
@@ -1241,31 +1140,6 @@ struct SidebarView: View {
                 expandedAppNames.remove(appName)
             }
         }
-    }
-
-    private func focusSetExpansionBinding(for id: UUID) -> Binding<Bool> {
-        Binding {
-            SidebarSearchFilter.hasQuery(sidebarFilterText) || expandedFocusSetIDs.contains(id)
-        } set: { isExpanded in
-            if isExpanded {
-                expandedFocusSetIDs.insert(id)
-            } else {
-                expandedFocusSetIDs.remove(id)
-            }
-        }
-    }
-
-    private func toggleFocusSetExpansion(_ id: UUID) {
-        if expandedFocusSetIDs.contains(id) {
-            expandedFocusSetIDs.remove(id)
-        } else {
-            expandedFocusSetIDs.insert(id)
-        }
-    }
-
-    private func applyFocusSetFromSidebar(_ focusSet: FocusSet) {
-        expandedFocusSetIDs.insert(focusSet.id)
-        coordinator.applyFocusSet(focusSet)
     }
 
     private func saveFocusSetFromSidebar(_ focusSet: FocusSet) {

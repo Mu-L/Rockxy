@@ -411,10 +411,11 @@ struct ExternalProxySettingsView: View {
                 Spacer()
 
                 Text(
-                    String(
-                        localized: "\(viewModel.bypassEntriesUsed) of \(viewModel.bypassEntriesLimit) entries",
-                        bundle: RockxyLocalization.bundle
-                    )
+                    String(AttributedString(
+                        localized: "\(viewModel.bypassEntriesUsed) of ^[\(viewModel.bypassEntriesLimit) entry](inflect: true)",
+                        bundle: RockxyLocalization.bundle,
+                        locale: RockxyLocalization.locale
+                    ).characters)
                 )
                 .font(toolMetrics.metadataFont(weight: .medium))
                 .foregroundStyle(

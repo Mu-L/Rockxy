@@ -108,7 +108,7 @@ struct GRPCInspectorView: View {
                 )
                 metric(
                     String(localized: "Messages", bundle: RockxyLocalization.bundle),
-                    value: "\(inspection.frames.count)",
+                    value: CountFormatter.format(inspection.frames.count),
                     color: .primary
                 )
                 metric(
@@ -446,7 +446,7 @@ struct GRPCInspectorView: View {
         guard let duration = inspection.duration else {
             return String(localized: "Unknown", bundle: RockxyLocalization.bundle)
         }
-        return String(format: "%.0f ms", duration * 1_000)
+        return DurationFormatter.format(seconds: duration)
     }
 
     private func totalPayloadBytes(_ inspection: GRPCInspection) -> Int {
@@ -478,11 +478,18 @@ struct GRPCInspectorView: View {
         case .complete:
             String(localized: "Raw bytes", bundle: RockxyLocalization.bundle)
         case let .incompleteHeader(remainingBytes):
-            String(localized: "Incomplete header · \(remainingBytes) bytes", bundle: RockxyLocalization.bundle)
+            String(AttributedString(
+                localized: "Incomplete header · ^[\(remainingBytes) byte](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         case let .truncatedPayload(expectedBytes, actualBytes):
+            // Deliberately raw counts rather than `SizeFormatter`: this is a ratio the reader
+            // compares against itself, and adaptive units would print "1 KB/2 KB" for a frame that
+            // is missing half its payload. Allowlisted in `SizeFormatterTests`.
             String(localized: "Truncated · \(actualBytes)/\(expectedBytes) bytes", bundle: RockxyLocalization.bundle)
         case let .unsupportedCompressionFlag(flag):
-            String(localized: "Unknown compression flag \(flag)", bundle: RockxyLocalization.bundle)
+            String(localized: "Unknown compression flag \(Int(flag))", bundle: RockxyLocalization.bundle)
         }
     }
 

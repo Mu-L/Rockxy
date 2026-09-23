@@ -64,25 +64,25 @@ enum RockxyNearbyTransferError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidFrame:
-            "The nearby transfer frame is invalid."
+            String(localized: "The nearby transfer frame is invalid.", bundle: RockxyLocalization.bundle)
         case .frameTooLarge:
-            "The nearby transfer exceeds Rockxy's local transfer size limit."
+            String(localized: "The nearby transfer exceeds Rockxy's local transfer size limit.", bundle: RockxyLocalization.bundle)
         case .invalidMessage:
-            "The nearby transfer message is incomplete."
+            String(localized: "The nearby transfer message is incomplete.", bundle: RockxyLocalization.bundle)
         case .unsupportedVersion:
-            "The nearby Rockxy app uses an unsupported transfer protocol."
+            String(localized: "The nearby Rockxy app uses an unsupported transfer protocol.", bundle: RockxyLocalization.bundle)
         case .invalidPeerKey:
-            "Rockxy could not verify the nearby device key."
+            String(localized: "Rockxy could not verify the nearby device key.", bundle: RockxyLocalization.bundle)
         case .invalidEncryptedPayload:
-            "Rockxy could not decrypt the nearby transfer."
+            String(localized: "Rockxy could not decrypt the nearby transfer.", bundle: RockxyLocalization.bundle)
         case .transferTooLarge:
-            "The session is too large for nearby transfer."
+            String(localized: "The session is too large for nearby transfer.", bundle: RockxyLocalization.bundle)
         case .emptyTransfer:
-            "The transferred session contains no requests."
+            String(localized: "The transferred session contains no requests.", bundle: RockxyLocalization.bundle)
         case .invalidTransaction:
-            "The transferred session contains an invalid request."
+            String(localized: "The transferred session contains an invalid request.", bundle: RockxyLocalization.bundle)
         case .projectCatalogUnavailable:
-            "Projects could not be loaded, so Rockxy did not import the transferred session."
+            String(localized: "Projects could not be loaded, so Rockxy did not import the transferred session.", bundle: RockxyLocalization.bundle)
         }
     }
 }

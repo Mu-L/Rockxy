@@ -386,11 +386,16 @@ struct AllowListWindowView: View {
 
     private var footerHint: String {
         let countText = viewModel.searchText.isEmpty
-            ? "\(viewModel.ruleCount) \(String(localized: "rules", bundle: RockxyLocalization.bundle))"
-            : String(
-                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
-                bundle: RockxyLocalization.bundle
-            )
+            ? String(AttributedString(
+                localized: "^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "\(viewModel.filteredRules.count) of ^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 

@@ -322,11 +322,17 @@ final class UpstreamResponseHandler: ChannelInboundHandler, RemovableChannelHand
                     onTransactionComplete: onTransactionComplete,
                     onChannelClosed: onChannelClosed
                 )
+                let handshake = WebSocketHandshakeRecord(
+                    responseHead: responseHead,
+                    timingInfo: buildTimingInfo(endTime: .now()),
+                    sourcePort: sourcePort
+                )
                 handshakePromise.futureResult.flatMap { [clientContext, requestData, onTransactionComplete] in
                     WebSocketPipelineConfigurator.upgradeToWebSocket(
                         clientChannel: clientContext.channel,
                         serverChannel: context.channel,
                         requestData: requestData,
+                        handshake: handshake,
                         onTransactionComplete: onTransactionComplete,
                         lifecycle: webSocketLifecycle
                     )

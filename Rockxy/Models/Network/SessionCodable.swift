@@ -64,6 +64,7 @@ struct CodableTransaction: Codable {
             .map { CodableWeb3RPCInfo(from: $0) }
         self.sourcePort = transaction.sourcePort
         self.clientApp = transaction.clientApp
+        self.measuredDuration = transaction.measuredDuration
         self.comment = transaction.comment
         self.highlightColor = transaction.highlightColor?.rawValue
         self.isPinned = transaction.isPinned
@@ -90,6 +91,7 @@ struct CodableTransaction: Codable {
         web3RPCInfo = try container.decodeIfPresent(CodableWeb3RPCInfo.self, forKey: .web3RPCInfo)
         sourcePort = try container.decodeIfPresent(UInt16.self, forKey: .sourcePort)
         clientApp = try container.decodeIfPresent(String.self, forKey: .clientApp)
+        measuredDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .measuredDuration)
         comment = try container.decodeIfPresent(String.self, forKey: .comment)
         highlightColor = try container.decodeIfPresent(String.self, forKey: .highlightColor)
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
@@ -115,6 +117,7 @@ struct CodableTransaction: Codable {
         case web3RPCInfo
         case sourcePort
         case clientApp
+        case measuredDuration
         case comment
         case highlightColor
         case isPinned
@@ -137,6 +140,9 @@ struct CodableTransaction: Codable {
     let web3RPCInfo: CodableWeb3RPCInfo?
     let sourcePort: UInt16?
     let clientApp: String?
+    /// Wall-clock lifetime for rows without a timing breakdown (WebSocket connections,
+    /// replays). Older session files omit it.
+    let measuredDuration: TimeInterval?
     let comment: String?
     let highlightColor: String?
     let isPinned: Bool
@@ -161,6 +167,7 @@ struct CodableTransaction: Codable {
         )
         transaction.clientApp = clientApp
         transaction.sourcePort = sourcePort
+        transaction.measuredDuration = measuredDuration
         transaction.comment = comment
         transaction.highlightColor = highlightColor.flatMap { HighlightColor(rawValue: $0) }
         transaction.isPinned = isPinned

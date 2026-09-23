@@ -72,9 +72,11 @@ struct FocusSetSidebarRow: View {
             ? String(localized: "This Focus Set is active. Click to reapply it.", bundle: RockxyLocalization.bundle)
             : String(localized: "Apply this Focus Set.", bundle: RockxyLocalization.bundle))
         .accessibilityValue(
-            focusSet.ruleCount == 1
-                ? String(localized: "1 condition", bundle: RockxyLocalization.bundle)
-                : String(localized: "\(focusSet.ruleCount) conditions", bundle: RockxyLocalization.bundle)
+            String(AttributedString(
+                localized: "^[\(focusSet.ruleCount) condition](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         )
     }
 

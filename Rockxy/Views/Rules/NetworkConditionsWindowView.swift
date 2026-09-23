@@ -762,11 +762,16 @@ struct NetworkConditionsWindowView: View {
 
     private var footerHint: String {
         let countText = isSearching
-            ? String(
-                localized: "\(viewModel.filteredRules.count) of \(viewModel.ruleCount) rules",
-                bundle: RockxyLocalization.bundle
-            )
-            : String(localized: "\(viewModel.ruleCount) rules", bundle: RockxyLocalization.bundle)
+            ? String(AttributedString(
+                localized: "\(viewModel.filteredRules.count) of ^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+            : String(AttributedString(
+                localized: "^[\(viewModel.ruleCount) rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         return "\(countText) · ⌘N \(String(localized: "New Rule", bundle: RockxyLocalization.bundle)) · ⌘↩ \(String(localized: "Edit", bundle: RockxyLocalization.bundle))"
     }
 
@@ -918,7 +923,10 @@ struct NetworkConditionsWindowView: View {
             .width(min: 110, ideal: 145)
 
             TableColumn(String(localized: "Latency", bundle: RockxyLocalization.bundle)) { rule in
-                Text("\(viewModel.networkProfile(for: rule).latencyMs) ms")
+                Text(String(
+                    localized: "\(viewModel.networkProfile(for: rule).latencyMs) ms",
+                    bundle: RockxyLocalization.bundle
+                ))
                     .lineLimit(1)
                     .opacity(rule.isEnabled ? 1.0 : 0.5)
             }

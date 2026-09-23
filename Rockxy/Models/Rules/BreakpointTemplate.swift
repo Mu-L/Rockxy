@@ -493,7 +493,7 @@ enum BreakpointRawMessage {
             )
         case .response:
             return join(
-                startLine: "HTTP/1.1 \(draft.statusCode) \(reasonPhrase(for: draft.statusCode))",
+                startLine: "HTTP/1.1 \(draft.statusCode) \(HTTPReasonPhrase.standard(for: draft.statusCode))",
                 headers: headers,
                 body: draft.body
             )
@@ -569,25 +569,6 @@ enum BreakpointRawMessage {
             return "\(path)?\(query)"
         }
         return path
-    }
-
-    private static func reasonPhrase(for statusCode: Int) -> String {
-        switch statusCode {
-        case 200: "OK"
-        case 201: "Created"
-        case 204: "No Content"
-        case 301: "Moved Permanently"
-        case 302: "Found"
-        case 304: "Not Modified"
-        case 400: "Bad Request"
-        case 401: "Unauthorized"
-        case 403: "Forbidden"
-        case 404: "Not Found"
-        case 500: "Internal Server Error"
-        case 502: "Bad Gateway"
-        case 503: "Service Unavailable"
-        default: ""
-        }
     }
 }
 

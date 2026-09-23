@@ -408,11 +408,6 @@ struct RequestTableView: NSViewRepresentable {
 
     // MARK: Private
 
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter
-    }()
 
     @Environment(\.appUIDisplayMetrics) private var displayMetrics
 
@@ -917,7 +912,7 @@ extension RequestTableView {
                     text = rowData.statusCode.map { "\($0)" } ?? ""
                     font = .monospacedDigitSystemFont(ofSize: metrics.fontSize, weight: .medium)
                 case "time":
-                    text = RequestTableView.timeFormatter.string(from: rowData.timestamp)
+                    text = TimestampFormatter.timeOfDay(rowData.timestamp)
                     font = .monospacedDigitSystemFont(ofSize: metrics.secondaryFontSize, weight: .regular)
                 case "duration":
                     text = rowData.totalDuration.map {
@@ -2297,6 +2292,12 @@ extension RequestTableView {
             return Self.clientIconColors[hash % Self.clientIconColors.count]
         }
 
+        /// Unattributed rows read "Unknown", matching the sidebar's Unknown group and the
+        /// Context Dock, instead of a bare "?" badge beside an empty label.
+        private func clientDisplayName(for appName: String) -> String {
+            appName.isEmpty ? String(localized: "Unknown", bundle: RockxyLocalization.bundle) : appName
+        }
+
         private func clientIconInitials(for appName: String) -> String {
             let trimmed = appName.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else {
@@ -2565,8 +2566,9 @@ extension RequestTableView {
                 if let nameLabel {
                     updateClientNameConstraints(nameLabel, in: existing, iconSize: iconSize, gap: gap)
                 }
-                nameLabel?.stringValue = appName
+                nameLabel?.stringValue = clientDisplayName(for: appName)
                 nameLabel?.font = parent.effectiveDisplayMetrics.appKitFont()
+                nameLabel?.textColor = appName.isEmpty ? .tertiaryLabelColor : .secondaryLabelColor
                 nameLabel?.toolTip = appName.isEmpty ? nil : appName
                 if let icon = appIcon(for: appName) {
                     imageView?.image = icon
@@ -2619,7 +2621,8 @@ extension RequestTableView {
             ])
 
             // Populate content
-            nameLabel.stringValue = appName
+            nameLabel.stringValue = clientDisplayName(for: appName)
+            nameLabel.textColor = appName.isEmpty ? .tertiaryLabelColor : .secondaryLabelColor
             nameLabel.toolTip = appName.isEmpty ? nil : appName
             if let icon = appIcon(for: appName) {
                 imageView.image = icon
@@ -2784,7 +2787,7 @@ extension RequestTableView {
                 }
 
             case "time":
-                cell.stringValue = RequestTableView.timeFormatter.string(from: rowData.timestamp)
+                cell.stringValue = TimestampFormatter.timeOfDay(rowData.timestamp)
                 cell.font = .monospacedDigitSystemFont(ofSize: metrics.secondaryFontSize, weight: .regular)
                 cell.textColor = .secondaryLabelColor
 

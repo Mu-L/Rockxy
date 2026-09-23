@@ -10,12 +10,12 @@ struct HeadersInspectorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Section("Request Headers") {
+                Section(String(localized: "Request Headers", bundle: RockxyLocalization.bundle)) {
                     headerTable(headers: transaction.request.headers)
                 }
 
                 if let response = transaction.response {
-                    Section("Response Headers") {
+                    Section(String(localized: "Response Headers", bundle: RockxyLocalization.bundle)) {
                         headerTable(headers: response.headers)
                     }
                 }

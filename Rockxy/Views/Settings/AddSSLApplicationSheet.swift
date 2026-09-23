@@ -281,7 +281,11 @@ struct AddSSLApplicationSheet: View {
                     .truncationMode(.middle)
             }
             Spacer()
-            Text(String(localized: "\(app.domains.count) hosts", bundle: RockxyLocalization.bundle))
+            Text(String(AttributedString(
+                localized: "^[\(app.domains.count) host](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
                 .font(toolMetrics.metadataFont())
                 .foregroundStyle(.secondary)
         }

@@ -302,10 +302,14 @@ private struct CapturedValuePicker: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 8)
                 if let requestCount {
-                    Text("\(requestCount)")
+                    Text(CountFormatter.format(requestCount))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .help(String(localized: "\(requestCount) captured requests", bundle: RockxyLocalization.bundle))
+                        .help(String(AttributedString(
+                            localized: "^[\(requestCount) captured request](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters))
                 }
                 if selection == value {
                     Image(systemName: "checkmark")
