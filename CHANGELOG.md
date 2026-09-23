@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - Fixed the inspector showing "No Selection" after a filter hid the focused row of a multi-row selection while other selected rows stayed visible; the top-most visible selected row now becomes the inspected request.
+- Localized system proxy and plugin script error messages shown in the capture readiness panel and the scripting surfaces.
 - Fixed an open WebSocket reading "Duration Unavailable" in the Context Dock while its inspector showed a running time; both now show the elapsed time of a connection or stream that is still open, updated once a second.
 - Confirmed late helper proxy restoration after an XPC timeout before leaving capture in a recovery state, so stopping capture does not require a second click when macOS finishes the restore moments later.
 - Made Map Local quick-create, response breakpoints, and Copy as Raw/JSON decode gzip, deflate, and Brotli response bodies so compressed JSON is editable and copyable text instead of an opaque binary payload, with the compressed-only headers dropped from the edited response.

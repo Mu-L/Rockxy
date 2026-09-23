@@ -54,12 +54,118 @@
         }
       }
     },
+    "Another running Rockxy instance owns the current system proxy session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个正在运行的 Rockxy 实例拥有当前的系统代理会话"
+          }
+        }
+      }
+    },
+    "Cannot read %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Cannot read %1$@: %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 %1$@：%2$@"
+          }
+        }
+      }
+    },
+    "Could not detect an active network service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法检测到活跃的网络服务"
+          }
+        }
+      }
+    },
+    "Failed to create JSContext": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法创建 JSContext"
+          }
+        }
+      }
+    },
+    "JS exception: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JS 异常：%@"
+          }
+        }
+      }
+    },
+    "No script entry point defined": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未定义脚本入口点"
+          }
+        }
+      }
+    },
+    "Plugin not loaded: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件未加载：%@"
+          }
+        }
+      }
+    },
+    "Plugin script execution timed out": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件脚本执行超时"
+          }
+        }
+      }
+    },
     "Projects could not be loaded, so Rockxy did not import the transferred session.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "无法加载项目，因此 Rockxy 未导入传输的会话。"
+          }
+        }
+      }
+    },
+    "Rockxy cannot safely reclaim system routing with the installed helper. Quit and reopen Rockxy, then update or repair the helper in Advanced Proxy Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法通过已安装的辅助工具安全地收回系统路由。请退出并重新打开 Rockxy，然后在“高级代理设置”中更新或修复辅助工具。"
+          }
+        }
+      }
+    },
+    "Rockxy could not arm the watchdog that restores your proxy settings, so the system proxy was left unchanged: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法启用用于恢复代理设置的看护程序，因此系统代理保持不变：%@"
           }
         }
       }
@@ -74,12 +180,42 @@
         }
       }
     },
+    "Rockxy could not restore one or more system proxy settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法恢复一个或多个系统代理设置"
+          }
+        }
+      }
+    },
+    "Rockxy could not set the system proxy and could not fully undo the services it had already changed (%@). Your previous settings were kept so they can still be restored.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法设置系统代理，也无法完全撤销已更改的服务（%@）。之前的设置已保留，仍可恢复。"
+          }
+        }
+      }
+    },
     "Rockxy could not verify the nearby device key.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Rockxy 无法验证附近设备的密钥。"
+          }
+        }
+      }
+    },
+    "Script load failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "脚本加载失败：%@"
           }
         }
       }
@@ -124,6 +260,16 @@
         }
       }
     },
+    "The proxy settings for %@ changed before Rockxy could apply its recorded update": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Rockxy 应用其记录的更新之前，%@ 的代理设置已发生更改"
+          }
+        }
+      }
+    },
     "The session is too large for nearby transfer.": {
       "localizations": {
         "zh-Hans": {
@@ -150,6 +296,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "传输的会话不包含任何请求。"
+          }
+        }
+      }
+    },
+    "Unexpected networksetup output: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "意外的 networksetup 输出：%@"
           }
         }
       }
@@ -458,6 +614,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "钥匙串保存失败，状态码：%@"
+          }
+        }
+      }
+    },
+    "macOS did not confirm the Rockxy system proxy on port %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 未确认端口 %@ 上的 Rockxy 系统代理"
           }
         }
       }
@@ -838,6 +1004,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "^[%lld 条规则](inflect: true)"
+          }
+        }
+      }
+    },
+    "networksetup %@ failed (exit %@): %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "networksetup %1$@ failed (exit %2$@): %3$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "networksetup %1$@ 失败（退出码 %2$@）：%3$@"
           }
         }
       }

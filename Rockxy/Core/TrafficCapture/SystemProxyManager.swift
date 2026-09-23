@@ -30,28 +30,56 @@ enum SystemProxyError: LocalizedError {
 
     // MARK: Internal
 
+    /// These reach the viewer through the capture readiness panel
+    /// (`setProxyEnableFailed(message:)`), so every template is localized; the quoted
+    /// `networksetup` output and service names stay verbatim.
     var errorDescription: String? {
         switch self {
         case let .networkSetupFailed(command, output, exitCode):
-            "networksetup \(command) failed (exit \(exitCode)): \(output)"
+            String(
+                localized: "networksetup \(command) failed (exit \(String(exitCode))): \(output)",
+                bundle: RockxyLocalization.bundle
+            )
         case .noActiveNetworkService:
-            "Could not detect an active network service"
+            String(localized: "Could not detect an active network service", bundle: RockxyLocalization.bundle)
         case let .proxyActivationNotConfirmed(port):
-            "macOS did not confirm the Rockxy system proxy on port \(port)"
+            String(
+                localized: "macOS did not confirm the Rockxy system proxy on port \(String(port))",
+                bundle: RockxyLocalization.bundle
+            )
         case .proxyRestoreFailed:
-            "Rockxy could not restore one or more system proxy settings"
+            String(
+                localized: "Rockxy could not restore one or more system proxy settings",
+                bundle: RockxyLocalization.bundle
+            )
         case .proxySessionInUse:
-            "Another running Rockxy instance owns the current system proxy session"
+            String(
+                localized: "Another running Rockxy instance owns the current system proxy session",
+                bundle: RockxyLocalization.bundle
+            )
         case let .proxyStateChangedDuringCommit(service):
-            "The proxy settings for \(service) changed before Rockxy could apply its recorded update"
+            String(
+                localized: "The proxy settings for \(service) changed before Rockxy could apply its recorded update",
+                bundle: RockxyLocalization.bundle
+            )
         case .previousHelperUnavailable:
-            "Rockxy cannot safely reclaim system routing with the installed helper. Quit and reopen Rockxy, then update or repair the helper in Advanced Proxy Settings."
+            String(
+                // swiftlint:disable:next line_length
+                localized: "Rockxy cannot safely reclaim system routing with the installed helper. Quit and reopen Rockxy, then update or repair the helper in Advanced Proxy Settings.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .unexpectedOutput(output):
-            "Unexpected networksetup output: \(output)"
+            String(localized: "Unexpected networksetup output: \(output)", bundle: RockxyLocalization.bundle)
         case let .directProxyWatchdogUnavailable(reason):
-            "Rockxy could not arm the watchdog that restores your proxy settings, so the system proxy was left unchanged: \(reason)"
+            String(
+                localized: "Rockxy could not arm the watchdog that restores your proxy settings, so the system proxy was left unchanged: \(reason)",
+                bundle: RockxyLocalization.bundle
+            )
         case let .overrideRollbackIncomplete(reason):
-            "Rockxy could not set the system proxy and could not fully undo the services it had already changed (\(reason)). Your previous settings were kept so they can still be restored."
+            String(
+                localized: "Rockxy could not set the system proxy and could not fully undo the services it had already changed (\(reason)). Your previous settings were kept so they can still be restored.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }
