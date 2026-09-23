@@ -11,6 +11,7 @@ actor TrafficSessionManager {
 
     var onBatchReady: (@Sendable ([HTTPTransaction], _ generation: UInt) -> Void)?
     var onClientAppEnriched: (@Sendable ([HTTPTransaction]) -> Void)?
+    var onLiveTransactionUpdated: (@Sendable ([HTTPTransaction]) -> Void)?
     var onBeginNewSession: (@Sendable (_ generation: UInt) async -> Void)?
 
     var currentGeneration: UInt {
@@ -27,6 +28,12 @@ actor TrafficSessionManager {
         onClientAppEnriched = callback
     }
 
+    /// Receives long-lived transactions (WebSocket connections) that were already delivered as
+    /// live rows and have since changed state, so the UI refreshes them in place.
+    func setOnLiveTransactionUpdated(_ callback: @escaping @Sendable ([HTTPTransaction]) -> Void) {
+        onLiveTransactionUpdated = callback
+    }
+
     func setOnBeginNewSession(_ callback: (@Sendable (_ generation: UInt) async -> Void)?) {
         onBeginNewSession = callback
     }
@@ -41,7 +48,30 @@ actor TrafficSessionManager {
 
     // MARK: - Transaction Intake
 
-    func addTransaction(_ transaction: HTTPTransaction) {
+    /// Takes in one delivered transaction.
+    ///
+    /// - Parameter acceptsNewRows: `false` while recording is paused. A paused capture still
+    ///   finishes rows it already shows — otherwise a stream or WebSocket that closes during the
+    ///   pause would stay `Active` in the list — but it never adds a new one.
+    func addTransaction(_ transaction: HTTPTransaction, acceptsNewRows: Bool = true) {
+        // A proxied WebSocket, and a streaming (SSE/NDJSON) response, is delivered once when it
+        // opens and once when it finishes, through independent tasks that can arrive in either
+        // order. Whichever delivery comes first adds the row; the other one is an in-place
+        // update. A delivery for a row dismissed by Clear Session is dropped so the finished
+        // connection cannot resurface as a new row.
+        if !dismissedLiveTransactionIDs.isEmpty, dismissedLiveTransactionIDs.remove(transaction.id) != nil {
+            return
+        }
+        if liveTransactionIDs.remove(transaction.id) != nil {
+            onLiveTransactionUpdated?([transaction])
+            return
+        }
+        guard acceptsNewRows else {
+            return
+        }
+        if transaction.deliversLiveRow {
+            liveTransactionIDs.insert(transaction.id)
+        }
         pendingUpdates.append(transaction)
 
         if pendingUpdates.count >= batchSize {
@@ -82,6 +112,7 @@ actor TrafficSessionManager {
     /// local state cleared (e.g. tests) and does not rely on the rollover callback.
     func resetBufferState() {
         pendingUpdates.removeAll()
+        dismissLiveTransactions()
         totalBuffered = 0
         generation &+= 1
     }
@@ -102,6 +133,7 @@ actor TrafficSessionManager {
     func beginNewSessionPreservingPending() async -> (generation: UInt, pending: [HTTPTransaction]) {
         let pending = pendingUpdates
         pendingUpdates.removeAll()
+        dismissLiveTransactions()
         totalBuffered = 0
         generation &+= 1
         if let onBeginNewSession {
@@ -128,6 +160,10 @@ actor TrafficSessionManager {
     )
 
     private var pendingUpdates: [HTTPTransaction] = []
+    /// Live (still open) connections already delivered as rows, keyed for update routing.
+    private var liveTransactionIDs: Set<UUID> = []
+    /// Live connections whose rows were cleared; their close delivery must not resurface them.
+    private var dismissedLiveTransactionIDs: Set<UUID> = []
     private let batchSize = 50
     private let batchInterval: TimeInterval = 0.1
     private var maxBufferSize: Int = 50_000
@@ -172,6 +208,14 @@ actor TrafficSessionManager {
             if !enrichedTransactions.isEmpty {
                 enrichCallback?(enrichedTransactions)
             }
+        }
+    }
+
+    private func dismissLiveTransactions() {
+        dismissedLiveTransactionIDs.formUnion(liveTransactionIDs)
+        liveTransactionIDs.removeAll()
+        if dismissedLiveTransactionIDs.count > 4_096 {
+            dismissedLiveTransactionIDs.removeAll()
         }
     }
 

@@ -36,6 +36,7 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
         self.graphQLInfo = graphQLInfo
         self.web3RPCInfo = web3RPCInfo
         self.x402Info = x402Info
+        deliversLiveRow = state == .active
         captureContext = request.captureContext
     }
 
@@ -64,6 +65,11 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
     /// Changes whenever request or response evidence used by cached list signals changes.
     @ObservationIgnored private(set) var signalEvidenceRevision: UInt64 = 0
     var state: TransactionState
+    /// Whether this transaction reaches the session twice — as an `.active` row when it opens
+    /// and again when it finishes. Fixed at creation because the two deliveries travel through
+    /// independent tasks: by the time the opening one is taken in, `state` may already read
+    /// `.completed`, so routing on the live `state` could append the same transaction twice.
+    @ObservationIgnored var deliversLiveRow: Bool
     var timingInfo: TimingInfo?
     var measuredDuration: TimeInterval?
     var webSocketConnection: WebSocketConnection?
@@ -114,6 +120,44 @@ final class HTTPTransaction: Identifiable, @unchecked Sendable {
             return false
         }
         return !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Duration shown in list rows and summaries. A WebSocket row reports the connection
+    /// lifetime measured at close (its `timingInfo` only covers the upgrade handshake); every
+    /// other transaction reports the timing breakdown total, falling back to the wall-clock
+    /// measurement.
+    var displayDuration: TimeInterval? {
+        if webSocketConnection != nil {
+            return measuredDuration
+        }
+        return timingInfo?.totalDuration ?? measuredDuration
+    }
+
+    /// Identifies what an inspector derived from this transaction. A live row keeps its id but
+    /// gains its body when it completes, so an analysis keyed on the id alone stayed on the
+    /// empty-body snapshot taken while the stream was running.
+    var inspectionKey: String {
+        "\(id.uuidString)|\(state.rawValue)"
+    }
+
+    /// Whether this row is a connection or stream that is still open, so its duration is not
+    /// final yet.
+    var isRunning: Bool {
+        state == .active && displayDuration == nil
+    }
+
+    /// The duration a detail surface shows at `now`: the final value once known, otherwise the
+    /// running time of a connection or stream that is still open. The request list keeps `—` for
+    /// a running row instead — a per-second redraw belongs to the one selected row, not the
+    /// capture hot path.
+    func displayDuration(at now: Date) -> TimeInterval? {
+        if let displayDuration {
+            return displayDuration
+        }
+        guard state == .active else {
+            return nil
+        }
+        return max(0, now.timeIntervalSince(timestamp))
     }
 
     func applyMatchedRuleMetadata(from rule: ProxyRule) {

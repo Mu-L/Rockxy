@@ -378,10 +378,11 @@ struct DebugAssistantEngine {
             evidence.append(.init(
                 id: "scope:comparison.request-headers",
                 kind: .derived,
-                title: String(
-                    localized: "\(missing.count) baseline request headers are absent",
-                    bundle: RockxyLocalization.bundle
-                ),
+                title: String(AttributedString(
+                    localized: "^[\(missing.count) baseline request header](inflect: true) absent",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters),
                 detail: missing.prefix(4).joined(separator: ", "),
                 sourceTransactionID: primary.id
             ))
@@ -741,17 +742,15 @@ struct DebugAssistantEngine {
         let relatedCount = max(0, requestCount - 1)
         return relatedCount == 0
             ? String(localized: "Selected request", bundle: RockxyLocalization.bundle)
-            : String(
-                localized: "Selected request + \(relatedCount) related requests",
-                bundle: RockxyLocalization.bundle
-            )
+            : String(AttributedString(
+                localized: "Selected request + ^[\(relatedCount) related request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
-        if duration < 1 {
-            return String(format: "%.0f ms", duration * 1_000)
-        }
-        return String(format: "%.2f s", duration)
+        DurationFormatter.format(seconds: duration)
     }
 
     private func bounded(_ value: String, characters: Int) -> String {

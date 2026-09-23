@@ -150,16 +150,35 @@ enum AppLanguagePreference {
         ) ?? bundle.developmentLocalization ?? "en"
         let localizedBundle = bundle.path(forResource: identifier, ofType: "lproj")
             .flatMap(Bundle.init(path:)) ?? bundle
-        // System Default must keep following the Mac's full locale (language *and*
-        // region), so number/date formatting stays as the user configured it. Only an
-        // explicit language choice pins the locale to that language.
+        // System Default keeps following the Mac's full, live locale. An explicit choice
+        // changes the language only, as macOS does for a per-app language: region formats
+        // stay the Mac's.
         let locale = optionID == AppLanguageOption.systemID
-            ? Locale.current
-            : Locale(identifier: identifier)
+            ? Locale.autoupdatingCurrent
+            : formattingLocale(languageIdentifier: identifier, regionalBase: .autoupdatingCurrent)
         return AppLanguageRuntimeState(
             bundle: localizedBundle,
             locale: locale
         )
+    }
+
+    /// The locale for an explicitly chosen app language.
+    ///
+    /// Rockxy's Language setting changes the language, never the formats: numbers, times, and
+    /// dates keep the Mac's region, 24-hour clock, first weekday, and measurement system, the same
+    /// split macOS applies to a per-app language in System Settings. A bare `Locale(identifier:)`
+    /// would switch a Mac set to Vietnam from "1.234,5" to "1,234.5" and from a 24-hour clock to
+    /// "9:13 PM" just because the interface language changed. The region travels as an `rg`
+    /// override, so words inside a format (AM/PM, "5 minutes ago") still follow the language.
+    static func formattingLocale(languageIdentifier: String, regionalBase: Locale) -> Locale {
+        var components = Locale.Components(identifier: languageIdentifier)
+        if let region = regionalBase.region {
+            components.region = region
+        }
+        components.hourCycle = regionalBase.hourCycle
+        components.firstDayOfWeek = regionalBase.firstDayOfWeek
+        components.measurementSystem = regionalBase.measurementSystem
+        return Locale(components: components)
     }
 
     // MARK: Private

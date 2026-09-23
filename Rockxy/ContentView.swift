@@ -209,9 +209,13 @@ struct ContentView: View {
             }
         } message: {
             if let invitation = nearbyTransferReceiver.pendingInvitation {
-                Text(
-                    "Code: \(invitation.verificationCode)\n\n\(invitation.sessionTitle) contains \(invitation.transactionCount) requests. Confirm the same code appears on \(invitation.deviceName). Your current Mac traffic will stay intact."
-                )
+                Text(String(
+                    AttributedString(
+                        localized: "Code: \(invitation.verificationCode)\n\n\(invitation.sessionTitle) contains ^[\(invitation.transactionCount) request](inflect: true). Confirm the same code appears on \(invitation.deviceName). Your current Mac traffic will stay intact.",
+                        bundle: RockxyLocalization.bundle,
+                        locale: RockxyLocalization.locale
+                    ).characters
+                ))
             }
         }
         .sheet(item: $coordinator.importPreview) { preview in

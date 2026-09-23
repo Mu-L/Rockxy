@@ -20,7 +20,7 @@ struct GraphQLInspectorView: View {
                         Text(info.operationType.rawValue.capitalized)
                     }
 
-                    Text("Query")
+                    Text(String(localized: "Query", bundle: RockxyLocalization.bundle))
                         .fontWeight(.semibold)
                     Text(info.query)
                         .font(.system(size: metrics.secondaryFontSize, design: .monospaced))
@@ -30,7 +30,7 @@ struct GraphQLInspectorView: View {
                         .cornerRadius(4)
 
                     if let variables = info.variables {
-                        Text("Variables")
+                        Text(String(localized: "Variables", bundle: RockxyLocalization.bundle))
                             .fontWeight(.semibold)
                         Text(variables)
                             .font(.system(size: metrics.secondaryFontSize, design: .monospaced))

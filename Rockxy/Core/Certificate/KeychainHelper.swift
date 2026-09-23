@@ -1338,36 +1338,91 @@ nonisolated enum KeychainError: LocalizedError {
 
     // MARK: Internal
 
+    /// The certificate wizard prints these under "Installation failed:" and the Welcome window
+    /// repeats them, so they are read by whoever is trying to trust the root CA. The `OSStatus`
+    /// values stay numeric — they are what a support search needs — but the prose around them,
+    /// including the instructions, is translated.
     var errorDescription: String? {
         switch self {
         case let .saveFailed(status):
-            "Keychain save failed with status: \(status)"
+            String(
+                localized: "Keychain save failed with status: \(String(status))",
+                bundle: RockxyLocalization.bundle
+            )
         case let .loadFailed(status):
-            "Keychain load failed with status: \(status)"
+            String(
+                localized: "Keychain load failed with status: \(String(status))",
+                bundle: RockxyLocalization.bundle
+            )
         case let .deleteFailed(status):
-            "Keychain delete failed with status: \(status)"
+            String(
+                localized: "Keychain delete failed with status: \(String(status))",
+                bundle: RockxyLocalization.bundle
+            )
         case let .certificateRemovalIncomplete(status):
-            "The exact certificate is still installed after removal (status: \(status))."
+            String(
+                localized: "The exact certificate is still installed after removal (status: \(String(status))).",
+                bundle: RockxyLocalization.bundle
+            )
         case .certificateInstallIncomplete:
-            "The certificate is not installed after the keychain reported a successful add."
+            String(
+                localized: "The certificate is not installed after the keychain reported a successful add.",
+                bundle: RockxyLocalization.bundle
+            )
         case .trustNotApplied:
-            "Trust settings were not applied. The authorization prompt may have been dismissed — try again."
+            String(
+                localized: "Trust settings were not applied. The authorization prompt may have been dismissed — try again.",
+                bundle: RockxyLocalization.bundle
+            )
         case .readbackMismatch:
-            "Keychain readback did not match the value that was just written"
+            String(
+                localized: "Keychain readback did not match the value that was just written",
+                bundle: RockxyLocalization.bundle
+            )
         case .invalidCertificateData:
-            "Invalid certificate data — could not create SecCertificate"
+            String(
+                localized: "Invalid certificate data — could not create SecCertificate",
+                bundle: RockxyLocalization.bundle
+            )
         case .loginKeychainUnavailable:
-            "The login keychain is unavailable. Unlock it and try the certificate installation again."
+            String(
+                localized: "The login keychain is unavailable. Unlock it and try the certificate installation again.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .certificateLabelFailed(status):
-            "Failed to label the imported certificate (status: \(status))"
+            String(
+                localized: "Failed to label the imported certificate (status: \(String(status)))",
+                bundle: RockxyLocalization.bundle
+            )
         case let .trustSettingsFailed(status):
-            "Failed to set certificate trust settings with status: \(status)"
+            String(
+                localized: "Failed to set certificate trust settings with status: \(String(status))",
+                bundle: RockxyLocalization.bundle
+            )
         case .trustSettingsStillPresent:
-            "The certificate still has system trust settings, so it was kept in the keychain. Remove its trust settings, then try again."
+            String(
+                localized: "The certificate still has system trust settings, so it was kept in the keychain. Remove its trust settings, then try again.",
+                bundle: RockxyLocalization.bundle
+            )
         case let .trustSettingsUnreadable(status):
-            "Rockxy could not read the certificate's system trust settings\(status.map { " (status: \($0))" } ?? ""). Unlock your keychain or restore access, then check the status again."
+            // Two whole sentences rather than one with an optional fragment spliced in: a
+            // translator cannot place " (status: %lld)" inside a sentence they never see.
+            if let status {
+                String(
+                    localized: "Rockxy could not read the certificate's system trust settings (status: \(String(status))). Unlock your keychain or restore access, then check the status again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            } else {
+                String(
+                    localized: "Rockxy could not read the certificate's system trust settings. Unlock your keychain or restore access, then check the status again.",
+                    bundle: RockxyLocalization.bundle
+                )
+            }
         case .privateKeyItemUnreadable:
-            "The stored root CA private key could not be read from the keychain."
+            String(
+                localized: "The stored root CA private key could not be read from the keychain.",
+                bundle: RockxyLocalization.bundle
+            )
         }
     }
 }

@@ -374,7 +374,7 @@ struct BabylonPairingView: View {
             GridRow {
                 detailLabel(String(localized: "Open Connections", bundle: RockxyLocalization.bundle))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(receiver.openConnectionCount)")
+                    Text(CountFormatter.format(receiver.openConnectionCount))
                         .font(toolMetrics.font(monospaced: true))
                     Text(String(
                         localized: "Open connections may still be authenticating.",

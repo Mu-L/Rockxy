@@ -224,7 +224,11 @@ struct FooterMutationIndicator: Identifiable, Equatable {
     }
 
     var accessibilityLabel: String {
-        String(localized: "\(id.title), \(count) active rules", bundle: RockxyLocalization.bundle)
+        String(AttributedString(
+            localized: "\(id.title), ^[\(count) active rule](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }
 
@@ -321,7 +325,11 @@ private struct FooterMutationIndicatorButton: View {
             .tint(indicatorColor)
             .help(indicator.help)
             .accessibilityLabel(indicator.accessibilityLabel)
-            .accessibilityValue(String(localized: "\(indicator.count) active rules", bundle: RockxyLocalization.bundle))
+            .accessibilityValue(String(AttributedString(
+                localized: "^[\(indicator.count) active rule](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters))
     }
 
     // MARK: Private
@@ -344,7 +352,7 @@ private struct FooterMutationIndicatorButton: View {
             if showsTitle {
                 Text(indicator.title)
             }
-            Text("\(indicator.count)")
+            Text(CountFormatter.format(indicator.count))
                 .monospacedDigit()
         }
         .font(.system(size: metrics.badgeFontSize, weight: .semibold))
@@ -445,7 +453,11 @@ enum StatusBarRequestSummary {
                     bundle: RockxyLocalization.bundle
                 )
             }
-            return String(localized: "\(visibleCount) of \(availableCount) requests", bundle: RockxyLocalization.bundle)
+            return String(AttributedString(
+                localized: "\(visibleCount) of ^[\(availableCount) request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
         if visibleCount == 0 {
             return String(localized: "No requests", bundle: RockxyLocalization.bundle)
@@ -456,7 +468,11 @@ enum StatusBarRequestSummary {
                 bundle: RockxyLocalization.bundle
             )
         }
-        return String(localized: "\(visibleCount) requests", bundle: RockxyLocalization.bundle)
+        return String(AttributedString(
+            localized: "^[\(visibleCount) request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }
 
@@ -528,7 +544,7 @@ struct StatusBarView: View {
     }
 
     private var formattedDataSize: String {
-        ByteCountFormatter.string(fromByteCount: totalDataSize, countStyle: .file)
+        SizeFormatter.format(bytes: totalDataSize)
     }
 
     private var mutationIndicatorList: [FooterMutationIndicator] {
@@ -545,6 +561,14 @@ struct StatusBarView: View {
             storageRaw: quickToolsLayoutRaw,
             legacyFooterRaw: legacyFooterQuickToolOrder
         )
+    }
+
+    private var breakpointQueueSummary: String {
+        String(AttributedString(
+            localized: "^[\(pausedBreakpointCount) item](inflect: true) waiting",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 
     @ViewBuilder private var breakpointQueueIndicator: some View {
@@ -571,16 +595,6 @@ struct StatusBarView: View {
             .padding(.trailing, 8)
             .layoutPriority(4)
         }
-    }
-
-    private var breakpointQueueSummary: String {
-        if pausedBreakpointCount == 1 {
-            return String(localized: "1 item waiting", bundle: RockxyLocalization.bundle)
-        }
-        return String(
-            localized: "\(pausedBreakpointCount) items waiting",
-            bundle: RockxyLocalization.bundle
-        )
     }
 
     @ViewBuilder private var mutationIndicators: some View {
@@ -630,7 +644,11 @@ struct StatusBarView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: metrics.badgeFontSize))
-                    Text(String(localized: "\(errorCount) errors", bundle: RockxyLocalization.bundle))
+                    Text(String(AttributedString(
+                        localized: "^[\(errorCount) error](inflect: true)",
+                        bundle: RockxyLocalization.bundle,
+                        locale: RockxyLocalization.locale
+                    ).characters))
                         .font(.system(size: metrics.secondaryFontSize))
                 }
                 .foregroundStyle(Color(nsColor: .systemRed))
@@ -640,20 +658,20 @@ struct StatusBarView: View {
                 SessionDurationView(startedAt: proxyStartedAt)
             }
 
-            Text("\(formattedDataSize) total")
+            Text(String(localized: "\(formattedDataSize) total", bundle: RockxyLocalization.bundle))
                 .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(Color(nsColor: .tertiaryLabelColor))
-                .help("Total captured payload bytes")
+                .help(String(localized: "Total captured payload bytes", bundle: RockxyLocalization.bundle))
 
             Text("↑ \(formattedSpeed(uploadSpeed))")
                 .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(Color(nsColor: .systemGreen))
-                .help("Captured upload throughput")
+                .help(String(localized: "Captured upload throughput", bundle: RockxyLocalization.bundle))
 
             Text("↓ \(formattedSpeed(downloadSpeed))")
                 .font(.system(size: metrics.secondaryFontSize))
                 .foregroundStyle(Color.accentColor)
-                .help("Captured download throughput")
+                .help(String(localized: "Captured download throughput", bundle: RockxyLocalization.bundle))
 
             if let proxyOverride = FooterActionDescriptor.toolingActions(
                 isAllowListActive: isAllowListActive,
@@ -783,11 +801,17 @@ struct StatusBarView: View {
                 Button {
                     onOpenToolWindow(indicator.windowID)
                 } label: {
-                    Label("\(indicator.title)  \(indicator.count)", systemImage: indicator.systemImage)
+                    Label(
+                        "\(indicator.title)  \(CountFormatter.format(indicator.count))",
+                        systemImage: indicator.systemImage
+                    )
                 }
             }
         } label: {
-            Label("\(indicators.reduce(0) { $0 + $1.count })", systemImage: "bolt.horizontal.circle")
+            Label(
+                CountFormatter.format(indicators.reduce(0) { $0 + $1.count }),
+                systemImage: "bolt.horizontal.circle"
+            )
                 .font(.system(size: metrics.badgeFontSize, weight: .semibold))
         }
         .menuStyle(.button)
@@ -810,14 +834,9 @@ struct StatusBarView: View {
     }
 
     private func formattedSpeed(_ bytesPerSecond: Int64) -> String {
-        if bytesPerSecond < 1_024 {
-            return "\(bytesPerSecond) B/s"
-        } else if bytesPerSecond < 1_048_576 {
-            return "\(bytesPerSecond / 1_024) KB/s"
-        } else {
-            let mb = Double(bytesPerSecond) / 1_048_576
-            return String(format: "%.1f MB/s", mb)
-        }
+        // Shares the footer row with the total captured size, so both have to come from the same
+        // formatter — a hand-rolled "%.1f MB/s" also ignores the locale's decimal separator.
+        "\(SizeFormatter.format(bytes: bytesPerSecond))/s"
     }
 
     private func performAction(_ action: FooterActionKind) {

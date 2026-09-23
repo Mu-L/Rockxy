@@ -75,6 +75,7 @@ struct KeyboardShortcutTests {
     func mainCaptureShortcutsDoNotCollide() throws {
         let app = try Self.projectFile(named: "Rockxy/RockxyApp.swift")
         let contextDock = try Self.projectFile(named: "Rockxy/Views/Inspector/ContextDockView.swift")
+            + Self.projectFile(named: "Rockxy/Views/Inspector/AIAssistantDockView.swift")
 
         #expect(Self.occurrences(of: #".keyboardShortcut("u", modifiers: [.command, .option])"#, in: app) == 1)
         #expect(Self.occurrences(of: #".keyboardShortcut("r", modifiers: [.command, .option])"#, in: app) == 1)

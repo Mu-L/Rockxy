@@ -4,6 +4,16 @@
     "": {
       "shouldTranslate": false
     },
+    "%@  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@  •  ⌘N 新建  •  ⌘↩ 编辑  •  ⌘D 复制  •  ⌘⌫ 删除"
+          }
+        }
+      }
+    },
     "%@'s recognized proxy settings were prepared temporarily and will be restored after it quits. A fresh instance was opened with Rockxy's scoped environment.": {
       "localizations": {
         "zh-Hans": {
@@ -40,6 +50,340 @@
           "stringUnit": {
             "state": "translated",
             "value": "已使用 Rockxy 的作用域环境打开 %@。如果它会覆盖 macOS 或环境代理设置，请单独配置该应用级代理。"
+          }
+        }
+      }
+    },
+    "Another running Rockxy instance owns the current system proxy session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个正在运行的 Rockxy 实例拥有当前的系统代理会话"
+          }
+        }
+      }
+    },
+    "Cannot read %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Cannot read %1$@: %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 %1$@：%2$@"
+          }
+        }
+      }
+    },
+    "Could not detect an active network service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法检测到活跃的网络服务"
+          }
+        }
+      }
+    },
+    "Failed to create JSContext": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法创建 JSContext"
+          }
+        }
+      }
+    },
+    "JS exception: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JS 异常：%@"
+          }
+        }
+      }
+    },
+    "No script entry point defined": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未定义脚本入口点"
+          }
+        }
+      }
+    },
+    "Plugin not loaded: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件未加载：%@"
+          }
+        }
+      }
+    },
+    "Plugin script execution timed out": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件脚本执行超时"
+          }
+        }
+      }
+    },
+    "Projects could not be loaded, so Rockxy did not import the transferred session.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法加载项目，因此 Rockxy 未导入传输的会话。"
+          }
+        }
+      }
+    },
+    "Rockxy cannot safely reclaim system routing with the installed helper. Quit and reopen Rockxy, then update or repair the helper in Advanced Proxy Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法通过已安装的辅助工具安全地收回系统路由。请退出并重新打开 Rockxy，然后在“高级代理设置”中更新或修复辅助工具。"
+          }
+        }
+      }
+    },
+    "Rockxy could not arm the watchdog that restores your proxy settings, so the system proxy was left unchanged: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法启用用于恢复代理设置的看护程序，因此系统代理保持不变：%@"
+          }
+        }
+      }
+    },
+    "Rockxy could not decrypt the nearby transfer.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法解密附近传输的内容。"
+          }
+        }
+      }
+    },
+    "Rockxy could not restore one or more system proxy settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法恢复一个或多个系统代理设置"
+          }
+        }
+      }
+    },
+    "Rockxy could not set the system proxy and could not fully undo the services it had already changed (%@). Your previous settings were kept so they can still be restored.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法设置系统代理，也无法完全撤销已更改的服务（%@）。之前的设置已保留，仍可恢复。"
+          }
+        }
+      }
+    },
+    "Rockxy could not verify the nearby device key.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法验证附近设备的密钥。"
+          }
+        }
+      }
+    },
+    "Script load failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "脚本加载失败：%@"
+          }
+        }
+      }
+    },
+    "The nearby Rockxy app uses an unsupported transfer protocol.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附近的 Rockxy 应用使用了不受支持的传输协议。"
+          }
+        }
+      }
+    },
+    "The nearby transfer exceeds Rockxy's local transfer size limit.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附近传输超出了 Rockxy 的本地传输大小限制。"
+          }
+        }
+      }
+    },
+    "The nearby transfer frame is invalid.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附近传输的数据帧无效。"
+          }
+        }
+      }
+    },
+    "The nearby transfer message is incomplete.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "附近传输的消息不完整。"
+          }
+        }
+      }
+    },
+    "The proxy settings for %@ changed before Rockxy could apply its recorded update": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Rockxy 应用其记录的更新之前，%@ 的代理设置已发生更改"
+          }
+        }
+      }
+    },
+    "The session is too large for nearby transfer.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该会话过大，无法通过附近传输发送。"
+          }
+        }
+      }
+    },
+    "The transferred session contains an invalid request.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "传输的会话包含无效的请求。"
+          }
+        }
+      }
+    },
+    "The transferred session contains no requests.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "传输的会话不包含任何请求。"
+          }
+        }
+      }
+    },
+    "Unexpected networksetup output: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "意外的 networksetup 输出：%@"
+          }
+        }
+      }
+    },
+    "^[%lld hidden request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld 条隐藏请求](inflect: true)"
+          }
+        }
+      }
+    },
+    "%lld of ^[%lld rule](inflect: true)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of ^[%2$lld rule](inflect: true)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld 条规则中的 %1$lld 条"
+          }
+        }
+      }
+    },
+    "%lld of ^[%lld script](inflect: true)  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of ^[%2$lld script](inflect: true)  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%2$lld 个脚本](inflect: true)中的 %1$lld 个  •  ⌘N 新建  •  ⌘↩ 编辑  •  ⇧⌘N 文件夹"
+          }
+        }
+      }
+    },
+    "%lld of ^[%lld selected and opted-in related request](inflect: true)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$lld of ^[%2$lld selected and opted-in related request](inflect: true)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%2$lld 个选定并已加入的相关请求](inflect: true)中的 %1$lld 个"
+          }
+        }
+      }
+    },
+    "A certificate removal is already in progress. Wait for it to finish, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证书移除已在进行中。请等待完成后再试。"
+          }
+        }
+      }
+    },
+    "A certificate trust installation is already in progress. Wait for it to finish, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证书信任安装已在进行中。请等待完成后再试。"
           }
         }
       }
@@ -84,6 +428,16 @@
         }
       }
     },
+    "Configure Noise Control…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置噪音控制…"
+          }
+        }
+      }
+    },
     "Developer application": {
       "localizations": {
         "zh-Hans": {
@@ -100,6 +454,216 @@
           "stringUnit": {
             "state": "translated",
             "value": "请先在 Rockxy 中启用 macOS 系统代理，再打开 %@。"
+          }
+        }
+      }
+    },
+    "Failed to compute certificate validity dates": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法计算证书有效期"
+          }
+        }
+      }
+    },
+    "Failed to establish XPC connection to helper tool": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法与助手工具建立 XPC 连接"
+          }
+        }
+      }
+    },
+    "Failed to label the imported certificate (status: %@)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法为导入的证书添加标签（状态码：%@）"
+          }
+        }
+      }
+    },
+    "Failed to set certificate trust settings with status: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置证书信任失败，状态码：%@"
+          }
+        }
+      }
+    },
+    "Helper failed to install root certificate: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能安装根证书：%@"
+          }
+        }
+      }
+    },
+    "Helper failed to override system proxy: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能覆盖系统代理：%@"
+          }
+        }
+      }
+    },
+    "Helper failed to prepare for uninstall": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能完成卸载准备"
+          }
+        }
+      }
+    },
+    "Helper failed to remove root certificate: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能移除根证书：%@"
+          }
+        }
+      }
+    },
+    "Helper failed to restore system proxy: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能恢复系统代理：%@"
+          }
+        }
+      }
+    },
+    "Helper failed to set bypass domains: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具未能设置绕过域名：%@"
+          }
+        }
+      }
+    },
+    "Hide a recurring host or path from this Traffic Tab without stopping capture.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在不停止捕获的情况下，从此流量标签页隐藏重复出现的主机或路径。"
+          }
+        }
+      }
+    },
+    "Invalid certificate data — could not create SecCertificate": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "证书数据无效——无法创建 SecCertificate"
+          }
+        }
+      }
+    },
+    "Keychain delete failed with status: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钥匙串删除失败，状态码：%@"
+          }
+        }
+      }
+    },
+    "Keychain load failed with status: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钥匙串读取失败，状态码：%@"
+          }
+        }
+      }
+    },
+    "Keychain readback did not match the value that was just written": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钥匙串回读的内容与刚写入的值不一致"
+          }
+        }
+      }
+    },
+    "Keychain save failed with status: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钥匙串保存失败，状态码：%@"
+          }
+        }
+      }
+    },
+    "macOS did not confirm the Rockxy system proxy on port %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 未确认端口 %@ 上的 Rockxy 系统代理"
+          }
+        }
+      }
+    },
+    "macOS has not validated the certificate for TLS. Your certificate and key were kept. Recheck the certificate status in Settings.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 尚未针对 TLS 验证该证书。你的证书和私钥已保留。请在“设置”中重新检查证书状态。"
+          }
+        }
+      }
+    },
+    "Muted. Requests matching this source stay captured but are hidden from the list.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已静音。匹配此来源的请求仍会被捕获，但已从列表中隐藏。"
+          }
+        }
+      }
+    },
+    "No Block List rules": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有阻止列表规则"
+          }
+        }
+      }
+    },
+    "No Matching Muted Sources": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无匹配的静音来源"
           }
         }
       }
@@ -124,12 +688,132 @@
         }
       }
     },
+    "Published ^[%lld request](inflect: true) to Gist": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已将 ^[%lld 个请求](inflect: true)发布到 Gist"
+          }
+        }
+      }
+    },
     "Quit %@ completely, then try again so its proxy state and launch environment cannot be stale.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "请完全退出 %@ 后重试，避免使用过期的代理状态和启动环境。"
+          }
+        }
+      }
+    },
+    "Remove header %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除标头 %@"
+          }
+        }
+      }
+    },
+    "Remove query parameter %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除查询参数 %@"
+          }
+        }
+      }
+    },
+    "Rockxy could not read the certificate's Keychain and trust status, so it did not request administrator approval. Check the status again once the keychain is available (%@).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法读取该证书的钥匙串和信任状态，因此未请求管理员授权。请在钥匙串可用后重新检查状态（%@）。"
+          }
+        }
+      }
+    },
+    "Rockxy could not read the certificate's system trust settings (status: %@). Unlock your keychain or restore access, then check the status again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法读取该证书的系统信任设置（状态码：%@）。请解锁钥匙串或恢复访问权限，然后重新检查状态。"
+          }
+        }
+      }
+    },
+    "Rockxy could not read the certificate's system trust settings. Unlock your keychain or restore access, then check the status again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法读取该证书的系统信任设置。请解锁钥匙串或恢复访问权限，然后重新检查状态。"
+          }
+        }
+      }
+    },
+    "Rockxy could not safely compare the application's current proxy settings with its recovery snapshot. Rockxy restored the original settings and preserved the current file at %@. Review it, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法安全地比较应用当前的代理设置与其恢复快照。Rockxy 已恢复原始设置，并将当前文件保存在 %@。请检查该文件后重试。"
+          }
+        }
+      }
+    },
+    "Rockxy's active root CA no longer matches its saved certificate and private key. This can happen after another Rockxy copy or a Keychain restore changed certificate storage. Use Install & Trust Certificate to reconcile it before HTTPS interception.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 当前使用的根 CA 与其保存的证书和私钥不再匹配。这可能是另一个 Rockxy 副本或钥匙串恢复更改了证书存储所致。请在进行 HTTPS 解密前使用“安装并信任证书”来修复。"
+          }
+        }
+      }
+    },
+    "Rockxy's persisted root CA changed while trust was being prepared. Quit other running copies of Rockxy, then try again. No second trust prompt was requested.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在准备信任期间，Rockxy 保存的根 CA 发生了变化。请退出其他正在运行的 Rockxy 副本后重试。未再次请求信任授权。"
+          }
+        }
+      }
+    },
+    "Root CA certificate has not been generated": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未生成根 CA 证书"
+          }
+        }
+      }
+    },
+    "Root CA certificate is not trusted — install and trust the certificate before HTTPS interception": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "根 CA 证书未受信任——请在进行 HTTPS 解密前安装并信任该证书"
+          }
+        }
+      }
+    },
+    "SOCKS5 proxy selected unsupported authentication method %lld.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SOCKS5 代理选择了不受支持的身份验证方法 %lld。"
           }
         }
       }
@@ -164,6 +848,126 @@
         }
       }
     },
+    "The certificate is not installed after the keychain reported a successful add.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钥匙串报告添加成功，但证书并未安装。"
+          }
+        }
+      }
+    },
+    "The certificate still has system trust settings, so it was kept in the keychain. Remove its trust settings, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该证书仍存在系统信任设置，因此被保留在钥匙串中。请先移除其信任设置，然后重试。"
+          }
+        }
+      }
+    },
+    "The exact certificate is still installed after removal (status: %@).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除后该证书仍处于安装状态（状态码：%@）。"
+          }
+        }
+      }
+    },
+    "The helper answered with an executable identity Rockxy cannot compare": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具返回了 Rockxy 无法比对的可执行文件标识"
+          }
+        }
+      }
+    },
+    "The helper is busy with proxy or certificate work; executable refresh was deferred": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助手工具正在处理代理或证书任务，可执行文件刷新已推迟"
+          }
+        }
+      }
+    },
+    "The installed helper cannot describe the executable it is running": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装的助手工具无法说明它正在运行的可执行文件"
+          }
+        }
+      }
+    },
+    "The installed helper does not support approval-preserving executable refresh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装的助手工具不支持保留授权的可执行文件刷新"
+          }
+        }
+      }
+    },
+    "The installed Rockxy helper does not support safe certificate removal. Update the helper in Settings > Advanced > Proxy Helper Tool, then try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装的 Rockxy 助手工具不支持安全移除证书。请在“设置 > 高级 > 代理助手工具”中更新助手工具后重试。"
+          }
+        }
+      }
+    },
+    "The installed Rockxy helper installs certificates destructively, so it was not used. Update it in Settings > Advanced > Proxy Helper Tool.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装的 Rockxy 助手工具会以破坏性方式安装证书，因此未被使用。请在“设置 > 高级 > 代理助手工具”中更新它。"
+          }
+        }
+      }
+    },
+    "The installed root CA certificate could not be fully removed, so your local certificate and key were kept. Remove it in Keychain Access and try again (%@).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装的根 CA 证书未能完全移除，因此你的本地证书和私钥已保留。请在“钥匙串访问”中移除后重试（%@）。"
+          }
+        }
+      }
+    },
+    "The login keychain is unavailable. Unlock it and try the certificate installation again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录钥匙串不可用。请解锁后重新安装证书。"
+          }
+        }
+      }
+    },
+    "The privileged helper was not used for this installation (%@).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次安装未使用特权助手工具（%@）。"
+          }
+        }
+      }
+    },
     "The selected application's proxy metadata could not be read safely.": {
       "localizations": {
         "zh-Hans": {
@@ -180,6 +984,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "所选应用报告了不安全的设置位置。Rockxy 未对其进行更改。"
+          }
+        }
+      }
+    },
+    "^[%lld active Modify Header rule](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld 条生效的修改标头规则](inflect: true)"
+          }
+        }
+      }
+    },
+    "^[%lld rule](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld 条规则](inflect: true)"
+          }
+        }
+      }
+    },
+    "networksetup %@ failed (exit %@): %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "networksetup %1$@ failed (exit %2$@): %3$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "networksetup %1$@ 失败（退出码 %2$@）：%3$@"
           }
         }
       }
@@ -284,6 +1124,32 @@
         }
       }
     },
+    "The stored root CA private key could not be read from the keychain.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法从钥匙串读取已存储的根 CA 私钥。"
+          }
+        }
+      }
+    },
+    "This app is signed by \"%@\" but the installed helper was signed by \"%@\"": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "This app is signed by \"%1$@\" but the installed helper was signed by \"%2$@\""
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本应用由“%1$@”签名，但已安装的助手工具由“%2$@”签名"
+          }
+        }
+      }
+    },
     "This host is in Full Proxy Bypass. Remove that bypass entry before decrypting it.": {
       "localizations": {
         "zh-Hans": {
@@ -300,6 +1166,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "此主机位于 HTTPS TLS 绕过列表中。请先移除该绕过模式，再进行解密。"
+          }
+        }
+      }
+    },
+    "Trust settings were not applied. The authorization prompt may have been dismissed — try again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "信任设置未生效。授权提示可能已被取消——请重试。"
           }
         }
       }
@@ -490,6 +1366,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "解密整个应用可能暴露敏感流量并使用更多 CPU 和内存。可添加隧道规则作为例外。"
+          }
+        }
+      }
+    },
+    "declared": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已声明"
           }
         }
       }
@@ -732,12 +1618,12 @@
         }
       }
     },
-    " // %lld items": {
+    " // ^[%lld item](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": " // %lld 项"
+            "value": " // ^[%lld 项](inflect: true)"
           }
         }
       }
@@ -754,6 +1640,36 @@
     },
     "-%lld": {
       "shouldTranslate": false
+    },
+    "Unknown compression flag %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知压缩标志 %lld"
+          }
+        }
+      }
+    },
+    "Unmute": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消静音"
+          }
+        }
+      }
+    },
+    "XPC call timed out — helper tool may not be responding": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "XPC 调用超时——助手工具可能没有响应"
+          }
+        }
+      }
     },
     "—": {
       "shouldTranslate": false
@@ -823,12 +1739,12 @@
         }
       }
     },
-    "(binary data, %lld bytes)": {
+    "(binary data, ^[%lld byte](inflect: true))": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "（二进制数据，%lld 字节）"
+            "value": "（二进制数据，^[%lld 字节](inflect: true)）"
           }
         }
       }
@@ -1003,18 +1919,18 @@
       },
       "shouldTranslate": false
     },
-    "%@ · %@ · %lld requests": {
+    "%@ · %@ · ^[%lld request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$@ · %2$@ · %3$lld requests"
+            "value": "%1$@ · %2$@ · ^[%3$lld request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ · %2$@ · %3$lld 个请求"
+            "value": "%1$@ · %2$@ · ^[%3$lld 个请求](inflect: true)"
           }
         }
       }
@@ -1073,18 +1989,18 @@
         }
       }
     },
-    "%@ contains %lld traffic tab(s), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced.": {
+    "%@ contains ^[%lld traffic tab](inflect: true), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$@ contains %2$lld traffic tab(s), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced."
+            "value": "%1$@ contains ^[%2$lld traffic tab](inflect: true), user-authored filter text, host/path patterns, and layout preferences. It contains no captured traffic, bodies, headers, cookies, scripts, or local file paths. Filter text may be sensitive. Existing Projects will not be replaced."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ 包含 %2$lld 个流量标签页、用户编写的过滤文本、主机/路径模式和布局偏好设置。其中不包含捕获的流量、正文、标头、Cookie、脚本或本地文件路径。过滤文本可能包含敏感信息。现有项目不会被替换。"
+            "value": "%1$@ 包含 ^[%2$lld 个流量标签页](inflect: true)、用户编写的过滤文本、主机/路径模式和布局偏好设置。其中不包含捕获的流量、正文、标头、Cookie、脚本或本地文件路径。过滤文本可能包含敏感信息。现有项目不会被替换。"
           }
         }
       }
@@ -1268,42 +2184,22 @@
         }
       }
     },
-    "%@ rules  •  ⌘N New  •  ⌘↩ Edit  •  ⌘D Duplicate  •  ⌘⌫ Delete": {
+    "^[%lld script](inflect: true)  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 条规则  •  ⌘N 新建  •  ⌘↩ 编辑  •  ⌘D 复制  •  ⌘⌫ 删除"
+            "value": "^[%lld 个脚本](inflect: true)  •  ⌘N 新建  •  ⌘↩ 编辑  •  ⇧⌘N 文件夹"
           }
         }
       }
     },
-    "%@ scripts  •  ⌘N New  •  ⌘↩ Edit  •  ⇧⌘N Folder": {
+    "^[%lld selected and opted-in related request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 个脚本  •  ⌘N 新建  •  ⌘↩ 编辑  •  ⇧⌘N 文件夹"
-          }
-        }
-      }
-    },
-    "%@ selected and opted-in related request(s)": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ 个选定并已加入的相关请求"
-          }
-        }
-      }
-    },
-    "%@ selected request(s)": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已选择 %@ 个请求"
+            "value": "^[%lld 个选定并已加入的相关请求](inflect: true)"
           }
         }
       }
@@ -1395,18 +2291,18 @@
         }
       }
     },
-    "%@, %lld active rules": {
+    "%@, ^[%lld active rule](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$@, %2$lld active rules"
+            "value": "%1$@, ^[%2$lld active rule](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@，%2$lld 条生效规则"
+            "value": "%1$@，^[%2$lld 条生效规则](inflect: true)"
           }
         }
       }
@@ -1569,22 +2465,12 @@
         }
       }
     },
-    "%lld active Modify Header rules": {
+    "^[%lld active rule](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 条生效的修改标头规则"
-          }
-        }
-      }
-    },
-    "%lld active rules": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 条生效规则"
+            "value": "^[%lld 条生效规则](inflect: true)"
           }
         }
       }
@@ -1599,22 +2485,22 @@
         }
       }
     },
-    "%lld already exists": {
+    "^[%lld duplicate](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 已存在"
+            "value": "^[%lld 个重复项](inflect: true)"
           }
         }
       }
     },
-    "%lld baseline request headers are absent": {
+    "^[%lld baseline request header](inflect: true) absent": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "缺少 %lld 个基线请求标头"
+            "value": "缺少 ^[%lld 个基线请求标头](inflect: true)"
           }
         }
       }
@@ -1629,12 +2515,12 @@
         }
       }
     },
-    "%lld calls": {
+    "^[%lld call](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 次调用"
+            "value": "^[%lld 次调用](inflect: true)"
           }
         }
       }
@@ -1649,12 +2535,12 @@
         }
       }
     },
-    "%lld captured requests": {
+    "^[%lld captured request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个已捕获请求"
+            "value": "^[%lld 个已捕获请求](inflect: true)"
           }
         }
       }
@@ -1675,12 +2561,22 @@
         }
       }
     },
-    "%lld conditions": {
+    "^[%lld character](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个条件"
+            "value": "^[%lld 个字符](inflect: true)"
+          }
+        }
+      }
+    },
+    "^[%lld condition](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld 个条件](inflect: true)"
           }
         }
       }
@@ -1701,12 +2597,12 @@
         }
       }
     },
-    "%lld definitions": {
+    "^[%lld definition](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个定义"
+            "value": "^[%lld 个定义](inflect: true)"
           }
         }
       }
@@ -1721,42 +2617,42 @@
         }
       }
     },
-    "%lld errors": {
+    "^[%lld error](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个错误"
+            "value": "^[%lld 个错误](inflect: true)"
           }
         }
       }
     },
-    "%lld events": {
+    "^[%lld event](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个事件"
+            "value": "^[%lld 个事件](inflect: true)"
           }
         }
       }
     },
-    "%lld failed or error responses": {
+    "^[%lld failed or error response](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个失败或错误响应"
+            "value": "^[%lld 个失败或错误响应](inflect: true)"
           }
         }
       }
     },
-    "%lld host patterns": {
+    "^[%lld host pattern](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个主机模式"
+            "value": "^[%lld 个主机模式](inflect: true)"
           }
         }
       }
@@ -1809,12 +2705,12 @@
         }
       }
     },
-    "%lld items waiting": {
+    "^[%lld item](inflect: true) waiting": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个项目正在等待"
+            "value": "^[%lld 个项目](inflect: true)正在等待"
           }
         }
       }
@@ -1829,12 +2725,12 @@
         }
       }
     },
-    "%lld matching requests": {
+    "^[%lld matching request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个匹配请求"
+            "value": "^[%lld 个匹配请求](inflect: true)"
           }
         }
       }
@@ -1875,12 +2771,12 @@
         }
       }
     },
-    "%lld muted sources": {
+    "^[%lld muted source](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个已静音的来源"
+            "value": "^[%lld 个已静音来源](inflect: true)"
           }
         }
       }
@@ -1911,22 +2807,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个新更新"
-          }
-        }
-      }
-    },
-    "%lld of %lld": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld of %2$lld"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%2$lld 个中的 %1$lld 个"
           }
         }
       }
@@ -1963,34 +2843,34 @@
         }
       }
     },
-    "%lld of %lld entries": {
+    "%lld of ^[%lld entry](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$lld of %2$lld entries"
+            "value": "%1$lld of ^[%2$lld entry](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "第 %1$lld 个，共 %2$lld 个条目"
+            "value": "第 %1$lld 个，共 ^[%2$lld 个条目](inflect: true)"
           }
         }
       }
     },
-    "%lld of %lld events": {
+    "%lld of ^[%lld event](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$lld of %2$lld events"
+            "value": "%1$lld of ^[%2$lld event](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%2$lld 个事件中的 %1$lld 个"
+            "value": "^[%2$lld 个事件](inflect: true)中的 %1$lld 个"
           }
         }
       }
@@ -2011,80 +2891,64 @@
         }
       }
     },
-    "%lld of %lld requests": {
+    "%lld of ^[%lld request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$lld of %2$lld requests"
+            "value": "%1$lld of ^[%2$lld request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%2$lld 个请求中的 %1$lld 个"
+            "value": "^[%2$lld 个请求](inflect: true)中的 %1$lld 个"
           }
         }
       }
     },
-    "%lld of %lld rules": {
+    "%lld of ^[%lld selected request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "%1$lld of %2$lld rules"
+            "value": "%1$lld of ^[%2$lld selected request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "第 %1$lld 条，共 %2$lld 条规则"
+            "value": "已选择 ^[%2$lld 个请求](inflect: true)中的 %1$lld 个"
           }
         }
       }
     },
-    "%lld of %lld selected request(s)": {
+    "^[%lld overlap](inflect: true); Tunnel Without Decryption takes priority": {
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld of %2$lld selected request(s)"
-          }
-        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已选择 %2$lld 个请求中的 %1$lld 个"
+            "value": "^[%lld 处重叠](inflect: true)；“不解密隧道”优先"
           }
         }
       }
     },
-    "%lld overlaps; Tunnel Without Decryption takes priority": {
+    "^[%lld paused item](inflect: true) will receive a 503 Service Unavailable response.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 处重叠；“不解密隧道”优先"
+            "value": "^[%lld 个暂停的项目](inflect: true)将收到 503 Service Unavailable 响应。"
           }
         }
       }
     },
-    "%lld paused items will receive a 503 Service Unavailable response.": {
+    "^[%lld plugin](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个暂停的项目将收到 503 Service Unavailable 响应。"
-          }
-        }
-      }
-    },
-    "%lld plugins": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 个插件"
+            "value": "^[%lld 个插件](inflect: true)"
           }
         }
       }
@@ -2115,16 +2979,6 @@
         }
       }
     },
-    "%lld requests": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 个请求"
-          }
-        }
-      }
-    },
     "%lld requests are showing with the current filters": {
       "localizations": {
         "zh-Hans": {
@@ -2135,22 +2989,12 @@
         }
       }
     },
-    "%lld RPC errors": {
+    "^[%lld RPC error](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个 RPC 错误"
-          }
-        }
-      }
-    },
-    "%lld rules": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 条规则"
+            "value": "^[%lld 个 RPC 错误](inflect: true)"
           }
         }
       }
@@ -2175,22 +3019,42 @@
         }
       }
     },
-    "%lld seconds": {
+    "^[%lld second](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 秒"
+            "value": "^[%lld 秒](inflect: true)"
           }
         }
       }
     },
-    "%lld selected request(s)": {
+    "%lld selected": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个所选请求"
+            "value": "已选择 %lld 项"
+          }
+        }
+      }
+    },
+    "%lld+ selected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选择 %lld+ 项"
+          }
+        }
+      }
+    },
+    "^[%lld selected request](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "^[%lld 个所选请求](inflect: true)"
           }
         }
       }
@@ -2267,12 +3131,12 @@
         }
       }
     },
-    "%lld templates": {
+    "^[%lld template](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld 个模板"
+            "value": "^[%lld 个模板](inflect: true)"
           }
         }
       }
@@ -2595,26 +3459,6 @@
         }
       }
     },
-    "1 condition": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个条件"
-          }
-        }
-      }
-    },
-    "1 definition": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个定义"
-          }
-        }
-      }
-    },
     "1 ENABLED": {
       "localizations": {
         "zh-Hans": {
@@ -2625,42 +3469,12 @@
         }
       }
     },
-    "1 host pattern": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个主机模式"
-          }
-        }
-      }
-    },
-    "1 item waiting": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个项目正在等待"
-          }
-        }
-      }
-    },
     "1 mapping definition": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "1 个映射定义"
-          }
-        }
-      }
-    },
-    "1 matching request": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个匹配请求"
           }
         }
       }
@@ -2681,16 +3495,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "有 1 个模型可用。本地下载完成后列表会刷新。"
-          }
-        }
-      }
-    },
-    "1 muted source": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 个已静音来源"
           }
         }
       }
@@ -3058,18 +3862,34 @@
         }
       }
     },
-    "About %lld%% slower than the session median of %@.": {
+    "About %@ slower than the session median of %@.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "About %1$lld%% slower than the session median of %2$@."
+            "value": "About %1$@ slower than the session median of %2$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "比会话中位数 %2$@ 慢约 %1$lld%%。"
+            "value": "比会话中位数 %2$@ 慢约 %1$@。"
+          }
+        }
+      }
+    },
+    "About %@× the session median of %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "About %1$@× the session median of %2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "约为会话中位数 %2$@ 的 %1$@ 倍。"
           }
         }
       }
@@ -3670,12 +4490,12 @@
         }
       }
     },
-    "Adds the %lld request(s) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change.": {
+    "Adds the ^[%lld request](inflect: true) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅将被焦点或噪声隐藏的 %lld 个请求添加到本次审查。你的焦点和噪声设置不会更改。"
+            "value": "仅将被焦点或噪声隐藏的 ^[%lld 个请求](inflect: true)添加到本次审查。你的焦点和噪声设置不会更改。"
           }
         }
       }
@@ -4656,6 +5476,16 @@
         }
       }
     },
+    "Assembled Output": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拼接输出"
+          }
+        }
+      }
+    },
     "Assign a Left Transaction": {
       "localizations": {
         "zh-Hans": {
@@ -4716,18 +5546,18 @@
         }
       }
     },
-    "Attached traffic: %@, %lld requests": {
+    "Attached traffic: %@, ^[%lld request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Attached traffic: %1$@, %2$lld requests"
+            "value": "Attached traffic: %1$@, ^[%2$lld request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "附加流量：%1$@，%2$lld 个请求"
+            "value": "附加流量：%1$@，^[%2$lld 个请求](inflect: true)"
           }
         }
       }
@@ -5201,6 +6031,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "适用于调试和工具调用类提示词的均衡本地模型"
+          }
+        }
+      }
+    },
+    "Bars show each captured event's payload size in stream order. Per-event arrival timing is not recorded.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "柱形按流顺序显示每个已捕获事件的负载大小。不记录每个事件的到达时间。"
           }
         }
       }
@@ -7517,16 +8357,6 @@
         }
       }
     },
-    "Click \"+\" or ⌘N to add new entry": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "点按“+”或按 ⌘N 以添加新条目"
-          }
-        }
-      }
-    },
     "Click \"+\" or press ⌘N to add a definition.": {
       "localizations": {
         "zh-Hans": {
@@ -7613,6 +8443,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "点按候选项上的 R 列以完成此基础比较。"
+          }
+        }
+      }
+    },
+    "called": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已调用"
           }
         }
       }
@@ -8264,18 +9104,18 @@
         }
       }
     },
-    "Code: %@\n\n%@ contains %lld requests. Confirm the same code appears on %@. Your current Mac traffic will stay intact.": {
+    "Code: %@\n\n%@ contains ^[%lld request](inflect: true). Confirm the same code appears on %@. Your current Mac traffic will stay intact.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Code: %1$@\n\n%2$@ contains %3$lld requests. Confirm the same code appears on %4$@. Your current Mac traffic will stay intact."
+            "value": "Code: %1$@\n\n%2$@ contains ^[%3$lld request](inflect: true). Confirm the same code appears on %4$@. Your current Mac traffic will stay intact."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代码：%1$@\n\n%2$@ 包含 %3$lld 个请求。请确认 %4$@ 上显示相同的代码。当前 Mac 流量将保持不变。"
+            "value": "代码：%1$@\n\n%2$@ 包含 ^[%3$lld 个请求](inflect: true)。请确认 %4$@ 上显示相同的代码。当前 Mac 流量将保持不变。"
           }
         }
       }
@@ -8924,18 +9764,18 @@
         }
       }
     },
-    "Connected to %@:%lld through %@ in %lld ms.": {
+    "Connected to %@:%@ through %@ in %lld ms.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Connected to %1$@:%2$lld through %3$@ in %4$lld ms."
+            "value": "Connected to %1$@:%2$@ through %3$@ in %4$lld ms."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已通过 %3$@ 在 %4$lld 毫秒内连接到 %1$@:%2$lld。"
+            "value": "已通过 %3$@ 在 %4$lld 毫秒内连接到 %1$@:%2$@。"
           }
         }
       }
@@ -9686,6 +10526,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法保存项目"
+          }
+        }
+      }
+    },
+    "Could not save the body.\n\n%@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存正文。\n\n%@"
           }
         }
       }
@@ -11163,12 +12013,12 @@
         }
       }
     },
-    "Disabled SSL Proxying for %@. Requests to it will stay tunneled.": {
+    "Disabled HTTPS Decryption for %@. Requests to it will stay tunneled.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为 %@ 停用 SSL 代理。对它的请求将保持隧道传输。"
+            "value": "已为 %@ 停用 HTTPS 解密。对它的请求将保持隧道传输。"
           }
         }
       }
@@ -12250,12 +13100,12 @@
         }
       }
     },
-    "Enabled SSL Proxying for %@. Make the request again to inspect it.": {
+    "Enabled HTTPS Decryption for %@. Make the request again to inspect it.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为 %@ 启用 SSL 代理。请再次发送请求以检查它。"
+            "value": "已为 %@ 启用 HTTPS 解密。请再次发送请求以检查它。"
           }
         }
       }
@@ -12806,6 +13656,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "确切的审查内容"
+          }
+        }
+      }
+    },
+    "error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "错误"
           }
         }
       }
@@ -13373,34 +14233,34 @@
         }
       }
     },
-    "Exported %@ from %lld requests": {
+    "Exported %@ from ^[%lld request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Exported %1$@ from %2$lld requests"
+            "value": "Exported %1$@ from ^[%2$lld request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已从 %2$lld 个请求导出 %1$@"
+            "value": "已从 ^[%2$lld 个请求](inflect: true)导出 %1$@"
           }
         }
       }
     },
-    "Exported %@ from %lld requests; skipped %lld ineligible requests": {
+    "Exported %@ from ^[%lld request](inflect: true); skipped ^[%lld ineligible request](inflect: true)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Exported %1$@ from %2$lld requests; skipped %3$lld ineligible requests"
+            "value": "Exported %1$@ from ^[%2$lld request](inflect: true); skipped ^[%3$lld ineligible request](inflect: true)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已从 %2$lld 个请求导出 %1$@；跳过 %3$lld 个不符合条件的请求"
+            "value": "已从 ^[%2$lld 个请求](inflect: true)导出 %1$@；跳过 ^[%3$lld 个不符合条件的请求](inflect: true)"
           }
         }
       }
@@ -15701,6 +16561,16 @@
         }
       }
     },
+    "HTTP Version": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTP 版本"
+          }
+        }
+      }
+    },
     "HTTP/1.1 OK 200": {
       "shouldTranslate": false
     },
@@ -15863,12 +16733,12 @@
         }
       }
     },
-    "HTTPS Map Local needs SSL Proxying for %@ before this rule can see the request.": {
+    "HTTPS Map Local needs HTTPS Decryption for %@ before this rule can see the request.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "HTTPS Map Local 需要先为 %@ 启用 SSL 代理，此规则才能看到请求。"
+            "value": "HTTPS Map Local 需要先为 %@ 启用 HTTPS 解密，此规则才能看到请求。"
           }
         }
       }
@@ -16167,6 +17037,22 @@
         }
       }
     },
+    "Import file is too large (%@). Maximum allowed is %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Import file is too large (%1$@). Maximum allowed is %2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入文件过大（%1$@）。最大允许 %2$@。"
+          }
+        }
+      }
+    },
     "Import from cURL...": {
       "localizations": {
         "zh-Hans": {
@@ -16367,34 +17253,34 @@
         }
       }
     },
-    "Imported %lld transactions from %@": {
+    "Imported ^[%lld transaction](inflect: true) from %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Imported %1$lld transactions from %2$@"
+            "value": "Imported ^[%1$lld transaction](inflect: true) from %2$@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已从 %2$@ 导入 %1$lld 个事务"
+            "value": "已从 %2$@ 导入 ^[%1$lld 个事务](inflect: true)"
           }
         }
       }
     },
-    "Imported from %@ (%lld requests)": {
+    "Imported from %@ (^[%lld request](inflect: true))": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Imported from %1$@ (%2$lld requests)"
+            "value": "Imported from %1$@ (^[%2$lld request](inflect: true))"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已从 %1$@ 导入（%2$lld 个请求）"
+            "value": "已从 %1$@ 导入（^[%2$lld 个请求](inflect: true)）"
           }
         }
       }
@@ -16555,12 +17441,12 @@
         }
       }
     },
-    "Incomplete header · %lld bytes": {
+    "Incomplete header · ^[%lld byte](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "标头不完整 · %lld 字节"
+            "value": "标头不完整 · ^[%lld 字节](inflect: true)"
           }
         }
       }
@@ -17367,6 +18253,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "匹配规则 ‘%1$@’ 无效：%2$@"
+          }
+        }
+      }
+    },
+    "Invalid regex pattern '%@': %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Invalid regex pattern '%1$@': %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正则表达式 ‘%1$@’ 无效：%2$@"
           }
         }
       }
@@ -18269,12 +19171,12 @@
         }
       }
     },
-    "Local analysis · %lld requests": {
+    "Local analysis · ^[%lld request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "本地分析 · %lld 个请求"
+            "value": "本地分析 · ^[%lld 个请求](inflect: true)"
           }
         }
       }
@@ -19894,6 +20796,16 @@
         }
       }
     },
+    "NDJSON stream": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NDJSON 流"
+          }
+        }
+      }
+    },
     "NEEDS ATTENTION": {
       "localizations": {
         "zh-Hans": {
@@ -19904,12 +20816,12 @@
         }
       }
     },
-    "nested message · %lld fields": {
+    "nested message · ^[%lld field](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "嵌套消息 · %lld 个字段"
+            "value": "嵌套消息 · ^[%lld 个字段](inflect: true)"
           }
         }
       }
@@ -22020,6 +22932,16 @@
         }
       }
     },
+    "No tool declarations or tool-call payloads were visible in the captured traffic.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "捕获的流量中未见工具声明或工具调用负载。"
+          }
+        }
+      }
+    },
     "No tool-call payloads were visible in the captured traffic.": {
       "localizations": {
         "zh-Hans": {
@@ -23166,12 +24088,12 @@
         }
       }
     },
-    "Open SSL Proxying for this host or capture SDK traffic with HTTPS_PROXY when debugging local apps.": {
+    "Enable HTTPS Decryption for this host, or capture SDK traffic with HTTPS_PROXY when debugging local apps.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "为此主机打开 SSL 代理，或在调试本地应用时使用 HTTPS_PROXY 捕获 SDK 流量。"
+            "value": "为此主机启用 HTTPS 解密，或在调试本地应用时使用 HTTPS_PROXY 捕获 SDK 流量。"
           }
         }
       }
@@ -23326,12 +24248,12 @@
         }
       }
     },
-    "Opened session with %lld transactions": {
+    "Opened session with ^[%lld transaction](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已打开包含 %lld 个事务的会话"
+            "value": "已打开包含 ^[%lld 个事务](inflect: true)的会话"
           }
         }
       }
@@ -23805,6 +24727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "路径范围"
+          }
+        }
+      }
+    },
+    "partial": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分"
           }
         }
       }
@@ -25549,12 +26481,12 @@
         }
       }
     },
-    "raw bytes · %lld bytes": {
+    "raw bytes · ^[%lld byte](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "原始字节 · %lld 字节"
+            "value": "原始字节 · ^[%lld 字节](inflect: true)"
           }
         }
       }
@@ -25792,12 +26724,12 @@
         }
       }
     },
-    "Read-only traffic scope, %lld requests": {
+    "Read-only traffic scope, ^[%lld request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "只读流量范围，%lld 个请求"
+            "value": "只读流量范围，^[%lld 个请求](inflect: true)"
           }
         }
       }
@@ -25808,6 +26740,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "就绪状态"
+          }
+        }
+      }
+    },
+    "Readiness Inspector": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "就绪检查器"
           }
         }
       }
@@ -25881,6 +26823,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "实时订阅生命周期"
+          }
+        }
+      }
+    },
+    "Reasoning": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推理"
+          }
+        }
+      }
+    },
+    "Reassembled from captured stream deltas; the client may apply its own post-processing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "由捕获的流增量重新拼接；客户端可能会自行后处理。"
           }
         }
       }
@@ -26408,12 +27370,12 @@
         }
       }
     },
-    "Remove %lld Entries": {
+    "Remove ^[%lld Entry](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "移除 %lld 个条目"
+            "value": "移除 ^[%lld 个条目](inflect: true)"
           }
         }
       }
@@ -27215,6 +28177,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求 URL"
+          }
+        }
+      }
+    },
+    "Requested": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已请求"
           }
         }
       }
@@ -28328,12 +29300,12 @@
         }
       }
     },
-    "Rockxy blocked %lld model action request(s).": {
+    "Rockxy blocked ^[%lld model action request](inflect: true).": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 阻止了 %lld 个模型操作请求。"
+            "value": "Rockxy 阻止了 ^[%lld 个模型操作请求](inflect: true)。"
           }
         }
       }
@@ -28564,6 +29536,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rockxy 无法加载默认根证书的详细信息。"
+          }
+        }
+      }
+    },
+    "Rockxy could not load your saved rules: %@. Your saved rules file was left untouched — try reopening this window to load again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法加载您已保存的规则：%@。您保存的规则文件未被改动——请重新打开此窗口再次加载。"
+          }
+        }
+      }
+    },
+    "Rockxy could not save your rules to disk: %@. Your latest change is active now but will be lost when Rockxy quits.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rockxy 无法将您的规则保存到磁盘：%@。您的最新更改现已生效，但在 Rockxy 退出时将丢失。"
           }
         }
       }
@@ -28901,18 +29893,18 @@
         }
       }
     },
-    "Rockxy is listening on %@:%lld.": {
+    "Rockxy is listening on %@:%@.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Rockxy is listening on %1$@:%2$lld."
+            "value": "Rockxy is listening on %1$@:%2$@."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rockxy 正在监听 %1$@:%2$lld。"
+            "value": "Rockxy 正在监听 %1$@:%2$@。"
           }
         }
       }
@@ -30005,16 +30997,6 @@
         }
       }
     },
-    "rules": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "规则"
-          }
-        }
-      }
-    },
     "Rules": {
       "extractionState": "stale",
       "localizations": {
@@ -30222,12 +31204,12 @@
         }
       }
     },
-    "Running on port %lld": {
+    "Running on port %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在端口 %lld 上运行"
+            "value": "正在端口 %@ 上运行"
           }
         }
       }
@@ -31228,6 +32210,16 @@
         }
       }
     },
+    "Search the selected field. Tokens: is:ai, is:web3, provider:, model:, rpc:, rpc_error:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索所选字段。标记：is:ai、is:web3、provider:、model:、rpc:、rpc_error:"
+          }
+        }
+      }
+    },
     "Search titles and messages": {
       "localizations": {
         "zh-Hans": {
@@ -31698,12 +32690,12 @@
         }
       }
     },
-    "Selected request + %lld related requests": {
+    "Selected request + ^[%lld related request](inflect: true)": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选定的请求 + %lld 个相关请求"
+            "value": "选定的请求 + ^[%lld 个相关请求](inflect: true)"
           }
         }
       }
@@ -31768,12 +32760,28 @@
         }
       }
     },
-    "Selected Traffic Only (%@)": {
+    "Selected Traffic Only (%lld of ^[%lld request](inflect: true))": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Selected Traffic Only (%1$lld of ^[%2$lld request](inflect: true))"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅所选流量（^[%2$lld 个请求](inflect: true)中的 %1$lld 个）"
+          }
+        }
+      }
+    },
+    "Selected Traffic Only (^[%lld request](inflect: true))": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅所选流量（%@）"
+            "value": "仅所选流量（^[%lld 个请求](inflect: true)）"
           }
         }
       }
@@ -32034,6 +33042,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "服务器"
+          }
+        }
+      }
+    },
+    "Served": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实际模型"
           }
         }
       }
@@ -33406,6 +34424,16 @@
         }
       }
     },
+    "SSE stream": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SSE 流"
+          }
+        }
+      }
+    },
     "SSL": {
       "shouldTranslate": false
     },
@@ -33429,12 +34457,12 @@
         }
       }
     },
-    "SSL Proxying is already enabled for %@. Make the request again to inspect it.": {
+    "HTTPS Decryption is already enabled for %@. Make the request again to inspect it.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已为 %@ 启用 SSL 代理。请再次发送请求以检查它。"
+            "value": "已为 %@ 启用 HTTPS 解密。请再次发送请求以检查它。"
           }
         }
       }
@@ -33969,6 +34997,16 @@
         }
       }
     },
+    "Stream event sizes, ^[%lld event](inflect: true)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流事件大小，共 ^[%lld 个事件](inflect: true)"
+          }
+        }
+      }
+    },
     "Streaming": {
       "localizations": {
         "zh-Hans": {
@@ -34219,18 +35257,18 @@
         }
       }
     },
-    "System Proxy is Overridden by Rockxy (IP=%@ Port=%lld) (Toggle by: ⌥⌘O)": {
+    "System Proxy is Overridden by Rockxy (IP=%@ Port=%@) (Toggle by: ⌥⌘O)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$lld) (Toggle by: ⌥⌘O)"
+            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$@) (Toggle by: ⌥⌘O)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$lld）（切换快捷键：⌥⌘O）"
+            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$@）（切换快捷键：⌥⌘O）"
           }
         }
       }
@@ -34541,6 +35579,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "文本选择：查看为"
+          }
+        }
+      }
+    },
+    "Text read from the captured response body.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从捕获的响应正文读取的文本。"
           }
         }
       }
@@ -35064,6 +36112,16 @@
         }
       }
     },
+    "streaming": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流式传输中"
+          }
+        }
+      }
+    },
     "the helper tool could not be used": {
       "localizations": {
         "zh-Hans": {
@@ -35324,6 +36382,16 @@
         }
       }
     },
+    "The model stopped at the output limit; raise max tokens or shorten the prompt before comparing outputs.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型在输出上限处停止；比较输出前请提高最大 token 数或缩短提示。"
+          }
+        }
+      }
+    },
     "The original captured traffic is no longer available.": {
       "localizations": {
         "zh-Hans": {
@@ -35424,12 +36492,12 @@
         }
       }
     },
-    "The provider rate limit was reached. Try again in %lld seconds.": {
+    "The provider rate limit was reached. Try again in ^[%lld second](inflect: true).": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已达到提供商速率限制。请在 %lld 秒后重试。"
+            "value": "已达到提供商速率限制。请在 ^[%lld 秒](inflect: true)后重试。"
           }
         }
       }
@@ -40499,16 +41567,6 @@
         }
       }
     },
-    "Reasoning": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "推理"
-          }
-        }
-      }
-    },
     "Recommended For": {
       "localizations": {
         "zh-Hans": {
@@ -40715,48 +41773,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已存储的请求和响应正文若大于 1 MB，会另存为单独文件。"
-          }
-        }
-      }
-    },
-    "Rockxy is listening on %@:%@.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "Rockxy is listening on %1$@:%2$@."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rockxy 正在监听 %1$@:%2$@。"
-          }
-        }
-      }
-    },
-    "Running on port %@": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在端口 %@ 上运行"
-          }
-        }
-      }
-    },
-    "System Proxy is Overridden by Rockxy (IP=%@ Port=%@) (Toggle by: ⌥⌘O)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "System Proxy is Overridden by Rockxy (IP=%1$@ Port=%2$@) (Toggle by: ⌥⌘O)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "系统代理已被 Rockxy 覆盖（IP=%1$@ 端口=%2$@）（切换快捷键：⌥⌘O）"
           }
         }
       }

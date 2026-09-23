@@ -340,8 +340,11 @@ enum DiffFormatter {
         version.hasPrefix("HTTP/") ? version : "HTTP/\(version)"
     }
 
+    /// Deliberately not `DurationFormatter`: a diff puts two timing blocks side by side, so every
+    /// phase has to render in one fixed unit. Adaptive units would print "1.23 s" against "980 ms"
+    /// for values the reader is trying to subtract.
     private static func formatMs(_ seconds: TimeInterval) -> String {
-        String(format: "%.1fms", seconds * 1_000)
+        "\(DecimalFormatter.format(seconds * 1_000, fractionDigits: 1))ms"
     }
 
     private static func sha256(_ data: Data) -> String {

@@ -578,7 +578,7 @@ struct SidebarSSLProxyingTests {
         #expect(!coordinator.isSSLProxyingEnabled(for: "api.example.com"))
         #expect(
             coordinator.activeToast?.text ==
-                "Disabled SSL Proxying for api.example.com. Requests to it will stay tunneled."
+                "Disabled HTTPS Decryption for api.example.com. Requests to it will stay tunneled."
         )
     }
 

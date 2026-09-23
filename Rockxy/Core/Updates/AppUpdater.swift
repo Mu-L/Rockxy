@@ -263,7 +263,7 @@ final class AppUpdater: NSObject, ObservableObject, SPUUpdaterDelegate {
             return String(localized: "Never", bundle: RockxyLocalization.bundle)
         }
 
-        return lastUpdateCheckDate.formatted(date: .abbreviated, time: .shortened)
+        return TimestampFormatter.string(lastUpdateCheckDate, date: .abbreviated, time: .shortened)
     }
 
     static func makeUpdateStatusSummary(

@@ -16,6 +16,26 @@ struct ContextDetailsView: View {
             .accessibilityLabel(String(localized: "Inspector Details", bundle: RockxyLocalization.bundle))
     }
 
+    /// Streams and long model calls run orders of magnitude past a host's median, where a
+    /// "17,825% slower" figure stops being readable; switch to a multiplier past 3×.
+    static func hostBaselineDetail(duration: TimeInterval, baseline: TimeInterval) -> String {
+        let ratio = duration / baseline
+        if ratio >= 3 {
+            let multiplier = ratio >= 10
+                ? DecimalFormatter.format(ratio, fractionDigits: 0)
+                : DecimalFormatter.format(ratio, fractionDigits: 1)
+            return String(
+                localized: "About \(multiplier)× the session median of \(formatDuration(baseline)).",
+                bundle: RockxyLocalization.bundle
+            )
+        }
+        let percent = DecimalFormatter.percent(Double(Int((ratio - 1) * 100)))
+        return String(
+            localized: "About \(percent) slower than the session median of \(formatDuration(baseline)).",
+            bundle: RockxyLocalization.bundle
+        )
+    }
+
     // MARK: Private
 
     private struct ContextInsight: Identifiable {
@@ -50,27 +70,27 @@ struct ContextDetailsView: View {
             partial + Int64(transaction.request.body?.count ?? 0)
                 + Int64(transaction.response?.body?.count ?? 0)
         }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        return SizeFormatter.format(bytes: bytes)
     }
 
     private var multiSelectionFields: [ContextTableField] {
         [
             ContextTableField(
                 label: String(localized: "Requests", bundle: RockxyLocalization.bundle),
-                value: "\(selectedTransactions.count)"
+                value: CountFormatter.format(selectedTransactions.count)
             ),
             ContextTableField(
                 label: String(localized: "Hosts", bundle: RockxyLocalization.bundle),
-                value: "\(Set(selectedTransactions.map(\.request.host)).count)"
+                value: CountFormatter.format(Set(selectedTransactions.map(\.request.host)).count)
             ),
             ContextTableField(
                 label: String(localized: "Errors", bundle: RockxyLocalization.bundle),
-                value: "\(selectedErrorCount)",
+                value: CountFormatter.format(selectedErrorCount),
                 color: selectedErrorCount > 0 ? .red : .primary
             ),
             ContextTableField(
                 label: String(localized: "Rules Hit", bundle: RockxyLocalization.bundle),
-                value: "\(selectedTransactions.count { $0.matchedRuleID != nil })"
+                value: CountFormatter.format(selectedTransactions.count { $0.matchedRuleID != nil })
             ),
             ContextTableField(
                 label: String(localized: "Transferred", bundle: RockxyLocalization.bundle),
@@ -236,10 +256,14 @@ struct ContextDetailsView: View {
     }
 
     private func overviewSection(_ transaction: HTTPTransaction) -> some View {
-        ContextInspectorFieldTable(
-            title: String(localized: "Details", bundle: RockxyLocalization.bundle),
-            fields: overviewFields(transaction)
-        )
+        // A connection or stream that is still open has no final duration; tick its running
+        // time once a second, as the WebSocket inspector does, and stay paused otherwise.
+        TimelineView(.animation(minimumInterval: 1, paused: !transaction.isRunning)) { context in
+            ContextInspectorFieldTable(
+                title: String(localized: "Details", bundle: RockxyLocalization.bundle),
+                fields: overviewFields(transaction, now: context.date)
+            )
+        }
     }
 
     private func insightSection(_ transaction: HTTPTransaction) -> some View {
@@ -307,12 +331,12 @@ struct ContextDetailsView: View {
             Divider()
             ContextInspectorFieldRow(field: ContextTableField(
                 label: String(localized: "Request Headers", bundle: RockxyLocalization.bundle),
-                value: "\(transaction.request.headers.count)"
+                value: CountFormatter.format(transaction.request.headers.count)
             ))
             Divider()
             ContextInspectorFieldRow(field: ContextTableField(
                 label: String(localized: "Response Headers", bundle: RockxyLocalization.bundle),
-                value: "\(transaction.response?.headers.count ?? 0)"
+                value: CountFormatter.format(transaction.response?.headers.count ?? 0)
             ))
             if transaction.response?.bodyTruncated == true {
                 Divider()
@@ -336,7 +360,7 @@ struct ContextDetailsView: View {
         return ContextInspectorDisclosureTable(
             title: String(localized: "Related Requests", bundle: RockxyLocalization.bundle),
             isExpanded: $isRelatedExpanded,
-            summary: related.isEmpty ? nil : "\(related.count)"
+            summary: related.isEmpty ? nil : CountFormatter.format(related.count)
         ) {
             if related.isEmpty {
                 ContextInspectorFullRow {
@@ -509,7 +533,11 @@ struct ContextDetailsView: View {
         }
     }
 
-    private func overviewFields(_ transaction: HTTPTransaction) -> [ContextTableField] {
+    private static func formatDuration(_ duration: TimeInterval) -> String {
+        DurationFormatter.format(seconds: duration)
+    }
+
+    private func overviewFields(_ transaction: HTTPTransaction, now: Date) -> [ContextTableField] {
         var fields: [ContextTableField] = [
             ContextTableField(
                 label: String(localized: "Outcome", bundle: RockxyLocalization.bundle),
@@ -531,7 +559,7 @@ struct ContextDetailsView: View {
             ),
             ContextTableField(
                 label: String(localized: "Duration", bundle: RockxyLocalization.bundle),
-                value: durationText(for: transaction)
+                value: durationText(for: transaction, now: now)
             ),
             ContextTableField(
                 label: String(localized: "Transferred", bundle: RockxyLocalization.bundle),
@@ -612,14 +640,10 @@ struct ContextDetailsView: View {
             return
         }
         if let baseline = hostDurationBaseline(for: transaction), duration > baseline * 1.5, duration - baseline > 0.1 {
-            let percent = Int(((duration / baseline) - 1) * 100)
             values.append(ContextInsight(
                 id: "host-baseline",
                 title: String(localized: "Slower than this host's recent requests", bundle: RockxyLocalization.bundle),
-                detail: String(
-                    localized: "About \(percent)% slower than the session median of \(formatDuration(baseline)).",
-                    bundle: RockxyLocalization.bundle
-                ),
+                detail: Self.hostBaselineDetail(duration: duration, baseline: baseline),
                 systemImage: "chart.line.uptrend.xyaxis",
                 color: .orange
             ))
@@ -806,36 +830,39 @@ struct ContextDetailsView: View {
     }
 
     private func payloadSummary(body: Data?, contentType: ContentType?) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(body?.count ?? 0), countStyle: .file)
+        let size = SizeFormatter.format(bytes: body?.count ?? 0)
         guard let contentType else {
             return size
         }
         return "\(contentType.rawValue) · \(size)"
     }
 
-    private func durationText(for transaction: HTTPTransaction) -> String {
-        guard let duration = transaction.timingInfo?.totalDuration ?? transaction.measuredDuration else {
+    private func durationText(for transaction: HTTPTransaction, now: Date) -> String {
+        guard let duration = transaction.displayDuration(at: now) else {
             return String(localized: "Unavailable", bundle: RockxyLocalization.bundle)
         }
         return formatDuration(duration)
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
-        if duration < 1 {
-            return String(format: "%.0f ms", duration * 1_000)
-        }
-        return String(format: "%.2f s", duration)
+        Self.formatDuration(duration)
     }
 
     private func phaseDurationText(_ duration: TimeInterval, total: TimeInterval) -> String {
+        // Truncated, not rounded: the phases of one request are read as a column, and rounding
+        // each of them up lets the column sum past 100%.
         let percentage = total > 0 ? Int((duration / total) * 100) : 0
-        return "\(formatDuration(duration)) · \(percentage)%"
+        return "\(formatDuration(duration)) · \(DecimalFormatter.percent(Double(percentage)))"
     }
 
     private func transferredText(for transaction: HTTPTransaction) -> String {
-        let bytes = Int64(transaction.request.body?.count ?? 0)
+        var bytes = Int64(transaction.request.body?.count ?? 0)
             + Int64(transaction.response?.body?.count ?? 0)
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        // A WebSocket moves its payload in frames after the bodiless upgrade exchange.
+        if let connection = transaction.webSocketConnection {
+            bytes += Int64(connection.totalPayloadSize)
+        }
+        return SizeFormatter.format(bytes: bytes)
     }
 
     private func relativeTimeText(_ timestamp: Date, from reference: Date) -> String {

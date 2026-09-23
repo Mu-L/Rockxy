@@ -111,23 +111,21 @@ struct DeveloperSetupInspector: View {
             .foregroundStyle(.secondary)
     }
 
+    /// Rows must not re-measure themselves against the column width (`ViewThatFits`): the
+    /// inspector column's minimum size is derived from its content, so a layout that flips
+    /// between two shapes as the split view resizes never converges and AppKit aborts the window.
     private func readinessRow(title: String, value: String) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(setupMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                Text(value)
-                    .font(setupMetrics.secondaryFont(weight: .medium))
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(setupMetrics.secondaryFont())
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(setupMetrics.secondaryFont(weight: .medium))
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(setupMetrics.secondaryFont())
+                .foregroundStyle(.secondary)
+                .fixedSize()
+            Spacer(minLength: 8)
+            Text(value)
+                .font(setupMetrics.secondaryFont(weight: .medium))
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
         }
+        .accessibilityElement(children: .combine)
     }
 }

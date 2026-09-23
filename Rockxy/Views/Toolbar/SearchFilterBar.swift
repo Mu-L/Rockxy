@@ -68,6 +68,10 @@ struct SearchFilterBar: View {
                 .font(metrics.swiftUIFont())
                 .focused($isSearchFocused)
                 .frame(minWidth: 220, maxWidth: .infinity)
+                .help(String(
+                    localized: "Search the selected field. Tokens: is:ai, is:web3, provider:, model:, rpc:, rpc_error:",
+                    bundle: RockxyLocalization.bundle
+                ))
 
             if !searchText.isEmpty {
                 Button {
@@ -99,7 +103,7 @@ struct SearchFilterBar: View {
                 HStack(spacing: 4) {
                     Image(systemName: "line.3.horizontal.decrease")
                     if advancedFilterCount > 0 {
-                        Text("\(advancedFilterCount)")
+                        Text(CountFormatter.format(advancedFilterCount))
                             .monospacedDigit()
                     }
                     Image(systemName: isAdvancedFilterVisible ? "chevron.up" : "chevron.down")

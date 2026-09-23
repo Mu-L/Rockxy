@@ -24,7 +24,7 @@ struct RequestListRow: Identifiable {
         statusCode = transaction.response?.statusCode
         statusMessage = transaction.response?.statusMessage
         state = transaction.state
-        totalDuration = transaction.timingInfo?.totalDuration ?? transaction.measuredDuration
+        totalDuration = transaction.displayDuration
         requestSize = Self.estimatedRequestSize(for: transaction)
         responseSize = Self.estimatedResponseSize(for: transaction)
         clientApp = transaction.clientApp
@@ -141,7 +141,11 @@ struct RequestListRow: Identifiable {
         case .active:
             String(localized: "Active", bundle: RockxyLocalization.bundle)
         case .completed:
-            String(localized: "Completed", bundle: RockxyLocalization.bundle)
+            if isWebSocket {
+                String(localized: "Closed", bundle: RockxyLocalization.bundle)
+            } else {
+                String(localized: "Completed", bundle: RockxyLocalization.bundle)
+            }
         case .failed:
             String(localized: "Failed", bundle: RockxyLocalization.bundle)
         case .blocked:
@@ -231,7 +235,7 @@ extension RequestListRow {
 
     private static func operationDisplayName(for row: RequestListRow) -> String {
         if row.isWebSocket {
-            return "\(row.webSocketFrameCount)"
+            return CountFormatter.format(row.webSocketFrameCount)
         }
         return row.web3RPCMethod ?? row.graphQLOpName ?? ""
     }

@@ -39,7 +39,7 @@ struct DeveloperSetupWindowView: View {
         }
         .navigationTitle(String(localized: "Developer Setup", bundle: RockxyLocalization.bundle))
         .toolbar { toolbarContent }
-        .frame(minWidth: 820, minHeight: 560)
+        .frame(minHeight: 560)
         .background {
             Button("") {
                 searchPresented = true
@@ -162,11 +162,12 @@ struct DeveloperSetupWindowView: View {
 
     // MARK: Toolbar
 
+    /// Toolbar items use the system's toolbar item styling only, and the section switcher lives
+    /// in the detail column like the main window's view switcher. A custom Liquid Glass surface or
+    /// a centered principal item in this `NSToolbar` was hosted through AppKit platform views whose
+    /// sizes fed back into toolbar layout; on macOS 26 that oscillated until AppKit aborted the
+    /// window with an "Update Constraints in Window" exception on open or on a readiness refresh.
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            detailTabPicker
-        }
-
         ToolbarItemGroup(placement: .primaryAction) {
             Menu {
                 Button(String(localized: "Open Setup Guide…", bundle: RockxyLocalization.bundle)) {
@@ -178,22 +179,11 @@ struct DeveloperSetupWindowView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Text(String(localized: "Set Up…", bundle: RockxyLocalization.bundle))
-                    Image(systemName: "chevron.down")
-                        .font(setupMetrics.secondaryFont(weight: .semibold))
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 36)
+                Label(
+                    String(localized: "Set Up…", bundle: RockxyLocalization.bundle),
+                    systemImage: "play.circle"
+                )
             }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.plain)
-            .fixedSize()
-            .rockxyGlassEffect(
-                tint: toolbarGlassTint,
-                interactive: true,
-                in: Capsule(style: .continuous)
-            )
             .help(String(
                 localized: "Open a guided or configured setup for this target",
                 bundle: RockxyLocalization.bundle
@@ -202,15 +192,11 @@ struct DeveloperSetupWindowView: View {
             Button {
                 inspectorPresented.toggle()
             } label: {
-                Image(systemName: "sidebar.trailing")
-                    .frame(width: 42, height: 36)
+                Label(
+                    String(localized: "Readiness Inspector", bundle: RockxyLocalization.bundle),
+                    systemImage: "sidebar.trailing"
+                )
             }
-            .buttonStyle(.plain)
-            .rockxyGlassEffect(
-                tint: toolbarGlassTint,
-                interactive: true,
-                in: Capsule(style: .continuous)
-            )
             .help(String(localized: "Toggle the readiness inspector", bundle: RockxyLocalization.bundle))
             .accessibilityLabel(String(localized: "Toggle readiness inspector", bundle: RockxyLocalization.bundle))
         }
@@ -323,16 +309,24 @@ struct DeveloperSetupWindowView: View {
         viewModel.currentGuideContent?.troubleshootingTips ?? []
     }
 
-    private var toolbarGlassTint: Color? {
-        colorScheme == .light ? Color.white.opacity(0.28) : nil
-    }
-
-    private var toolbarSelectionFill: Color {
-        Color.primary.opacity(colorScheme == .light ? 0.10 : 0.14)
+    private var selectedTabBinding: Binding<SetupDetailTab> {
+        Binding(
+            get: { viewModel.selectedTab },
+            set: { newValue in
+                guard newValue != viewModel.selectedTab else {
+                    return
+                }
+                viewModel.selectTab(newValue)
+            }
+        )
     }
 
     // MARK: Detail column
 
+    /// The detail column carries its own minimum width. A minimum applied to the whole
+    /// `NavigationSplitView` over-constrained the window once the inspector column opened
+    /// (sidebar + detail + inspector exceeded the window), and an over-constrained split view
+    /// with content that re-measures itself on every proposed width never settles.
     private var detailColumn: some View {
         // Resolve the column against the space the split view actually offers. Measured
         // through its own ideal size, the stacked scroll view + feedback bar reported the
@@ -341,6 +335,10 @@ struct DeveloperSetupWindowView: View {
         // title bar at the default window size.
         GeometryReader { proxy in
             VStack(spacing: 0) {
+                UtilitySegmentedHeader(width: 460) {
+                    detailTabPicker
+                }
+                Divider()
                 centerContent
                 if let message = feedbackMessage {
                     Divider()
@@ -349,79 +347,17 @@ struct DeveloperSetupWindowView: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
+        .frame(minWidth: 440)
     }
 
     private var detailTabPicker: some View {
-        ViewThatFits(in: .horizontal) {
-            segmentedTabPicker
-            menuTabPicker
-        }
-    }
-
-    private var segmentedTabPicker: some View {
-        HStack(spacing: 0) {
+        Picker(String(localized: "Section", bundle: RockxyLocalization.bundle), selection: selectedTabBinding) {
             ForEach(SetupDetailTab.allCases) { tab in
-                Button {
-                    viewModel.selectTab(tab)
-                } label: {
-                    Text(tab.title)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 8)
-                        .frame(height: 32)
-                        .background {
-                            if viewModel.selectedTab == tab {
-                                Capsule(style: .continuous)
-                                    .fill(toolbarSelectionFill)
-                            }
-                        }
-                        .contentShape(Capsule(style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(viewModel.selectedTab == tab ? .isSelected : [])
+                Text(tab.title).tag(tab)
             }
         }
-        .padding(4)
-        .frame(minWidth: 380)
-        .rockxyGlassEffect(
-            tint: toolbarGlassTint,
-            interactive: true,
-            in: Capsule(style: .continuous)
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Section", bundle: RockxyLocalization.bundle))
-    }
-
-    private var menuTabPicker: some View {
-        Menu {
-            ForEach(SetupDetailTab.allCases) { tab in
-                Button {
-                    viewModel.selectTab(tab)
-                } label: {
-                    if viewModel.selectedTab == tab {
-                        Label(tab.title, systemImage: "checkmark")
-                    } else {
-                        Text(tab.title)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Text(viewModel.selectedTab.title)
-                Image(systemName: "chevron.down")
-                    .font(setupMetrics.secondaryFont(weight: .semibold))
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-        }
-        .menuStyle(.borderlessButton)
-        .buttonStyle(.plain)
-        .fixedSize()
-        .rockxyGlassEffect(
-            tint: toolbarGlassTint,
-            interactive: true,
-            in: Capsule(style: .continuous)
-        )
+        .pickerStyle(.segmented)
+        .labelsHidden()
         .accessibilityLabel(String(localized: "Section", bundle: RockxyLocalization.bundle))
     }
 
@@ -587,16 +523,10 @@ struct DeveloperSetupWindowView: View {
             if viewModel.selectedTarget.supportStatus == .availableNow,
                let currentSnippetText = viewModel.currentSnippetText
             {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        snippetSelector
-                        Spacer(minLength: 12)
-                        copySnippetButton
-                    }
-                    VStack(alignment: .leading, spacing: 10) {
-                        snippetSelector
-                        copySnippetButton
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    snippetSelector
+                    Spacer(minLength: 12)
+                    copySnippetButton
                 }
 
                 snippetBox(currentSnippetText)
@@ -664,13 +594,8 @@ struct DeveloperSetupWindowView: View {
 
                 snippetBox(currentSnippetText)
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        checkActions
-                    }
-                    VStack(alignment: .leading, spacing: 10) {
-                        checkActions
-                    }
+                HStack(spacing: 10) {
+                    checkActions
                 }
 
                 Text(viewModel.snapshot.verificationState.title)
@@ -746,12 +671,18 @@ struct DeveloperSetupWindowView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Status text outside the scroll view must not derive its height from the column width:
+    /// a wrapped label here changes the detail column's minimum size, the split view resizes
+    /// the column, the label re-wraps, and AppKit aborts the window after 257 layout passes.
+    /// Keep it to one truncated line and expose the full text through the tooltip.
     private func feedbackBar(_ message: String) -> some View {
         HStack(spacing: 8) {
             Text(message)
                 .font(setupMetrics.secondaryFont())
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(message)
             Spacer(minLength: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -767,16 +698,10 @@ struct DeveloperSetupWindowView: View {
                 .font(setupMetrics.font(size: setupMetrics.iconFontSize, weight: .medium))
                 .accessibilityHidden(true)
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 12) {
-                    stepText(step)
-                    Spacer(minLength: 12)
-                    stepButton(step)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    stepText(step)
-                    stepButton(step)
-                }
+            HStack(alignment: .top, spacing: 12) {
+                stepText(step)
+                Spacer(minLength: 12)
+                stepButton(step)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -831,24 +756,12 @@ struct DeveloperSetupWindowView: View {
         -> some View
     {
         VStack(alignment: .leading, spacing: 6) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    overviewRowLabel(label)
-                    Spacer(minLength: 12)
-                    overviewRowValue(value)
-                    if let action {
-                        Button(action.title) { action.perform() }
-                    }
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        overviewRowLabel(label)
-                        Spacer(minLength: 12)
-                        overviewRowValue(value)
-                    }
-                    if let action {
-                        Button(action.title) { action.perform() }
-                    }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                overviewRowLabel(label)
+                Spacer(minLength: 12)
+                overviewRowValue(value)
+                if let action {
+                    Button(action.title) { action.perform() }
                 }
             }
 

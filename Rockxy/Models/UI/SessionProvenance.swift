@@ -9,8 +9,10 @@ struct SessionProvenance {
     let importedAt: Date
 
     var displayText: String {
-        String(
-            localized: "Imported from \(fileName) (\(transactionCount) requests)", bundle: RockxyLocalization.bundle
-        )
+        String(AttributedString(
+            localized: "Imported from \(fileName) (^[\(transactionCount) request](inflect: true))",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }

@@ -185,7 +185,7 @@ struct MCPSettingsTab: View {
         case let .running(port):
             Label {
                 if let port {
-                    Text(String(localized: "Running on port \(port)", bundle: RockxyLocalization.bundle))
+                    Text(String(localized: "Running on port \(String(port))", bundle: RockxyLocalization.bundle))
                 } else {
                     Text(String(localized: "Running", bundle: RockxyLocalization.bundle))
                 }
@@ -215,7 +215,7 @@ struct MCPSettingsTab: View {
 
                 Text(
                     String(
-                        localized: "Last validated method: \(activity.lastMethod) · \(activity.lastActivityAt.formatted(date: .abbreviated, time: .shortened))",
+                        localized: "Last validated method: \(activity.lastMethod) · \(TimestampFormatter.string(activity.lastActivityAt, date: .abbreviated, time: .shortened))",
                         bundle: RockxyLocalization.bundle
                     )
                 )

@@ -21,6 +21,23 @@ struct RuntimeLocalizationRegressionTests {
             "Rockxy/Views/Rules/RuleListView.swift",
             "Rockxy/Views/Export/GistPublishConfirmationSheet.swift",
             "Rockxy/Models/UI/ExportScope.swift",
+            "Rockxy/Models/UI/SessionProvenance.swift",
+            "Rockxy/Views/RequestList/StatusBarView.swift",
+            "Rockxy/Views/Breakpoint/BreakpointWindowView.swift",
+            "Rockxy/Views/Inspector/AIAssistantDockView.swift",
+            "Rockxy/Views/Inspector/AIInspectorView.swift",
+            "Rockxy/Views/Inspector/Web3RPCInspectorView.swift",
+            "Rockxy/Views/Inspector/ProtobufTreeView.swift",
+            "Rockxy/Views/Settings/SSLProxyingListView.swift",
+            "Rockxy/Views/Settings/BypassProxyListView.swift",
+            "Rockxy/Views/Sidebar/NoiseControlManagerSheet.swift",
+            "Rockxy/Views/Scripting/ScriptingListWindowView.swift",
+            "Rockxy/Views/Main/Extensions/MainContentCoordinator+Export.swift",
+            "Rockxy/Views/Main/Extensions/MainContentCoordinator+Import.swift",
+            "Rockxy/Views/Main/Extensions/MainContentCoordinator+GistPublish.swift",
+            "Rockxy/ContentView.swift",
+            "Rockxy/Views/Components/JSONTreeView.swift",
+            "Rockxy/Views/Diff/DiffControlBar.swift",
         ]
 
         for file in files {
@@ -47,6 +64,49 @@ struct RuntimeLocalizationRegressionTests {
                 )
             }
         }
+    }
+
+    @Test("Inflection markup never goes through plain String(localized:)")
+    func inflectionMarkupNeverUsesPlainStringLocalized() throws {
+        // `String(localized:)` does not apply automatic grammar agreement, so a key
+        // written as ^[\(count) rule](inflect: true) renders its raw markup on screen.
+        // Only `String(AttributedString(localized:...).characters)` resolves it.
+        let root = try resolveProjectRoot().appendingPathComponent("Rockxy")
+        let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        var offenders: [String] = []
+        while let url = enumerator?.nextObject() as? URL {
+            guard url.pathExtension == "swift" else {
+                continue
+            }
+            let source = try String(contentsOf: url, encoding: .utf8)
+            guard source.contains("(inflect: true)") else {
+                continue
+            }
+            // Match the wrapped form too: `String(\n    localized: "^[…]")` is the same
+            // defect, and `AttributedString(`/`NSAttributedString(` must not be mistaken
+            // for it, so every `String(` whose call starts with the `localized:` label is
+            // inspected regardless of where the formatter broke the line.
+            for range in ranges(of: "String(", in: source) {
+                if range.lowerBound > source.startIndex,
+                   source[source.index(before: range.lowerBound)].isLetter
+                   || source[source.index(before: range.lowerBound)] == "_"
+                {
+                    continue
+                }
+                let window = callWindow(in: source, from: range.upperBound)
+                guard window.drop(while: { $0.isWhitespace }).hasPrefix("localized:") else {
+                    continue
+                }
+                if window.contains("(inflect: true)") {
+                    offenders.append(url.lastPathComponent)
+                    break
+                }
+            }
+        }
+        #expect(
+            offenders.isEmpty,
+            "Inflected keys must resolve through AttributedString: \(offenders.sorted().joined(separator: ", "))"
+        )
     }
 
     @Test("Presentation messages are re-resolving computed values, not cached static lets")
@@ -158,8 +218,10 @@ struct RuntimeLocalizationRegressionTests {
                 !source.contains("localized: \"Code\""),
                 "\(file): must not localize the ambiguous \"Code\" key for HTTP status codes"
             )
+            // Compared with whitespace collapsed: the formatter rewraps these call sites whenever
+            // the surrounding view is edited, and that must not read as a localization regression.
             #expect(
-                source.contains(expectedCallSite),
+                Self.collapsingWhitespace(source).contains(Self.collapsingWhitespace(expectedCallSite)),
                 "\(file): the target status-code call site must use its contextual localization key"
             )
         }
@@ -233,6 +295,13 @@ struct RuntimeLocalizationRegressionTests {
 
     private enum ResolveError: Error {
         case rootNotFound(filePath: String)
+    }
+
+    /// Removes every whitespace character so a pinned call site survives the formatter rewrapping
+    /// it across lines. Applied to both sides, so the spaces inside the compared string literals
+    /// drop out symmetrically and the match still means what it says.
+    private static func collapsingWhitespace(_ text: String) -> String {
+        text.filter { !$0.isWhitespace }
     }
 
     /// The substring covering a single call starting at `start`, up to the matching

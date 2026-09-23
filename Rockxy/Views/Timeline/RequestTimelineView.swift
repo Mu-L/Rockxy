@@ -200,10 +200,12 @@ struct RequestTimelineView: View {
 
     // MARK: - Formatting
 
+    /// Deliberately not `DurationFormatter`: these are the waterfall's axis ticks, which have to
+    /// stay short and uniform across the whole scale rather than switch unit per tick.
     private func formatMs(_ ms: Double) -> String {
         if ms >= 1_000 {
-            return String(format: "%.1fs", ms / 1_000)
+            return "\(DecimalFormatter.format(ms / 1_000, fractionDigits: 1))s"
         }
-        return String(format: "%.0fms", ms)
+        return "\(DecimalFormatter.format(ms, fractionDigits: 0))ms"
     }
 }

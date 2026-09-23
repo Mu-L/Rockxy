@@ -103,7 +103,7 @@ struct ContextDockInvestigationReportTests {
 
     @Test("Configured model picker exposes runtime identity and data destination")
     func configuredModelPickerShowsRuntimeAndExecutionLocation() throws {
-        let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let dock = try readProjectFile("Rockxy/Views/Inspector/AIAssistantDockView.swift")
         let presentation = try readProjectFile(
             "Rockxy/Models/Assistant/AssistantModelSelectionPresentation.swift"
         )
@@ -120,7 +120,7 @@ struct ContextDockInvestigationReportTests {
 
     @Test("Investigation response uses editorial Summary/Next step headings and collapses evidence")
     func investigateRendersAnswerFirstResponse() throws {
-        let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let dock = try readProjectFile("Rockxy/Views/Inspector/AIAssistantDockView.swift")
         let report = try readProjectFile("Rockxy/Views/Inspector/InvestigationEvidenceViews.swift")
 
         // User prompts render as compact right-aligned chat bubbles (the request side).
@@ -199,7 +199,7 @@ struct ContextDockInvestigationReportTests {
         #expect(report.contains("String(localized: \"Findings\", bundle: RockxyLocalization.bundle)"))
         #expect(report.contains("String(localized: \"Unknowns\", bundle: RockxyLocalization.bundle)"))
         #expect(report.contains("InvestigationUnknownsView("))
-        #expect(report.contains("scopeTransactionIDs.count) requests"))
+        #expect(report.contains("scopeTransactionIDs.count) request](inflect: true)"))
 
         // Detail chrome is simplified: text-only section headings (no SF Symbol argument on
         // InvestigationReportSection) and no group-level accessibility override on the disclosure.
@@ -442,7 +442,7 @@ struct ContextDockInvestigationReportTests {
 
     @Test("Empty launcher shows a sparkles hero and every recipe as a two-column card grid")
     func emptyStateUsesRecipeCardLauncher() throws {
-        let dock = try readProjectFile("Rockxy/Views/Inspector/ContextDockView.swift")
+        let dock = try readProjectFile("Rockxy/Views/Inspector/AIAssistantDockView.swift")
         let coordinator = try readProjectFile(
             "Rockxy/Views/Main/Extensions/MainContentCoordinator+DebugAssistant.swift"
         )

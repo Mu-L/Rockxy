@@ -84,7 +84,7 @@ private struct ScriptConsoleEntryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
-            Text(Self.formatter.string(from: entry.timestamp))
+            Text(TimestampFormatter.timeOfDay(entry.timestamp))
                 .font(toolMetrics.metadataFont(monospaced: true))
                 .foregroundStyle(.tertiary)
             Text(entry.message)
@@ -96,11 +96,6 @@ private struct ScriptConsoleEntryRow: View {
 
     // MARK: Private
 
-    private static let formatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }()
 
     @Environment(\.appUIDisplayMetrics) private var appMetrics
 

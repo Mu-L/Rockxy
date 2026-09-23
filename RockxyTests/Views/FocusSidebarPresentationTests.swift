@@ -21,7 +21,9 @@ struct FocusSidebarPresentationTests {
 
     @Test("Focus section actions use visible native buttons")
     func focusSectionActionsUseVisibleNativeButtons() throws {
-        let source = try readProjectFile("Rockxy/Views/Sidebar/SidebarView.swift")
+        // Focus mode moved out of `SidebarView` when that file crossed `file_length`; the section
+        // header and its two actions went with it.
+        let source = try readProjectFile("Rockxy/Views/Sidebar/FocusSidebarList.swift")
 
         #expect(source
             .contains("actionLabel: String(localized: \"Create Focus Set\", bundle: RockxyLocalization.bundle)"))

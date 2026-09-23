@@ -429,14 +429,16 @@ extension MainContentCoordinator {
         -> String
     {
         if skippedCount > 0 {
-            return String(
-                localized: "Exported \(format.successLabel) from \(count) requests; skipped \(skippedCount) ineligible requests",
-                bundle: RockxyLocalization.bundle
-            )
+            return String(AttributedString(
+                localized: "Exported \(format.successLabel) from ^[\(count) request](inflect: true); skipped ^[\(skippedCount) ineligible request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
-        return String(
-            localized: "Exported \(format.successLabel) from \(count) requests",
-            bundle: RockxyLocalization.bundle
-        )
+        return String(AttributedString(
+            localized: "Exported \(format.successLabel) from ^[\(count) request](inflect: true)",
+            bundle: RockxyLocalization.bundle,
+            locale: RockxyLocalization.locale
+        ).characters)
     }
 }

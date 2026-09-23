@@ -77,18 +77,21 @@ private struct InspectorSelectionSummaryView: View {
             )
             .font(.headline)
             Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 8) {
-                summaryRow(String(localized: "Selected", bundle: RockxyLocalization.bundle), "\(transactions.count)")
+                summaryRow(
+                    String(localized: "Selected", bundle: RockxyLocalization.bundle),
+                    CountFormatter.format(transactions.count)
+                )
                 summaryRow(
                     String(localized: "Hosts", bundle: RockxyLocalization.bundle),
-                    "\(Set(transactions.map(\.request.host)).count)"
+                    CountFormatter.format(Set(transactions.map(\.request.host)).count)
                 )
                 summaryRow(
                     String(localized: "Errors", bundle: RockxyLocalization.bundle),
-                    "\(transactions.count { ($0.response?.statusCode ?? 0) >= 400 })"
+                    CountFormatter.format(transactions.count { ($0.response?.statusCode ?? 0) >= 400 })
                 )
                 summaryRow(
                     String(localized: "Transferred", bundle: RockxyLocalization.bundle),
-                    ByteCountFormatter.string(fromByteCount: transferredBytes, countStyle: .file)
+                    SizeFormatter.format(bytes: transferredBytes)
                 )
             }
             Text(String(

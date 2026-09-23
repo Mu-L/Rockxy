@@ -284,10 +284,11 @@ struct DebugAssistantReviewDataSheet: View {
                 ))
             }
             Text(
-                String(
-                    localized: "Adds the \(reviewSummary.focusNoiseExcluded) request(s) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change.",
-                    bundle: RockxyLocalization.bundle
-                )
+                String(AttributedString(
+                    localized: "Adds the ^[\(reviewSummary.focusNoiseExcluded) request](inflect: true) hidden by Focus or Noise to this review only. Your Focus and Noise settings will not change.",
+                    bundle: RockxyLocalization.bundle,
+                    locale: RockxyLocalization.locale
+                ).characters)
             )
             .font(toolMetrics.metadataFont())
             .foregroundStyle(.secondary)
@@ -364,11 +365,16 @@ struct DebugAssistantReviewDataSheet: View {
                 let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
                 Text(
                     pack.manifest.omittedTransactionCount == 0
-                        ? String(localized: "\(pack.manifest.requestCount) requests", bundle: RockxyLocalization.bundle)
-                        : String(
-                            localized: "\(pack.manifest.requestCount) of \(totalRequestCount) requests",
-                            bundle: RockxyLocalization.bundle
-                        )
+                        ? String(AttributedString(
+                            localized: "^[\(pack.manifest.requestCount) request](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters)
+                        : String(AttributedString(
+                            localized: "\(pack.manifest.requestCount) of ^[\(totalRequestCount) request](inflect: true)",
+                            bundle: RockxyLocalization.bundle,
+                            locale: RockxyLocalization.locale
+                        ).characters)
                 )
                 .font(toolMetrics.metadataFont())
                 .foregroundStyle(.secondary)
@@ -428,7 +434,7 @@ struct DebugAssistantReviewDataSheet: View {
             Text(title)
                 .font(toolMetrics.secondaryFont())
             Spacer(minLength: 8)
-            Text(value.formatted())
+            Text(CountFormatter.format(value))
                 .font(toolMetrics.secondaryFont())
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -437,21 +443,34 @@ struct DebugAssistantReviewDataSheet: View {
     }
 
     private func scopeDescription(_ pack: InvestigationContextPack) -> String {
-        let totalRequestCount = pack.manifest.requestCount + pack.manifest.omittedTransactionCount
-        let countDescription = pack.manifest.omittedTransactionCount == 0
-            ? pack.manifest.requestCount.formatted()
-            : String(
-                localized: "\(pack.manifest.requestCount) of \(totalRequestCount)",
-                bundle: RockxyLocalization.bundle
-            )
-        return switch trafficScope {
-        case .selectedOnly:
-            String(localized: "\(countDescription) selected request(s)", bundle: RockxyLocalization.bundle)
-        case .selectedAndRelated:
-            String(
-                localized: "\(countDescription) selected and opted-in related request(s)",
-                bundle: RockxyLocalization.bundle
-            )
+        let shownCount = pack.manifest.requestCount
+        let totalRequestCount = shownCount + pack.manifest.omittedTransactionCount
+        let isPartial = pack.manifest.omittedTransactionCount > 0
+        return switch (trafficScope, isPartial) {
+        case (.selectedOnly, false):
+            String(AttributedString(
+                localized: "^[\(shownCount) selected request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+        case (.selectedOnly, true):
+            String(AttributedString(
+                localized: "\(shownCount) of ^[\(totalRequestCount) selected request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+        case (.selectedAndRelated, false):
+            String(AttributedString(
+                localized: "^[\(shownCount) selected and opted-in related request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
+        case (.selectedAndRelated, true):
+            String(AttributedString(
+                localized: "\(shownCount) of ^[\(totalRequestCount) selected and opted-in related request](inflect: true)",
+                bundle: RockxyLocalization.bundle,
+                locale: RockxyLocalization.locale
+            ).characters)
         }
     }
 
@@ -491,22 +510,19 @@ struct DebugAssistantReviewDataSheet: View {
             ),
             ReviewDetail(
                 title: String(localized: "Reviewed Content Size", bundle: RockxyLocalization.bundle),
-                value: ByteCountFormatter.string(
-                    fromByteCount: Int64(request?.reviewedContentBytes ?? pack.manifest.outboundBytes),
-                    countStyle: .file
-                )
+                value: SizeFormatter.format(bytes: request?.reviewedContentBytes ?? pack.manifest.outboundBytes)
             ),
         ]
         if let contextWindow = contextPlan?.contextWindowTokens {
             details.append(ReviewDetail(
                 title: String(localized: "Context Window", bundle: RockxyLocalization.bundle),
-                value: String(localized: "\(contextWindow.formatted()) tokens", bundle: RockxyLocalization.bundle)
+                value: String(localized: "\(CountFormatter.format(contextWindow)) tokens", bundle: RockxyLocalization.bundle)
             ))
         }
         if let outputLimit = contextPlan?.maxOutputTokens {
             details.append(ReviewDetail(
                 title: String(localized: "Output Limit", bundle: RockxyLocalization.bundle),
-                value: String(localized: "\(outputLimit.formatted()) tokens", bundle: RockxyLocalization.bundle)
+                value: String(localized: "\(CountFormatter.format(outputLimit)) tokens", bundle: RockxyLocalization.bundle)
             ))
         }
         if !isLocalExecution {

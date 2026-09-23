@@ -7,6 +7,9 @@ import os
 enum ScriptResponseBodyLoader {
     // MARK: Internal
 
+    /// Diagnostic only: `ScriptMultiArgBridge` logs these and falls back to the inline body, so
+    /// they are deliberately unlocalized and report exact byte counts. Allowlisted in
+    /// `SizeFormatterTests`. Localize them if they ever reach a user-facing surface.
     enum LoadError: Error, LocalizedError {
         case invalidPath(String)
         case outsideHome(String)

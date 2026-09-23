@@ -82,6 +82,7 @@ extension MainContentCoordinator {
             state: state
         )
         replay.assignCaptureContextIfMissing(activeCaptureContext)
+        pendingReplaySelectionIDs.insert(replay.id)
         await sessionManager.addTransaction(replay)
     }
 
@@ -120,8 +121,10 @@ extension MainContentCoordinator {
                 contentTransfer: 0
             )
         )
+        replay.measuredDuration = elapsed
         replay.clientApp = RockxyIdentity.current.displayName
         replay.graphQLInfo = original.graphQLInfo
+        replay.sslCapture = request.url.scheme?.lowercased() == "https" ? .intercepted : nil
         return replay
     }
 
@@ -130,6 +133,26 @@ extension MainContentCoordinator {
             return
         }
         editAndReplayTransaction(transaction)
+    }
+
+    /// Selects a replay row once its batch reaches the active list, provided the current
+    /// filter still shows it.
+    func selectPendingReplayTransaction(from batch: [HTTPTransaction]) {
+        guard !pendingReplaySelectionIDs.isEmpty else {
+            return
+        }
+        let arrived = batch.filter { pendingReplaySelectionIDs.contains($0.id) }
+        guard !arrived.isEmpty else {
+            return
+        }
+        pendingReplaySelectionIDs.subtract(arrived.map(\.id))
+        guard let latest = arrived.last,
+              filteredTransactions.contains(where: { $0.id == latest.id }) else
+        {
+            return
+        }
+        selectedTransactionIDs = [latest.id]
+        selectTransaction(latest)
     }
 
     nonisolated static func canReplay(_ transaction: HTTPTransaction) -> Bool {

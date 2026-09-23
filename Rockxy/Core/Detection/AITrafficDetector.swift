@@ -6,11 +6,21 @@ import Foundation
 ///
 /// The detector intentionally works from captured HTTP evidence only. It does not infer
 /// provider internals, token boundaries, or pricing when those fields are not present.
+///
+/// `signal(...)` runs for every request-list row, so it only scans bounded prefixes.
+/// `detect(...)` runs for the selected transaction and parses the full (bounded) bodies,
+/// including OpenAI chat/Responses, Anthropic Messages, Gemini, and Ollama shapes, in both
+/// their JSON and streamed (SSE / NDJSON) forms.
 nonisolated enum AITrafficDetector {
-    // MARK: Internal
+    struct ParsedStreamEvent {
+        let event: AIStreamEvent
+        let json: [String: Any]?
+    }
 
     static let maxBodyBytes = 256 * 1_024
     static let maxQuickScanBytes = 16 * 1_024
+    static let maxStreamEvents = 400
+    static let maxAssembledOutputCharacters = 20_000
 
     static func isLikelyAI(transaction: HTTPTransaction) -> Bool {
         isLikelyAI(snapshot: AITrafficSnapshot(transaction: transaction))
@@ -54,18 +64,26 @@ nonisolated enum AITrafficDetector {
             return true
         }
 
-        let requestPrefix = snapshot.requestBody
-            .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
+        let requestPrefix = lowercasedPrefix(of: snapshot.requestBody)
         if contains(requestPrefix, #""model""#),
            contains(requestPrefix, #""messages""#)
-            || contains(requestPrefix, #""input""#)
-            || contains(requestPrefix, #""tools""#)
+           || contains(requestPrefix, #""input""#)
+           || contains(requestPrefix, #""tools""#)
+           || contains(requestPrefix, #""prompt""#)
         {
             return true
         }
+        if contains(requestPrefix, #""contents""#), contains(requestPrefix, #""parts""#) {
+            return true
+        }
 
-        let responsePrefix = snapshot.responseBody
-            .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
+        let responsePrefix = lowercasedPrefix(of: snapshot.responseBody)
+        if contains(responsePrefix, #""usagemetadata""#), contains(responsePrefix, #""candidates""#) {
+            return true
+        }
+        if contains(responsePrefix, #""prompt_eval_count""#) || contains(responsePrefix, #""eval_count""#) {
+            return true
+        }
         return contains(responsePrefix, #""usage""#)
             && (contains(responsePrefix, #""input_tokens""#)
                 || contains(responsePrefix, #""output_tokens""#)
@@ -80,51 +98,96 @@ nonisolated enum AITrafficDetector {
     static func detect(snapshot: AITrafficSnapshot) -> AIInspection? {
         let requestJSON = parseJSONObject(snapshot.requestBody)
         let responseJSON = parseJSONObject(snapshot.responseBody)
-        let streamEvents = parseSSEEvents(snapshot.responseBody)
-        let resolvedProvider = provider(from: snapshot) ?? provider(from: requestJSON, responseJSON: responseJSON)
+        let transport = streamTransport(snapshot: snapshot, responseJSON: responseJSON)
+        let streamEvents: [AIStreamEvent] = switch transport {
+        case .sse: parseSSEEvents(snapshot.responseBody)
+        case .ndjson: parseNDJSONEvents(snapshot.responseBody)
+        case .none: []
+        }
+        let resolvedProvider = provider(from: snapshot)
+            ?? provider(from: requestJSON, responseJSON: responseJSON, streamEvents: streamEvents)
 
         guard let resolvedProvider,
-              isLikelyAI(snapshot: snapshot)
-        else {
+              isLikelyAI(snapshot: snapshot) else
+        {
             return nil
         }
 
-        let usage = usage(from: responseJSON, streamEvents: streamEvents)
-        let toolCalls = toolCalls(from: requestJSON, responseJSON: responseJSON, streamEvents: streamEvents)
+        let parsedEvents = streamEvents.map { ParsedStreamEvent(event: $0, json: parseJSONObject(Data($0.data.utf8))) }
+        let usage = usage(provider: resolvedProvider, responseJSON: responseJSON, streamEvents: parsedEvents)
+        let declaredTools = declaredTools(from: requestJSON)
+        let invokedTools = invokedToolCalls(
+            provider: resolvedProvider,
+            responseJSON: responseJSON,
+            streamEvents: parsedEvents
+        )
+        let toolCalls = Array((declaredTools + invokedTools).prefix(24))
+        let finishReason = finishReason(
+            provider: resolvedProvider,
+            responseJSON: responseJSON,
+            streamEvents: parsedEvents
+        )
+        let assembledOutput = assembledOutput(
+            provider: resolvedProvider,
+            responseJSON: responseJSON,
+            streamEvents: parsedEvents
+        )
         let events = eventSummaries(
             snapshot: snapshot,
             responseJSON: responseJSON,
-            streamEvents: streamEvents,
-            toolCalls: toolCalls
+            streamEvents: parsedEvents,
+            toolCalls: invokedTools,
+            finishReason: finishReason
         )
         let retrieval = retrievalMatches(snapshot: snapshot, responseJSON: responseJSON)
         let warnings = warnings(
             snapshot: snapshot,
             requestJSON: requestJSON,
-            toolCalls: toolCalls,
+            responseJSON: responseJSON,
+            toolCalls: invokedTools,
             retrieval: retrieval
+        )
+        let requestedModel = stringValue(forKey: "model", in: requestJSON) ?? modelFromGeminiPath(snapshot.path)
+        let servedModel = servedModel(responseJSON: responseJSON, streamEvents: parsedEvents)
+        let isStreaming = isStreaming(
+            snapshot: snapshot,
+            requestJSON: requestJSON,
+            transport: transport,
+            streamEvents: streamEvents
         )
 
         return AIInspection(
             provider: resolvedProvider,
             kind: signalKind(for: snapshot),
             evidence: evidence(for: snapshot),
-            model: stringValue(forKey: "model", in: requestJSON)
-                ?? stringValue(forKey: "model", in: responseJSON),
+            model: requestedModel ?? servedModel,
+            servedModel: servedModel.flatMap { $0 == requestedModel ? nil : $0 },
             endpoint: snapshot.path.isEmpty ? snapshot.urlString : snapshot.path,
-            isStreaming: isStreaming(snapshot: snapshot, requestJSON: requestJSON, streamEvents: streamEvents),
+            isStreaming: isStreaming,
+            streamTransport: transport,
             httpStatusCode: snapshot.responseStatusCode,
             duration: snapshot.duration,
+            requestID: requestID(in: snapshot.responseHeaders),
+            finishReason: finishReason,
             usage: usage,
             toolCalls: toolCalls,
             events: events,
             retrieval: retrieval,
             warnings: warnings,
-            unavailableFields: unavailableFields(usage: usage, events: events, toolCalls: toolCalls)
+            assembledOutput: assembledOutput,
+            unavailableFields: unavailableFields(
+                usage: usage,
+                events: events,
+                declaredTools: declaredTools,
+                invokedTools: invokedTools,
+                isStreaming: isStreaming
+            )
         )
     }
 
-    // MARK: Private
+    static func lowercasedPrefix(of data: Data?) -> String {
+        data.flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
+    }
 
     private final class SignalCacheEntry {
         weak var transaction: HTTPTransaction?
@@ -152,7 +215,9 @@ nonisolated enum AITrafficDetector {
         text.utf8.firstRange(of: needle.utf8) != nil
     }
 
-    private static func provider(from snapshot: AITrafficSnapshot) -> AIProvider? {
+    // MARK: Provider
+
+    static func provider(from snapshot: AITrafficSnapshot) -> AIProvider? {
         let host = snapshot.host.lowercased()
         let path = snapshot.path.lowercased()
         let headerNames = snapshot.requestHeaders.map { $0.name.lowercased() }
@@ -169,12 +234,37 @@ nonisolated enum AITrafficDetector {
         {
             return .claude
         }
-        if host.contains("anthropic.com") || headerNames.contains("anthropic-version") {
+        if host.contains("anthropic.com")
+            || headerNames.contains("anthropic-version")
+            || (path.contains("/v1/messages") && looksLikeMessagesAPI(snapshot))
+        {
             return .anthropic
+        }
+        if host == "generativelanguage.googleapis.com"
+            || host.hasSuffix(".generativelanguage.googleapis.com")
+            || headerNames.contains("x-goog-api-key")
+            || path.contains(":generatecontent")
+            || path.contains(":streamgeneratecontent")
+            || path.contains(":counttokens")
+            || path.contains(":embedcontent")
+        {
+            return .gemini
+        }
+        if path.hasSuffix("/api/chat")
+            || path.hasSuffix("/api/generate")
+            || path.hasSuffix("/api/embed")
+            || path.hasSuffix("/api/embeddings")
+        {
+            // Ordinary app backends also expose `/api/chat`; only treat the Ollama routes as AI
+            // when they run where Ollama runs or the request carries a model field.
+            if isLocalOllamaHost(snapshot) || lowercasedPrefix(of: snapshot.requestBody).contains(#""model""#) {
+                return .ollama
+            }
         }
         if host.contains("openai.com")
             || path.contains("/v1/responses")
             || path.contains("/v1/chat/completions")
+            || path.contains("/v1/completions")
             || path.contains("/v1/embeddings")
         {
             return .openAICompatible
@@ -185,7 +275,43 @@ nonisolated enum AITrafficDetector {
         return nil
     }
 
-    private static func signalKind(for snapshot: AITrafficSnapshot) -> AITrafficSignalKind {
+    static func provider(
+        from requestJSON: [String: Any]?,
+        responseJSON: [String: Any]?,
+        streamEvents: [AIStreamEvent]
+    )
+        -> AIProvider?
+    {
+        if requestJSON?["contents"] != nil || responseJSON?["candidates"] != nil {
+            return .gemini
+        }
+        if responseJSON?["prompt_eval_count"] != nil
+            || responseJSON?["eval_count"] != nil
+            || responseJSON?["done_reason"] != nil
+        {
+            return .ollama
+        }
+        if responseJSON?["stop_reason"] != nil {
+            return .anthropic
+        }
+        if stringValue(forKey: "model", in: requestJSON) != nil
+            || stringValue(forKey: "model", in: responseJSON) != nil
+            || !streamEvents.isEmpty
+        {
+            return .openAICompatible
+        }
+        return nil
+    }
+
+    static func isLocalOllamaHost(_ snapshot: AITrafficSnapshot) -> Bool {
+        let host = snapshot.host.lowercased()
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" || host.hasSuffix(".local") {
+            return true
+        }
+        return URL(string: snapshot.urlString)?.port == 11_434
+    }
+
+    static func signalKind(for snapshot: AITrafficSnapshot) -> AITrafficSignalKind {
         if hasVisibleAIAPIEvidence(snapshot) {
             return .api
         }
@@ -195,28 +321,46 @@ nonisolated enum AITrafficDetector {
         return .heuristic
     }
 
-    private static func hasVisibleAIAPIEvidence(_ snapshot: AITrafficSnapshot) -> Bool {
+    static func hasVisibleAIAPIEvidence(_ snapshot: AITrafficSnapshot) -> Bool {
         let path = snapshot.path.lowercased()
         if path.contains("/v1/responses")
             || path.contains("/v1/chat/completions")
-            || path.contains("/v1/messages")
+            || (path.contains("/v1/messages") && looksLikeMessagesAPI(snapshot))
             || path.contains("/v1/embeddings")
             || path.contains("/chat/completions")
             || path.contains("/embeddings")
+            || path.contains(":generatecontent")
+            || path.contains(":streamgeneratecontent")
+            || path.hasSuffix("/api/chat")
+            || path.hasSuffix("/api/generate")
         {
             return true
         }
 
-        let requestPrefix = snapshot.requestBody
-            .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
-        let responsePrefix = snapshot.responseBody
-            .flatMap { String(bytes: $0.prefix(maxQuickScanBytes), encoding: .utf8)?.lowercased() } ?? ""
+        let requestPrefix = lowercasedPrefix(of: snapshot.requestBody)
+        let responsePrefix = lowercasedPrefix(of: snapshot.responseBody)
         return requestPrefix.contains(#""model""#)
+            || requestPrefix.contains(#""contents""#)
             || responsePrefix.contains(#""usage""#)
+            || responsePrefix.contains(#""usagemetadata""#)
             || headerValue(named: "anthropic-version", in: snapshot.requestHeaders) != nil
     }
 
-    private static func isKnownNativeSession(_ snapshot: AITrafficSnapshot) -> Bool {
+    /// `/v1/messages` is also a common REST route for chat and inbox backends. Off the
+    /// Anthropic host it only counts as the Messages API when the exchange carries Messages
+    /// API shape: the version header, a `model` field, or a `stop_reason` in the response.
+    static func looksLikeMessagesAPI(_ snapshot: AITrafficSnapshot) -> Bool {
+        if headerValue(named: "anthropic-version", in: snapshot.requestHeaders) != nil {
+            return true
+        }
+        if lowercasedPrefix(of: snapshot.requestBody).contains(#""model""#) {
+            return true
+        }
+        let responsePrefix = lowercasedPrefix(of: snapshot.responseBody)
+        return responsePrefix.contains(#""stop_reason""#) || responsePrefix.contains(#"event: message_start"#)
+    }
+
+    static func isKnownNativeSession(_ snapshot: AITrafficSnapshot) -> Bool {
         let host = snapshot.host.lowercased()
         return host == "chatgpt.com"
             || host.hasSuffix(".chatgpt.com")
@@ -226,14 +370,14 @@ nonisolated enum AITrafficDetector {
             || host.hasSuffix(".claude.ai")
     }
 
-    private static func hasHiddenTLSOnlyBody(_ snapshot: AITrafficSnapshot) -> Bool {
+    static func hasHiddenTLSOnlyBody(_ snapshot: AITrafficSnapshot) -> Bool {
         let method = snapshot.requestMethod.uppercased()
         let scheme = snapshot.scheme.lowercased()
         return method == "CONNECT"
             || ((scheme == "https" || scheme == "wss") && snapshot.requestBody == nil && snapshot.responseBody == nil)
     }
 
-    private static func evidence(for snapshot: AITrafficSnapshot) -> [String] {
+    static func evidence(for snapshot: AITrafficSnapshot) -> [String] {
         var values: [String] = []
         if provider(from: snapshot) != nil {
             values.append("known host")
@@ -241,7 +385,9 @@ nonisolated enum AITrafficDetector {
         if hasVisibleAIAPIEvidence(snapshot) {
             values.append("api fields")
         }
-        if snapshot.scheme.lowercased() == "wss" || headerValue(named: "upgrade", in: snapshot.requestHeaders)?.lowercased() == "websocket" {
+        if snapshot.scheme.lowercased() == "wss" || headerValue(named: "upgrade", in: snapshot.requestHeaders)?
+            .lowercased() == "websocket"
+        {
             values.append("websocket")
         }
         if hasHiddenTLSOnlyBody(snapshot) {
@@ -250,25 +396,20 @@ nonisolated enum AITrafficDetector {
         return Array(NSOrderedSet(array: values).compactMap { $0 as? String })
     }
 
-    private static func provider(from requestJSON: [String: Any]?, responseJSON: [String: Any]?) -> AIProvider? {
-        if stringValue(forKey: "model", in: requestJSON) != nil || stringValue(forKey: "model", in: responseJSON) != nil {
-            return .openAICompatible
-        }
-        return nil
-    }
+    // MARK: JSON helpers
 
-    private static func parseJSONObject(_ data: Data?) -> [String: Any]? {
+    static func parseJSONObject(_ data: Data?) -> [String: Any]? {
         guard let data, !data.isEmpty, data.count <= maxBodyBytes else {
             return nil
         }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
-    private static func stringValue(forKey key: String, in json: [String: Any]?) -> String? {
+    static func stringValue(forKey key: String, in json: [String: Any]?) -> String? {
         json?[key] as? String
     }
 
-    private static func intValue(forKey key: String, in json: [String: Any]?) -> Int? {
+    static func intValue(forKey key: String, in json: [String: Any]?) -> Int? {
         if let int = json?[key] as? Int {
             return int
         }
@@ -278,7 +419,7 @@ nonisolated enum AITrafficDetector {
         return nil
     }
 
-    private static func boolValue(forKey key: String, in json: [String: Any]?) -> Bool? {
+    static func boolValue(forKey key: String, in json: [String: Any]?) -> Bool? {
         if let bool = json?[key] as? Bool {
             return bool
         }
@@ -288,256 +429,113 @@ nonisolated enum AITrafficDetector {
         return nil
     }
 
-    private static func usage(from responseJSON: [String: Any]?, streamEvents: [AIStreamEvent]) -> AIUsage? {
-        if let usage = usageObject(from: responseJSON) {
-            return usage
+    static func compactJSONString(_ value: Any) -> String? {
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else
+        {
+            return nil
         }
+        return String(data: data, encoding: .utf8)
+    }
 
-        for event in streamEvents.reversed() {
-            guard let json = parseJSONObject(Data(event.data.utf8)),
-                  let usage = usageObject(from: json)
-            else {
-                continue
+    /// The model the client asked for, from the request body or the Gemini path.
+    /// Cheap enough for search tokens: it only parses the bounded request body.
+    static func requestedModel(transaction: HTTPTransaction) -> String? {
+        let snapshot = AITrafficSnapshot(transaction: transaction)
+        guard isLikelyAI(snapshot: snapshot) else {
+            return nil
+        }
+        return stringValue(forKey: "model", in: parseJSONObject(snapshot.requestBody))
+            ?? modelFromGeminiPath(snapshot.path)
+    }
+
+    static func modelFromGeminiPath(_ path: String) -> String? {
+        guard let range = path.range(of: "/models/") else {
+            return nil
+        }
+        let remainder = path[range.upperBound...]
+        let model = remainder.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        return model.isEmpty ? nil : model
+    }
+
+    static func servedModel(responseJSON: [String: Any]?, streamEvents: [ParsedStreamEvent]) -> String? {
+        if let model = stringValue(forKey: "model", in: responseJSON)
+            ?? stringValue(forKey: "modelVersion", in: responseJSON)
+        {
+            return model
+        }
+        for event in streamEvents {
+            if let model = stringValue(forKey: "model", in: event.json)
+                ?? stringValue(forKey: "modelVersion", in: event.json)
+                ?? stringValue(forKey: "model", in: event.json?["message"] as? [String: Any])
+                ?? stringValue(forKey: "model", in: event.json?["response"] as? [String: Any])
+            {
+                return model
             }
-            return usage
         }
         return nil
     }
 
-    private static func usageObject(from json: [String: Any]?) -> AIUsage? {
-        guard let raw = json?["usage"] as? [String: Any] else {
-            return nil
+    static func requestID(in headers: [HTTPHeader]) -> String? {
+        for name in ["x-request-id", "request-id", "openai-request-id", "x-goog-request-id"] {
+            if let value = headerValue(named: name, in: headers)?.trimmingCharacters(in: .whitespaces), !value.isEmpty {
+                return value
+            }
         }
-
-        let cached = (raw["prompt_tokens_details"] as? [String: Any])
-            .flatMap { intValue(forKey: "cached_tokens", in: $0) }
-        let input = intValue(forKey: "input_tokens", in: raw)
-            ?? intValue(forKey: "prompt_tokens", in: raw)
-        let output = intValue(forKey: "output_tokens", in: raw)
-            ?? intValue(forKey: "completion_tokens", in: raw)
-        let total = intValue(forKey: "total_tokens", in: raw)
-            ?? [input, output].compactMap { $0 }.reduce(0, +)
-
-        guard input != nil || output != nil || total > 0 else {
-            return nil
-        }
-        return AIUsage(inputTokens: input, cachedTokens: cached, outputTokens: output, totalTokens: total)
+        return nil
     }
 
-    private static func toolCalls(
-        from requestJSON: [String: Any]?,
-        responseJSON: [String: Any]?,
-        streamEvents: [AIStreamEvent]
-    )
-        -> [AIToolCall]
-    {
-        var calls: [AIToolCall] = []
-        if let tools = requestJSON?["tools"] as? [[String: Any]] {
-            calls += tools.compactMap { tool in
-                let name = tool["name"] as? String
-                    ?? (tool["function"] as? [String: Any])?["name"] as? String
-                return name.map {
-                    AIToolCall(name: $0, argumentsPreview: nil, state: .declared)
-                }
-            }
-        }
+    // MARK: Streaming
 
-        calls += responseToolCalls(from: responseJSON)
-
-        for event in streamEvents where event.event?.lowercased().contains("tool") == true || event.data.contains("tool") {
-            guard let json = parseJSONObject(Data(event.data.utf8)) else {
-                calls.append(AIToolCall(name: "tool_call", argumentsPreview: event.data, state: .partial))
-                continue
-            }
-            if let name = stringValue(forKey: "name", in: json) {
-                calls.append(AIToolCall(
-                    name: name,
-                    argumentsPreview: stringValue(forKey: "arguments", in: json),
-                    state: .streaming
-                ))
-            }
-        }
-
-        return Array(calls.prefix(12))
-    }
-
-    private static func responseToolCalls(from responseJSON: [String: Any]?) -> [AIToolCall] {
-        if let output = responseJSON?["output"] as? [[String: Any]] {
-            return output.compactMap { item in
-                guard (item["type"] as? String)?.contains("function") == true else {
-                    return nil
-                }
-                return AIToolCall(
-                    name: item["name"] as? String ?? "tool_call",
-                    argumentsPreview: item["arguments"] as? String,
-                    state: .completed
-                )
-            }
-        }
-
-        let choices = responseJSON?["choices"] as? [[String: Any]]
-        let message = choices?.first?["message"] as? [String: Any]
-        let calls = message?["tool_calls"] as? [[String: Any]] ?? []
-        return calls.compactMap { call in
-            let function = call["function"] as? [String: Any]
-            return AIToolCall(
-                name: function?["name"] as? String ?? "tool_call",
-                argumentsPreview: function?["arguments"] as? String,
-                state: .completed
-            )
-        }
-    }
-
-    private static func eventSummaries(
-        snapshot: AITrafficSnapshot,
-        responseJSON: [String: Any]?,
-        streamEvents: [AIStreamEvent],
-        toolCalls: [AIToolCall]
-    )
-        -> [AIEventSummary]
-    {
-        if !streamEvents.isEmpty {
-            return streamEvents.enumerated().map { index, event in
-                let eventName = event.event ?? "data"
-                let category: AIEventCategory = eventName.lowercased().contains("tool") ? .tool : .stream
-                let severity: AIEventSeverity = eventName.lowercased().contains("error") ? .error : .normal
-                return AIEventSummary(
-                    id: "stream-\(index)",
-                    title: eventName,
-                    detail: event.data,
-                    offsetLabel: "#\(index + 1)",
-                    category: category,
-                    severity: severity
-                )
-            }
-        }
-
-        var events: [AIEventSummary] = [
-            AIEventSummary(
-                id: "request",
-                title: "model request",
-                detail: snapshot.urlString,
-                offsetLabel: "request",
-                category: .request,
-                severity: .normal
-            )
-        ]
-        events += toolCalls.enumerated().map { index, tool in
-            AIEventSummary(
-                id: "tool-\(index)",
-                title: tool.name,
-                detail: tool.argumentsPreview ?? tool.state.displayName,
-                offsetLabel: tool.state.displayName,
-                category: .tool,
-                severity: .normal
-            )
-        }
-        if let status = snapshot.responseStatusCode {
-            events.append(AIEventSummary(
-                id: "response",
-                title: "response",
-                detail: responseJSON?["status"] as? String ?? "HTTP \(status)",
-                offsetLabel: "\(status)",
-                category: .response,
-                severity: status >= 400 ? .error : .normal
-            ))
-        }
-        return events
-    }
-
-    private static func retrievalMatches(
+    static func streamTransport(
         snapshot: AITrafficSnapshot,
         responseJSON: [String: Any]?
     )
-        -> [AIRetrievalMatch]
+        -> AIStreamTransport
     {
-        let path = snapshot.path.lowercased()
-        guard path.contains("search") || path.contains("embedding") || path.contains("retrieval") else {
-            return []
+        let contentType = headerValue(named: "content-type", in: snapshot.responseHeaders)?.lowercased() ?? ""
+        if contentType.contains("text/event-stream") {
+            return .sse
         }
-
-        let matches = responseJSON?["matches"] as? [[String: Any]]
-            ?? responseJSON?["data"] as? [[String: Any]]
-            ?? []
-        return matches.prefix(8).enumerated().map { index, match in
-            let source = match["id"] as? String ?? "match-\(index + 1)"
-            let score = (match["score"] as? NSNumber)?.doubleValue
-            return AIRetrievalMatch(
-                source: source,
-                score: score,
-                signal: path.contains("embedding") ? "embedding" : "retrieval",
-                risk: (match["snippet"] as? String)?.lowercased().contains("secret") == true ? "sensitive-context" : "visible"
-            )
+        if contentType.contains("ndjson") || contentType.contains("jsonl") || contentType.contains("json-seq") {
+            return .ndjson
         }
-    }
-
-    private static func warnings(
-        snapshot: AITrafficSnapshot,
-        requestJSON: [String: Any]?,
-        toolCalls: [AIToolCall],
-        retrieval: [AIRetrievalMatch]
-    )
-        -> [AIWarning]
-    {
-        var warnings: [AIWarning] = []
-        if headerValue(named: "authorization", in: snapshot.requestHeaders) != nil
-            || headerValue(named: "x-api-key", in: snapshot.requestHeaders) != nil
+        guard responseJSON == nil,
+              let body = snapshot.responseBody,
+              body.count <= maxBodyBytes,
+              let text = String(data: body, encoding: .utf8) else
         {
-            warnings.append(AIWarning(message: "Authentication header is present.", severity: .redaction))
+            return .none
         }
-        if requestJSON?["input"] != nil || requestJSON?["messages"] != nil {
-            warnings.append(AIWarning(message: "Prompt content may require redaction.", severity: .redaction))
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("data:") || trimmed.hasPrefix("event:") || trimmed.contains("\ndata:") {
+            return .sse
         }
-        if !toolCalls.isEmpty {
-            warnings.append(AIWarning(message: "Tool arguments may contain sensitive data.", severity: .redaction))
+        if trimmed.hasPrefix("{"), trimmed.contains("}\n{") || trimmed.contains("}\r\n{") {
+            return .ndjson
         }
-        if retrieval.contains(where: { $0.risk == "sensitive-context" }) {
-            warnings.append(AIWarning(message: "Retrieved context includes sensitive-looking snippets.", severity: .redaction))
-        }
-        if let status = snapshot.responseStatusCode, status >= 400 {
-            warnings.append(AIWarning(message: "Provider returned HTTP \(status).", severity: .error))
-        }
-        return warnings
+        return .none
     }
 
-    private static func unavailableFields(
-        usage: AIUsage?,
-        events: [AIEventSummary],
-        toolCalls: [AIToolCall]
-    )
-        -> [String]
-    {
-        var fields: [String] = []
-        if usage == nil {
-            fields.append("usage")
-        }
-        if events.allSatisfy({ $0.category != .stream }) {
-            fields.append("stream events")
-        }
-        if toolCalls.isEmpty {
-            fields.append("tool calls")
-        }
-        return fields
-    }
-
-    private static func isStreaming(
+    static func isStreaming(
         snapshot: AITrafficSnapshot,
         requestJSON: [String: Any]?,
+        transport: AIStreamTransport,
         streamEvents: [AIStreamEvent]
     )
         -> Bool
     {
-        boolValue(forKey: "stream", in: requestJSON) == true
+        transport != .none
             || !streamEvents.isEmpty
-            || headerValue(named: "content-type", in: snapshot.responseHeaders)?.lowercased().contains("text/event-stream") == true
+            || boolValue(forKey: "stream", in: requestJSON) == true
     }
 
-    private static func parseSSEEvents(_ data: Data?) -> [AIStreamEvent] {
+    static func parseSSEEvents(_ data: Data?) -> [AIStreamEvent] {
         guard let data,
               data.count <= maxBodyBytes,
               let text = String(data: data, encoding: .utf8),
-              text.contains("data:")
-        else {
+              text.contains("data:") else
+        {
             return []
         }
 
@@ -569,184 +567,31 @@ nonisolated enum AITrafficDetector {
             }
         }
         flush()
-        return Array(events.prefix(200))
+        return Array(events.prefix(maxStreamEvents))
     }
 
-    private static func headerValue(named name: String, in headers: [HTTPHeader]) -> String? {
+    static func parseNDJSONEvents(_ data: Data?) -> [AIStreamEvent] {
+        guard let data,
+              data.count <= maxBodyBytes,
+              let text = String(data: data, encoding: .utf8) else
+        {
+            return []
+        }
+        var events: [AIStreamEvent] = []
+        for rawLine in text.split(whereSeparator: \.isNewline) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard line.hasPrefix("{") else {
+                continue
+            }
+            events.append(AIStreamEvent(event: nil, data: line))
+            if events.count >= maxStreamEvents {
+                break
+            }
+        }
+        return events
+    }
+
+    static func headerValue(named name: String, in headers: [HTTPHeader]) -> String? {
         headers.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.value
     }
-}
-
-// MARK: - AITrafficSnapshot
-
-struct AITrafficSnapshot: Sendable {
-    init(transaction: HTTPTransaction) {
-        requestMethod = transaction.request.method
-        urlString = transaction.request.url.absoluteString
-        scheme = transaction.request.url.scheme ?? ""
-        host = transaction.request.host
-        path = transaction.request.path
-        requestHeaders = transaction.request.headers
-        requestBody = transaction.request.body
-        responseStatusCode = transaction.response?.statusCode
-        responseHeaders = transaction.response?.headers ?? []
-        responseBody = transaction.response?.decodedBody(limit: AITrafficDetector.maxBodyBytes)
-        duration = transaction.timingInfo?.totalDuration ?? transaction.measuredDuration
-    }
-
-    let requestMethod: String
-    let urlString: String
-    let scheme: String
-    let host: String
-    let path: String
-    let requestHeaders: [HTTPHeader]
-    let requestBody: Data?
-    let responseStatusCode: Int?
-    let responseHeaders: [HTTPHeader]
-    let responseBody: Data?
-    let duration: TimeInterval?
-}
-
-// MARK: - AIInspection
-
-struct AIInspection: Equatable, Sendable {
-    let provider: AIProvider
-    let kind: AITrafficSignalKind
-    let evidence: [String]
-    let model: String?
-    let endpoint: String
-    let isStreaming: Bool
-    let httpStatusCode: Int?
-    let duration: TimeInterval?
-    let usage: AIUsage?
-    let toolCalls: [AIToolCall]
-    let events: [AIEventSummary]
-    let retrieval: [AIRetrievalMatch]
-    let warnings: [AIWarning]
-    let unavailableFields: [String]
-}
-
-enum AIProvider: String, Sendable {
-    case openAICompatible
-    case anthropic
-    case chatGPT
-    case claude
-
-    var displayName: String {
-        switch self {
-        case .openAICompatible: "OpenAI-compatible"
-        case .anthropic: "Anthropic"
-        case .chatGPT: "ChatGPT"
-        case .claude: "Claude"
-        }
-    }
-}
-
-enum AITrafficSignalKind: String, Equatable, Sendable {
-    case none
-    case api
-    case session
-    case heuristic
-}
-
-struct AITrafficSignal: Equatable, Sendable {
-    let isLikelyAI: Bool
-    let provider: AIProvider?
-    let kind: AITrafficSignalKind
-    let evidence: [String]
-
-    var tableLabel: String {
-        guard isLikelyAI else {
-            return ""
-        }
-        switch kind {
-        case .api:
-            return "AI API"
-        case .session:
-            return "AI Session"
-        case .heuristic:
-            return "Likely AI"
-        case .none:
-            return "AI"
-        }
-    }
-
-    var accessibilityLabel: String {
-        guard isLikelyAI else {
-            return ""
-        }
-        if let provider {
-            let evidenceLabel = evidence.isEmpty ? "" : " (\(evidence.joined(separator: ", ")))"
-            return "\(tableLabel): \(provider.displayName)\(evidenceLabel)"
-        }
-        return tableLabel
-    }
-}
-
-struct AIUsage: Equatable, Sendable {
-    let inputTokens: Int?
-    let cachedTokens: Int?
-    let outputTokens: Int?
-    let totalTokens: Int
-}
-
-struct AIToolCall: Equatable, Sendable {
-    let name: String
-    let argumentsPreview: String?
-    let state: AIToolCallState
-}
-
-enum AIToolCallState: String, Sendable {
-    case declared
-    case streaming
-    case completed
-    case partial
-
-    var displayName: String {
-        rawValue
-    }
-}
-
-struct AIEventSummary: Equatable, Identifiable, Sendable {
-    let id: String
-    let title: String
-    let detail: String
-    let offsetLabel: String
-    let category: AIEventCategory
-    let severity: AIEventSeverity
-}
-
-enum AIEventCategory: String, Sendable {
-    case request
-    case stream
-    case tool
-    case response
-}
-
-enum AIEventSeverity: String, Sendable {
-    case normal
-    case warning
-    case error
-}
-
-struct AIRetrievalMatch: Equatable, Sendable {
-    let source: String
-    let score: Double?
-    let signal: String
-    let risk: String
-}
-
-struct AIWarning: Equatable, Sendable {
-    let message: String
-    let severity: AIWarningSeverity
-}
-
-enum AIWarningSeverity: String, Sendable {
-    case redaction
-    case error
-}
-
-private struct AIStreamEvent: Equatable {
-    let event: String?
-    let data: String
 }
