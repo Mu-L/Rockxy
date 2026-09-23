@@ -592,6 +592,40 @@ struct FilteringTests {
         #expect(coordinator.filteredTransactions[0].id == match.id)
     }
 
+    // MARK: - Selection Across Filters
+
+    @Test("Filtering out the primary row promotes a surviving selected row")
+    func filterPromotesSurvivingSelectedRow() {
+        let first = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/a")
+        let kept = TestFixtures.makeTransaction(method: "POST", url: "https://api.example.com/b")
+        let last = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/c")
+        let coordinator = makeCoordinator(transactions: [first, kept, last])
+        coordinator.selectTransactions([first.id, kept.id, last.id], primaryID: first.id)
+        #expect(coordinator.selectedTransaction?.id == first.id)
+
+        coordinator.filterCriteria.searchField = .method
+        coordinator.filterCriteria.searchText = "POST"
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.selectedTransactionIDs == [kept.id])
+        #expect(coordinator.selectedTransaction?.id == kept.id)
+    }
+
+    @Test("Filtering out every selected row clears the primary row")
+    func filterClearsPrimaryWhenNothingSurvives() {
+        let first = TestFixtures.makeTransaction(method: "GET", url: "https://api.example.com/a")
+        let other = TestFixtures.makeTransaction(method: "POST", url: "https://api.example.com/b")
+        let coordinator = makeCoordinator(transactions: [first, other])
+        coordinator.selectTransactions([first.id], primaryID: first.id)
+
+        coordinator.filterCriteria.searchField = .method
+        coordinator.filterCriteria.searchText = "POST"
+        coordinator.recomputeFilteredTransactions()
+
+        #expect(coordinator.selectedTransactionIDs.isEmpty)
+        #expect(coordinator.selectedTransaction == nil)
+    }
+
     // MARK: - Append Fast Path
 
     @Test("appendFilteredTransactions fast path when no filters active")
